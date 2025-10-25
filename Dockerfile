@@ -1,5 +1,5 @@
 # Multi-stage build for React app
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 # Enable corepack for yarn
 RUN corepack enable
@@ -19,7 +19,7 @@ RUN yarn install --immutable --frozen-lockfile
 COPY . .
 
 # Build the application with static blog pages
-RUN yarn build:blog
+RUN yarn build
 
 # Production stage with Nginx
 FROM nginx:1.25-alpine AS production
