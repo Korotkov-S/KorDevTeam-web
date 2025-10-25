@@ -1,0 +1,13 @@
+# Настройки для статичного сайта на Netlify
+
+# Статические страницы блога
+/blog/react-native-best-practices    /blog/react-native-best-practices.html    200
+/blog/nodejs-microservices          /blog/nodejs-microservices.html          200
+/blog/wordpress-optimization         /blog/wordpress-optimization.html         200
+/blog/laravel-api-development       /blog/laravel-api-development.html       200
+
+# Перенаправляем все остальные запросы на index.html для SPA
+/*    /index.html   200
+
+# Настройки кэширования
+/assets/*  Cache-Control: public, max-age=31536000, immutable

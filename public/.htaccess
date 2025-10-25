@@ -1,0 +1,67 @@
+# Настройки для статичного сайта на Apache
+
+# Включаем mod_rewrite
+RewriteEngine On
+
+# Статические страницы блога
+RewriteRule ^blog/([^/]+)/?$ /blog/$1.html [L]
+
+# Перенаправляем все остальные запросы на index.html для SPA
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+
+# Настройки кэширования
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # HTML файлы - короткое кэширование
+    ExpiresByType text/html "access plus 0 seconds"
+    
+    # CSS и JS файлы - долгое кэширование
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    
+    # Изображения - долгое кэширование
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    
+    # Шрифты - долгое кэширование
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+</IfModule>
+
+# Сжатие файлов
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+</IfModule>
+
+# Безопасность
+<IfModule mod_headers.c>
+    # Запрещаем загрузку сайта в iframe
+    Header always append X-Frame-Options SAMEORIGIN
+    
+    # Защита от XSS
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Защита от MIME-type sniffing
+    Header set X-Content-Type-Options nosniff
+    
+    # Strict Transport Security (только для HTTPS)
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>

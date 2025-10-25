@@ -1,0 +1,117 @@
+{
+  "themeName": "KorDevTeam Dark Blue",
+  "description": "Темная тема с синими акцентами для сайта аутсорс разработчиков",
+  "colors": {
+    "dark": {
+      "background": "#0a0e1a",
+      "foreground": "#e5e7eb",
+      "card": "#141826",
+      "cardForeground": "#e5e7eb",
+      "popover": "#141826",
+      "popoverForeground": "#e5e7eb",
+      "primary": "#3b82f6",
+      "primaryForeground": "#ffffff",
+      "secondary": "#1e293b",
+      "secondaryForeground": "#e5e7eb",
+      "muted": "#1e293b",
+      "mutedForeground": "#94a3b8",
+      "accent": "#1e40af",
+      "accentForeground": "#e5e7eb",
+      "border": "#1e293b",
+      "input": "#1e293b",
+      "ring": "#3b82f6"
+    },
+    "light": {
+      "background": "#ffffff",
+      "foreground": "oklch(0.145 0 0)",
+      "card": "#ffffff",
+      "cardForeground": "oklch(0.145 0 0)",
+      "popover": "oklch(1 0 0)",
+      "popoverForeground": "oklch(0.145 0 0)",
+      "primary": "#030213",
+      "primaryForeground": "oklch(1 0 0)",
+      "secondary": "oklch(0.95 0.0058 264.53)",
+      "secondaryForeground": "#030213",
+      "muted": "#ececf0",
+      "mutedForeground": "#717182",
+      "accent": "#e9ebef",
+      "accentForeground": "#030213",
+      "border": "rgba(0, 0, 0, 0.1)",
+      "input": "transparent",
+      "ring": "oklch(0.708 0 0)"
+    }
+  },
+  "presets": {
+    "darkBlue": {
+      "name": "Dark Blue (Current)",
+      "description": "Темная тема с синими акцентами",
+      "dark": {
+        "background": "#0a0e1a",
+        "primary": "#3b82f6",
+        "accent": "#1e40af",
+        "secondary": "#1e293b"
+      }
+    },
+    "darkGreen": {
+      "name": "Dark Green",
+      "description": "Темная тема с зелеными акцентами",
+      "dark": {
+        "background": "#0a1a0e",
+        "primary": "#10b981",
+        "accent": "#059669",
+        "secondary": "#1e2b1e"
+      }
+    },
+    "darkPurple": {
+      "name": "Dark Purple",
+      "description": "Темная тема с фиолетовыми акцентами",
+      "dark": {
+        "background": "#130a1a",
+        "primary": "#a855f7",
+        "accent": "#7c3aed",
+        "secondary": "#251e2b"
+      }
+    },
+    "darkOrange": {
+      "name": "Dark Orange",
+      "description": "Темная тема с оранжевыми акцентами",
+      "dark": {
+        "background": "#1a0f0a",
+        "primary": "#f97316",
+        "accent": "#ea580c",
+        "secondary": "#2b1e1e"
+      }
+    },
+    "darkCyan": {
+      "name": "Dark Cyan",
+      "description": "Темная тема с голубыми акцентами",
+      "dark": {
+        "background": "#0a1a1a",
+        "primary": "#06b6d4",
+        "accent": "#0891b2",
+        "secondary": "#1e2b2b"
+      }
+    },
+    "darkRed": {
+      "name": "Dark Red",
+      "description": "Темная тема с красными акцентами",
+      "dark": {
+        "background": "#1a0a0a",
+        "primary": "#ef4444",
+        "accent": "#dc2626",
+        "secondary": "#2b1e1e"
+      }
+    }
+  },
+  "instructions": {
+    "howToUse": "Скопируйте нужный пресет и примените в styles/globals.css",
+    "steps": [
+      "1. Выберите пресет из раздела 'presets'",
+      "2. Скопируйте значения цветов",
+      "3. Замените в файле styles/globals.css в секции .dark",
+      "4. При необходимости дополните остальные цвета (foreground, card, muted и т.д.)",
+      "5. Сохраните файл и перезагрузите приложение"
+    ],
+    "example": "Для применения темы Dark Green:\n--background: #0a1a0e;\n--primary: #10b981;\n--accent: #059669;\n--secondary: #1e2b1e;"
+  }
+}
