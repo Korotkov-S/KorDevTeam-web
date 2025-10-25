@@ -68,6 +68,28 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            echo "🚀 Starting Adonis app deployment..."
+            cd kordevteam
+
+            echo "🔑 Logging into Docker registry..."
+            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ghcr.io -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
+
+            echo "📦 Pulling latest image..."
+            docker compose pull
+
+            echo "🔄 Restarting containers..."
+            docker compose up -d
+
+            echo "✅ Deployment & migrations complete!"
+
       - name: Generate deployment summary
         run: |
           echo "## 🐳 Docker Image Built Successfully" >> $GITHUB_STEP_SUMMARY
