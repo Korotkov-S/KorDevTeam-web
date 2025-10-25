@@ -11,7 +11,7 @@ export function Hero() {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
-      
+
       {/* Grid pattern */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
 
@@ -19,16 +19,20 @@ export function Hero() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-8">
             <Code2 className="w-4 h-4 text-primary" />
-            <span className="text-sm text-primary">Команда профессиональных разработчиков</span>
+            <span className="text-sm text-primary">
+              Команда профессиональных разработчиков
+            </span>
           </div>
 
           <h1 className="text-4xl md:text-6xl mb-6 bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-            Разработка и поддержка веб-проектов любой сложности
+            Ваша безопасная цифровая трансформация. Внедряем решения, которые
+            начинают работать и приносить пользу сразу после запуска.
           </h1>
 
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Мы специализируемся на разработке современных веб-приложений, мобильных решений 
-            и backend систем. От идеи до запуска и дальнейшей поддержки.
+            Мы специализируемся на разработке современных веб-приложений,
+            мобильных решений и backend систем. От идеи до запуска и дальнейшей
+            поддержки.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
