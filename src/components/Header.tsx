@@ -30,7 +30,7 @@ export function Header() {
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground">KOR</span>
             </div>
-            <span className="text-foreground">KorDevTeam</span>
+            <span className="text-foreground">DevTeam</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -115,7 +115,10 @@ export function Header() {
             >
               Контакты
             </button>
-            <Button onClick={() => scrollToSection("contact")} className="w-full">
+            <Button
+              onClick={() => scrollToSection("contact")}
+              className="w-full"
+            >
               Связаться
             </Button>
           </nav>

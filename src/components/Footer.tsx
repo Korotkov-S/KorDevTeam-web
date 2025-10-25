@@ -10,11 +10,11 @@ export function Footer() {
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-primary-foreground">KOR</span>
               </div>
-              <span className="text-foreground">KorDevTeam</span>
+              <span className="text-foreground">DevTeam</span>
             </div>
             <p className="text-muted-foreground max-w-md">
-              Команда профессиональных разработчиков, специализирующихся на создании 
-              современных веб-приложений и мобильных решений.
+              Команда профессиональных разработчиков, специализирующихся на
+              создании веб-сервисов и мобильных решений.
             </p>
           </div>
 
@@ -22,22 +22,34 @@ export function Footer() {
             <h3 className="mb-4">Услуги</h3>
             <ul className="space-y-2 text-muted-foreground">
               <li>
-                <a href="#services" className="hover:text-primary transition-colors">
-                  Веб-разработка
+                <a
+                  href="#services"
+                  className="hover:text-primary transition-colors"
+                >
+                  Веб-сервисы
                 </a>
               </li>
               <li>
-                <a href="#services" className="hover:text-primary transition-colors">
+                <a
+                  href="#services"
+                  className="hover:text-primary transition-colors"
+                >
                   React Native
                 </a>
               </li>
               <li>
-                <a href="#services" className="hover:text-primary transition-colors">
+                <a
+                  href="#services"
+                  className="hover:text-primary transition-colors"
+                >
                   Backend разработка
                 </a>
               </li>
               <li>
-                <a href="#services" className="hover:text-primary transition-colors">
+                <a
+                  href="#services"
+                  className="hover:text-primary transition-colors"
+                >
                   Поддержка WordPress
                 </a>
               </li>
@@ -49,15 +61,15 @@ export function Footer() {
             <ul className="space-y-2 text-muted-foreground">
               <li>
                 <a
-                  href="mailto:info@kordevteam.com"
+                  href="mailto:team@korotkov.dev"
                   className="hover:text-primary transition-colors"
                 >
-                  info@kordevteam.com
+                  team@korotkov.dev
                 </a>
               </li>
               <li>
                 <a
-                  href="https://t.me/kordevteam"
+                  href="https://t.me/ideamen51"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-primary transition-colors"
@@ -73,7 +85,7 @@ export function Footer() {
           <p className="text-muted-foreground text-sm">
             © 2025 KorDevTeam. Все права защищены.
           </p>
-          
+
           <div className="flex items-center gap-4">
             <a
               href="https://github.com/Korotkov-S"

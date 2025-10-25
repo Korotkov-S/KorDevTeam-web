@@ -1,36 +1,55 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Globe, Smartphone, Server, Wrench, Code, Database } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import {
+  Globe,
+  Smartphone,
+  Server,
+  Wrench,
+  Code,
+  Database,
+} from "lucide-react";
 
 const services = [
   {
     icon: Globe,
-    title: "Разработка веб-сайтов",
-    description: "Создание современных, отзывчивых и производительных веб-сайтов с использованием последних технологий.",
+    title: "Разработка веб-сервисов",
+    description:
+      "Создание современных, отзывчивых и производительных веб-сервисов с использованием последних технологий.",
   },
   {
     icon: Smartphone,
     title: "React Native приложения",
-    description: "Разработка кроссплатформенных мобильных приложений для iOS и Android с нативным качеством.",
+    description:
+      "Разработка кроссплатформенных мобильных приложений для iOS и Android.",
   },
   {
     icon: Server,
     title: "Backend разработка",
-    description: "Создание надежных серверных решений на Node.js (NestJS, AdonisJS, Fastify), PHP Laravel и Python.",
+    description:
+      "Создание надежных серверных решений на Node.js (NestJS, AdonisJS, Fastify), PHP Laravel и Python.",
   },
   {
     icon: Database,
-    title: "API разработка",
-    description: "Проектирование и разработка RESTful и GraphQL API для интеграции различных систем.",
+    title: "Проведение технических собеседований",
+    description:
+      "Проводим технические собеседования, выдаем подробный отчет и экономим ваши деньги на найме.",
   },
   {
     icon: Code,
-    title: "Поддержка WordPress",
-    description: "Полный цикл работы с WordPress: от установки и настройки до кастомной разработки и оптимизации.",
+    title: "Поддержка WordPress, Drupal",
+    description:
+      "Полный цикл работы с CMS: от установки и настройки до кастомной разработки и оптимизации.",
   },
   {
     icon: Wrench,
     title: "Техническая поддержка",
-    description: "Поддержка и обслуживание существующих проектов, исправление ошибок, обновления и улучшения.",
+    description:
+      "Поддержка и обслуживание существующих проектов, исправление ошибок, обновления и улучшения.",
   },
 ];
 
@@ -41,7 +60,8 @@ export function Services() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl mb-4">Наши услуги</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Предоставляем полный спектр услуг по разработке, внедрению и поддержке веб-решений
+            Предоставляем полный спектр услуг по разработке, внедрению и
+            поддержке веб-решений
           </p>
         </div>
 

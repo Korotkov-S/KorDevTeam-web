@@ -3,19 +3,33 @@ import { Badge } from "./ui/badge";
 const techStacks = [
   {
     category: "Frontend",
-    technologies: ["React", "React Native", "Next.js", "TypeScript", "Tailwind CSS", "Redux"],
+    technologies: [
+      "React",
+      "React Native",
+      "Next.js",
+      "TypeScript",
+      "Tailwind CSS",
+      "Zustand",
+    ],
   },
   {
     category: "Backend",
-    technologies: ["Node.js", "NestJS", "AdonisJS", "Fastify", "Express", "GraphQL"],
+    technologies: [
+      "Node.js",
+      "NestJS",
+      "AdonisJS",
+      "Fastify",
+      "Express",
+      "RestAPI",
+    ],
   },
   {
     category: "PHP",
-    technologies: ["Laravel", "Symfony", "WordPress", "Composer"],
+    technologies: ["Laravel", "WordPress", "Composer"],
   },
   {
     category: "Python",
-    technologies: ["Django", "FastAPI", "Flask", "SQLAlchemy"],
+    technologies: ["Django", "FastAPI"],
   },
   {
     category: "Базы данных",
@@ -23,7 +37,7 @@ const techStacks = [
   },
   {
     category: "DevOps & Tools",
-    technologies: ["Docker", "Git", "CI/CD", "AWS", "Nginx", "Linux"],
+    technologies: ["Docker", "Git", "CI/CD", "Nginx", "Linux"],
   },
 ];
 
@@ -34,7 +48,8 @@ export function Technologies() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl mb-4">Технологии</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Используем современный стек технологий для создания надежных и масштабируемых решений
+            Используем современный стек технологий для создания надежных и
+            масштабируемых решений
           </p>
         </div>
 

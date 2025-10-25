@@ -1,4 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
@@ -35,7 +41,8 @@ export function Contact() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl mb-4">Свяжитесь с нами</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Готовы обсудить ваш проект? Напишите нам, и мы свяжемся с вами в ближайшее время
+            Готовы обсудить ваш проект? Напишите нам, и мы свяжемся с вами в
+            ближайшее время
           </p>
         </div>
 
@@ -51,15 +58,35 @@ export function Contact() {
               <CardContent>
                 <CardDescription>
                   <a
-                    href="mailto:info@kordevteam.com"
+                    href="mailto:team@korotkov.dev"
                     className="text-primary hover:underline"
                   >
-                    info@kordevteam.com
+                    team@korotkov.dev
                   </a>
                 </CardDescription>
               </CardContent>
             </Card>
 
+            {/* <Card className="bg-card border-border">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
+                  <MessageSquare className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Telegram</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  <a
+                    href="https://t.me/ideamen51"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    @ideamen51
+                  </a>
+                </CardDescription>
+              </CardContent>
+            </Card>
             <Card className="bg-card border-border">
               <CardHeader>
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
@@ -70,19 +97,102 @@ export function Contact() {
               <CardContent>
                 <CardDescription>
                   <a
-                    href="https://t.me/kordevteam"
+                    href="https://t.me/ideamen51"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline"
                   >
-                    @kordevteam
+                    @ideamen51
+                  </a>
+                </CardDescription>
+              </CardContent>
+            </Card> */}
+          </div>
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
+                  <MessageSquare className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Telegram</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  <a
+                    href="https://t.me/ideamen51"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    @ideamen51
+                  </a>
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            {/* <Card className="bg-card border-border">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
+                  <MessageSquare className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Telegram</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  <a
+                    href="https://t.me/ideamen51"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    @ideamen51
+                  </a>
+                </CardDescription>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
+                  <MessageSquare className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Telegram</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  <a
+                    href="https://t.me/ideamen51"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    @ideamen51
+                  </a>
+                </CardDescription>
+              </CardContent>
+            </Card> */}
+          </div>
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
+                  <MessageSquare className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Max</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  <a
+                    href="https://max.ru/u/f9LHodD0cOJpymJqsmOnWwFeDCCZGy15ba7H_HhajC8Vnm6U12_ZrsEX8uY"
+                    className="text-primary hover:underline"
+                  >
+                    Геннадий Коротков
                   </a>
                 </CardDescription>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="lg:col-span-2 bg-card border-border">
+          {/* <Card className="lg:col-span-2 bg-card border-border">
             <CardHeader>
               <CardTitle>Отправить сообщение</CardTitle>
               <CardDescription>
@@ -129,7 +239,7 @@ export function Contact() {
                 </Button>
               </form>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
       </div>
     </section>

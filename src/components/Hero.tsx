@@ -25,14 +25,12 @@ export function Hero() {
           </div>
 
           <h1 className="text-4xl md:text-6xl mb-6 bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-            Ваша безопасная цифровая трансформация. Внедряем решения, которые
-            начинают работать и приносить пользу сразу после запуска.
+            Цифровая трансформация вашего бизнеса
           </h1>
 
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Мы специализируемся на разработке современных веб-приложений,
-            мобильных решений и backend систем. От идеи до запуска и дальнейшей
-            поддержки.
+            Мы специализируемся на разработке веб-сервисов и мобильных
+            приложений. От концепции до запуска и поддержки.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -56,16 +54,22 @@ export function Hero() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-8 mt-16 max-w-2xl mx-auto">
             <div className="text-center">
-              <div className="text-3xl md:text-4xl text-primary mb-2">5+</div>
-              <div className="text-sm text-muted-foreground">Лет опыта</div>
+              <div className="text-3xl md:text-4xl text-primary mb-2">95%</div>
+              <div className="text-sm text-muted-foreground">
+                клиентов остались довольны
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-3xl md:text-4xl text-primary mb-2">100+</div>
-              <div className="text-sm text-muted-foreground">Проектов</div>
+              <div className="text-3xl md:text-4xl text-primary mb-2">30%</div>
+              <div className="text-sm text-muted-foreground">
+                Дешевле, чем у коллег
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-3xl md:text-4xl text-primary mb-2">50+</div>
-              <div className="text-sm text-muted-foreground">Клиентов</div>
+              <div className="text-3xl md:text-4xl text-primary mb-2">83%</div>
+              <div className="text-sm text-muted-foreground">
+                Точно в дедлайн
+              </div>
             </div>
           </div>
         </div>

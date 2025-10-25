@@ -64,5 +64,6 @@
     "serve": "vite preview --port 4173",
     "build:blog": "yarn build && node scripts/generate-blog-pages.mjs",
     "generate:blog": "node scripts/generate-blog-pages.mjs"
-  }
+  },
+  "packageManager": "yarn@4.10.3"
 }
