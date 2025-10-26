@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Calendar, Clock } from "lucide-react";
 import { Badge } from "../components/ui/badge";
+import { useTranslation } from "react-i18next";
 
 interface BlogPostMeta {
   title: string;
@@ -12,39 +13,15 @@ interface BlogPostMeta {
   tags: string[];
 }
 
-const blogPostsData: Record<string, BlogPostMeta> = {
-  "react-native-best-practices": {
-    title: "Лучшие практики разработки на React Native в 2025 году",
-    date: "20 октября 2025",
-    readTime: "8 мин",
-    tags: ["React Native", "Mobile Development", "Best Practices"],
-  },
-  "nodejs-microservices": {
-    title: "Микросервисная архитектура на Node.js с NestJS",
-    date: "15 октября 2025",
-    readTime: "12 мин",
-    tags: ["Node.js", "NestJS", "Microservices", "Backend"],
-  },
-  "wordpress-optimization": {
-    title: "Оптимизация производительности WordPress сайтов",
-    date: "10 октября 2025",
-    readTime: "10 мин",
-    tags: ["WordPress", "Optimization", "Performance", "PHP"],
-  },
-  "laravel-api-development": {
-    title: "Разработка RESTful API на Laravel: Полное руководство",
-    date: "5 октября 2025",
-    readTime: "15 мин",
-    tags: ["Laravel", "PHP", "API Development", "REST"],
-  },
-};
-
 export function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [meta, setMeta] = useState<BlogPostMeta | null>(null);
+
+  // Получаем метаданные из переводов
 
   const navigateGoBack = () => {
     if (window.history.state?.idx > 0) {
@@ -55,6 +32,39 @@ export function BlogPostPage() {
   };
 
   useEffect(() => {
+    const blogPostsData: Record<string, BlogPostMeta> = {
+      "react-native-best-practices": {
+        title: t("blog.posts.reactNative.title"),
+        date: t("blog.posts.reactNative.date"),
+        readTime: t("blog.posts.reactNative.readTime"),
+        tags: t("blog.posts.reactNative.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "nodejs-microservices": {
+        title: t("blog.posts.microservices.title"),
+        date: t("blog.posts.microservices.date"),
+        readTime: t("blog.posts.microservices.readTime"),
+        tags: t("blog.posts.microservices.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "wordpress-optimization": {
+        title: t("blog.posts.wordpress.title"),
+        date: t("blog.posts.wordpress.date"),
+        readTime: t("blog.posts.wordpress.readTime"),
+        tags: t("blog.posts.wordpress.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "laravel-api-development": {
+        title: t("blog.posts.laravel.title"),
+        date: t("blog.posts.laravel.date"),
+        readTime: t("blog.posts.laravel.readTime"),
+        tags: t("blog.posts.laravel.tags", { returnObjects: true }) as string[],
+      },
+    };
+
     const loadMarkdown = async () => {
       if (!slug) {
         navigateGoBack();
@@ -71,7 +81,9 @@ export function BlogPostPage() {
 
       try {
         setLoading(true);
-        const response = await fetch(`/blog/${slug}.md`);
+        // Определяем язык и загружаем соответствующую версию статьи
+        const lang = i18n.language === "ru" ? "" : ".en";
+        const response = await fetch(`/blog/${slug}${lang}.md`);
         if (!response.ok) {
           throw new Error("Failed to load");
         }
@@ -79,16 +91,14 @@ export function BlogPostPage() {
         setContent(text);
       } catch (error) {
         console.error("Error loading markdown:", error);
-        setContent(
-          "# Ошибка загрузки\n\nНе удалось загрузить содержимое статьи.",
-        );
+        setContent("# Error Loading\n\nFailed to load article content.");
       } finally {
         setLoading(false);
       }
     };
 
     loadMarkdown();
-  }, [slug, navigate]);
+  }, [slug, navigate, i18n.language]);
 
   useEffect(() => {
     if (meta) {
@@ -103,7 +113,7 @@ export function BlogPostPage() {
         <div className="mb-8">
           <Button variant="ghost" onClick={navigateGoBack} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
-            Назад к главной
+            {t("blog.backToBlog")}
           </Button>
         </div>
 
@@ -235,7 +245,7 @@ export function BlogPostPage() {
             <div className="mt-12 pt-8 border-t border-border">
               <Button onClick={navigateGoBack} className="gap-2">
                 <ArrowLeft className="w-4 h-4" />
-                Вернуться к блогу
+                {t("blog.backToBlog")}
               </Button>
             </div>
           </article>

@@ -81,22 +81,35 @@
     "title": "Blog",
     "subtitle": "Sharing experience, knowledge and best practices in development",
     "readMore": "Read More",
+    "backToBlog": "Back to Blog",
     "posts": {
       "reactNative": {
         "title": "Best Practices for React Native Development in 2025",
-        "excerpt": "React Native continues to be one of the most popular frameworks for mobile app development. In this article, we'll look at key practices..."
+        "excerpt": "React Native continues to be one of the most popular frameworks for mobile app development. In this article, we'll look at key practices...",
+        "date": "October 20, 2025",
+        "readTime": "8 min",
+        "tags": ["React Native", "Mobile Development"]
       },
       "microservices": {
         "title": "Microservices Architecture on Node.js with NestJS",
-        "excerpt": "Microservices architecture allows breaking down a monolithic application into small, independent services that are easy to scale and maintain..."
+        "excerpt": "Microservices architecture allows breaking down a monolithic application into small, independent services that are easy to scale and maintain...",
+        "date": "October 15, 2025",
+        "readTime": "12 min",
+        "tags": ["Node.js", "NestJS", "Microservices"]
       },
       "wordpress": {
         "title": "WordPress Site Performance Optimization",
-        "excerpt": "WordPress is one of the most popular CMS in the world, but without proper optimization, sites can run slowly. In this article, we'll look at key methods..."
+        "excerpt": "WordPress is one of the most popular CMS in the world, but without proper optimization, sites can run slowly. In this article, we'll look at key methods...",
+        "date": "October 10, 2025",
+        "readTime": "10 min",
+        "tags": ["WordPress", "Optimization", "PHP"]
       },
       "laravel": {
         "title": "RESTful API Development on Laravel: Complete Guide",
-        "excerpt": "Laravel is one of the most popular PHP frameworks for creating web applications and APIs. In this guide, we'll create a full-fledged RESTful API..."
+        "excerpt": "Laravel is one of the most popular PHP frameworks for creating web applications and APIs. In this guide, we'll create a full-fledged RESTful API...",
+        "date": "October 5, 2025",
+        "readTime": "15 min",
+        "tags": ["Laravel", "PHP", "API Development"]
       }
     }
   },
@@ -138,6 +151,55 @@
     "aria": {
       "light": "Switch to dark theme",
       "dark": "Switch to light theme"
+    }
+  },
+  "projectDetails": {
+    "noodome": {
+      "description": "Digital member key: meeting room booking, restaurant payment, events, networking, personal account.",
+      "fullDescription": "## Main Sections and Application Features\n\n### 1. Personal Account and Membership\n\n**Membership Status:** Information about membership type, validity period and list of available options.\n\n**Visit and Activity History:** View your past bookings, attended events and transactions.\n\n### 2. Meeting Room Booking\n\n#### Meeting room booking:\n- View room availability schedule\n- Select date, time and duration of booking\n- Instant booking confirmation\n- Manage your bookings (cancel, reschedule)\n\n#### Restaurant payment:\n- Ability to pay restaurant bills through the mobile app\n\n### 3. Events and Activities (Club Social Hub)\n\n**Event calendar:** Full schedule of all upcoming club events - master classes, workshops, expert meetings, networking.\n\n**Event registration:** Register for events of interest directly from the app.\n\n**\"I'm going\" function** for scheduling.\n\n**Notifications:** Push notifications about new events, reminders about the start of a registered event, program changes.\n\n**Event archive:** Ability to view materials or photos from past events.\n\n### 4. Networking and Community\n\n**Member profiles** (with limited access): ability to view profiles of other club members\n\n**Industry, company and interests** for convenient networking.\n\n**Event guest list:** See who else is attending the event to plan meetings in advance.\n\n**Secure chat:** Ability to exchange messages with other club members or administration through a secure channel within the app.\n\n### 5. Restaurant and Services\n\n**Digital menu:** View Noodome restaurant menu with current items and prices.\n\n**Deposit system and cashless payments:** Link bank card for convenient payment of restaurant bills and other club services without using cash.\n\n### 6. Notifications and Feedback\n\n**Personalized notifications:** Information about special offers, changes in club operations, personal invitations.",
+      "features": [
+        "Club event registration",
+        "Meeting room booking",
+        "Restaurant payment through the app",
+        "Chat with other club members",
+        "Bonuses and partner offers"
+      ]
+    },
+    "asg": {
+      "description": "Website for AllianceStroyGarant LLC - a corporate web resource designed to showcase the company's services in construction and renovation. The site is developed using modern technologies (React.js, Laravel, MySQL) and adapted for all devices. Its main goal is to attract customers through a convenient interface, interactive elements and functionality for processing applications.",
+      "fullDescription": "## Website for Alliance-Construction-Guarantee Construction Company\n\nCorporate web resource for showcasing the company's services in construction and renovation, developed using modern technologies and adapted for all devices.\n\n### Responsive and mobile design\n\n- **Resolution support:** 1440px, 1024px, 768px, 320px\n- **Cross-browser compatibility:** Chrome, Firefox, Safari, Yandex Browser\n\n### Interactive elements\n\n- **Modal windows** for contact forms and renovation cost calculator\n- **Forms with validation** (name, phone, email)\n- **Horizontal scroll** for service cards and portfolio\n\n### Renovation cost calculator\n\n- **Step-by-step calculation** of cost based on parameters: number of rooms, area, design, property type\n- **Integration with contact form**\n\n### Main site sections\n\n#### Services\nCards with filtering by categories (commercial, apartments, additional services)\n\n#### Portfolio\nGallery of completed projects with modal windows for detailed viewing\n\n#### Work stages\nTimeline with infographics\n\n#### Reviews\nInteractive cards with modal windows\n\n#### About company\nLegal information, registers, management data\n\n#### Contacts\nMap, details, contact form\n\n### Integrations and notifications\n\n- **Form data submission** to customer's Telegram channel\n- **PDF generation** with company details\n\n### Technical requirements\n\n- **Compliance with 152-FZ** (personal data processing)\n- **Daily backup**\n\n### SEO and accessibility\n\n- **Meta tags optimization**, headers, ALT texts\n- **Clean semantic markup**\n- **Yandex Metrica and Webvisor support**\n\n### Additional pages\n\n- **\"About company\" page** with legal data\n- **\"Contacts\" page** with map and details\n- **Custom 404 page** with link to home",
+      "features": [
+        "Responsive design for all devices",
+        "Renovation cost calculator",
+        "Interactive modal windows",
+        "Telegram notification integration",
+        "SEO optimization",
+        "Contact forms with validation"
+      ]
+    },
+    "sims": {
+      "description": "A fan tool for creating and maintaining detailed Sims family trees.",
+      "fullDescription": "## Sims Dynasty Tree\n\nSpecialized online service created by The Sims fans that transforms the standard in-game kinship system into a powerful tool for deep storytelling and preserving the memory of your unique dynasty.\n\n### Extended tree creation and customization\n\n- **Detailed character profiles:** Ability to add not only name and photo, but also birth dates, character traits, careers, education, life goals, location and custom notes\n- **Full visual customization:** Change color scheme, tree background and avatar styles (including premium options)\n- **Unlimited scale:** Create any number of trees and add unlimited generations\n\n### Advanced storytelling and organization\n\n- **Detailed biographies:** Write a unique life story for each Sim, noting key events and features\n- **Media albums:** Attach multiple photos to the entire tree, generation or individual character to capture their life at different age stages\n- **Tree linking:** For premium users - function to merge different dynasties, allowing to create complex branched universes\n\n### Social and public features\n\n- **Public and private trees:** Share your creation with the community or keep it private\n- **Public links:** Public trees have clear links with dynasty name and author name for convenient viewing\n\n### Continuous development and support\n\n- **Regular updates:** Team promptly adds content from new game expansions (careers, traits, goals, etc.)\n- **Active technical support:** Notification system for news and updates, as well as continuous work on stability and interface usability\n\n### Flexible access model\n\n- **Free basic functionality:** Tree creation, basic information filling and use of main features available\n- **Premium subscription:** Opens advanced features: premium avatars, tree linking and other exclusive features\n\n### Conclusion\n\nSims Dynasty Tree is a project created by Simmers for Simmers. It solves the key problem of \"generations\" players - the need to preserve and structure complex family stories, going far beyond the limited in-game functionality.",
+      "features": [
+        "Genealogy tree creation",
+        "Detailed character profiles",
+        "Media albums and biographies",
+        "Public and private trees",
+        "Premium features",
+        "Social features"
+      ]
+    },
+    "harmonizeMe": {
+      "description": "Harmonize Me is an educational online platform that helps achieve harmony with the body and nutrition through a psychotherapeutic approach. The project offers course programs combining expert knowledge and gamification methods for forming healthy relationships with food and one's own body.",
+      "fullDescription": "# HarmonizeMe\n\n**Educational online platform for achieving harmony with the body and nutrition through a psychotherapeutic approach.**\n\n## Key Project Features\n\n### 1. Multi-level course system\n\n- **Platform courses** at fixed price:\n  - \"Eat with pleasure\"\n  - \"I look with love\" \n  - \"My beloved body\"\n- **Course constructor** with ability to select thematic videos (49 options)\n- **Free introductory course** to get acquainted with the methodology\n\n### 2. Personalized learning\n\n- **Personal account** with progress tracking\n- **Bonus system** for completing lessons and activity\n- **AI assistant** for rapid student support\n\n### 3. Integrated motivation system\n\n- **Accumulative bonuses** for educational activity\n- **Internal store (HarmoMarket)** for exchanging bonuses for premium content\n- **Recommendation mechanism** through social networks\n\n### 4. Technology infrastructure\n\n- **Responsive interface** for all devices\n- **Multilingual support** (RU/EN)\n- **Secure system** of registration and payments\n- **Chat bot** for quick assistance\n\n### 5. Additional services\n\n- **Knowledge base** with useful materials\n- **Therapeutic groups** in Telegram\n- **Online booking** for programs\n\n### 6. Thoughtful business model\n\n- **Flexible payment system** (one-time payments and bonus program)\n- **Built-in mechanisms** for audience retention\n- **Tools for viral marketing**\n\n---\n\n**The platform creates a comprehensive ecosystem for working with eating behavior and self-perception, combining educational methods with gamification elements and psychological support.**",
+      "features": [
+        "Multi-level course system",
+        "Personalized learning",
+        "AI assistant for support",
+        "Bonus and motivation system",
+        "Internal HarmoMarket store",
+        "Therapeutic groups in Telegram"
+      ]
     }
   }
 }
