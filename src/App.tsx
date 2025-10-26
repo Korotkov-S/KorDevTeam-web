@@ -8,6 +8,7 @@ import { BlogPostPage } from "./pages/BlogPostPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { Root } from "./pages/Root";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import "./i18n";
 
 const router = createBrowserRouter([
   {

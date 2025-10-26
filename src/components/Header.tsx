@@ -3,11 +3,14 @@ import { Menu, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageToggle } from "./LanguageToggle";
+import { useTranslation } from "react-i18next";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const scrollToSection = (id: string) => {
     if (location.pathname !== "/") {
@@ -40,38 +43,39 @@ export function Header() {
               onClick={() => scrollToSection("services")}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Услуги
+              {t("header.services")}
             </button>
             <button
               onClick={() => scrollToSection("technologies")}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Технологии
+              {t("header.technologies")}
             </button>
             <button
               onClick={() => scrollToSection("projects")}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Проекты
+              {t("header.projects")}
             </button>
             <button
               onClick={() => scrollToSection("blog")}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Блог
+              {t("header.blog")}
             </button>
             <button
               onClick={() => scrollToSection("contact")}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Контакты
+              {t("header.contact")}
             </button>
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
+            <LanguageToggle />
             <ThemeToggle />
             <Button onClick={() => scrollToSection("contact")}>
-              Связаться
+              {t("header.getInTouch")}
             </Button>
           </div>
 
@@ -91,39 +95,40 @@ export function Header() {
               onClick={() => scrollToSection("services")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
             >
-              Услуги
+              {t("header.services")}
             </button>
             <button
               onClick={() => scrollToSection("technologies")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
             >
-              Технологии
+              {t("header.technologies")}
             </button>
             <button
               onClick={() => scrollToSection("projects")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
             >
-              Проекты
+              {t("header.projects")}
             </button>
             <button
               onClick={() => scrollToSection("blog")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
             >
-              Блог
+              {t("header.blog")}
             </button>
             <button
               onClick={() => scrollToSection("contact")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
             >
-              Контакты
+              {t("header.contact")}
             </button>
             <div className="flex items-center gap-4">
+              <LanguageToggle />
               <ThemeToggle />
               <Button
                 onClick={() => scrollToSection("contact")}
                 className="flex-1"
               >
-                Связаться
+                {t("header.getInTouch")}
               </Button>
             </div>
           </nav>

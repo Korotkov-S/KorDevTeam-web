@@ -4,50 +4,49 @@ import { Badge } from "./ui/badge";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const projects = [
-  {
-    id: "Mediа & Entertainment",
-    title: "Мобильное приложение для бизнес-клуба Noodome",
-    description:
-      "Мобильное приложение - это цифровой ключ участника: бронирование комнат, события, нетворкинг, личный кабинет и оплата.",
-    image: "/projects/noodome.png",
-    technologies: ["React", "Node.js", "PostgreSQL", "Stripe"],
-  },
-  {
-    id: "web-site",
-    title: "Сайт строительной компании Альянс-Строй-Гарант",
-    description:
-      "Сайт для ООО «АльянсСтройГарант» — это корпоративный веб-ресурс, предназначенный для презентации услуг компании в сфере строительства и ремонта..",
-    image: "/projects/asg.png",
-    technologies: ["React.js", "Laravel", "MySQL"],
-  },
-  {
-    id: "web-service",
-    title: "SimsDynastyTree",
-    description:
-      "Инструмент фанатов для создания и ведения детальных генеалогических древ Sims.",
-    image: "/projects/sims.png",
-    technologies: ["Next.js", "Node.js", "PostgreSQL"],
-  },
-  {
-    id: "harmonize-me",
-    title: "HarmonizeMe",
-    description:
-      "Harmonize Me — это образовательная онлайн-платформа, помогающая достичь гармонии с телом и питанием через психотерапевтический подход",
-    image: "/projects/harmonizeMe.png",
-    technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
-  },
-];
+import { useTranslation } from "react-i18next";
 
 export function Projects() {
+  const { t } = useTranslation();
+
+  const projects = [
+    {
+      id: "Mediа & Entertainment",
+      title: t("projects.noodome.title"),
+      description: t("projects.noodome.description"),
+      image: "/projects/noodome.png",
+      technologies: ["React", "Node.js", "PostgreSQL", "Stripe"],
+    },
+    {
+      id: "web-site",
+      title: t("projects.asg.title"),
+      description: t("projects.asg.description"),
+      image: "/projects/asg.png",
+      technologies: ["React.js", "Laravel", "MySQL"],
+    },
+    {
+      id: "web-service",
+      title: t("projects.sims.title"),
+      description: t("projects.sims.description"),
+      image: "/projects/sims.png",
+      technologies: ["Next.js", "Node.js", "PostgreSQL"],
+    },
+    {
+      id: "harmonize-me",
+      title: t("projects.harmonizeMe.title"),
+      description: t("projects.harmonizeMe.description"),
+      image: "/projects/harmonizeMe.png",
+      technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
+    },
+  ];
+
   return (
     <section id="projects" className="py-20 bg-card/50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4">Наши проекты</h2>
+          <h2 className="text-3xl md:text-4xl mb-4">{t("projects.title")}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Примеры наших работ — от веб-приложений до мобильных решений
+            {t("projects.subtitle")}
           </p>
         </div>
 

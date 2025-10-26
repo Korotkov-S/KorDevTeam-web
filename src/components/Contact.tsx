@@ -11,8 +11,10 @@ import { Button } from "./ui/button";
 import { Mail, MessageSquare, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner@2.0.3";
+import { useTranslation } from "react-i18next";
 
 export function Contact() {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -22,7 +24,7 @@ export function Contact() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // В реальном приложении здесь будет отправка данных на сервер
-    toast.success("Спасибо! Мы свяжемся с вами в ближайшее время.");
+    toast.success(t("contact.thanks"));
     setFormData({ name: "", email: "", message: "" });
   };
 
@@ -39,10 +41,9 @@ export function Contact() {
     <section id="contact" className="py-20">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4">Свяжитесь с нами</h2>
+          <h2 className="text-3xl md:text-4xl mb-4">{t("contact.title")}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Готовы обсудить ваш проект? Напишите нам, и мы свяжемся с вами в
-            ближайшее время
+            {t("contact.subtitle")}
           </p>
         </div>
 
@@ -53,7 +54,7 @@ export function Contact() {
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
                   <Mail className="w-6 h-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Email</CardTitle>
+                <CardTitle className="text-lg">{t("contact.email")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription>
@@ -66,47 +67,6 @@ export function Contact() {
                 </CardDescription>
               </CardContent>
             </Card>
-
-            {/* <Card className="bg-card border-border">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
-                  <MessageSquare className="w-6 h-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Telegram</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  <a
-                    href="https://t.me/ideamen51"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    @ideamen51
-                  </a>
-                </CardDescription>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
-                  <MessageSquare className="w-6 h-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Telegram</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  <a
-                    href="https://t.me/ideamen51"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    @ideamen51
-                  </a>
-                </CardDescription>
-              </CardContent>
-            </Card> */}
           </div>
           <div className="lg:col-span-1 space-y-6">
             <Card className="bg-card border-border">
@@ -114,7 +74,7 @@ export function Contact() {
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
                   <MessageSquare className="w-6 h-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Telegram</CardTitle>
+                <CardTitle className="text-lg">{t("contact.telegram")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription>
@@ -129,47 +89,6 @@ export function Contact() {
                 </CardDescription>
               </CardContent>
             </Card>
-
-            {/* <Card className="bg-card border-border">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
-                  <MessageSquare className="w-6 h-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Telegram</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  <a
-                    href="https://t.me/ideamen51"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    @ideamen51
-                  </a>
-                </CardDescription>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
-                  <MessageSquare className="w-6 h-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Telegram</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  <a
-                    href="https://t.me/ideamen51"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    @ideamen51
-                  </a>
-                </CardDescription>
-              </CardContent>
-            </Card> */}
           </div>
           <div className="lg:col-span-1 space-y-6">
             <Card className="bg-card border-border">
@@ -177,7 +96,7 @@ export function Contact() {
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
                   <MessageSquare className="w-6 h-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">Max</CardTitle>
+                <CardTitle className="text-lg">{t("contact.max")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription>
@@ -191,55 +110,6 @@ export function Contact() {
               </CardContent>
             </Card>
           </div>
-
-          {/* <Card className="lg:col-span-2 bg-card border-border">
-            <CardHeader>
-              <CardTitle>Отправить сообщение</CardTitle>
-              <CardDescription>
-                Заполните форму ниже, и мы ответим вам как можно скорее
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Input
-                    name="name"
-                    placeholder="Ваше имя"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="bg-input border-border"
-                  />
-                </div>
-                <div>
-                  <Input
-                    name="email"
-                    type="email"
-                    placeholder="Ваш email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="bg-input border-border"
-                  />
-                </div>
-                <div>
-                  <Textarea
-                    name="message"
-                    placeholder="Расскажите о вашем проекте..."
-                    value={formData.message}
-                    onChange={handleChange}
-                    required
-                    rows={5}
-                    className="bg-input border-border resize-none"
-                  />
-                </div>
-                <Button type="submit" className="w-full group">
-                  Отправить
-                  <Send className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </form>
-            </CardContent>
-          </Card> */}
         </div>
       </div>
     </section>

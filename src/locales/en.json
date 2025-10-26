@@ -1,0 +1,143 @@
+{
+  "header": {
+    "services": "Services",
+    "technologies": "Technologies",
+    "projects": "Projects",
+    "blog": "Blog",
+    "contact": "Contact",
+    "getInTouch": "Get in Touch"
+  },
+  "hero": {
+    "badge": "Team of Professional Developers",
+    "title": "Digital Transformation of Your Business",
+    "subtitle": "We specialize in developing web services and mobile applications. From concept to launch and support.",
+    "discussProject": "Discuss Project",
+    "ourServices": "Our Services",
+    "stats": {
+      "clients": "clients were satisfied",
+      "cheaper": "Cheaper than competitors",
+      "onTime": "On time deadline"
+    }
+  },
+  "services": {
+    "title": "Our Services",
+    "subtitle": "We provide a full range of services for development, implementation and support of web solutions",
+    "webDevelopment": {
+      "title": "Web Services Development",
+      "description": "Creating modern, responsive and performant web services using the latest technologies."
+    },
+    "mobileApps": {
+      "title": "React Native Apps",
+      "description": "Cross-platform mobile application development for iOS and Android."
+    },
+    "backend": {
+      "title": "Backend Development",
+      "description": "Creating reliable server solutions on Node.js (NestJS, AdonisJS, Fastify), PHP Laravel and Python."
+    },
+    "interviews": {
+      "title": "Technical Interviews",
+      "description": "We conduct technical interviews, provide detailed reports and save your money on hiring."
+    },
+    "cmsSupport": {
+      "title": "WordPress, Drupal Support",
+      "description": "Full cycle of CMS work: from installation and configuration to custom development and optimization."
+    },
+    "technicalSupport": {
+      "title": "Technical Support",
+      "description": "Support and maintenance of existing projects, bug fixes, updates and improvements."
+    }
+  },
+  "technologies": {
+    "title": "Technologies",
+    "subtitle": "We use modern technology stack to create reliable and scalable solutions",
+    "frontend": "Frontend",
+    "backend": "Backend",
+    "php": "PHP",
+    "python": "Python",
+    "databases": "Databases",
+    "devops": "DevOps & Tools"
+  },
+  "projects": {
+    "title": "Our Projects",
+    "subtitle": "Examples of our work — from web applications to mobile solutions",
+    "noodome": {
+      "title": "Mobile App for Noodome Business Club",
+      "description": "Mobile app is a digital member key: room booking, events, networking, personal account and payment."
+    },
+    "asg": {
+      "title": "Website for Alliance-Construction-Guarantee Construction Company",
+      "description": "Website for AllianceStroyGarant LLC — a corporate web resource designed to showcase the company's services in construction and renovation."
+    },
+    "sims": {
+      "title": "SimsDynastyTree",
+      "description": "A fan tool for creating and maintaining detailed Sims family trees."
+    },
+    "harmonizeMe": {
+      "title": "HarmonizeMe",
+      "description": "Harmonize Me is an educational online platform that helps achieve harmony with the body and nutrition through a psychotherapeutic approach"
+    }
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "Sharing experience, knowledge and best practices in development",
+    "readMore": "Read More",
+    "posts": {
+      "reactNative": {
+        "title": "Best Practices for React Native Development in 2025",
+        "excerpt": "React Native continues to be one of the most popular frameworks for mobile app development. In this article, we'll look at key practices..."
+      },
+      "microservices": {
+        "title": "Microservices Architecture on Node.js with NestJS",
+        "excerpt": "Microservices architecture allows breaking down a monolithic application into small, independent services that are easy to scale and maintain..."
+      },
+      "wordpress": {
+        "title": "WordPress Site Performance Optimization",
+        "excerpt": "WordPress is one of the most popular CMS in the world, but without proper optimization, sites can run slowly. In this article, we'll look at key methods..."
+      },
+      "laravel": {
+        "title": "RESTful API Development on Laravel: Complete Guide",
+        "excerpt": "Laravel is one of the most popular PHP frameworks for creating web applications and APIs. In this guide, we'll create a full-fledged RESTful API..."
+      }
+    }
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "Ready to discuss your project? Write to us and we will contact you soon",
+    "email": "Email",
+    "telegram": "Telegram",
+    "max": "Max",
+    "sendMessage": "Send Message",
+    "sendDescription": "Fill out the form below and we will respond as soon as possible",
+    "yourName": "Your Name",
+    "yourEmail": "Your Email",
+    "messagePlaceholder": "Tell us about your project...",
+    "send": "Send",
+    "thanks": "Thank you! We will contact you soon."
+  },
+  "footer": {
+    "description": "A team of professional developers specializing in creating web services and mobile solutions.",
+    "services": "Services",
+    "webServices": "Web Services",
+    "reactNative": "React Native",
+    "backend": "Backend Development",
+    "wordpressSupport": "WordPress Support",
+    "contacts": "Contacts",
+    "copyright": "© 2025 KorDevTeam. All rights reserved."
+  },
+  "projectPage": {
+    "notFound": "Project Not Found",
+    "backToHome": "Back to Home",
+    "backToMain": "Back to Main",
+    "projectDescription": "Project Description",
+    "usedTechnologies": "Used Technologies",
+    "mainFeatures": "Main Features",
+    "backToProjects": "Back to Projects",
+    "demo": "Demo"
+  },
+  "themeToggle": {
+    "aria": {
+      "light": "Switch to dark theme",
+      "dark": "Switch to light theme"
+    }
+  }
+}

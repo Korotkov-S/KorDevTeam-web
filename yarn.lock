@@ -173,7 +173,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.5.5, @babel/runtime@npm:^7.8.7":
+"@babel/runtime@npm:^7.23.2, @babel/runtime@npm:^7.27.6, @babel/runtime@npm:^7.5.5, @babel/runtime@npm:^7.8.7":
   version: 7.28.4
   resolution: "@babel/runtime@npm:7.28.4"
   checksum: 934b0a0460f7d06637d93fcd1a44ac49adc33518d17253b5a0b55ff4cb90a45d8fe78bf034b448911dbec7aff2a90b918697559f78d21c99ff8dbadae9565b55
@@ -3290,6 +3290,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"html-parse-stringify@npm:^3.0.1":
+  version: 3.0.1
+  resolution: "html-parse-stringify@npm:3.0.1"
+  dependencies:
+    void-elements: 3.1.0
+  checksum: 334fdebd4b5c355dba8e95284cead6f62bf865a2359da2759b039db58c805646350016d2017875718bc3c4b9bf81a0d11be5ee0cf4774a3a5a7b97cde21cfd67
+  languageName: node
+  linkType: hard
+
 "html-url-attributes@npm:^3.0.0":
   version: 3.0.1
   resolution: "html-url-attributes@npm:3.0.1"
@@ -3333,6 +3342,29 @@ __metadata:
     agent-base: "npm:^7.1.2"
     debug: "npm:4"
   checksum: b882377a120aa0544846172e5db021fa8afbf83fea2a897d397bd2ddd8095ab268c24bc462f40a15f2a8c600bf4aa05ce52927f70038d4014e68aefecfa94e8d
+  languageName: node
+  linkType: hard
+
+"i18next-browser-languagedetector@npm:^8.2.0":
+  version: 8.2.0
+  resolution: "i18next-browser-languagedetector@npm:8.2.0"
+  dependencies:
+    "@babel/runtime": ^7.23.2
+  checksum: 02fda84fdfd443d7a888c3eaf99550e4f75692453392dffecc1b6f4b8df112672bdc9675f84347d8b9e23ee488aa4e17691abf1ef5847191c3f6ddd4d833524d
+  languageName: node
+  linkType: hard
+
+"i18next@npm:^25.6.0":
+  version: 25.6.0
+  resolution: "i18next@npm:25.6.0"
+  dependencies:
+    "@babel/runtime": ^7.27.6
+  peerDependencies:
+    typescript: ^5
+  peerDependenciesMeta:
+    typescript:
+      optional: true
+  checksum: 533d04943a78c117d5bda0f925cfc4a7792e51afe3574a2a99b808fb272cd0b6af5f868e1eccfb329dbf26f48470774f33980e71e37665611b17315f150b0de1
   languageName: node
   linkType: hard
 
@@ -3552,6 +3584,8 @@ __metadata:
     clsx: "*"
     cmdk: ^1.1.1
     embla-carousel-react: ^8.6.0
+    i18next: ^25.6.0
+    i18next-browser-languagedetector: ^8.2.0
     input-otp: ^1.4.2
     lucide-react: ^0.487.0
     next-themes: ^0.4.6
@@ -3560,6 +3594,7 @@ __metadata:
     react-day-picker: ^8.10.1
     react-dom: ^18.3.1
     react-hook-form: ^7.55.0
+    react-i18next: ^16.2.0
     react-markdown: "*"
     react-resizable-panels: ^2.1.7
     react-router-dom: "*"
@@ -4497,6 +4532,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-i18next@npm:^16.2.0":
+  version: 16.2.0
+  resolution: "react-i18next@npm:16.2.0"
+  dependencies:
+    "@babel/runtime": ^7.27.6
+    html-parse-stringify: ^3.0.1
+    use-sync-external-store: ^1.6.0
+  peerDependencies:
+    i18next: ">= 25.5.2"
+    react: ">= 16.8.0"
+    typescript: ^5
+  peerDependenciesMeta:
+    react-dom:
+      optional: true
+    react-native:
+      optional: true
+    typescript:
+      optional: true
+  checksum: 342f38555e0e0ed560ca8cb782263bd6cf58fa388eabbbe28957038b4fdf943f5e5ebc9fc14b154a827a96597e08a83a4139b0928beec4d36f5568a515cadb89
+  languageName: node
+  linkType: hard
+
 "react-is@npm:^16.13.1":
   version: 16.13.1
   resolution: "react-is@npm:16.13.1"
@@ -5306,7 +5363,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"use-sync-external-store@npm:^1.5.0":
+"use-sync-external-store@npm:^1.5.0, use-sync-external-store@npm:^1.6.0":
   version: 1.6.0
   resolution: "use-sync-external-store@npm:1.6.0"
   peerDependencies:
@@ -5421,6 +5478,13 @@ __metadata:
   bin:
     vite: bin/vite.js
   checksum: b7f1ebaae483090441f17ca09ea2c9b803688d2a2ed9860fbd8b72271918776ea3ceca643e807a5ee00628d65b79656d32529a4b8dd388aa33e41bc3f38732d0
+  languageName: node
+  linkType: hard
+
+"void-elements@npm:3.1.0":
+  version: 3.1.0
+  resolution: "void-elements@npm:3.1.0"
+  checksum: 0390f818107fa8fce55bb0a5c3f661056001c1d5a2a48c28d582d4d847347c2ab5b7f8272314cac58acf62345126b6b09bea623a185935f6b1c3bbce0dfd7f7f
   languageName: node
   linkType: hard
 

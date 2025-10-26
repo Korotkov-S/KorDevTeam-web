@@ -1,7 +1,10 @@
 import { Button } from "./ui/button";
 import { ArrowRight, Code2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function Hero() {
+  const { t } = useTranslation();
+
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     element?.scrollIntoView({ behavior: "smooth" });
@@ -20,17 +23,16 @@ export function Hero() {
           <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-8" style={{backdropFilter: 'blur(1.2px)'}}>
             <Code2 className="w-4 h-4 text-primary" />
             <span className="text-sm text-primary">
-              Команда профессиональных разработчиков
+              {t("hero.badge")}
             </span>
           </div>
 
           <h1 className="text-4xl md:text-6xl mb-6 bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-            Цифровая трансформация вашего бизнеса
+            {t("hero.title")}
           </h1>
 
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Мы специализируемся на разработке веб-сервисов и мобильных
-            приложений. От концепции до запуска и поддержки.
+            {t("hero.subtitle")}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -39,7 +41,7 @@ export function Hero() {
               onClick={() => scrollToSection("contact")}
               className="group"
             >
-              Обсудить проект
+              {t("hero.discussProject")}
               <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button
@@ -47,7 +49,7 @@ export function Hero() {
               variant="outline"
               onClick={() => scrollToSection("services")}
             >
-              Наши услуги
+              {t("hero.ourServices")}
             </Button>
           </div>
 
@@ -56,19 +58,19 @@ export function Hero() {
             <div className="text-center">
               <div className="text-3xl md:text-4xl text-primary mb-2">95%</div>
               <div className="text-sm text-muted-foreground">
-                клиентов остались довольны
+                {t("hero.stats.clients")}
               </div>
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl text-primary mb-2">30%</div>
               <div className="text-sm text-muted-foreground">
-                Дешевле, чем у коллег
+                {t("hero.stats.cheaper")}
               </div>
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl text-primary mb-2">83%</div>
               <div className="text-sm text-muted-foreground">
-                Точно в дедлайн
+                {t("hero.stats.onTime")}
               </div>
             </div>
           </div>

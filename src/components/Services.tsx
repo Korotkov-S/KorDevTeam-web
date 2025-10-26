@@ -13,55 +13,51 @@ import {
   Code,
   Database,
 } from "lucide-react";
-
-const services = [
-  {
-    icon: Globe,
-    title: "Разработка веб-сервисов",
-    description:
-      "Создание современных, отзывчивых и производительных веб-сервисов с использованием последних технологий.",
-  },
-  {
-    icon: Smartphone,
-    title: "React Native приложения",
-    description:
-      "Разработка кроссплатформенных мобильных приложений для iOS и Android.",
-  },
-  {
-    icon: Server,
-    title: "Backend разработка",
-    description:
-      "Создание надежных серверных решений на Node.js (NestJS, AdonisJS, Fastify), PHP Laravel и Python.",
-  },
-  {
-    icon: Database,
-    title: "Проведение технических собеседований",
-    description:
-      "Проводим технические собеседования, выдаем подробный отчет и экономим ваши деньги на найме.",
-  },
-  {
-    icon: Code,
-    title: "Поддержка WordPress, Drupal",
-    description:
-      "Полный цикл работы с CMS: от установки и настройки до кастомной разработки и оптимизации.",
-  },
-  {
-    icon: Wrench,
-    title: "Техническая поддержка",
-    description:
-      "Поддержка и обслуживание существующих проектов, исправление ошибок, обновления и улучшения.",
-  },
-];
+import { useTranslation } from "react-i18next";
 
 export function Services() {
+  const { t } = useTranslation();
+
+  const services = [
+    {
+      icon: Globe,
+      title: t("services.webDevelopment.title"),
+      description: t("services.webDevelopment.description"),
+    },
+    {
+      icon: Smartphone,
+      title: t("services.mobileApps.title"),
+      description: t("services.mobileApps.description"),
+    },
+    {
+      icon: Server,
+      title: t("services.backend.title"),
+      description: t("services.backend.description"),
+    },
+    {
+      icon: Database,
+      title: t("services.interviews.title"),
+      description: t("services.interviews.description"),
+    },
+    {
+      icon: Code,
+      title: t("services.cmsSupport.title"),
+      description: t("services.cmsSupport.description"),
+    },
+    {
+      icon: Wrench,
+      title: t("services.technicalSupport.title"),
+      description: t("services.technicalSupport.description"),
+    },
+  ];
+
   return (
     <section id="services" className="py-20 bg-card/50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4">Наши услуги</h2>
+          <h2 className="text-3xl md:text-4xl mb-4">{t("services.title")}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Предоставляем полный спектр услуг по разработке, внедрению и
-            поддержке веб-решений
+            {t("services.subtitle")}
           </p>
         </div>
 

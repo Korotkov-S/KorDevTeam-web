@@ -1,55 +1,57 @@
 import { Badge } from "./ui/badge";
-
-const techStacks = [
-  {
-    category: "Frontend",
-    technologies: [
-      "React",
-      "React Native",
-      "Next.js",
-      "TypeScript",
-      "Tailwind CSS",
-      "Zustand",
-    ],
-  },
-  {
-    category: "Backend",
-    technologies: [
-      "Node.js",
-      "NestJS",
-      "AdonisJS",
-      "Fastify",
-      "Express",
-      "RestAPI",
-    ],
-  },
-  {
-    category: "PHP",
-    technologies: ["Laravel", "WordPress", "Composer"],
-  },
-  {
-    category: "Python",
-    technologies: ["Django", "FastAPI"],
-  },
-  {
-    category: "Базы данных",
-    technologies: ["PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch"],
-  },
-  {
-    category: "DevOps & Tools",
-    technologies: ["Docker", "Git", "CI/CD", "Nginx", "Linux"],
-  },
-];
+import { useTranslation } from "react-i18next";
 
 export function Technologies() {
+  const { t } = useTranslation();
+
+  const techStacks = [
+    {
+      category: t("technologies.frontend"),
+      technologies: [
+        "React",
+        "React Native",
+        "Next.js",
+        "TypeScript",
+        "Tailwind CSS",
+        "Zustand",
+      ],
+    },
+    {
+      category: t("technologies.backend"),
+      technologies: [
+        "Node.js",
+        "NestJS",
+        "AdonisJS",
+        "Fastify",
+        "Express",
+        "RestAPI",
+      ],
+    },
+    {
+      category: t("technologies.php"),
+      technologies: ["Laravel", "WordPress", "Composer"],
+    },
+    {
+      category: t("technologies.python"),
+      technologies: ["Django", "FastAPI"],
+    },
+    {
+      category: t("technologies.databases"),
+      technologies: ["PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch"],
+    },
+    {
+      category: t("technologies.devops"),
+      technologies: ["Docker", "Git", "CI/CD", "Nginx", "Linux"],
+    },
+  ];
+
   return (
     <section id="technologies" className="py-20">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4">Технологии</h2>
+          <h2 className="text-3xl md:text-4xl mb-4">{t("technologies.title")}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Используем современный стек технологий для создания надежных и
-            масштабируемых решений
+            {t("technologies.subtitle")}
           </p>
         </div>
 

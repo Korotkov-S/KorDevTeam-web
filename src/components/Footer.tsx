@@ -1,6 +1,9 @@
 import { Code2, Github, Linkedin, Twitter } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function Footer() {
+  const { t } = useTranslation();
+
   return (
     <footer className="bg-card border-t border-border py-12">
       <div className="container mx-auto px-4">
@@ -13,20 +16,19 @@ export function Footer() {
               <span className="text-foreground">DevTeam</span>
             </div>
             <p className="text-muted-foreground max-w-md">
-              Команда профессиональных разработчиков, специализирующихся на
-              создании веб-сервисов и мобильных решений.
+              {t("footer.description")}
             </p>
           </div>
 
           <div>
-            <h3 className="mb-4">Услуги</h3>
+            <h3 className="mb-4">{t("footer.services")}</h3>
             <ul className="space-y-2 text-muted-foreground">
               <li>
                 <a
                   href="#services"
                   className="hover:text-primary transition-colors"
                 >
-                  Веб-сервисы
+                  {t("footer.webServices")}
                 </a>
               </li>
               <li>
@@ -34,7 +36,7 @@ export function Footer() {
                   href="#services"
                   className="hover:text-primary transition-colors"
                 >
-                  React Native
+                  {t("footer.reactNative")}
                 </a>
               </li>
               <li>
@@ -42,7 +44,7 @@ export function Footer() {
                   href="#services"
                   className="hover:text-primary transition-colors"
                 >
-                  Backend разработка
+                  {t("footer.backend")}
                 </a>
               </li>
               <li>
@@ -50,14 +52,14 @@ export function Footer() {
                   href="#services"
                   className="hover:text-primary transition-colors"
                 >
-                  Поддержка WordPress
+                  {t("footer.wordpressSupport")}
                 </a>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="mb-4">Контакты</h3>
+            <h3 className="mb-4">{t("footer.contacts")}</h3>
             <ul className="space-y-2 text-muted-foreground">
               <li>
                 <a
@@ -83,7 +85,7 @@ export function Footer() {
 
         <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-muted-foreground text-sm">
-            © 2025 KorDevTeam. Все права защищены.
+            {t("footer.copyright")}
           </p>
 
           <div className="flex items-center gap-4">
