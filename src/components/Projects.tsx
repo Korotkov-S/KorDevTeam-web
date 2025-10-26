@@ -30,6 +30,14 @@ const projects = [
     image: "/projects/sims.png",
     technologies: ["Next.js", "Node.js", "PostgreSQL"],
   },
+  {
+    id: "harmonize-me",
+    title: "HarmonizeMe",
+    description:
+      "Harmonize Me — это образовательная онлайн-платформа, помогающая достичь гармонии с телом и питанием через психотерапевтический подход",
+    image: "/projects/harmonizeMe.png",
+    technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
+  },
 ];
 
 export function Projects() {
