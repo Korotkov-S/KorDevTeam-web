@@ -214,6 +214,14 @@ export function ProjectPage() {
 
   const project = projects.find((p) => p.id === projectId);
 
+  const navigateGoBack = () => {
+    if (window.history.state?.idx > 0) {
+      navigate(-1);
+    } else {
+      navigateGoBack();
+    }
+  };
+
   // Автоматический скролл наверх при загрузке страницы
   useEffect(() => {
     window.scrollTo({
@@ -228,7 +236,7 @@ export function ProjectPage() {
       <div className="min-h-screen pt-20 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Проект не найден</h1>
-          <Button onClick={() => navigate("/")}>
+          <Button onClick={() => navigateGoBack()}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Вернуться на главную
           </Button>
@@ -242,11 +250,7 @@ export function ProjectPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
         <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="gap-2"
-          >
+          <Button variant="ghost" onClick={navigateGoBack} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Назад к главной
           </Button>
@@ -400,7 +404,7 @@ export function ProjectPage() {
 
           {/* Back to Projects Button */}
           <div className="mt-12 pt-8 border-t border-border">
-            <Button onClick={() => navigate("/#projects")} className="gap-2">
+            <Button onClick={navigateGoBack} className="gap-2">
               <ArrowLeft className="w-4 h-4" />
               Вернуться к проектам
             </Button>

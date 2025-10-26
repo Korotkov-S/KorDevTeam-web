@@ -10,7 +10,7 @@ export function Header() {
 
   const scrollToSection = (id: string) => {
     if (location.pathname !== "/") {
-      navigate("/");
+      navigate("/", { preventScrollReset: true });
       setTimeout(() => {
         const element = document.getElementById(id);
         element?.scrollIntoView({ behavior: "smooth" });

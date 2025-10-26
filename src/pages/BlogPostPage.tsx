@@ -46,16 +46,24 @@ export function BlogPostPage() {
   const [loading, setLoading] = useState(true);
   const [meta, setMeta] = useState<BlogPostMeta | null>(null);
 
+  const navigateGoBack = () => {
+    if (window.history.state?.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
   useEffect(() => {
     const loadMarkdown = async () => {
       if (!slug) {
-        navigate("/");
+        navigateGoBack();
         return;
       }
 
       const postMeta = blogPostsData[slug];
       if (!postMeta) {
-        navigate("/");
+        navigateGoBack();
         return;
       }
 
@@ -71,7 +79,9 @@ export function BlogPostPage() {
         setContent(text);
       } catch (error) {
         console.error("Error loading markdown:", error);
-        setContent("# Ошибка загрузки\n\nНе удалось загрузить содержимое статьи.");
+        setContent(
+          "# Ошибка загрузки\n\nНе удалось загрузить содержимое статьи.",
+        );
       } finally {
         setLoading(false);
       }
@@ -91,11 +101,7 @@ export function BlogPostPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
         <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="gap-2"
-          >
+          <Button variant="ghost" onClick={navigateGoBack} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Назад к главной
           </Button>
@@ -111,7 +117,7 @@ export function BlogPostPage() {
             {meta && (
               <header className="mb-12 pb-8 border-b border-border">
                 <h1 className="text-4xl md:text-5xl mb-6">{meta.title}</h1>
-                
+
                 <div className="flex flex-wrap items-center gap-4 text-muted-foreground mb-6">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
@@ -142,19 +148,34 @@ export function BlogPostPage() {
               <ReactMarkdown
                 components={{
                   h1: ({ node, ...props }) => (
-                    <h1 className="text-4xl mb-8 mt-12 text-foreground" {...props} />
+                    <h1
+                      className="text-4xl mb-8 mt-12 text-foreground"
+                      {...props}
+                    />
                   ),
                   h2: ({ node, ...props }) => (
-                    <h2 className="text-3xl mt-12 mb-6 text-foreground" {...props} />
+                    <h2
+                      className="text-3xl mt-12 mb-6 text-foreground"
+                      {...props}
+                    />
                   ),
                   h3: ({ node, ...props }) => (
-                    <h3 className="text-2xl mt-8 mb-4 text-foreground" {...props} />
+                    <h3
+                      className="text-2xl mt-8 mb-4 text-foreground"
+                      {...props}
+                    />
                   ),
                   h4: ({ node, ...props }) => (
-                    <h4 className="text-xl mt-6 mb-3 text-foreground" {...props} />
+                    <h4
+                      className="text-xl mt-6 mb-3 text-foreground"
+                      {...props}
+                    />
                   ),
                   p: ({ node, ...props }) => (
-                    <p className="text-muted-foreground mb-4 leading-relaxed" {...props} />
+                    <p
+                      className="text-muted-foreground mb-4 leading-relaxed"
+                      {...props}
+                    />
                   ),
                   a: ({ node, ...props }) => (
                     <a className="text-primary hover:underline" {...props} />
@@ -172,13 +193,22 @@ export function BlogPostPage() {
                       />
                     ),
                   pre: ({ node, ...props }) => (
-                    <pre className="bg-secondary rounded-lg p-4 overflow-x-auto mb-6" {...props} />
+                    <pre
+                      className="bg-secondary rounded-lg p-4 overflow-x-auto mb-6"
+                      {...props}
+                    />
                   ),
                   ul: ({ node, ...props }) => (
-                    <ul className="list-disc list-inside text-muted-foreground mb-4 space-y-2 ml-4" {...props} />
+                    <ul
+                      className="list-disc list-inside text-muted-foreground mb-4 space-y-2 ml-4"
+                      {...props}
+                    />
                   ),
                   ol: ({ node, ...props }) => (
-                    <ol className="list-decimal list-inside text-muted-foreground mb-4 space-y-2 ml-4" {...props} />
+                    <ol
+                      className="list-decimal list-inside text-muted-foreground mb-4 space-y-2 ml-4"
+                      {...props}
+                    />
                   ),
                   li: ({ node, ...props }) => (
                     <li className="text-muted-foreground" {...props} />
@@ -203,10 +233,7 @@ export function BlogPostPage() {
 
             {/* Back to Blog Button */}
             <div className="mt-12 pt-8 border-t border-border">
-              <Button
-                onClick={() => navigate("/#blog")}
-                className="gap-2"
-              >
+              <Button onClick={navigateGoBack} className="gap-2">
                 <ArrowLeft className="w-4 h-4" />
                 Вернуться к блогу
               </Button>
