@@ -68,7 +68,7 @@ export function Header() {
             </button>
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-4">
             <ThemeToggle />
             <Button onClick={() => scrollToSection("contact")}>
               Связаться
@@ -117,7 +117,7 @@ export function Header() {
             >
               Контакты
             </button>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <ThemeToggle />
               <Button
                 onClick={() => scrollToSection("contact")}
