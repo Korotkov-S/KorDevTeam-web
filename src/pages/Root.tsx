@@ -5,7 +5,7 @@ import { Toaster } from "../components/ui/sonner";
 
 export function Root() {
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main>
         <Outlet />

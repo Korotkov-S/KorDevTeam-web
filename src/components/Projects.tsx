@@ -66,7 +66,9 @@ export function Projects() {
                   </div>
                 </div>
                 <CardContent className="p-6 flex-1 flex flex-col">
-                  <h3 className="mb-2">{project.title}</h3>
+                  <h3 className="mb-2 group-hover:text-primary transition-colors">
+                    {project.title}
+                  </h3>
                   <p className="text-muted-foreground mb-4 text-sm flex-1">
                     {project.description}
                   </p>

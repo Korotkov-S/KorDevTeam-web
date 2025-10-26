@@ -1,7 +1,8 @@
+import React, { useState } from "react";
 import { Menu, X } from "lucide-react";
-import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -67,7 +68,8 @@ export function Header() {
             </button>
           </nav>
 
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Button onClick={() => scrollToSection("contact")}>
               Связаться
             </Button>
@@ -115,12 +117,15 @@ export function Header() {
             >
               Контакты
             </button>
-            <Button
-              onClick={() => scrollToSection("contact")}
-              className="w-full"
-            >
-              Связаться
-            </Button>
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <Button
+                onClick={() => scrollToSection("contact")}
+                className="flex-1"
+              >
+                Связаться
+              </Button>
+            </div>
           </nav>
         )}
       </div>

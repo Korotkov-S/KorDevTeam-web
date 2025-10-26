@@ -1,5 +1,11 @@
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
@@ -18,7 +24,8 @@ const blogPosts: BlogPost[] = [
   {
     id: "1",
     title: "Лучшие практики разработки на React Native в 2025 году",
-    excerpt: "React Native продолжает оставаться одним из самых популярных фреймворков для разработки мобильных приложений. В этой статье мы рассмотрим ключевые практики...",
+    excerpt:
+      "React Native продолжает оставаться одним из самых популярных фреймворков для разработки мобильных приложений. В этой статье мы рассмотрим ключевые практики...",
     date: "20 октября 2025",
     readTime: "8 мин",
     tags: ["React Native", "Mobile Development"],
@@ -27,7 +34,8 @@ const blogPosts: BlogPost[] = [
   {
     id: "2",
     title: "Микросервисная архитектура на Node.js с NestJS",
-    excerpt: "Микросервисная архитектура позволяет разбить монолитное приложение на небольшие, независимые сервисы, которые легко масштабировать и поддерживать...",
+    excerpt:
+      "Микросервисная архитектура позволяет разбить монолитное приложение на небольшие, независимые сервисы, которые легко масштабировать и поддерживать...",
     date: "15 октября 2025",
     readTime: "12 мин",
     tags: ["Node.js", "NestJS", "Microservices"],
@@ -36,7 +44,8 @@ const blogPosts: BlogPost[] = [
   {
     id: "3",
     title: "Оптимизация производительности WordPress сайтов",
-    excerpt: "WordPress — одна из самых популярных CMS в мире, но без правильной оптимизации сайты могут работать медленно. В этой статье мы рассмотрим ключевые методы...",
+    excerpt:
+      "WordPress — одна из самых популярных CMS в мире, но без правильной оптимизации сайты могут работать медленно. В этой статье мы рассмотрим ключевые методы...",
     date: "10 октября 2025",
     readTime: "10 мин",
     tags: ["WordPress", "Optimization", "PHP"],
@@ -45,7 +54,8 @@ const blogPosts: BlogPost[] = [
   {
     id: "4",
     title: "Разработка RESTful API на Laravel: Полное руководство",
-    excerpt: "Laravel — один из самых популярных PHP фреймворков для создания веб-приложений и API. В этом руководстве мы создадим полноценный RESTful API...",
+    excerpt:
+      "Laravel — один из самых популярных PHP фреймворков для создания веб-приложений и API. В этом руководстве мы создадим полноценный RESTful API...",
     date: "5 октября 2025",
     readTime: "15 мин",
     tags: ["Laravel", "PHP", "API Development"],
@@ -64,13 +74,9 @@ export function Blog() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {blogPosts.map((post) => (
-            <Link
-              key={post.id}
-              to={`/blog/${post.slug}`}
-              className="block"
-            >
+            <Link key={post.id} to={`/blog/${post.slug}`} className="block">
               <Card className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer group h-full">
                 <CardHeader>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">

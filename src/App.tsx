@@ -7,6 +7,7 @@ import { HomePage } from "./pages/HomePage";
 import { BlogPostPage } from "./pages/BlogPostPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { Root } from "./pages/Root";
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 const router = createBrowserRouter([
   {
@@ -30,5 +31,9 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <ThemeProvider>
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  );
 }
