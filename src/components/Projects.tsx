@@ -7,31 +7,28 @@ import { Link } from "react-router-dom";
 
 const projects = [
   {
-    id: "ecommerce-platform",
-    title: "E-commerce платформа",
+    id: "Mediа & Entertainment",
+    title: "Мобильное приложение для бизнес-клуба Noodome",
     description:
-      "Полнофункциональная платформа для онлайн-торговли с административной панелью и интеграцией платежных систем.",
-    image:
-      "https://images.unsplash.com/photo-1627599936744-51d288f89af4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3ZWIlMjBkZXZlbG9wbWVudCUyMHRlYW18ZW58MXx8fHwxNzYxMzI4Nzk3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      "Мобильное приложение - это цифровой ключ участника: бронирование комнат, события, нетворкинг, личный кабинет и оплата.",
+    image: "/projects/noodome.png",
     technologies: ["React", "Node.js", "PostgreSQL", "Stripe"],
   },
   {
-    id: "delivery-app",
-    title: "Мобильное приложение для доставки",
+    id: "web-site",
+    title: "Сайт строительной компании Альянс-Строй-Гарант",
     description:
-      "React Native приложение для сервиса доставки еды с отслеживанием заказов в реальном времени.",
-    image:
-      "https://images.unsplash.com/photo-1618761714954-0b8cd0026356?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2JpbGUlMjBhcHAlMjBpbnRlcmZhY2V8ZW58MXx8fHwxNzYxMzUyMTg3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    technologies: ["React Native", "NestJS", "MongoDB", "Socket.io"],
+      "Сайт для ООО «АльянсСтройГарант» — это корпоративный веб-ресурс, предназначенный для презентации услуг компании в сфере строительства и ремонта..",
+    image: "/projects/asg.png",
+    technologies: ["React.js", "Laravel", "MySQL"],
   },
   {
-    id: "corporate-portal",
-    title: "Корпоративный портал",
+    id: "web-service",
+    title: "SimsDynastyTree",
     description:
-      "Веб-платформа для управления проектами и взаимодействия команды с расширенной аналитикой.",
-    image:
-      "https://images.unsplash.com/photo-1669062897193-f8a4215c2033?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3ZWIlMjBkZXNpZ258ZW58MXx8fHwxNzYxMzUzMDU1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    technologies: ["Next.js", "Laravel", "MySQL", "Redis"],
+      "Инструмент фанатов для создания и ведения детальных генеалогических древ Sims.",
+    image: "/projects/sims.png",
+    technologies: ["Next.js", "Node.js", "PostgreSQL"],
   },
 ];
 
@@ -49,7 +46,7 @@ export function Projects() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {projects.map((project, index) => (
             <Link key={index} to={`/project/${project.id}`} className="block">
-              <Card className="bg-card border-border overflow-hidden group hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer">
+              <Card className="bg-card border-border overflow-hidden group hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer h-full flex flex-col">
                 <div className="relative overflow-hidden aspect-video">
                   <ImageWithFallback
                     src={project.image}
@@ -60,12 +57,12 @@ export function Projects() {
                     <ExternalLink className="w-6 h-6 text-primary" />
                   </div>
                 </div>
-                <CardContent className="p-6">
+                <CardContent className="p-6 flex-1 flex flex-col">
                   <h3 className="mb-2">{project.title}</h3>
-                  <p className="text-muted-foreground mb-4 text-sm">
+                  <p className="text-muted-foreground mb-4 text-sm flex-1">
                     {project.description}
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 mt-auto">
                     {project.technologies.map((tech, techIndex) => (
                       <Badge
                         key={techIndex}
