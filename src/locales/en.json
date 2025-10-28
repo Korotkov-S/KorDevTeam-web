@@ -75,6 +75,10 @@
     "harmonizeMe": {
       "title": "HarmonizeMe",
       "description": "Harmonize Me is an educational online platform that helps achieve harmony with the body and nutrition through a psychotherapeutic approach"
+    },
+    "stroyrem": {
+      "title": "Stroyrem",
+      "description": "Online store of construction and finishing materials in Nizhny Novgorod with city delivery"
     }
   },
   "blog": {
@@ -199,6 +203,18 @@
         "Bonus and motivation system",
         "Internal HarmoMarket store",
         "Therapeutic groups in Telegram"
+      ]
+    },
+    "stroyrem": {
+      "description": "StroyRem-NN is an online store of construction and finishing materials in Nizhny Novgorod. The site offers a wide range of products for repair, construction and installation with city delivery.",
+      "fullDescription": "## StroyRem-NN - Online Store of Construction Materials\n\nComprehensive technical support and development of an online store of construction and finishing materials in Nizhny Novgorod. The project includes targeted functionality improvements, code optimization and ensuring stable platform operation.\n\n### Main Specialization\n\n**Business Type:** Online store of construction goods\n\n**Product Range:** Wide range of products for:\n- Construction work\n- Finishing work  \n- Repair work\n- Installation work\n\n**Geography:** Nizhny Novgorod and region\n\n### Key Site Features\n\n- **Product catalog** with current assortment and detailed specifications\n- **Search and filtering system** by categories, brands and product parameters\n- **Shopping cart and order placement** with delivery cost calculation\n- **Delivery information** around the city with various rates\n- **Current prices and availability** in real time\n- **Store contacts and details**\n\n### Technical Support and Optimization\n\n- **Targeted functionality improvements** to enhance user convenience\n- **Code cleanup and optimization** to improve performance\n- **Bug fixes** and ensuring stable operation\n- **Mobile device adaptation** for convenient shopping\n\n### Benefits for Customers\n\n- **Wide selection** of construction materials from leading manufacturers\n- **Convenient online ordering** with quick checkout\n- **Delivery in Nizhny Novgorod** with flexible rates\n- **Current product availability** with regular updates\n- **Competitive prices** and special offers\n\n### Target Audience\n\n- **Private individuals** planning apartment and house renovations\n- **Professional builders** and finishers\n- **Installation teams** and contractors\n- **Renovation companies** and design studios\n\n### Technical Features\n\n- **Modern platform** for online trading\n- **Responsive design** for all devices\n- **Optimized performance** and fast loading\n- **Secure payments** and customer data protection\n- **SEO optimization** for attracting organic traffic",
+      "features": [
+        "Product catalog with filtering",
+        "Delivery cost calculation",
+        "Online shopping and cart",
+        "Personal account with purchase history",
+        "Responsive design for mobile",
+        "Technical support and optimization"
       ]
     }
   }

@@ -38,6 +38,13 @@ export function Projects() {
       image: "/projects/harmonizeMe.png",
       technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
     },
+    {
+      id: "stroyrem",
+      title: t("projects.stroyrem.title"),
+      description: t("projects.stroyrem.description"),
+      image: "/projects/stroyrem.png",
+      technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
+    },
   ];
 
   return (

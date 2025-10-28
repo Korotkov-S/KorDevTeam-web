@@ -22,7 +22,9 @@ export function ProjectPage() {
       fullDescription: t("projectDetails.noodome.fullDescription"),
       image: "/projects/noodome.png",
       technologies: ["React Native", "Node.js", "PostgreSQL"],
-      features: t("projectDetails.noodome.features", { returnObjects: true }) as string[],
+      features: t("projectDetails.noodome.features", {
+        returnObjects: true,
+      }) as string[],
       demoUrl: "#",
       githubUrl: "#",
     },
@@ -33,7 +35,9 @@ export function ProjectPage() {
       fullDescription: t("projectDetails.asg.fullDescription"),
       image: "/projects/asg.png",
       technologies: ["React.js", "Laravel", "MySQL"],
-      features: t("projectDetails.asg.features", { returnObjects: true }) as string[],
+      features: t("projectDetails.asg.features", {
+        returnObjects: true,
+      }) as string[],
       demoUrl: "#",
       githubUrl: "#",
     },
@@ -44,7 +48,9 @@ export function ProjectPage() {
       fullDescription: t("projectDetails.sims.fullDescription"),
       image: "/projects/sims.png",
       technologies: ["Next.js", "Node.js", "PostgreSQL"],
-      features: t("projectDetails.sims.features", { returnObjects: true }) as string[],
+      features: t("projectDetails.sims.features", {
+        returnObjects: true,
+      }) as string[],
       demoUrl: "https://simsdynastytree.com/ru",
     },
     {
@@ -54,8 +60,22 @@ export function ProjectPage() {
       fullDescription: t("projectDetails.harmonizeMe.fullDescription"),
       image: "/projects/harmonizeMe.png",
       technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
-      features: t("projectDetails.harmonizeMe.features", { returnObjects: true }) as string[],
+      features: t("projectDetails.harmonizeMe.features", {
+        returnObjects: true,
+      }) as string[],
       demoUrl: "https://iharmo.com/ru",
+    },
+    {
+      id: "stroyrem",
+      title: t("projects.stroyrem.title"),
+      description: t("projectDetails.stroyrem.description"),
+      fullDescription: t("projectDetails.stroyrem.fullDescription"),
+      image: "/projects/stroyrem.png",
+      technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
+      features: t("projectDetails.stroyrem.features", {
+        returnObjects: true,
+      }) as string[],
+      demoUrl: "https://stroyrem-nn.ru",
     },
   ];
 
@@ -82,7 +102,9 @@ export function ProjectPage() {
     return (
       <div className="min-h-screen pt-20 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">{t("projectPage.notFound")}</h1>
+          <h1 className="text-2xl font-bold mb-4">
+            {t("projectPage.notFound")}
+          </h1>
           <Button onClick={navigateGoBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             {t("projectPage.backToHome")}
