@@ -45,6 +45,13 @@ export function Projects() {
       image: "/projects/stroyrem.png",
       technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
     },
+    {
+      id: "wowbanner",
+      title: t("projects.wowbanner.title"),
+      description: t("projects.wowbanner.description"),
+      image: "/projects/wowbanner.png",
+      technologies: ["React.js", "Node.js", "MongoDB"],
+    },
   ];
 
   return (

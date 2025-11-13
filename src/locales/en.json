@@ -79,6 +79,10 @@
     "stroyrem": {
       "title": "Stroyrem",
       "description": "Online store of construction and finishing materials in Nizhny Novgorod with city delivery"
+    },
+    "wowbanner": {
+      "title": "WowBanner.ru",
+      "description": "Creating advertising banners and creatives for internet marketing"
     }
   },
   "blog": {
@@ -215,6 +219,18 @@
         "Personal account with purchase history",
         "Responsive design for mobile",
         "Technical support and optimization"
+      ]
+    },
+    "wowbanner": {
+      "description": "WowBanner.ru is a service for creating advertising banners and creatives for internet marketing. The platform provides tools for quickly creating professional advertising materials in various formats.",
+      "fullDescription": "## WowBanner.ru - Creating Advertising Banners and Creatives\n\nSpecialized platform for creating advertising banners and creatives for internet marketing. The service provides a wide range of tools and templates for quickly creating professional advertising materials.\n\n### Main Specialization\n\n**Service Type:** Online advertising banner constructor\n\n**Areas of Activity:**\n- Creating banners for websites\n- Developing creatives for social media\n- Designing advertising materials\n- Creating presentation materials\n\n### Key Platform Features\n\n- **Ready-made templates** of various sizes and styles\n- **Intuitive editor** with drag-and-drop functionality\n- **Image library** and graphic elements\n- **Export in various formats** (PNG, JPG, PDF)\n- **Responsive sizes** for different devices and platforms\n- **Branding and customization** for corporate style\n\n### Technical Capabilities\n\n- **Cloud storage** of projects and templates\n- **Collaborative work** on projects\n- **Versioning** and change history\n- **API integration** for automation\n- **Scaling** for high loads\n\n### Benefits for Users\n\n- **Quick creation** of advertising materials without design skills\n- **Professional quality** of finished creatives\n- **Time saving** on creating advertising materials\n- **Accessibility** for users of any level\n- **Regular updates** of templates and features\n\n### Target Audience\n\n- **Marketers** and SMM specialists\n- **Small business owners**\n- **Internet marketing agencies**\n- **Freelancers** in design\n- **Content managers**\n\n### Technical Features\n\n- **Modern web interface** with high performance\n- **Responsive design** for all devices\n- **Data security** and privacy\n- **SEO optimization** for attracting clients\n- **Integration with popular** advertising platforms",
+      "features": [
+        "Ready-made banner templates",
+        "Intuitive editor",
+        "Graphic elements library",
+        "Export in various formats",
+        "Cloud project storage",
+        "Collaborative work on projects"
       ]
     }
   }

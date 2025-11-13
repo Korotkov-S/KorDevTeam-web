@@ -77,6 +77,18 @@ export function ProjectPage() {
       }) as string[],
       demoUrl: "https://stroyrem-nn.ru",
     },
+    {
+      id: "wowbanner",
+      title: t("projects.wowbanner.title"),
+      description: t("projectDetails.wowbanner.description"),
+      fullDescription: t("projectDetails.wowbanner.fullDescription"),
+      image: "/projects/wowbanner.png",
+      technologies: ["React.js", "Node.js", "MongoDB"],
+      features: t("projectDetails.wowbanner.features", {
+        returnObjects: true,
+      }) as string[],
+      demoUrl: "https://wowbanner.ru/",
+    },
   ];
 
   const project = projects.find((p) => p.id === projectId);
