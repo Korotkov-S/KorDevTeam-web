@@ -252,12 +252,12 @@ export function ProjectPage() {
                   <h3 className="text-lg font-semibold mb-4">
                     {t("projectPage.usedTechnologies")}
                   </h3>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
                     {project.technologies.map((tech, index) => (
                       <Badge
                         key={index}
                         variant="outline"
-                        className="border-primary/30 text-primary"
+                        className="border-primary/30 text-primary h-6 min-h-6 flex items-center justify-center py-0 leading-none"
                       >
                         {tech}
                       </Badge>
