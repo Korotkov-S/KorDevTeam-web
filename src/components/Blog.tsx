@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Card,
@@ -35,7 +35,8 @@ export function Blog() {
   const [currentPage, setCurrentPage] = useState(1);
   const postsPerPage = 3;
 
-  const blogPosts: BlogPost[] = [
+  const blogPosts: BlogPost[] = useMemo(
+    () => [
     {
       id: "1",
       title: t("blog.posts.reactNative.title"),
@@ -72,7 +73,63 @@ export function Blog() {
       tags: t("blog.posts.laravel.tags", { returnObjects: true }) as string[],
       slug: "laravel-api-development",
     },
-  ];
+    {
+      id: "5",
+      title: t("blog.posts.businessAutomation.title"),
+      excerpt: t("blog.posts.businessAutomation.excerpt"),
+      date: t("blog.posts.businessAutomation.date"),
+      readTime: t("blog.posts.businessAutomation.readTime"),
+      tags: t("blog.posts.businessAutomation.tags", { returnObjects: true }) as string[],
+      slug: "business-automation",
+    },
+    {
+      id: "6",
+      title: t("blog.posts.crmImplementation.title"),
+      excerpt: t("blog.posts.crmImplementation.excerpt"),
+      date: t("blog.posts.crmImplementation.date"),
+      readTime: t("blog.posts.crmImplementation.readTime"),
+      tags: t("blog.posts.crmImplementation.tags", { returnObjects: true }) as string[],
+      slug: "crm-implementation",
+    },
+    {
+      id: "7",
+      title: t("blog.posts.telegramBroadcast.title"),
+      excerpt: t("blog.posts.telegramBroadcast.excerpt"),
+      date: t("blog.posts.telegramBroadcast.date"),
+      readTime: t("blog.posts.telegramBroadcast.readTime"),
+      tags: t("blog.posts.telegramBroadcast.tags", { returnObjects: true }) as string[],
+      slug: "telegram-broadcast-automation",
+    },
+    {
+      id: "8",
+      title: t("blog.posts.stoneCalculator.title"),
+      excerpt: t("blog.posts.stoneCalculator.excerpt"),
+      date: t("blog.posts.stoneCalculator.date"),
+      readTime: t("blog.posts.stoneCalculator.readTime"),
+      tags: t("blog.posts.stoneCalculator.tags", { returnObjects: true }) as string[],
+      slug: "stone-calculator-automation",
+    },
+    {
+      id: "9",
+      title: t("blog.posts.harmonizeMe.title"),
+      excerpt: t("blog.posts.harmonizeMe.excerpt"),
+      date: t("blog.posts.harmonizeMe.date"),
+      readTime: t("blog.posts.harmonizeMe.readTime"),
+      tags: t("blog.posts.harmonizeMe.tags", { returnObjects: true }) as string[],
+      slug: "harmonize-me-platform",
+    },
+    {
+      id: "10",
+      title: t("blog.posts.simsDynastyTree.title"),
+      excerpt: t("blog.posts.simsDynastyTree.excerpt"),
+      date: t("blog.posts.simsDynastyTree.date"),
+      readTime: t("blog.posts.simsDynastyTree.readTime"),
+      tags: t("blog.posts.simsDynastyTree.tags", { returnObjects: true }) as string[],
+      slug: "sims-dynasty-tree-platform",
+    },
+  ],
+    [t]
+  );
 
   const totalPages = Math.ceil(blogPosts.length / postsPerPage);
   const startIndex = (currentPage - 1) * postsPerPage;
@@ -95,47 +152,47 @@ export function Blog() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
           {currentPosts.map((post) => (
-            <Link key={post.id} to={`/blog/${post.slug}`} className="block">
-              <Card className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer group h-full">
-                <CardHeader>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>{post.date}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{post.readTime}</span>
-                    </div>
-                  </div>
-                  <CardTitle className="group-hover:text-primary transition-colors">
-                    {post.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-muted-foreground mb-4">
-                    {post.excerpt}
-                  </CardDescription>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {post.tags.map((tag, index) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    className="group/btn p-0 h-auto hover:bg-transparent"
-                  >
-                    <span className="text-primary">{t("blog.readMore")}</span>
-                    <ArrowRight className="ml-2 w-4 h-4 text-primary group-hover/btn:translate-x-1 transition-transform" />
-                  </Button>
-                </CardContent>
-              </Card>
+                  <Link key={post.id} to={`/blog/${post.slug}`} className="block">
+                    <Card className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer group h-full">
+                      <CardHeader>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>{post.date}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{post.readTime}</span>
+                          </div>
+                        </div>
+                        <CardTitle className="group-hover:text-primary transition-colors">
+                          {post.title}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <CardDescription className="text-muted-foreground mb-4">
+                          {post.excerpt}
+                        </CardDescription>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {post.tags.map((tag, index) => (
+                            <Badge
+                              key={index}
+                              variant="secondary"
+                              className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors"
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          className="group/btn p-0 h-auto hover:bg-transparent"
+                        >
+                          <span className="text-primary">{t("blog.readMore")}</span>
+                          <ArrowRight className="ml-2 w-4 h-4 text-primary group-hover/btn:translate-x-1 transition-transform" />
+                        </Button>
+                      </CardContent>
+                    </Card>
             </Link>
           ))}
         </div>

@@ -10,23 +10,9 @@ React Native continues to be one of the most popular frameworks for mobile app d
 
 Wrap components in `React.memo` to avoid unnecessary re-renders:
 
-```javascript
-const MyComponent = React.memo(({ data }) => {
-  return <View>{data}</View>;
-});
-```
-
 ### FlatList instead of ScrollView
 
 For long lists, always use `FlatList` or `SectionList` instead of `ScrollView`:
-
-```javascript
-<FlatList
-  data={items}
-  renderItem={({ item }) => <ItemComponent item={item} />}
-  keyExtractor={item => item.id}
-/>
-```
 
 ## 2. State Management
 
@@ -40,33 +26,9 @@ Choose the right solution for state management depending on app size:
 
 TypeScript is essential for modern development:
 
-```typescript
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-const UserProfile: React.FC<{ user: User }> = ({ user }) => {
-  return <Text>{user.name}</Text>;
-};
-```
-
 ## 4. Error Handling
 
 Use Error Boundaries to catch errors:
-
-```javascript
-class ErrorBoundary extends React.Component {
-  componentDidCatch(error, errorInfo) {
-    console.log('Error:', error, errorInfo);
-  }
-  
-  render() {
-    return this.props.children;
-  }
-}
-```
 
 ## Conclusion
 

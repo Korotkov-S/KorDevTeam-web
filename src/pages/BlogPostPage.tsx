@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Button } from "../components/ui/button";
@@ -23,16 +23,15 @@ export function BlogPostPage() {
 
   // Получаем метаданные из переводов
 
-  const navigateGoBack = () => {
+  const navigateGoBack = useCallback(() => {
     if (window.history.state?.idx > 0) {
       navigate(-1);
     } else {
       navigate("/");
     }
-  };
+  }, [navigate]);
 
-  useEffect(() => {
-    const blogPostsData: Record<string, BlogPostMeta> = {
+  const blogPostsData = useMemo<Record<string, BlogPostMeta>>(() => ({
       "react-native-best-practices": {
         title: t("blog.posts.reactNative.title"),
         date: t("blog.posts.reactNative.date"),
@@ -63,22 +62,71 @@ export function BlogPostPage() {
         readTime: t("blog.posts.laravel.readTime"),
         tags: t("blog.posts.laravel.tags", { returnObjects: true }) as string[],
       },
-    };
+      "business-automation": {
+        title: t("blog.posts.businessAutomation.title"),
+        date: t("blog.posts.businessAutomation.date"),
+        readTime: t("blog.posts.businessAutomation.readTime"),
+        tags: t("blog.posts.businessAutomation.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "crm-implementation": {
+        title: t("blog.posts.crmImplementation.title"),
+        date: t("blog.posts.crmImplementation.date"),
+        readTime: t("blog.posts.crmImplementation.readTime"),
+        tags: t("blog.posts.crmImplementation.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "telegram-broadcast-automation": {
+        title: t("blog.posts.telegramBroadcast.title"),
+        date: t("blog.posts.telegramBroadcast.date"),
+        readTime: t("blog.posts.telegramBroadcast.readTime"),
+        tags: t("blog.posts.telegramBroadcast.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "stone-calculator-automation": {
+        title: t("blog.posts.stoneCalculator.title"),
+        date: t("blog.posts.stoneCalculator.date"),
+        readTime: t("blog.posts.stoneCalculator.readTime"),
+        tags: t("blog.posts.stoneCalculator.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "harmonize-me-platform": {
+        title: t("blog.posts.harmonizeMe.title"),
+        date: t("blog.posts.harmonizeMe.date"),
+        readTime: t("blog.posts.harmonizeMe.readTime"),
+        tags: t("blog.posts.harmonizeMe.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "sims-dynasty-tree-platform": {
+        title: t("blog.posts.simsDynastyTree.title"),
+        date: t("blog.posts.simsDynastyTree.date"),
+        readTime: t("blog.posts.simsDynastyTree.readTime"),
+        tags: t("blog.posts.simsDynastyTree.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+    }), [t]);
+
+  useEffect(() => {
+    if (!slug) {
+      navigateGoBack();
+      return;
+    }
+
+    const postMeta = blogPostsData[slug];
+    if (!postMeta) {
+      navigateGoBack();
+      return;
+    }
+
+    setMeta(postMeta);
 
     const loadMarkdown = async () => {
-      if (!slug) {
-        navigateGoBack();
-        return;
-      }
-
-      const postMeta = blogPostsData[slug];
-      if (!postMeta) {
-        navigateGoBack();
-        return;
-      }
-
-      setMeta(postMeta);
-
       try {
         setLoading(true);
         // Определяем язык и загружаем соответствующую версию статьи
@@ -98,7 +146,7 @@ export function BlogPostPage() {
     };
 
     loadMarkdown();
-  }, [slug, navigate, i18n.language]);
+  }, [slug, navigate, i18n.language, blogPostsData, navigateGoBack]);
 
   useEffect(() => {
     if (meta) {

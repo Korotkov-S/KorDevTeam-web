@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
@@ -19,50 +19,74 @@ export function Projects() {
   const [currentPage, setCurrentPage] = useState(1);
   const projectsPerPage = 3;
 
-  const projects = [
-    {
-      id: "Mediа & Entertainment",
-      title: t("projects.noodome.title"),
-      description: t("projects.noodome.description"),
-      image: "/projects/noodome.png",
-      technologies: ["React", "Node.js", "PostgreSQL", "Stripe"],
-    },
-    {
-      id: "web-site",
-      title: t("projects.asg.title"),
-      description: t("projects.asg.description"),
-      image: "/projects/asg.png",
-      technologies: ["React.js", "Laravel", "MySQL"],
-    },
-    {
-      id: "web-service",
-      title: t("projects.sims.title"),
-      description: t("projects.sims.description"),
-      image: "/projects/sims.png",
-      technologies: ["Next.js", "Node.js", "PostgreSQL"],
-    },
-    {
-      id: "harmonize-me",
-      title: t("projects.harmonizeMe.title"),
-      description: t("projects.harmonizeMe.description"),
-      image: "/projects/harmonizeMe.png",
-      technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
-    },
-    {
-      id: "stroyrem",
-      title: t("projects.stroyrem.title"),
-      description: t("projects.stroyrem.description"),
-      image: "/projects/stroyrem.png",
-      technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
-    },
-    {
-      id: "wowbanner",
-      title: t("projects.wowbanner.title"),
-      description: t("projects.wowbanner.description"),
-      image: "/projects/wowbanner.png",
-      technologies: ["React.js", "Node.js", "MongoDB"],
-    },
-  ];
+  const projects = useMemo(
+    () => [
+      {
+        id: "Media & Entertainment",
+        title: t("projects.noodome.title"),
+        description: t("projects.noodome.description"),
+        image: "/projects/noodome.png",
+        technologies: ["React", "Node.js", "PostgreSQL", "Stripe"],
+      },
+      {
+        id: "web-site",
+        title: t("projects.asg.title"),
+        description: t("projects.asg.description"),
+        image: "/projects/asg.png",
+        technologies: ["React.js", "Laravel", "MySQL"],
+      },
+      {
+        id: "web-service",
+        title: t("projects.sims.title"),
+        description: t("projects.sims.description"),
+        image: "/projects/sims.png",
+        technologies: ["Next.js", "Node.js", "PostgreSQL"],
+      },
+      {
+        id: "harmonize-me",
+        title: t("projects.harmonizeMe.title"),
+        description: t("projects.harmonizeMe.description"),
+        image: "/projects/harmonizeMe.png",
+        technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
+      },
+      {
+        id: "stroyrem",
+        title: t("projects.stroyrem.title"),
+        description: t("projects.stroyrem.description"),
+        image: "/projects/stroyrem.png",
+        technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
+      },
+      {
+        id: "wowbanner",
+        title: t("projects.wowbanner.title"),
+        description: t("projects.wowbanner.description"),
+        image: "/projects/wowbanner.png",
+        technologies: ["React.js", "Node.js", "MongoDB"],
+      },
+      {
+        id: "serviceplus",
+        title: t("projects.serviceplus.title"),
+        description: t("projects.serviceplus.description"),
+        image: "/projects/serviceplus.png",
+        technologies: ["React Native", "Node.js", "PostgreSQL"],
+      },
+      {
+        id: "amch",
+        title: t("projects.amch.title"),
+        description: t("projects.amch.description"),
+        image: "/projects/amch.png",
+        technologies: ["Python", "React.js", "PostgreSQL"],
+      },
+      {
+        id: "notion-analog",
+        title: t("projects.notionAnalog.title"),
+        description: t("projects.notionAnalog.description"),
+        image: "/projects/notion.png",
+        technologies: ["React.js", "Node.js", "PostgreSQL"],
+      },
+    ],
+    [t]
+  );
 
   const totalPages = Math.ceil(projects.length / projectsPerPage);
   const startIndex = (currentPage - 1) * projectsPerPage;

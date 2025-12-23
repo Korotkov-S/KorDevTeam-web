@@ -1,3 +1,4 @@
+import React from "react";
 import { Button } from "./ui/button";
 import { ArrowRight, Code2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -16,15 +17,24 @@ export function Hero() {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
 
       {/* Grid pattern */}
-      <div className="absolute inset-0" style={{backgroundImage: `linear-gradient(to right, var(--grid-color) 1px, transparent 1px), linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px)`, backgroundSize: '4rem 4rem', maskImage: 'radial-gradient(ellipse 60% 50% at 50% 50%, #000 70%, transparent 100%)'}} />
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `linear-gradient(to right, var(--grid-color) 1px, transparent 1px), linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px)`,
+          backgroundSize: "4rem 4rem",
+          maskImage:
+            "radial-gradient(ellipse 60% 50% at 50% 50%, #000 70%, transparent 100%)",
+        }}
+      />
 
       <div className="container mx-auto px-4 py-20 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-8" style={{backdropFilter: 'blur(1.2px)'}}>
+          <div
+            className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-8"
+            style={{ backdropFilter: "blur(1.2px)" }}
+          >
             <Code2 className="w-4 h-4 text-primary" />
-            <span className="text-sm text-primary">
-              {t("hero.badge")}
-            </span>
+            <span className="text-sm text-primary">{t("hero.badge")}</span>
           </div>
 
           <h1 className="text-4xl md:text-6xl mb-6 bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">

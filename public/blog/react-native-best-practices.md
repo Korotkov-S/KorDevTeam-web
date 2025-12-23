@@ -10,23 +10,9 @@ React Native продолжает оставаться одним из самы�
 
 Оборачивайте компоненты в `React.memo`, чтобы избежать ненужных перерисовок:
 
-```javascript
-const MyComponent = React.memo(({ data }) => {
-  return <View>{data}</View>;
-});
-```
-
 ### FlatList вместо ScrollView
 
 Для длинных списков всегда используйте `FlatList` или `SectionList` вместо `ScrollView`:
-
-```javascript
-<FlatList
-  data={items}
-  renderItem={({ item }) => <ItemComponent item={item} />}
-  keyExtractor={item => item.id}
-/>
-```
 
 ## 2. Управление состоянием
 
@@ -40,33 +26,9 @@ const MyComponent = React.memo(({ data }) => {
 
 TypeScript обязателен для современной разработки:
 
-```typescript
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-const UserProfile: React.FC<{ user: User }> = ({ user }) => {
-  return <Text>{user.name}</Text>;
-};
-```
-
 ## 4. Обработка ошибок
 
 Используйте Error Boundaries для перехвата ошибок:
-
-```javascript
-class ErrorBoundary extends React.Component {
-  componentDidCatch(error, errorInfo) {
-    console.log('Error:', error, errorInfo);
-  }
-  
-  render() {
-    return this.props.children;
-  }
-}
-```
 
 ## Заключение
 

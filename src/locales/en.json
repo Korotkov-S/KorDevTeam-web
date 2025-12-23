@@ -60,6 +60,12 @@
   "projects": {
     "title": "Our Projects",
     "subtitle": "Examples of our work — from web applications to mobile solutions",
+    "filters": {
+      "all": "All",
+      "mobile": "Mobile Apps",
+      "webService": "Web Services",
+      "website": "Websites"
+    },
     "noodome": {
       "title": "Mobile App for Noodome Business Club",
       "description": "Mobile app is a digital member key: room booking, events, networking, personal account and payment."
@@ -83,6 +89,18 @@
     "wowbanner": {
       "title": "WowBanner.ru",
       "description": "Creating advertising banners and creatives for internet marketing"
+    },
+    "serviceplus": {
+      "title": "Service-Plus: Mobile App for Equipment Inspection",
+      "description": "Mobile application for mining company for equipment inspection and damage recording with offline mode and data synchronization."
+    },
+    "amch": {
+      "title": "AMCH: Venture Investment Service",
+      "description": "Website redesign and Python backend development for venture investment service."
+    },
+    "notionAnalog": {
+      "title": "Notion Analog for Federal Companies",
+      "description": "Development of Notion analog for large federal companies with licensing system, Russian localization and support for Russian OS."
     }
   },
   "blog": {
@@ -90,18 +108,46 @@
     "subtitle": "Sharing experience, knowledge and best practices in development",
     "readMore": "Read More",
     "backToBlog": "Back to Blog",
+    "filters": {
+      "all": "All",
+      "reactNative": "React Native",
+      "mobileDevelopment": "Mobile Development",
+      "nodejs": "Node.js",
+      "nestjs": "NestJS",
+      "microservices": "Microservices",
+      "wordpress": "WordPress",
+      "optimization": "Optimization",
+      "php": "PHP",
+      "laravel": "Laravel",
+      "apiDevelopment": "API Development",
+      "automation": "Automation",
+      "businessProcesses": "Business Processes",
+      "efficiency": "Efficiency",
+      "crm": "CRM",
+      "salesAutomation": "Sales Automation",
+      "customerManagement": "Customer Management",
+      "telegramBot": "Telegram Bot",
+      "coldSales": "Cold Sales",
+      "webService": "Web Service",
+      "calculator": "Calculator",
+      "webPlatform": "Web Platform",
+      "education": "Education",
+      "ai": "AI",
+      "graphs": "Graphs",
+      "genealogy": "Genealogy"
+    },
     "posts": {
       "reactNative": {
         "title": "Best Practices for React Native Development in 2025",
         "excerpt": "React Native continues to be one of the most popular frameworks for mobile app development. In this article, we'll look at key practices...",
-        "date": "October 20, 2025",
+        "date": "October 30, 2025",
         "readTime": "8 min",
         "tags": ["React Native", "Mobile Development"]
       },
       "microservices": {
         "title": "Microservices Architecture on Node.js with NestJS",
         "excerpt": "Microservices architecture allows breaking down a monolithic application into small, independent services that are easy to scale and maintain...",
-        "date": "October 15, 2025",
+        "date": "October 20, 2025",
         "readTime": "12 min",
         "tags": ["Node.js", "NestJS", "Microservices"]
       },
@@ -115,9 +161,51 @@
       "laravel": {
         "title": "RESTful API Development on Laravel: Complete Guide",
         "excerpt": "Laravel is one of the most popular PHP frameworks for creating web applications and APIs. In this guide, we'll create a full-fledged RESTful API...",
-        "date": "October 5, 2025",
+        "date": "October 1, 2025",
         "readTime": "15 min",
         "tags": ["Laravel", "PHP", "API Development"]
+      },
+      "businessAutomation": {
+        "title": "Business Process Automation: How to Increase Company Efficiency in 2025",
+        "excerpt": "Business process automation has become a key success factor for modern companies. In 2025, technologies allow automating up to 80% of routine operations, significantly increasing efficiency and reducing operational costs...",
+        "date": "November 10, 2025",
+        "readTime": "12 min",
+        "tags": ["Automation", "Business Processes", "Efficiency"]
+      },
+      "crmImplementation": {
+        "title": "CRM Implementation: Complete Guide to Sales Automation in 2025",
+        "excerpt": "CRM systems have become an integral part of modern business. A properly implemented CRM system can increase sales by 30-50%, improve customer service quality, and optimize sales team operations...",
+        "date": "November 20, 2025",
+        "readTime": "14 min",
+        "tags": ["CRM", "Sales Automation", "Customer Management"]
+      },
+      "telegramBroadcast": {
+        "title": "Telegram Broadcast Automation: Saving 16 Hours of Work for Kusidis PRO",
+        "excerpt": "Real case study of automating mass messaging through a Telegram bot for Kusidis PRO massage salon in Vladimir. The solution saved 16 hours of manual work per month and increased conversion by 30% thanks to personalization...",
+        "date": "November 30, 2025",
+        "readTime": "16 min",
+        "tags": ["Telegram Bot", "Automation", "Cold Sales"]
+      },
+      "stoneCalculator": {
+        "title": "Stone Products Calculator: Automating Estimates and Saving Up to 80% of Time",
+        "excerpt": "Web service for a Moscow company producing stone products. Combines a visual drawing editor (simplified AutoCAD), automatic estimate calculation, and commercial proposal generation. The solution reduced time spent on creating estimates by up to 80%...",
+        "date": "December 10, 2025",
+        "readTime": "18 min",
+        "tags": ["Web Service", "Automation", "Calculator"]
+      },
+      "harmonizeMe": {
+        "title": "Harmonize Me Platform: Comprehensive Development of Online Psychology Courses with Gamification and AI Support",
+        "excerpt": "Development of Harmonize Me web platform — online psychology courses for weight management. The platform includes personal accounts, course system, bonuses for completion, mini product shop, publications, and AI psychologist bot integration for 24/7 user support...",
+        "date": "December 20, 2025",
+        "readTime": "20 min",
+        "tags": ["Web Platform", "Education", "AI"]
+      },
+      "simsDynastyTree": {
+        "title": "SimsDynastyTree: Development of Genealogy Tree Service Based on Graphs for The Sims Fans",
+        "excerpt": "Development of SimsDynastyTree web service — platform for creating genealogy trees for The Sims fans. The service is implemented using graphs for efficient relationship storage, includes tree customization, detailed character and pet profiles, subscription system with international payments...",
+        "date": "December 23, 2025",
+        "readTime": "19 min",
+        "tags": ["Web Service", "Graphs", "Genealogy"]
       }
     }
   },
@@ -231,6 +319,54 @@
         "Export in various formats",
         "Cloud project storage",
         "Collaborative work on projects"
+      ]
+    },
+    "serviceplus": {
+      "description": "Mobile application for mining company for equipment inspection and damage recording with offline mode and data synchronization.",
+      "fullDescription": "## Service-Plus: Mobile App for Equipment Inspection\n\nMobile application for mining company designed to systematize the equipment inspection process and record damages. The solution ensures efficient operation in conditions of unstable internet connection and allows monitoring equipment technical condition.\n\n### Main Features\n\n- **Equipment Inspection:** Structured equipment inspection process with ability to record all detected damages\n- **Damage Recording:** Detailed defect recording with photo attachments and descriptions\n- **Offline Mode:** Full application functionality without internet connection\n\n### Smart Data Management\n\n- **Device Storage:** All data is saved locally on employee's phone\n- **Memory Check:** Automatic free space monitoring on device before data saving\n- **Synchronization:** Automatic network availability check and data synchronization when connected to internet\n- **Reliable Storage:** Data safety guarantee even during connection failures\n\n### Authorization System\n\n- **Employee ID Login:** Convenient employee authorization by employee ID\n- **Login History:** System remembers all employees who logged into the application\n- **Security:** Access control to application and user activity tracking\n\n### Administrative Panel\n\n- **Branding Customization:** Ability to change company logo in administrative panel\n- **Color Settings:** Flexible application color scheme customization to match corporate style\n- **Holdings Management:** Administrative panel for managing multiple holdings with individual settings\n- **Defect Analytics:** Centralized information output about all defects detected during equipment inspection\n- **Reporting:** Detailed statistics and reports on inspections and identified issues\n\n### Technical Features\n\n- **Memory Optimization:** Efficient device memory usage\n- **Reliable Synchronization:** Smart synchronization system with data conflict handling\n- **Performance:** Fast application operation even with large data volumes\n- **Adaptability:** Operation on various mobile device models\n\n### Business Benefits\n\n- **Quality Control:** Systematization of equipment inspection process\n- **Downtime Reduction:** Timely problem detection and repair planning\n- **Transparency:** Complete real-time equipment condition information\n- **Efficiency:** Reduction of time spent on document and report filling\n\n### Conclusion\n\nService-Plus application is a comprehensive solution for mining company that ensures effective equipment technical condition control, operation in unstable connection conditions, and centralized data management through administrative panel.",
+      "features": [
+        "Equipment inspection and damage recording",
+        "Offline mode operation",
+        "Device data storage with memory check",
+        "Automatic synchronization when network available",
+        "Employee ID login",
+        "Employee login history",
+        "Administrative panel for customization",
+        "Company logo and color changes",
+        "Holdings management",
+        "Defect analytics and reporting"
+      ]
+    },
+    "amch": {
+      "description": "Website redesign and Python backend development for venture investment service.",
+      "fullDescription": "## AMCH: Venture Investment Service\n\nComprehensive work on website redesign and backend development for venture investment platform. The project includes user interface update and creation of reliable server-side on Python.\n\n### Website Redesign\n\n- **Modern Interface:** Complete user interface redesign with focus on usability\n- **Responsive Layout:** Optimization for all device types — desktop, tablet, mobile\n- **Improved Navigation:** Intuitive website structure for convenient information search\n- **Visual Identity:** Design update in accordance with modern trends\n\n### Python Backend Development\n\n- **Server Architecture:** Development of reliable backend on Python\n- **API Integration:** Creation of RESTful API for frontend and backend interaction\n- **Data Processing:** Efficient processing of venture investment data\n- **Security:** Implementation of security measures for financial data protection\n\n### Platform Functionality\n\n- **Investment Management:** System for managing venture investment portfolio\n- **Analytics:** Tools for analyzing investment opportunities\n- **Document Management:** Automation of document and reporting work\n- **User Accounts:** Personal accounts for investors and companies\n\n### Technical Features\n\n- **Performance:** Optimization of website and API speed\n- **Scalability:** Architecture ready for load growth\n- **Reliability:** Stable system operation without failures\n- **Integrations:** Ability to integrate with external services\n\n### Business Benefits\n\n- **Modern Look:** Updated design increases user trust\n- **Usability:** Improved UX increases conversion\n- **Efficiency:** Process automation reduces operational costs\n- **Competitive Advantage:** Modern platform stands out in the market\n\n### Conclusion\n\nAMCH project demonstrates comprehensive approach to venture investment platform development, combining modern design with reliable Python backend. The solution ensures efficient investment work and convenient user experience.",
+      "features": [
+        "Website redesign with modern interface",
+        "Python backend development",
+        "RESTful API for integration",
+        "Responsive layout for all devices",
+        "Venture investment management",
+        "Analytics and reporting",
+        "User accounts",
+        "Data security",
+        "Performance optimization",
+        "External service integrations"
+      ]
+    },
+    "notionAnalog": {
+      "description": "Development of Notion analog for large federal companies with licensing system, Russian localization and support for Russian OS.",
+      "fullDescription": "## Notion Analog for Federal Companies\n\nDevelopment of corporate solution based on Notion analog for large federal companies. The project included work with product team on creating full-featured platform for document management and knowledge management considering specifics of Russian market.\n\n### Platform Development\n\n- **Notion Analog:** Creation of full-featured platform for creating and managing documents, knowledge bases and projects\n- **Product Team Collaboration:** Close collaboration with product team to implement business requirements\n- **Corporate Features:** Adaptation of functionality to needs of large federal companies\n- **Scalability:** Architecture designed for work with large number of users and data\n\n### Licensing System\n\n- **Flexible Licensing:** Implementation of licensing system for managing user access\n- **Corporate Licenses:** Support for various license types for different access levels\n- **Usage Control:** Tracking license usage and management\n- **Security:** Protection against unauthorized use\n\n### Russian Localization\n\n- **Full Localization:** Translation of entire interface to Russian language\n- **Content Adaptation:** Adaptation of functionality to Russian standards and practices\n- **Format Localization:** Support for Russian date, number and document formats\n- **Cultural Adaptation:** Consideration of Russian company work specifics\n\n### Deployment for Russian OS\n\n- **Russian OS Support:** Deployment of application versions for work on Russian operating systems\n- **Compatibility:** Ensuring compatibility with various Russian distributions\n- **Testing:** Verification of functionality on target platforms\n- **Optimization:** Performance adaptation to Russian OS specifics\n\n### Platform Functionality\n\n- **Document Creation:** Rich editor for creating various document types\n- **Knowledge Bases:** Organization and structuring of corporate knowledge\n- **Project Management:** Tools for planning and tracking projects\n- **Collaboration:** Capabilities for collaborative work on documents and projects\n- **Integrations:** Connection to corporate systems and services\n\n### Technical Features\n\n- **Performance:** Optimization for work with large data volumes\n- **Reliability:** Stable operation in corporate environment\n- **Security:** Compliance with security requirements for federal companies\n- **Scalability:** Ability to scale to growing needs\n\n### Business Benefits\n\n- **Regulatory Compliance:** Solution complies with Russian legislation requirements\n- **Data Security:** Data storage on Russian servers\n- **Corporate Control:** Full control over data and access\n- **Efficiency:** Improvement of document management and knowledge management processes\n\n### Conclusion\n\nProject demonstrates successful development of corporate solution based on Notion analog considering specifics of Russian market. Solution provides large federal companies with modern platform for work with documents and knowledge with full support of Russian standards and operating systems.",
+      "features": [
+        "Notion analog for corporate use",
+        "Licensing system and access management",
+        "Full Russian interface localization",
+        "Deployment for Russian OS",
+        "Product team collaboration",
+        "Corporate features and integrations",
+        "Knowledge bases and document management",
+        "Project management",
+        "Collaboration and teamwork",
+        "Security and regulatory compliance"
       ]
     }
   }

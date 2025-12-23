@@ -16,7 +16,7 @@ export function ProjectPage() {
   // Расширенные данные проектов с переводом
   const projects = [
     {
-      id: "Mediа & Entertainment",
+      id: "Media & Entertainment",
       title: t("projects.noodome.title"),
       description: t("projectDetails.noodome.description"),
       fullDescription: t("projectDetails.noodome.fullDescription"),
@@ -88,6 +88,45 @@ export function ProjectPage() {
         returnObjects: true,
       }) as string[],
       demoUrl: "https://wowbanner.ru/",
+    },
+    {
+      id: "serviceplus",
+      title: t("projects.serviceplus.title"),
+      description: t("projectDetails.serviceplus.description"),
+      fullDescription: t("projectDetails.serviceplus.fullDescription"),
+      image: "/projects/serviceplus.png",
+      technologies: ["React Native", "Node.js", "PostgreSQL"],
+      features: t("projectDetails.serviceplus.features", {
+        returnObjects: true,
+      }) as string[],
+      demoUrl: "https://servicplus.ru/",
+      githubUrl: "#",
+    },
+    {
+      id: "amch",
+      title: t("projects.amch.title"),
+      description: t("projectDetails.amch.description"),
+      fullDescription: t("projectDetails.amch.fullDescription"),
+      image: "/projects/amch.png",
+      technologies: ["Python", "React.js", "PostgreSQL"],
+      features: t("projectDetails.amch.features", {
+        returnObjects: true,
+      }) as string[],
+      demoUrl: "https://amch.ltd/ru/venture",
+      githubUrl: "#",
+    },
+    {
+      id: "notion-analog",
+      title: t("projects.notionAnalog.title"),
+      description: t("projectDetails.notionAnalog.description"),
+      fullDescription: t("projectDetails.notionAnalog.fullDescription"),
+      image: "/projects/notion.png",
+      technologies: ["React.js", "Node.js", "PostgreSQL"],
+      features: t("projectDetails.notionAnalog.features", {
+        returnObjects: true,
+      }) as string[],
+      demoUrl: "https://affine.pro/",
+      githubUrl: "#",
     },
   ];
 
