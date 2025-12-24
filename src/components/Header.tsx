@@ -6,6 +6,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../contexts/ThemeContext";
+import { VideoStory } from "./VideoStory";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -29,9 +30,9 @@ export function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border relative overflow-visible">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border relative">
       {/* Мерцающие гирлянды с синими LED огоньками */}
-      <div className="absolute -top-2 left-0 right-0 h-6 overflow-visible flex items-center pointer-events-none z-20">
+      <div className="absolute -top-2 left-0 right-0 h-6 flex items-center pointer-events-none z-20 overflow-hidden">
         <div className="w-full flex items-center justify-between px-1">
           {Array.from({ length: 50 }).map((_, i) => {
             const delay = Math.random() * 2;
@@ -130,6 +131,7 @@ export function Header() {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
+            <VideoStory />
             <LanguageToggle />
             <ThemeToggle />
             <Button onClick={() => scrollToSection("contact")}>
@@ -137,13 +139,16 @@ export function Header() {
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden text-foreground"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          {/* Mobile: VideoStory и кнопка меню */}
+          <div className="md:hidden flex items-center" style={{ gap: '10px' }}>
+            <VideoStory />
+            <button
+              className="text-foreground"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}

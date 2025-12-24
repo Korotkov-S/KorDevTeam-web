@@ -6,7 +6,7 @@ import { NewYearAnimation } from "../components/NewYearAnimation";
 
 export function Root() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden" style={{ maxWidth: '100vw' }}>
       <Header />
       <main>
         <Outlet />

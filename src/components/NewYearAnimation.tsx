@@ -18,6 +18,7 @@ export function NewYearAnimation() {
   useEffect(() => {
     // Создаем снежинки
     const flakes: Snowflake[] = [];
+    const maxDrift = 20; // Уменьшаем максимальный дрейф
     for (let i = 0; i < 60; i++) {
       flakes.push({
         id: i,
@@ -26,7 +27,7 @@ export function NewYearAnimation() {
         size: 8 + Math.random() * 12, // 8-20px
         opacity: 0.4 + Math.random() * 0.6, // 0.4-1
         delay: Math.random() * 5, // 0-5 секунд задержки
-        drift: -30 + Math.random() * 60, // -30px до +30px горизонтальное смещение
+        drift: -maxDrift + Math.random() * (maxDrift * 2), // -20px до +20px горизонтальное смещение
       });
     }
     setSnowflakes(flakes);
@@ -34,7 +35,7 @@ export function NewYearAnimation() {
 
   return (
     <>
-      <div className="fixed inset-0 pointer-events-none z-10 overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none z-10 overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
         {snowflakes.map((flake) => {
           const isDark = theme === "dark";
           const snowColor = isDark 

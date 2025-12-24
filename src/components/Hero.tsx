@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Button } from "./ui/button";
 import { ArrowRight, Code2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export function Hero() {
   const { t } = useTranslation();
+  const sectionRef = useRef<HTMLElement>(null);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -12,13 +13,14 @@ export function Hero() {
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
+    <section ref={sectionRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
+
+      {/* Background gradient overlay for better text readability */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background/80 to-background/90 z-[1] pointer-events-none" />
 
       {/* Grid pattern */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 z-[2] pointer-events-none"
         style={{
           backgroundImage: `linear-gradient(to right, var(--grid-color) 1px, transparent 1px), linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px)`,
           backgroundSize: "4rem 4rem",
@@ -27,7 +29,7 @@ export function Hero() {
         }}
       />
 
-      <div className="container mx-auto px-4 py-20 relative z-10">
+      <div className="container mx-auto px-4 pt-[100px] pb-20 relative z-[3]">
         <div className="max-w-4xl mx-auto text-center">
           <div
             className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-8"

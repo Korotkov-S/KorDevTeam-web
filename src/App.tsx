@@ -6,6 +6,7 @@ import {
 import { HomePage } from "./pages/HomePage";
 import { BlogPostPage } from "./pages/BlogPostPage";
 import { ProjectPage } from "./pages/ProjectPage";
+import { VideoPage } from "./pages/VideoPage";
 import { Root } from "./pages/Root";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./i18n";
@@ -26,6 +27,10 @@ const router = createBrowserRouter([
       {
         path: "/project/:projectId",
         element: <ProjectPage />,
+      },
+      {
+        path: "/video",
+        element: <VideoPage />,
       },
     ],
   },

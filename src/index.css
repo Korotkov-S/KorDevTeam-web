@@ -147,10 +147,12 @@
     font-feature-settings: var(--default-font-feature-settings, normal);
     font-variation-settings: var(--default-font-variation-settings, normal);
     -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
   }
 
   body {
     line-height: inherit;
+    overflow-x: hidden;
   }
 
   hr {
@@ -2349,4 +2351,23 @@ html {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Увеличенный z-index для модального окна сториса */
+[data-slot="dialog-content"].story-modal,
+.story-modal[data-slot="dialog-content"] {
+  z-index: 999999 !important;
+  position: fixed !important;
+}
+
+body [data-slot="dialog-overlay"] {
+  z-index: 999998 !important;
+}
+
+/* Убеждаемся что модальное окно видно */
+[data-slot="dialog-content"].story-modal[data-state="open"],
+.story-modal[data-state="open"] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: grid !important;
 }
