@@ -74,7 +74,7 @@ export function VideoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center pt-20">
+    <div className="min-h-screen bg-white dark:bg-black flex md:items-center justify-center pt-[100px] md:pt-20">
       <div className="w-full max-w-6xl mx-auto px-4">
         {/* Кнопка возврата */}
         <div className="mb-6 relative" style={{ zIndex: 10001 }}>

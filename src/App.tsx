@@ -7,6 +7,7 @@ import { HomePage } from "./pages/HomePage";
 import { BlogPostPage } from "./pages/BlogPostPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { VideoPage } from "./pages/VideoPage";
+import { UnderMetupPage } from "./pages/UnderMetupPage";
 import { Root } from "./pages/Root";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./i18n";
@@ -31,6 +32,10 @@ const router = createBrowserRouter([
       {
         path: "/video",
         element: <VideoPage />,
+      },
+      {
+        path: "/under-metup/:slug",
+        element: <UnderMetupPage />,
       },
     ],
   },

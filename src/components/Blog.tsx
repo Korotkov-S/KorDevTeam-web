@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -32,6 +32,7 @@ interface BlogPost {
 
 export function Blog() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const postsPerPage = 3;
 
@@ -152,8 +153,24 @@ export function Blog() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
           {currentPosts.map((post) => (
-                  <Link key={post.id} to={`/blog/${post.slug}`} className="block">
-                    <Card className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer group h-full">
+                    <Card 
+                      key={post.id} 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate(`/blog/${post.slug}`);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/blog/${post.slug}`);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer group h-full relative z-50"
+                      style={{ zIndex: 50 }}
+                    >
                       <CardHeader>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
                           <div className="flex items-center gap-1">
@@ -173,27 +190,23 @@ export function Blog() {
                         <CardDescription className="text-muted-foreground mb-4">
                           {post.excerpt}
                         </CardDescription>
-                        <div className="flex flex-wrap gap-2 mb-4">
+                        <div className="flex flex-wrap gap-2 mb-4 pointer-events-none">
                           {post.tags.map((tag, index) => (
                             <Badge
                               key={index}
                               variant="secondary"
-                              className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors"
+                              className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors pointer-events-none"
                             >
                               {tag}
                             </Badge>
                           ))}
                         </div>
-                        <Button
-                          variant="ghost"
-                          className="group/btn p-0 h-auto hover:bg-transparent"
-                        >
+                        <div className="group/btn flex items-center pointer-events-none">
                           <span className="text-primary">{t("blog.readMore")}</span>
                           <ArrowRight className="ml-2 w-4 h-4 text-primary group-hover/btn:translate-x-1 transition-transform" />
-                        </Button>
+                        </div>
                       </CardContent>
                     </Card>
-            </Link>
           ))}
         </div>
 

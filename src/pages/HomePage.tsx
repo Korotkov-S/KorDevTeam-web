@@ -3,6 +3,7 @@ import { Services } from "../components/Services";
 import { Technologies } from "../components/Technologies";
 import { Projects } from "../components/Projects";
 import { Blog } from "../components/Blog";
+import { UnderMetup } from "../components/UnderMetup";
 import { Contact } from "../components/Contact";
 
 export function HomePage() {
@@ -13,6 +14,7 @@ export function HomePage() {
       <Technologies />
       <Projects />
       <Blog />
+      <UnderMetup />
       <Contact />
     </>
   );

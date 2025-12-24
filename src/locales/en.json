@@ -209,6 +209,31 @@
       }
     }
   },
+  "underMetup": {
+    "title": "Under Metup",
+    "subtitle": "Videos about our meetings, projects and development",
+    "watchVideo": "Watch Video",
+    "backToVideos": "Go Back",
+    "loadingVideo": "Loading video...",
+    "videos": {
+      "video1": {
+        "title": "Under Meetup #1",
+        "excerpt": "Program:\n1. 🚀 Every unit counts\n2. 🖥 Web3 Security Basics\n3. #⃣ .NET Platform\n\nSpeakers:\n1. Pavel Lantsev\n2. Kirill Nikitin\n3. Nikolay Voronin",
+        "date": "29.05.2025",
+        "duration": "~2 hours",
+        "tags": ["Web3", "Security", ".NET", "Meetup"],
+        "vkUrl": "https://vk.com/video_ext.php?oid=-230601417&id=456239018&hash=2a73ab015cee656a&autoplay=1"
+      },
+      "video2": {
+        "title": "Under Meetup #2",
+        "excerpt": "Program:\n1. ℹ️ Data Driven Development\n2. 📞 WebRTC: Call me, call me\n3. 👥 IT Networking for Beginners\n\nSpeakers:\n1. Pavel Lantsev\n2. Alexander Korotkov\n3. Gennady Korotkov",
+        "date": "18.09.25",
+        "duration": "~2 hours",
+        "tags": ["WebRTC", "Data Driven", "Networking", "Meetup"],
+        "vkUrl": "https://vk.com/video_ext.php?oid=-230601417&id=456239020&hash=48273e5577319310&autoplay=1"
+      }
+    }
+  },
   "contact": {
     "title": "Contact Us",
     "subtitle": "Ready to discuss your project? Write to us and we will contact you soon",
