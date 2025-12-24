@@ -123,6 +123,12 @@ export function Header() {
               {t("header.blog")}
             </button>
             <button
+              onClick={() => scrollToSection("under-metup")}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {t("header.underMetup")}
+            </button>
+            <button
               onClick={() => scrollToSection("contact")}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -177,6 +183,12 @@ export function Header() {
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
             >
               {t("header.blog")}
+            </button>
+            <button
+              onClick={() => scrollToSection("under-metup")}
+              className="text-muted-foreground hover:text-foreground transition-colors text-left"
+            >
+              {t("header.underMetup")}
             </button>
             <button
               onClick={() => scrollToSection("contact")}
