@@ -263,7 +263,6 @@
   iframe,
   embed,
   object {
-    vertical-align: middle;
     display: block;
   }
 
@@ -2370,4 +2369,143 @@ body [data-slot="dialog-overlay"] {
   opacity: 1 !important;
   visibility: visible !important;
   display: grid !important;
+}
+
+/* Адаптивность видео плеера для десктопа */
+@media (min-width: 769px) {
+  .under-metup-page {
+    /* pt-20 = 80px (фиксированная шапка) + служебные элементы (заголовок/бейджи/кнопки) */
+    --under-metup-top-offset: 80px;
+    --under-metup-ui-offset: 240px;
+  }
+
+  .video-container {
+    aspect-ratio: 16/9 !important;
+    min-height: 180px !important;
+    /* ориентация на высоту viewport (dvh), с фолбэком на vh */
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 240px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 240px)
+    ) !important;
+  }
+
+  .video-container iframe {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 240px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 240px)
+    ) !important;
+  }
+}
+
+/* Адаптивность видео плеера для мобильных устройств */
+@media (max-width: 768px) {
+  .under-metup-page {
+    --under-metup-top-offset: 80px;
+    --under-metup-ui-offset: 190px;
+  }
+
+  .video-container {
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 190px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 190px)
+    ) !important;
+    min-height: 200px !important;
+    aspect-ratio: 16/9 !important;
+  }
+
+  .video-container iframe {
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 190px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 190px)
+    ) !important;
+    min-height: 200px !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .under-metup-page {
+    --under-metup-top-offset: 80px;
+    --under-metup-ui-offset: 210px;
+  }
+
+  .video-container {
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 210px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 210px)
+    ) !important;
+    min-height: 180px !important;
+    aspect-ratio: 16/9 !important;
+  }
+
+  .video-container iframe {
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 210px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 210px)
+    ) !important;
+    min-height: 180px !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .under-metup-page {
+    --under-metup-top-offset: 80px;
+    --under-metup-ui-offset: 220px;
+  }
+
+  .video-container {
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 220px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 220px)
+    ) !important;
+    min-height: 150px !important;
+    aspect-ratio: 16/9 !important;
+  }
+
+  .video-container iframe {
+    max-height: calc(
+      100vh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 220px)
+    ) !important;
+    max-height: calc(
+      100dvh - var(--under-metup-top-offset, 80px) -
+        var(--under-metup-ui-offset, 220px)
+    ) !important;
+    min-height: 150px !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
 }

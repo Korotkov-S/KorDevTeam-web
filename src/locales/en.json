@@ -232,6 +232,14 @@
         "duration": "~2 hours",
         "tags": ["WebRTC", "Data Driven", "Networking", "Meetup"],
         "vkUrl": "https://vk.com/video_ext.php?oid=-230601417&id=456239020&hash=48273e5577319310&autoplay=1"
+      },
+      "video3": {
+        "title": "Under Meetup #3",
+        "excerpt": "Program:\n🛠 Commit and PR Automation: Standards and CI/CD in Practice\n✅ Time to Break the Pattern: Learning to Set Goals for 2026 So You Don't Abandon Them on February 1st.\n\nSpeakers:\n☺️ Alexander Korotkov - CTO KorDevTeam\n😉 Gennady Korotkov - Team Lead KorDevTeam",
+        "date": "24.12.25",
+        "duration": "~2 hours",
+        "tags": ["CI/CD", "Automation", "Goals", "Meetup"],
+        "vkUrl": "https://vk.com/video_ext.php?oid=-230601417&id=456239021&autoplay=1"
       }
     }
   },

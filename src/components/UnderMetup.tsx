@@ -59,6 +59,16 @@ export function UnderMetup() {
         slug: "video-2",
         vkUrl: t("underMetup.videos.video2.vkUrl"),
       },
+      {
+        id: "3",
+        title: t("underMetup.videos.video3.title"),
+        excerpt: t("underMetup.videos.video3.excerpt"),
+        date: t("underMetup.videos.video3.date"),
+        duration: t("underMetup.videos.video3.duration"),
+        tags: t("underMetup.videos.video3.tags", { returnObjects: true }) as string[],
+        slug: "video-3",
+        vkUrl: t("underMetup.videos.video3.vkUrl"),
+      },
     ],
     [t]
   );

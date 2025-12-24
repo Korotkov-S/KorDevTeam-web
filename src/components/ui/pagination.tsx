@@ -15,6 +15,7 @@ function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
       aria-label="pagination"
       data-slot="pagination"
       className={cn("mx-auto flex w-full justify-center", className)}
+      style={{ zIndex: 9999, position: 'relative' }}
       {...props}
     />
   );
@@ -28,6 +29,7 @@ function PaginationContent({
     <ul
       data-slot="pagination-content"
       className={cn("flex flex-row items-center gap-1", className)}
+      style={{ zIndex: 9999, position: 'relative' }}
       {...props}
     />
   );
@@ -60,6 +62,7 @@ function PaginationLink({
         }),
         className,
       )}
+      style={{ zIndex: 9999, position: 'relative' }}
       {...props}
     />
   );

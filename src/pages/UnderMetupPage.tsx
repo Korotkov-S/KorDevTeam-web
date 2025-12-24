@@ -46,6 +46,15 @@ export function UnderMetupPage() {
       }) as string[],
       vkUrl: t("underMetup.videos.video2.vkUrl"),
     },
+    "video-3": {
+      title: t("underMetup.videos.video3.title"),
+      date: t("underMetup.videos.video3.date"),
+      duration: t("underMetup.videos.video3.duration"),
+      tags: t("underMetup.videos.video3.tags", {
+        returnObjects: true,
+      }) as string[],
+      vkUrl: t("underMetup.videos.video3.vkUrl"),
+    },
   }), [t]);
 
   // Функция для преобразования URL VK в embed URL
@@ -93,10 +102,10 @@ export function UnderMetupPage() {
   }, [meta]);
 
   return (
-    <div className="min-h-screen pt-20">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen pt-20 under-metup-page">
+      <div className="container mx-auto px-2 md:px-4 py-2 md:py-8">
         {/* Back Button */}
-        <div className="mb-8 relative" style={{ zIndex: 9999 }}>
+        <div className="mb-2 md:mb-8 relative" style={{ zIndex: 9999 }}>
           <button
             type="button"
             onClick={(e) => {
@@ -117,26 +126,26 @@ export function UnderMetupPage() {
         {meta && (
           <article className="max-w-4xl mx-auto">
             {/* Video Header */}
-            <header className="mb-12 pb-8 border-b border-border">
-              <h1 className="text-4xl md:text-5xl mb-6">{meta.title}</h1>
+            <header className="mb-2 md:mb-12 pb-2 md:pb-8 border-b border-border">
+              <h1 className="text-xl md:text-4xl lg:text-5xl mb-2 md:mb-6">{meta.title}</h1>
 
-              <div className="flex flex-wrap items-center gap-4 text-muted-foreground mb-6">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
+              <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-base text-muted-foreground mb-2 md:mb-6">
+                <div className="flex items-center gap-1 md:gap-2">
+                  <Calendar className="w-3 h-3 md:w-4 md:h-4" />
                   <span>{meta.date}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Play className="w-4 h-4" />
+                <div className="flex items-center gap-1 md:gap-2">
+                  <Play className="w-3 h-3 md:w-4 md:h-4" />
                   <span>{meta.duration}</span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1 md:gap-2">
                 {meta.tags.map((tag, index) => (
                   <Badge
                     key={index}
                     variant="secondary"
-                    className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors"
+                    className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors text-xs md:text-sm"
                   >
                     {tag}
                   </Badge>
@@ -144,9 +153,48 @@ export function UnderMetupPage() {
               </div>
             </header>
 
+            {/* Video Player */}
+            <div className="mb-4 md:mb-12">
+              <div className="relative w-full bg-black rounded-lg overflow-hidden video-container">
+                {vkEmbedUrl ? (
+                  <iframe
+                    src={vkEmbedUrl}
+                    className="w-full h-full"
+                    style={{ backgroundColor: "#000" }}
+                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock"
+                    allowFullScreen
+                    frameBorder="0"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white">
+                    <p>{t("underMetup.loadingVideo")}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions under video (must be visible on first screen) */}
+            <div className="under-metup-actions relative" style={{ zIndex: 9999 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigateGoBack();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors relative"
+                style={{ zIndex: 9999 }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {t("underMetup.backToVideos")}
+              </button>
+            </div>
+
             {/* Program Description */}
             {meta.title.includes("№1") && (
-              <div className="mb-12 p-6 bg-card border border-border rounded-lg">
+              <div className="hidden md:block mb-4 md:mb-12 p-3 md:p-6 bg-card border border-border rounded-lg text-sm md:text-base">
                 <h2 className="text-2xl font-semibold mb-4">Программа митапа:</h2>
                 <ul className="space-y-3 mb-6 text-muted-foreground">
                   <li className="flex items-start gap-2">
@@ -188,7 +236,7 @@ export function UnderMetupPage() {
             )}
 
             {meta.title.includes("№2") && (
-              <div className="mb-12 p-6 bg-card border border-border rounded-lg">
+              <div className="hidden md:block mb-4 md:mb-12 p-3 md:p-6 bg-card border border-border rounded-lg text-sm md:text-base">
                 <h2 className="text-2xl font-semibold mb-4">Программа митапа:</h2>
                 <ul className="space-y-3 mb-6 text-muted-foreground">
                   <li className="flex items-start gap-2">
@@ -229,44 +277,38 @@ export function UnderMetupPage() {
               </div>
             )}
 
-            {/* Video Player */}
-            <div className="mb-12">
-              <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-                {vkEmbedUrl ? (
-                  <iframe
-                    src={vkEmbedUrl}
-                    className="w-full h-full"
-                    style={{ backgroundColor: '#000' }}
-                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock"
-                    allowFullScreen
-                    frameBorder="0"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white">
-                    <p>{t("underMetup.loadingVideo")}</p>
-                  </div>
-                )}
+            {meta.title.includes("№3") && (
+              <div className="hidden md:block mb-4 md:mb-12 p-3 md:p-6 bg-card border border-border rounded-lg text-sm md:text-base">
+                <h2 className="text-2xl font-semibold mb-4">Программа митапа:</h2>
+                <ul className="space-y-3 mb-6 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">🛠</span>
+                    <span>Автоматизация коммитов и PR: стандарты и CI/CD на практике</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">✅</span>
+                    <span>Пора ломать шаблон: Учимся ставить цели на 2026 так, чтобы не забросить их 1 февраля.</span>
+                  </li>
+                </ul>
+                
+                <h3 className="text-xl font-semibold mb-4 mt-8">Спикеры:</h3>
+                <ul className="space-y-3 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">☺️</span>
+                    <div>
+                      <strong className="text-foreground">Александр Коротков</strong> - СТО KorDevTeam
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">😉</span>
+                    <div>
+                      <strong className="text-foreground">Геннадий Коротков</strong> - Руководитель команды KorDevTeam
+                    </div>
+                  </li>
+                </ul>
               </div>
-            </div>
+            )}
 
-            {/* Back to Videos Button */}
-            <div className="mt-12 pt-8 border-t border-border relative" style={{ zIndex: 9999 }}>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  navigateGoBack();
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors relative"
-                style={{ zIndex: 9999 }}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                {t("underMetup.backToVideos")}
-              </button>
-            </div>
           </article>
         )}
       </div>
