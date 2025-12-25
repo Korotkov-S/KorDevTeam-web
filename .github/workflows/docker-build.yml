@@ -83,10 +83,10 @@ jobs:
             echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ghcr.io -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
 
             echo "📦 Pulling latest image..."
-            docker compose pull
+            docker compose -f docker-compose.team.yml pull
 
             echo "🔄 Restarting containers..."
-            docker compose up -d
+            docker compose -f docker-compose.team.yml up -d
 
             echo "✅ Deployment & migrations complete!"
 
