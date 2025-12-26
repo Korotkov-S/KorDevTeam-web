@@ -207,6 +207,27 @@
         "date": "December 23, 2025",
         "readTime": "19 min",
         "tags": ["Web Service", "Graphs", "Genealogy"]
+      },
+      "argumentationGuide": {
+        "title": "Stop Losing Negotiations! Iron-Clad Argumentation That Breaks Resistance Even from Stubborn Clients",
+        "excerpt": "This post was written after reading Nikita Nepryakhin's book \"Argue This!\". How to properly build your argumentation line, prove, reflect counterarguments and attack the opponent's position? A strong argument consists of proof and depth. Learn assertion and denial tactics, laws of iron logic...",
+        "date": "January 27, 2025",
+        "readTime": "15 min",
+        "tags": ["Negotiations", "Argumentation", "Communication"]
+      },
+      "governmentContractors": {
+        "title": "How to Effectively Work with Government Contractors in IT?",
+        "excerpt": "10 years of experience in government service and government procurement under 44-FZ. How to understand government employee motivation, build effective negotiations, resolve conflicts and manage contract changes. DISC methodology, motivation types by Gercikov, strategies for working with official correspondence and manipulations...",
+        "date": "January 27, 2025",
+        "readTime": "20 min",
+        "tags": ["Government Procurement", "Negotiations", "44-FZ"]
+      },
+      "harmonizeMeStory": {
+        "title": "\"HarmonizeMe I broke down again...\" — Daria knows why this happens and will teach you how to avoid breakdowns",
+        "excerpt": "The story of creating the HarmonizeMe platform for psychologist Daria Kuznetsova. A platform that changes not calories, but thinking. A game-based approach to eating behavior psychology with AI assistant, courses and motivation system. Technologies: Next.js, Adonis.js, PostgreSQL...",
+        "date": "January 27, 2025",
+        "readTime": "12 min",
+        "tags": ["Web Platform", "Psychology", "AI"]
       }
     }
   },
@@ -403,5 +424,8 @@
         "Security and regulatory compliance"
       ]
     }
+  },
+  "floatingButtons": {
+    "learnPrices": "Learn Prices"
   }
 }

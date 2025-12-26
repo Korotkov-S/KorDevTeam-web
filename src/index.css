@@ -2509,3 +2509,46 @@ body [data-slot="dialog-overlay"] {
     height: 100% !important;
   }
 }
+
+/* Высокий z-index для всех кнопок на сайте */
+button,
+[data-slot="button"],
+[role="button"],
+.Button,
+button[type="button"],
+button[type="submit"],
+a[role="button"],
+[data-slot="pagination"],
+[data-slot="pagination-content"],
+[data-slot="pagination-link"],
+[data-slot="pagination-item"],
+a[href^="mailto:"],
+a[href^="https://"],
+a[href^="http://"],
+footer a,
+footer button {
+  z-index: 999999 !important;
+  position: relative !important;
+}
+
+/* Максимальный z-index для плавающих кнопок */
+[data-floating-buttons] {
+  z-index: 2147483647 !important;
+  position: fixed !important;
+  right: 16px !important;
+  bottom: 16px !important;
+}
+
+[data-floating-buttons] > *,
+[data-floating-buttons] a,
+[data-floating-buttons] button {
+  z-index: 2147483647 !important;
+  position: relative !important;
+}
+
+@media (min-width: 768px) {
+  [data-floating-buttons] {
+    right: 24px !important;
+    bottom: 24px !important;
+  }
+}

@@ -128,6 +128,33 @@ export function Blog() {
       tags: t("blog.posts.simsDynastyTree.tags", { returnObjects: true }) as string[],
       slug: "sims-dynasty-tree-platform",
     },
+    {
+      id: "11",
+      title: t("blog.posts.argumentationGuide.title"),
+      excerpt: t("blog.posts.argumentationGuide.excerpt"),
+      date: t("blog.posts.argumentationGuide.date"),
+      readTime: t("blog.posts.argumentationGuide.readTime"),
+      tags: t("blog.posts.argumentationGuide.tags", { returnObjects: true }) as string[],
+      slug: "argumentation-guide",
+    },
+    {
+      id: "12",
+      title: t("blog.posts.governmentContractors.title"),
+      excerpt: t("blog.posts.governmentContractors.excerpt"),
+      date: t("blog.posts.governmentContractors.date"),
+      readTime: t("blog.posts.governmentContractors.readTime"),
+      tags: t("blog.posts.governmentContractors.tags", { returnObjects: true }) as string[],
+      slug: "government-contractors-guide",
+    },
+    {
+      id: "13",
+      title: t("blog.posts.harmonizeMeStory.title"),
+      excerpt: t("blog.posts.harmonizeMeStory.excerpt"),
+      date: t("blog.posts.harmonizeMeStory.date"),
+      readTime: t("blog.posts.harmonizeMeStory.readTime"),
+      tags: t("blog.posts.harmonizeMeStory.tags", { returnObjects: true }) as string[],
+      slug: "harmonize-me-story",
+    },
   ],
     [t]
   );

@@ -110,6 +110,30 @@ export function BlogPostPage() {
           returnObjects: true,
         }) as string[],
       },
+      "argumentation-guide": {
+        title: t("blog.posts.argumentationGuide.title"),
+        date: t("blog.posts.argumentationGuide.date"),
+        readTime: t("blog.posts.argumentationGuide.readTime"),
+        tags: t("blog.posts.argumentationGuide.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "government-contractors-guide": {
+        title: t("blog.posts.governmentContractors.title"),
+        date: t("blog.posts.governmentContractors.date"),
+        readTime: t("blog.posts.governmentContractors.readTime"),
+        tags: t("blog.posts.governmentContractors.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
+      "harmonize-me-story": {
+        title: t("blog.posts.harmonizeMeStory.title"),
+        date: t("blog.posts.harmonizeMeStory.date"),
+        readTime: t("blog.posts.harmonizeMeStory.readTime"),
+        tags: t("blog.posts.harmonizeMeStory.tags", {
+          returnObjects: true,
+        }) as string[],
+      },
     }), [t]);
 
   useEffect(() => {
@@ -158,8 +182,19 @@ export function BlogPostPage() {
     <div className="min-h-screen pt-20">
       <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
-        <div className="mb-8">
-          <Button variant="ghost" onClick={navigateGoBack} className="gap-2">
+        <div className="mb-8 relative" style={{ zIndex: 99999 }}>
+          <Button 
+            variant="ghost" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigateGoBack();
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="gap-2 relative"
+            style={{ zIndex: 99999 }}
+          >
             <ArrowLeft className="w-4 h-4" />
             {t("blog.backToBlog")}
           </Button>
@@ -290,8 +325,18 @@ export function BlogPostPage() {
             </div>
 
             {/* Back to Blog Button */}
-            <div className="mt-12 pt-8 border-t border-border">
-              <Button onClick={navigateGoBack} className="gap-2">
+            <div className="mt-12 pt-8 border-t border-border relative" style={{ zIndex: 99999 }}>
+              <Button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigateGoBack();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                className="gap-2 relative"
+                style={{ zIndex: 99999 }}
+              >
                 <ArrowLeft className="w-4 h-4" />
                 {t("blog.backToBlog")}
               </Button>

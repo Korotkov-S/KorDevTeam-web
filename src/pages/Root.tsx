@@ -3,6 +3,7 @@ import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
 import { Toaster } from "../components/ui/sonner";
 import { NewYearAnimation } from "../components/NewYearAnimation";
+import { FloatingButtons } from "../components/FloatingButtons";
 
 export function Root() {
   return (
@@ -12,6 +13,7 @@ export function Root() {
         <Outlet />
       </main>
       <Footer />
+      <FloatingButtons />
       <Toaster />
       <ScrollRestoration />
       <NewYearAnimation />
