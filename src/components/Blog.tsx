@@ -11,6 +11,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { SEO } from "./SEO";
 import {
   Pagination,
   PaginationContent,
@@ -169,19 +170,22 @@ export function Blog() {
   };
 
   return (
-    <section id="blog" className="py-20">
+    <section id="blog" className="py-20" itemScope itemType="https://schema.org/Blog">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4">{t("blog.title")}</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <h2 className="text-3xl md:text-4xl mb-4" itemProp="name">{t("blog.title")}</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto" itemProp="description">
             {t("blog.subtitle")}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
-          {currentPosts.map((post) => (
-                    <Card 
-                      key={post.id} 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8" itemScope itemType="https://schema.org/ItemList">
+          {currentPosts.map((post, index) => (
+                    <Card
+                      key={post.id}
+                      itemScope
+                      itemType="https://schema.org/BlogPosting"
+                      itemProp="itemListElement"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -202,21 +206,22 @@ export function Blog() {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
                           <div className="flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            <span>{post.date}</span>
+                            <time dateTime={post.date} itemProp="datePublished">{post.date}</time>
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="w-4 h-4" />
                             <span>{post.readTime}</span>
                           </div>
                         </div>
-                        <CardTitle className="group-hover:text-primary transition-colors">
+                        <CardTitle className="group-hover:text-primary transition-colors" itemProp="headline">
                           {post.title}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <CardDescription className="text-muted-foreground mb-4">
+                        <CardDescription className="text-muted-foreground mb-4" itemProp="description">
                           {post.excerpt}
                         </CardDescription>
+                        <meta itemProp="url" content={`https://kordev.team/blog/${post.slug}`} />
                         <div className="flex flex-wrap gap-2 mb-4 pointer-events-none">
                           {post.tags.map((tag, index) => (
                             <Badge

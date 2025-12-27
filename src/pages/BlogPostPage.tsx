@@ -1,16 +1,59 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Calendar, Clock } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { useTranslation } from "react-i18next";
+import { SEO } from "../components/SEO";
 
 interface BlogPostMeta {
   title: string;
+  excerpt: string;
   date: string;
   readTime: string;
   tags: string[];
+}
+
+// Функция для преобразования даты в ISO формат (пример: "30 октября 2025" -> "2025-10-30")
+function parseDateToISO(dateStr: string): string {
+  const monthsRu: Record<string, string> = {
+    января: "01", февраля: "02", марта: "03", апреля: "04",
+    мая: "05", июня: "06", июля: "07", августа: "08",
+    сентября: "09", октября: "10", ноября: "11", декабря: "12"
+  };
+  const monthsEn: Record<string, string> = {
+    january: "01", february: "02", march: "03", april: "04",
+    may: "05", june: "06", july: "07", august: "08",
+    september: "09", october: "10", november: "11", december: "12"
+  };
+  
+  try {
+    // Попытка парсинга русской даты
+    const matchRu = dateStr.match(/(\d+)\s+(\w+)\s+(\d+)/);
+    if (matchRu) {
+      const [, day, month, year] = matchRu;
+      const monthNum = monthsRu[month.toLowerCase()];
+      if (monthNum) {
+        return `${year}-${monthNum}-${day.padStart(2, "0")}`;
+      }
+    }
+    
+    // Попытка парсинга английской даты
+    const matchEn = dateStr.match(/(\w+)\s+(\d+),\s+(\d+)/);
+    if (matchEn) {
+      const [, month, day, year] = matchEn;
+      const monthNum = monthsEn[month.toLowerCase()];
+      if (monthNum) {
+        return `${year}-${monthNum}-${day.padStart(2, "0")}`;
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing date:", e);
+  }
+  
+  // Fallback: возвращаем текущую дату
+  return new Date().toISOString().split("T")[0];
 }
 
 export function BlogPostPage() {
@@ -31,9 +74,12 @@ export function BlogPostPage() {
     }
   }, [navigate]);
 
+  const location = useLocation();
+  
   const blogPostsData = useMemo<Record<string, BlogPostMeta>>(() => ({
       "react-native-best-practices": {
         title: t("blog.posts.reactNative.title"),
+        excerpt: t("blog.posts.reactNative.excerpt"),
         date: t("blog.posts.reactNative.date"),
         readTime: t("blog.posts.reactNative.readTime"),
         tags: t("blog.posts.reactNative.tags", {
@@ -42,6 +88,7 @@ export function BlogPostPage() {
       },
       "nodejs-microservices": {
         title: t("blog.posts.microservices.title"),
+        excerpt: t("blog.posts.microservices.excerpt"),
         date: t("blog.posts.microservices.date"),
         readTime: t("blog.posts.microservices.readTime"),
         tags: t("blog.posts.microservices.tags", {
@@ -50,6 +97,7 @@ export function BlogPostPage() {
       },
       "wordpress-optimization": {
         title: t("blog.posts.wordpress.title"),
+        excerpt: t("blog.posts.wordpress.excerpt"),
         date: t("blog.posts.wordpress.date"),
         readTime: t("blog.posts.wordpress.readTime"),
         tags: t("blog.posts.wordpress.tags", {
@@ -58,12 +106,14 @@ export function BlogPostPage() {
       },
       "laravel-api-development": {
         title: t("blog.posts.laravel.title"),
+        excerpt: t("blog.posts.laravel.excerpt"),
         date: t("blog.posts.laravel.date"),
         readTime: t("blog.posts.laravel.readTime"),
         tags: t("blog.posts.laravel.tags", { returnObjects: true }) as string[],
       },
       "business-automation": {
         title: t("blog.posts.businessAutomation.title"),
+        excerpt: t("blog.posts.businessAutomation.excerpt"),
         date: t("blog.posts.businessAutomation.date"),
         readTime: t("blog.posts.businessAutomation.readTime"),
         tags: t("blog.posts.businessAutomation.tags", {
@@ -72,6 +122,7 @@ export function BlogPostPage() {
       },
       "crm-implementation": {
         title: t("blog.posts.crmImplementation.title"),
+        excerpt: t("blog.posts.crmImplementation.excerpt"),
         date: t("blog.posts.crmImplementation.date"),
         readTime: t("blog.posts.crmImplementation.readTime"),
         tags: t("blog.posts.crmImplementation.tags", {
@@ -80,6 +131,7 @@ export function BlogPostPage() {
       },
       "telegram-broadcast-automation": {
         title: t("blog.posts.telegramBroadcast.title"),
+        excerpt: t("blog.posts.telegramBroadcast.excerpt"),
         date: t("blog.posts.telegramBroadcast.date"),
         readTime: t("blog.posts.telegramBroadcast.readTime"),
         tags: t("blog.posts.telegramBroadcast.tags", {
@@ -88,6 +140,7 @@ export function BlogPostPage() {
       },
       "stone-calculator-automation": {
         title: t("blog.posts.stoneCalculator.title"),
+        excerpt: t("blog.posts.stoneCalculator.excerpt"),
         date: t("blog.posts.stoneCalculator.date"),
         readTime: t("blog.posts.stoneCalculator.readTime"),
         tags: t("blog.posts.stoneCalculator.tags", {
@@ -96,6 +149,7 @@ export function BlogPostPage() {
       },
       "harmonize-me-platform": {
         title: t("blog.posts.harmonizeMe.title"),
+        excerpt: t("blog.posts.harmonizeMe.excerpt"),
         date: t("blog.posts.harmonizeMe.date"),
         readTime: t("blog.posts.harmonizeMe.readTime"),
         tags: t("blog.posts.harmonizeMe.tags", {
@@ -104,6 +158,7 @@ export function BlogPostPage() {
       },
       "sims-dynasty-tree-platform": {
         title: t("blog.posts.simsDynastyTree.title"),
+        excerpt: t("blog.posts.simsDynastyTree.excerpt"),
         date: t("blog.posts.simsDynastyTree.date"),
         readTime: t("blog.posts.simsDynastyTree.readTime"),
         tags: t("blog.posts.simsDynastyTree.tags", {
@@ -112,6 +167,7 @@ export function BlogPostPage() {
       },
       "argumentation-guide": {
         title: t("blog.posts.argumentationGuide.title"),
+        excerpt: t("blog.posts.argumentationGuide.excerpt"),
         date: t("blog.posts.argumentationGuide.date"),
         readTime: t("blog.posts.argumentationGuide.readTime"),
         tags: t("blog.posts.argumentationGuide.tags", {
@@ -120,6 +176,7 @@ export function BlogPostPage() {
       },
       "government-contractors-guide": {
         title: t("blog.posts.governmentContractors.title"),
+        excerpt: t("blog.posts.governmentContractors.excerpt"),
         date: t("blog.posts.governmentContractors.date"),
         readTime: t("blog.posts.governmentContractors.readTime"),
         tags: t("blog.posts.governmentContractors.tags", {
@@ -128,6 +185,7 @@ export function BlogPostPage() {
       },
       "harmonize-me-story": {
         title: t("blog.posts.harmonizeMeStory.title"),
+        excerpt: t("blog.posts.harmonizeMeStory.excerpt"),
         date: t("blog.posts.harmonizeMeStory.date"),
         readTime: t("blog.posts.harmonizeMeStory.readTime"),
         tags: t("blog.posts.harmonizeMeStory.tags", {
@@ -172,15 +230,23 @@ export function BlogPostPage() {
     loadMarkdown();
   }, [slug, navigate, i18n.language, blogPostsData, navigateGoBack]);
 
-  useEffect(() => {
-    if (meta) {
-      document.title = `${meta.title} | KorDevTeam Blog`;
-    }
-  }, [meta]);
-
   return (
-    <div className="min-h-screen pt-20">
-      <div className="container mx-auto px-4 py-8">
+    <>
+      {meta && (
+        <SEO
+          title={meta.title}
+          description={meta.excerpt}
+          canonical={`https://kordev.team/blog/${slug}`}
+          ogType="article"
+          article={{
+            publishedTime: parseDateToISO(meta.date),
+            tags: meta.tags,
+            authors: ["KorDevTeam"],
+          }}
+        />
+      )}
+      <div className="min-h-screen pt-20">
+        <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
         <div className="mb-8 relative" style={{ zIndex: 99999 }}>
           <Button 
@@ -205,16 +271,16 @@ export function BlogPostPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <article className="max-w-4xl mx-auto">
+          <article className="max-w-4xl mx-auto" itemScope itemType="https://schema.org/BlogPosting">
             {/* Article Header */}
             {meta && (
               <header className="mb-12 pb-8 border-b border-border">
-                <h1 className="text-4xl md:text-5xl mb-6">{meta.title}</h1>
+                <h1 className="text-4xl md:text-5xl mb-6" itemProp="headline">{meta.title}</h1>
 
                 <div className="flex flex-wrap items-center gap-4 text-muted-foreground mb-6">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    <span>{meta.date}</span>
+                    <time dateTime={parseDateToISO(meta.date)} itemProp="datePublished">{meta.date}</time>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4" />
@@ -228,16 +294,22 @@ export function BlogPostPage() {
                       key={index}
                       variant="secondary"
                       className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors"
+                      itemProp="keywords"
                     >
                       {tag}
                     </Badge>
                   ))}
                 </div>
+                <meta itemProp="description" content={meta.excerpt} />
+                <div itemProp="author" itemScope itemType="https://schema.org/Organization" style={{ display: 'none' }}>
+                  <meta itemProp="name" content="KorDevTeam" />
+                  <meta itemProp="url" content="https://kordev.team" />
+                </div>
               </header>
             )}
 
             {/* Article Content */}
-            <div className="prose prose-invert prose-lg max-w-none">
+            <div className="prose prose-invert prose-lg max-w-none" itemProp="articleBody">
               <ReactMarkdown
                 components={{
                   h1: ({ node, ...props }) => (
@@ -343,7 +415,8 @@ export function BlogPostPage() {
             </div>
           </article>
         )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
