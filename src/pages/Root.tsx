@@ -3,7 +3,6 @@ import { HelmetProvider } from "react-helmet-async";
 import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
 import { Toaster } from "../components/ui/sonner";
-import { NewYearAnimation } from "../components/NewYearAnimation";
 import { FloatingButtons } from "../components/FloatingButtons";
 
 export function Root() {
@@ -18,7 +17,6 @@ export function Root() {
         <FloatingButtons />
         <Toaster />
         <ScrollRestoration />
-        <NewYearAnimation />
       </div>
     </HelmetProvider>
   );
