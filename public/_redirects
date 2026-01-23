@@ -1,13 +1,22 @@
-# Настройки для статичного сайта на Netlify
+# Auto-generated. Do not edit by hand.
 
-# Статические страницы блога
+# Static blog pages (preferred for SEO)
+/blog/argumentation-guide    /blog/argumentation-guide.html    200
+/blog/business-automation    /blog/business-automation.html    200
+/blog/crm-implementation    /blog/crm-implementation.html    200
+/blog/government-contractors-guide    /blog/government-contractors-guide.html    200
+/blog/harmonize-me-platform    /blog/harmonize-me-platform.html    200
+/blog/harmonize-me-story    /blog/harmonize-me-story.html    200
+/blog/laravel-api-development    /blog/laravel-api-development.html    200
+/blog/nodejs-microservices    /blog/nodejs-microservices.html    200
 /blog/react-native-best-practices    /blog/react-native-best-practices.html    200
-/blog/nodejs-microservices          /blog/nodejs-microservices.html          200
-/blog/wordpress-optimization         /blog/wordpress-optimization.html         200
-/blog/laravel-api-development       /blog/laravel-api-development.html       200
+/blog/sims-dynasty-tree-platform    /blog/sims-dynasty-tree-platform.html    200
+/blog/stone-calculator-automation    /blog/stone-calculator-automation.html    200
+/blog/telegram-broadcast-automation    /blog/telegram-broadcast-automation.html    200
+/blog/wordpress-optimization    /blog/wordpress-optimization.html    200
 
-# Перенаправляем все остальные запросы на index.html для SPA
+# SPA fallback
 /*    /index.html   200
 
-# Настройки кэширования
+# Cache headers
 /assets/*  Cache-Control: public, max-age=31536000, immutable

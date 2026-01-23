@@ -24,8 +24,8 @@ RUN yarn build
 # Production stage with Nginx
 FROM nginx:1.25-alpine AS production
 
-# # Copy custom nginx configuration
-# COPY nginx.conf /etc/nginx/nginx.conf
+# Copy custom nginx configuration (SPA fallback, optional static .html pages)
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built application
 COPY --from=build /app/dist /usr/share/nginx/html
