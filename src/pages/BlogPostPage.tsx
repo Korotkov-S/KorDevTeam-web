@@ -15,6 +15,10 @@ interface BlogPostMeta {
   tags: string[];
 }
 
+function stripFirstMarkdownH1(md: string): string {
+  return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
+}
+
 // Функция для преобразования даты в ISO формат (пример: "30 октября 2025" -> "2025-10-30")
 function parseDateToISO(dateStr: string): string {
   const monthsRu: Record<string, string> = {
@@ -208,17 +212,36 @@ export function BlogPostPage() {
 
     setMeta(postMeta);
 
+    const langSuffix = i18n.language === "ru" ? "" : ".en";
+
+    // If this page was statically pre-rendered, grab the markdown immediately to avoid a flash/spinner.
+    let hasPrerender = false;
+    if (langSuffix === "") {
+      const el = document.getElementById("__BLOG_PRERENDER_DATA__");
+      if (el?.textContent) {
+        try {
+          const data = JSON.parse(el.textContent) as { slug?: string; lang?: string; md?: string };
+          if (data?.slug === slug && data?.lang === "ru" && typeof data?.md === "string" && data.md.trim()) {
+            setContent(data.md);
+            setLoading(false);
+            hasPrerender = true;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     const loadMarkdown = async () => {
       try {
-        setLoading(true);
+        if (!hasPrerender) setLoading(true);
         // Определяем язык и загружаем соответствующую версию статьи
-        const lang = i18n.language === "ru" ? "" : ".en";
-        const response = await fetch(`/blog/${slug}${lang}.md`);
+        const response = await fetch(`/blog/${slug}${langSuffix}.md`);
         if (!response.ok) {
           throw new Error("Failed to load");
         }
         const text = await response.text();
-        setContent(text);
+        setContent(stripFirstMarkdownH1(text));
       } catch (error) {
         console.error("Error loading markdown:", error);
         setContent("# Error Loading\n\nFailed to load article content.");

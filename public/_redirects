@@ -15,6 +15,10 @@
 /blog/telegram-broadcast-automation    /blog/telegram-broadcast-automation.html    200
 /blog/wordpress-optimization    /blog/wordpress-optimization.html    200
 
+# Static Krasotulya-CRM pages (preferred for SEO)
+/krasotulya-crm/getting-started    /krasotulya-crm/getting-started.html    200
+/krasotulya-crm/overview    /krasotulya-crm/overview.html    200
+
 # SPA fallback
 /*    /index.html   200
 

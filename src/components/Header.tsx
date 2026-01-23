@@ -59,6 +59,12 @@ export function Header() {
               {t("header.projects")}
             </button>
             <button
+              onClick={() => scrollToSection("krasotulya-crm")}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {t("header.krasotulyaCrm")}
+            </button>
+            <button
               onClick={() => scrollToSection("blog")}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -119,6 +125,12 @@ export function Header() {
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
             >
               {t("header.projects")}
+            </button>
+            <button
+              onClick={() => scrollToSection("krasotulya-crm")}
+              className="text-muted-foreground hover:text-foreground transition-colors text-left"
+            >
+              {t("header.krasotulyaCrm")}
             </button>
             <button
               onClick={() => scrollToSection("blog")}

@@ -3,10 +3,33 @@
     "services": "Services",
     "technologies": "Technologies",
     "projects": "Projects",
+    "krasotulyaCrm": "Krasotulya-CRM",
     "blog": "Blog",
     "underMetup": "Under Metup",
     "contact": "Contact",
     "getInTouch": "Get in Touch"
+  },
+  "krasotulyaCrm": {
+    "title": "Krasotulya-CRM",
+    "subtitle": "Materials, guides and updates for Krasotulya-CRM",
+    "readMore": "Read More",
+    "backToSection": "Back to Krasotulya-CRM",
+    "posts": {
+      "overview": {
+        "title": "Krasotulya-CRM: feature overview",
+        "excerpt": "A quick overview of what Krasotulya-CRM can do and which problems it solves.",
+        "date": "January 24, 2026",
+        "readTime": "6 min",
+        "tags": ["CRM", "Automation", "Sales"]
+      },
+      "gettingStarted": {
+        "title": "Getting started with Krasotulya-CRM",
+        "excerpt": "Quick start: basic setup, first entities, and common workflows.",
+        "date": "January 24, 2026",
+        "readTime": "8 min",
+        "tags": ["Onboarding", "Setup", "CRM"]
+      }
+    }
   },
   "hero": {
     "badge": "Team of Professional Developers",
