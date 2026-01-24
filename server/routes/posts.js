@@ -16,7 +16,7 @@ const {
  */
 router.post('/', authenticate, async (req, res, next) => {
   try {
-    const { title, content, excerpt, tags, date, readTime, lang = 'ru' } = req.body;
+    const { slug: slugOverride, title, content, excerpt, tags, date, readTime, lang = 'ru' } = req.body;
 
     // Валидация обязательных полей
     if (!title || !content) {
@@ -26,7 +26,9 @@ router.post('/', authenticate, async (req, res, next) => {
     }
 
     // Генерация slug из заголовка
-    const slug = generateSlug(title);
+    const slug = (slugOverride && typeof slugOverride === "string" && slugOverride.trim())
+      ? generateSlug(slugOverride)
+      : generateSlug(title);
 
     // Создание поста
     const post = await createPost({

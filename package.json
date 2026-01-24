@@ -32,7 +32,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "*",
     "cmdk": "^1.1.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
     "embla-carousel-react": "^8.6.0",
+    "express": "^5.2.1",
     "i18next": "^25.6.0",
     "i18next-browser-languagedetector": "^8.2.0",
     "input-otp": "^1.4.2",
@@ -62,12 +65,13 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/generate-blog-pages.mjs",
+    "build": "vite build && node scripts/generate-blog-pages.mjs && node scripts/generate-content-index.mjs",
     "preview": "vite preview",
     "build:static": "vite build --mode production",
     "serve": "vite preview --port 4173",
     "build:blog": "vite build && node scripts/generate-blog-pages.mjs",
-    "generate:blog": "node scripts/generate-blog-pages.mjs"
+    "generate:blog": "node scripts/generate-blog-pages.mjs",
+    "generate:content-index": "node scripts/generate-content-index.mjs"
   },
   "packageManager": "yarn@3.8.7"
 }

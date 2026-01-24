@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
@@ -15,12 +15,12 @@ import {
 } from "./ui/pagination";
 
 export function Projects() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const projectsPerPage = 3;
 
-  const projects = useMemo(
+  const fallbackProjects = useMemo(
     () => [
       {
         id: "Media & Entertainment",
@@ -89,6 +89,43 @@ export function Projects() {
     [t]
   );
 
+  type ProjectCard = {
+    id: string;
+    title: string;
+    description: string;
+    image: string;
+    technologies: string[];
+  };
+
+  const [projects, setProjects] = useState<ProjectCard[]>(fallbackProjects as any);
+  const [loadedFromJson, setLoadedFromJson] = useState(false);
+
+  useEffect(() => {
+    const lang = i18n.language === "ru" ? "ru" : "en";
+    const load = async () => {
+      try {
+        const res = await fetch(`/content/projects.${lang}.json`);
+        if (!res.ok) throw new Error("no json");
+        const data = (await res.json()) as any[];
+        if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
+        const mapped: ProjectCard[] = data.map((p) => ({
+          id: String(p.id),
+          title: String(p.title || p.id),
+          description: String(p.description || ""),
+          image: String(p.image || ""),
+          technologies: Array.isArray(p.technologies) ? p.technologies.map((x: any) => String(x)) : [],
+        }));
+        setProjects(mapped);
+        setLoadedFromJson(true);
+        setCurrentPage(1);
+      } catch {
+        setProjects(fallbackProjects as any);
+        setLoadedFromJson(false);
+      }
+    };
+    load();
+  }, [fallbackProjects, i18n.language]);
+
   const totalPages = Math.ceil(projects.length / projectsPerPage);
   const startIndex = (currentPage - 1) * projectsPerPage;
   const endIndex = startIndex + projectsPerPage;
@@ -106,6 +143,11 @@ export function Projects() {
           <p className="text-muted-foreground max-w-2xl mx-auto">
             {t("projects.subtitle")}
           </p>
+          {loadedFromJson && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Список проектов загружен динамически (из `public/content/projects.*.json`).
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">

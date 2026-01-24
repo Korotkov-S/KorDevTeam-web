@@ -2,6 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const postsRouter = require('./routes/posts');
+const krasotulyaCrmRouter = require("./routes/krasotulyaCrm");
+const contentRouter = require("./routes/content");
+const projectsRouter = require("./routes/projects");
+const adminRouter = require("./routes/admin");
 const path = require('path');
 
 // Загружаем переменные окружения
@@ -23,6 +27,10 @@ app.use((req, res, next) => {
 
 // Роуты
 app.use('/api/posts', postsRouter);
+app.use("/api/krasotulya-crm", krasotulyaCrmRouter);
+app.use("/api/content", contentRouter);
+app.use("/api/projects", projectsRouter);
+app.use("/api/admin", adminRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

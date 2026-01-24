@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Card, CardContent } from "../components/ui/card";
@@ -8,13 +8,26 @@ import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { ArrowLeft, ExternalLink, Github } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+type Project = {
+  id: string;
+  title: string;
+  description: string;
+  fullDescription: string;
+  image: string;
+  technologies: string[];
+  features: string[];
+  demoUrl?: string;
+  githubUrl?: string;
+};
+
 export function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Расширенные данные проектов с переводом
-  const projects = [
+  const fallbackProjects = useMemo<Project[]>(
+    () => [
     {
       id: "Media & Entertainment",
       title: t("projects.noodome.title"),
@@ -128,7 +141,42 @@ export function ProjectPage() {
       demoUrl: "https://affine.pro/",
       githubUrl: "#",
     },
-  ];
+  ],
+    [t]
+  );
+
+  const [projects, setProjects] = useState<Project[]>(fallbackProjects);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  useEffect(() => {
+    const lang = i18n.language === "ru" ? "ru" : "en";
+    const load = async () => {
+      setLoadingProjects(true);
+      try {
+        const res = await fetch(`/content/projects.${lang}.json`);
+        if (!res.ok) throw new Error("no json");
+        const data = (await res.json()) as any[];
+        if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
+        const mapped: Project[] = data.map((p) => ({
+          id: String(p.id),
+          title: String(p.title || p.id),
+          description: String(p.description || ""),
+          fullDescription: String(p.fullDescription || ""),
+          image: String(p.image || ""),
+          technologies: Array.isArray(p.technologies) ? p.technologies.map((x: any) => String(x)) : [],
+          features: Array.isArray(p.features) ? p.features.map((x: any) => String(x)) : [],
+          demoUrl: p.demoUrl ? String(p.demoUrl) : undefined,
+          githubUrl: p.githubUrl ? String(p.githubUrl) : undefined,
+        }));
+        setProjects(mapped);
+      } catch {
+        setProjects(fallbackProjects);
+      } finally {
+        setLoadingProjects(false);
+      }
+    };
+    load();
+  }, [fallbackProjects, i18n.language]);
 
   const project = projects.find((p) => p.id === projectId);
 
@@ -148,6 +196,14 @@ export function ProjectPage() {
       behavior: "smooth",
     });
   }, [projectId]);
+
+  if (loadingProjects && !project) {
+    return (
+      <div className="min-h-screen pt-20 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (!project) {
     return (

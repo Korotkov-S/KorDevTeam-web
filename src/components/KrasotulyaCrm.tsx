@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
@@ -25,13 +25,13 @@ interface CrmPost {
 }
 
 export function KrasotulyaCrm() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
 
   const postsPerPage = 3;
 
-  const posts: CrmPost[] = useMemo(
+  const fallbackPosts: CrmPost[] = useMemo(
     () => [
       {
         id: "1",
@@ -55,6 +55,66 @@ export function KrasotulyaCrm() {
     [t]
   );
 
+  const [posts, setPosts] = useState<CrmPost[]>(fallbackPosts);
+  const [loadedFromApi, setLoadedFromApi] = useState(false);
+
+  useEffect(() => {
+    const lang = i18n.language === "ru" ? "ru" : "en";
+    const load = async () => {
+      try {
+        // Prefer static index (works on static hosting)
+        const resStatic = await fetch(`/content/krasotulya-crm.${lang}.json`);
+        if (!resStatic.ok) throw new Error("no static index");
+        const items = (await resStatic.json()) as any[];
+        const mapped: CrmPost[] = (Array.isArray(items) ? items : []).map((x) => ({
+          id: String(x.slug),
+          slug: String(x.slug),
+          title: String(x.title || x.slug),
+          excerpt: String(x.excerpt || ""),
+          date: String(x.date || ""),
+          readTime: String(x.readTime || ""),
+          tags: Array.isArray(x.tags) ? x.tags.map((t: any) => String(t)) : [],
+        }));
+        if (mapped.length) {
+          setPosts(mapped);
+          setLoadedFromApi(true);
+          setCurrentPage(1);
+        } else {
+          setPosts(fallbackPosts);
+          setLoadedFromApi(false);
+        }
+      } catch {
+        // Fallback to API index (dev/with server)
+        try {
+          const res = await fetch(`/api/content/krasotulya-crm?lang=${lang}`);
+          if (!res.ok) throw new Error("failed");
+          const data = (await res.json()) as { items?: any[] };
+          const items = Array.isArray(data.items) ? data.items : [];
+          const mapped: CrmPost[] = items.map((x) => ({
+            id: String(x.slug),
+            slug: String(x.slug),
+            title: String(x.title || x.slug),
+            excerpt: String(x.excerpt || ""),
+            date: String(x.date || ""),
+            readTime: String(x.readTime || ""),
+            tags: Array.isArray(x.tags) ? x.tags.map((t: any) => String(t)) : [],
+          }));
+          if (mapped.length) {
+            setPosts(mapped);
+            setLoadedFromApi(true);
+            setCurrentPage(1);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        setPosts(fallbackPosts);
+        setLoadedFromApi(false);
+      }
+    };
+    load();
+  }, [fallbackPosts, i18n.language]);
+
   const totalPages = Math.ceil(posts.length / postsPerPage);
   const startIndex = (currentPage - 1) * postsPerPage;
   const endIndex = startIndex + postsPerPage;
@@ -70,6 +130,11 @@ export function KrasotulyaCrm() {
           <p className="text-muted-foreground max-w-2xl mx-auto" itemProp="description">
             {t("krasotulyaCrm.subtitle")}
           </p>
+          {loadedFromApi && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Список страниц загружен динамически (из markdown файлов).
+            </p>
+          )}
         </div>
 
         <div

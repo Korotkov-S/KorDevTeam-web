@@ -10,6 +10,7 @@ import { VideoPage } from "./pages/VideoPage";
 import { UnderMetupPage } from "./pages/UnderMetupPage";
 import { KrasotulyaCrmPostPage } from "./pages/KrasotulyaCrmPostPage";
 import { Root } from "./pages/Root";
+import { AdminPage } from "./pages/AdminPage";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./i18n";
 
@@ -41,6 +42,10 @@ const router = createBrowserRouter([
       {
         path: "/under-metup/:slug",
         element: <UnderMetupPage />,
+      },
+      {
+        path: "/admin",
+        element: <AdminPage />,
       },
     ],
   },

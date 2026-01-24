@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Calendar, Clock } from "lucide-react";
@@ -17,6 +17,54 @@ interface BlogPostMeta {
 
 function stripFirstMarkdownH1(md: string): string {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
+}
+
+function stripMd(md: string): string {
+  return md
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[`*_>#-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractLegacyMeta(md: string): Partial<BlogPostMeta> {
+  const tagsLine =
+    md.match(/\*\*(?:Теги|Tags)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Теги|Tags)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
+  const dateLine =
+    md.match(/\*\*(?:Дата публикации|Publication Date)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Дата публикации|Publication Date)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
+  const tags = tagsLine
+    ? tagsLine
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];
+  return { tags, date: dateLine.trim() };
+}
+
+function estimateReadTime(md: string, lang: string): string {
+  const words = stripMd(md).split(/\s+/).filter(Boolean).length;
+  const minutes = Math.max(1, Math.round(words / 200));
+  return lang === "ru" ? `${minutes} мин` : `${minutes} min`;
+}
+
+function deriveMetaFromMarkdown(md: string, lang: string): BlogPostMeta {
+  const titleMatch = md.match(/^\s*#\s+(.+)\s*$/m);
+  const title = (titleMatch?.[1] || "Blog").trim();
+  const body = stripFirstMarkdownH1(md);
+  const blocks = body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const excerpt = stripMd(blocks[0] || title).slice(0, 180);
+  const legacy = extractLegacyMeta(md);
+  return {
+    title,
+    excerpt,
+    date: legacy.date || "",
+    readTime: estimateReadTime(md, lang),
+    tags: legacy.tags || [],
+  };
 }
 
 // Функция для преобразования даты в ISO формат (пример: "30 октября 2025" -> "2025-10-30")
@@ -78,8 +126,6 @@ export function BlogPostPage() {
     }
   }, [navigate]);
 
-  const location = useLocation();
-  
   const blogPostsData = useMemo<Record<string, BlogPostMeta>>(() => ({
       "react-native-best-practices": {
         title: t("blog.posts.reactNative.title"),
@@ -205,12 +251,7 @@ export function BlogPostPage() {
     }
 
     const postMeta = blogPostsData[slug];
-    if (!postMeta) {
-      navigateGoBack();
-      return;
-    }
-
-    setMeta(postMeta);
+    if (postMeta) setMeta(postMeta);
 
     const langSuffix = i18n.language === "ru" ? "" : ".en";
 
@@ -242,9 +283,21 @@ export function BlogPostPage() {
         }
         const text = await response.text();
         setContent(stripFirstMarkdownH1(text));
+        if (!postMeta) {
+          setMeta(deriveMetaFromMarkdown(text, i18n.language === "ru" ? "ru" : "en"));
+        }
       } catch (error) {
         console.error("Error loading markdown:", error);
         setContent("# Error Loading\n\nFailed to load article content.");
+        if (!postMeta) {
+          setMeta({
+            title: "Error Loading",
+            excerpt: "Failed to load article content.",
+            date: "",
+            readTime: "",
+            tags: [],
+          });
+        }
       } finally {
         setLoading(false);
       }

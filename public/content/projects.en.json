@@ -1,0 +1,172 @@
+[
+  {
+    "id": "Media & Entertainment",
+    "title": "Mobile App for Noodome Business Club",
+    "description": "Mobile app is a digital member key: room booking, events, networking, personal account and payment.",
+    "fullDescription": "## Main Sections and Application Features\n\n### 1. Personal Account and Membership\n\n**Membership Status:** Information about membership type, validity period and list of available options.\n\n**Visit and Activity History:** View your past bookings, attended events and transactions.\n\n### 2. Meeting Room Booking\n\n#### Meeting room booking:\n- View room availability schedule\n- Select date, time and duration of booking\n- Instant booking confirmation\n- Manage your bookings (cancel, reschedule)\n\n#### Restaurant payment:\n- Ability to pay restaurant bills through the mobile app\n\n### 3. Events and Activities (Club Social Hub)\n\n**Event calendar:** Full schedule of all upcoming club events - master classes, workshops, expert meetings, networking.\n\n**Event registration:** Register for events of interest directly from the app.\n\n**\"I'm going\" function** for scheduling.\n\n**Notifications:** Push notifications about new events, reminders about the start of a registered event, program changes.\n\n**Event archive:** Ability to view materials or photos from past events.\n\n### 4. Networking and Community\n\n**Member profiles** (with limited access): ability to view profiles of other club members\n\n**Industry, company and interests** for convenient networking.\n\n**Event guest list:** See who else is attending the event to plan meetings in advance.\n\n**Secure chat:** Ability to exchange messages with other club members or administration through a secure channel within the app.\n\n### 5. Restaurant and Services\n\n**Digital menu:** View Noodome restaurant menu with current items and prices.\n\n**Deposit system and cashless payments:** Link bank card for convenient payment of restaurant bills and other club services without using cash.\n\n### 6. Notifications and Feedback\n\n**Personalized notifications:** Information about special offers, changes in club operations, personal invitations.",
+    "image": "/projects/noodome.png",
+    "technologies": ["React", "Node.js", "PostgreSQL", "Stripe"],
+    "features": [
+      "Club event registration",
+      "Meeting room booking",
+      "Restaurant payment through the app",
+      "Chat with other club members",
+      "Bonuses and partner offers"
+    ],
+    "demoUrl": "#",
+    "githubUrl": "#"
+  },
+  {
+    "id": "web-site",
+    "title": "Website for Alliance-Construction-Guarantee Construction Company",
+    "description": "Website for AllianceStroyGarant LLC — a corporate web resource designed to showcase the company's services in construction and renovation.",
+    "fullDescription": "## Website for Alliance-Construction-Guarantee Construction Company\n\nCorporate web resource for showcasing the company's services in construction and renovation, developed using modern technologies and adapted for all devices.\n\n### Responsive and mobile design\n\n- **Resolution support:** 1440px, 1024px, 768px, 320px\n- **Cross-browser compatibility:** Chrome, Firefox, Safari, Yandex Browser\n\n### Interactive elements\n\n- **Modal windows** for contact forms and renovation cost calculator\n- **Forms with validation** (name, phone, email)\n- **Horizontal scroll** for service cards and portfolio\n\n### Renovation cost calculator\n\n- **Step-by-step calculation** of cost based on parameters: number of rooms, area, design, property type\n- **Integration with contact form**\n\n### Main site sections\n\n#### Services\nCards with filtering by categories (commercial, apartments, additional services)\n\n#### Portfolio\nGallery of completed projects with modal windows for detailed viewing\n\n#### Work stages\nTimeline with infographics\n\n#### Reviews\nInteractive cards with modal windows\n\n#### About company\nLegal information, registers, management data\n\n#### Contacts\nMap, details, contact form\n\n### Integrations and notifications\n\n- **Form data submission** to customer's Telegram channel\n- **PDF generation** with company details\n\n### Technical requirements\n\n- **Compliance with 152-FZ** (personal data processing)\n- **Daily backup**\n\n### SEO and accessibility\n\n- **Meta tags optimization**, headers, ALT texts\n- **Clean semantic markup**\n- **Yandex Metrica and Webvisor support**\n\n### Additional pages\n\n- **\"About company\" page** with legal data\n- **\"Contacts\" page** with map and details\n- **Custom 404 page** with link to home",
+    "image": "/projects/asg.png",
+    "technologies": ["React.js", "Laravel", "MySQL"],
+    "features": [
+      "Responsive design for all devices",
+      "Renovation cost calculator",
+      "Interactive modal windows",
+      "Telegram notification integration",
+      "SEO optimization",
+      "Contact forms with validation"
+    ],
+    "demoUrl": "#",
+    "githubUrl": "#"
+  },
+  {
+    "id": "web-service",
+    "title": "SimsDynastyTree",
+    "description": "A fan tool for creating and maintaining detailed Sims family trees.",
+    "fullDescription": "## Sims Dynasty Tree\n\nSpecialized online service created by The Sims fans that transforms the standard in-game kinship system into a powerful tool for deep storytelling and preserving the memory of your unique dynasty.\n\n### Extended tree creation and customization\n\n- **Detailed character profiles:** Ability to add not only name and photo, but also birth dates, character traits, careers, education, life goals, location and custom notes\n- **Full visual customization:** Change color scheme, tree background and avatar styles (including premium options)\n- **Unlimited scale:** Create any number of trees and add unlimited generations\n\n### Advanced storytelling and organization\n\n- **Detailed biographies:** Write a unique life story for each Sim, noting key events and features\n- **Media albums:** Attach multiple photos to the entire tree, generation or individual character to capture their life at different age stages\n- **Tree linking:** For premium users - function to merge different dynasties, allowing to create complex branched universes\n\n### Social and public features\n\n- **Public and private trees:** Share your creation with the community or keep it private\n- **Public links:** Public trees have clear links with dynasty name and author name for convenient viewing\n\n### Continuous development and support\n\n- **Regular updates:** Team promptly adds content from new game expansions (careers, traits, goals, etc.)\n- **Active technical support:** Notification system for news and updates, as well as continuous work on stability and interface usability\n\n### Flexible access model\n\n- **Free basic functionality:** Tree creation, basic information filling and use of main features available\n- **Premium subscription:** Opens advanced features: premium avatars, tree linking and other exclusive features\n\n### Conclusion\n\nSims Dynasty Tree is a project created by Simmers for Simmers. It solves the key problem of \"generations\" players - the need to preserve and structure complex family stories, going far beyond the limited in-game functionality.",
+    "image": "/projects/sims.png",
+    "technologies": ["Next.js", "Node.js", "PostgreSQL"],
+    "features": [
+      "Genealogy tree creation",
+      "Detailed character profiles",
+      "Media albums and biographies",
+      "Public and private trees",
+      "Premium features",
+      "Social features"
+    ],
+    "demoUrl": "https://simsdynastytree.com/ru"
+  },
+  {
+    "id": "harmonize-me",
+    "title": "HarmonizeMe",
+    "description": "Harmonize Me is an educational online platform that helps achieve harmony with the body and nutrition through a psychotherapeutic approach",
+    "fullDescription": "# HarmonizeMe\n\n**Educational online platform for achieving harmony with the body and nutrition through a psychotherapeutic approach.**\n\n## Key Project Features\n\n### 1. Multi-level course system\n\n- **Platform courses** at fixed price:\n  - \"Eat with pleasure\"\n  - \"I look with love\" \n  - \"My beloved body\"\n- **Course constructor** with ability to select thematic videos (49 options)\n- **Free introductory course** to get acquainted with the methodology\n\n### 2. Personalized learning\n\n- **Personal account** with progress tracking\n- **Bonus system** for completing lessons and activity\n- **AI assistant** for rapid student support\n\n### 3. Integrated motivation system\n\n- **Accumulative bonuses** for educational activity\n- **Internal store (HarmoMarket)** for exchanging bonuses for premium content\n- **Recommendation mechanism** through social networks\n\n### 4. Technology infrastructure\n\n- **Responsive interface** for all devices\n- **Multilingual support** (RU/EN)\n- **Secure system** of registration and payments\n- **Chat bot** for quick assistance\n\n### 5. Additional services\n\n- **Knowledge base** with useful materials\n- **Therapeutic groups** in Telegram\n- **Online booking** for programs\n\n### 6. Thoughtful business model\n\n- **Flexible payment system** (one-time payments and bonus program)\n- **Built-in mechanisms** for audience retention\n- **Tools for viral marketing**\n\n---\n\n**The platform creates a comprehensive ecosystem for working with eating behavior and self-perception, combining educational methods with gamification elements and psychological support.**",
+    "image": "/projects/harmonizeMe.png",
+    "technologies": ["Next.js", "Adonis.js", "PostgreSQL"],
+    "features": [
+      "Multi-level course system",
+      "Personalized learning",
+      "AI assistant for support",
+      "Bonus and motivation system",
+      "Internal HarmoMarket store",
+      "Therapeutic groups in Telegram"
+    ],
+    "demoUrl": "https://iharmo.com/ru"
+  },
+  {
+    "id": "stroyrem",
+    "title": "Stroyrem",
+    "description": "Online store of construction and finishing materials in Nizhny Novgorod with city delivery",
+    "fullDescription": "## StroyRem-NN - Online Store of Construction Materials\n\nComprehensive technical support and development of an online store of construction and finishing materials in Nizhny Novgorod. The project includes targeted functionality improvements, code optimization and ensuring stable platform operation.\n\n### Main Specialization\n\n**Business Type:** Online store of construction goods\n\n**Product Range:** Wide range of products for:\n- Construction work\n- Finishing work  \n- Repair work\n- Installation work\n\n**Geography:** Nizhny Novgorod and region\n\n### Key Site Features\n\n- **Product catalog** with current assortment and detailed specifications\n- **Search and filtering system** by categories, brands and product parameters\n- **Shopping cart and order placement** with delivery cost calculation\n- **Delivery information** around the city with various rates\n- **Current prices and availability** in real time\n- **Store contacts and details**\n\n### Technical Support and Optimization\n\n- **Targeted functionality improvements** to enhance user convenience\n- **Code cleanup and optimization** to improve performance\n- **Bug fixes** and ensuring stable operation\n- **Mobile device adaptation** for convenient shopping\n\n### Benefits for Customers\n\n- **Wide selection** of construction materials from leading manufacturers\n- **Convenient online ordering** with quick checkout\n- **Delivery in Nizhny Novgorod** with flexible rates\n- **Current product availability** with regular updates\n- **Competitive prices** and special offers\n\n### Target Audience\n\n- **Private individuals** planning apartment and house renovations\n- **Professional builders** and finishers\n- **Installation teams** and contractors\n- **Renovation companies** and design studios\n\n### Technical Features\n\n- **Modern platform** for online trading\n- **Responsive design** for all devices\n- **Optimized performance** and fast loading\n- **Secure payments** and customer data protection\n- **SEO optimization** for attracting organic traffic",
+    "image": "/projects/stroyrem.png",
+    "technologies": ["Next.js", "Adonis.js", "PostgreSQL"],
+    "features": [
+      "Product catalog with filtering",
+      "Delivery cost calculation",
+      "Online shopping and cart",
+      "Personal account with purchase history",
+      "Responsive design for mobile",
+      "Technical support and optimization"
+    ],
+    "demoUrl": "https://stroyrem-nn.ru"
+  },
+  {
+    "id": "wowbanner",
+    "title": "WowBanner.ru",
+    "description": "Creating advertising banners and creatives for internet marketing",
+    "fullDescription": "## WowBanner.ru - Creating Advertising Banners and Creatives\n\nSpecialized platform for creating advertising banners and creatives for internet marketing. The service provides a wide range of tools and templates for quickly creating professional advertising materials.\n\n### Main Specialization\n\n**Service Type:** Online advertising banner constructor\n\n**Areas of Activity:**\n- Creating banners for websites\n- Developing creatives for social media\n- Designing advertising materials\n- Creating presentation materials\n\n### Key Platform Features\n\n- **Ready-made templates** of various sizes and styles\n- **Intuitive editor** with drag-and-drop functionality\n- **Image library** and graphic elements\n- **Export in various formats** (PNG, JPG, PDF)\n- **Responsive sizes** for different devices and platforms\n- **Branding and customization** for corporate style\n\n### Technical Capabilities\n\n- **Cloud storage** of projects and templates\n- **Collaborative work** on projects\n- **Versioning** and change history\n- **API integration** for automation\n- **Scaling** for high loads\n\n### Benefits for Users\n\n- **Quick creation** of advertising materials without design skills\n- **Professional quality** of finished creatives\n- **Time saving** on creating advertising materials\n- **Accessibility** for users of any level\n- **Regular updates** of templates and features\n\n### Target Audience\n\n- **Marketers** and SMM specialists\n- **Small business owners**\n- **Internet marketing agencies**\n- **Freelancers** in design\n- **Content managers**\n\n### Technical Features\n\n- **Modern web interface** with high performance\n- **Responsive design** for all devices\n- **Data security** and privacy\n- **SEO optimization** for attracting clients\n- **Integration with popular** advertising platforms",
+    "image": "/projects/wowbanner.png",
+    "technologies": ["React.js", "Node.js", "MongoDB"],
+    "features": [
+      "Ready-made banner templates",
+      "Intuitive editor",
+      "Graphic elements library",
+      "Export in various formats",
+      "Cloud project storage",
+      "Collaborative work on projects"
+    ],
+    "demoUrl": "https://wowbanner.ru/"
+  },
+  {
+    "id": "serviceplus",
+    "title": "Service-Plus: Mobile App for Equipment Inspection",
+    "description": "Mobile application for mining company for equipment inspection and damage recording with offline mode and data synchronization.",
+    "fullDescription": "## Service-Plus: Mobile App for Equipment Inspection\n\nMobile application for mining company designed to systematize the equipment inspection process and record damages. The solution ensures efficient operation in conditions of unstable internet connection and allows monitoring equipment technical condition.\n\n### Main Features\n\n- **Equipment Inspection:** Structured equipment inspection process with ability to record all detected damages\n- **Damage Recording:** Detailed defect recording with photo attachments and descriptions\n- **Offline Mode:** Full application functionality without internet connection\n\n### Smart Data Management\n\n- **Device Storage:** All data is saved locally on employee's phone\n- **Memory Check:** Automatic free space monitoring on device before data saving\n- **Synchronization:** Automatic network availability check and data synchronization when connected to internet\n- **Reliable Storage:** Data safety guarantee even during connection failures\n\n### Authorization System\n\n- **Employee ID Login:** Convenient employee authorization by employee ID\n- **Login History:** System remembers all employees who logged into the application\n- **Security:** Access control to application and user activity tracking\n\n### Administrative Panel\n\n- **Branding Customization:** Ability to change company logo in administrative panel\n- **Color Settings:** Flexible application color scheme customization to match corporate style\n- **Holdings Management:** Administrative panel for managing multiple holdings with individual settings\n- **Defect Analytics:** Centralized information output about all defects detected during equipment inspection\n- **Reporting:** Detailed statistics and reports on inspections and identified issues\n\n### Technical Features\n\n- **Memory Optimization:** Efficient device memory usage\n- **Reliable Synchronization:** Smart synchronization system with data conflict handling\n- **Performance:** Fast application operation even with large data volumes\n- **Adaptability:** Operation on various mobile device models\n\n### Business Benefits\n\n- **Quality Control:** Systematization of equipment inspection process\n- **Downtime Reduction:** Timely problem detection and repair planning\n- **Transparency:** Complete real-time equipment condition information\n- **Efficiency:** Reduction of time spent on document and report filling\n\n### Conclusion\n\nService-Plus application is a comprehensive solution for mining company that ensures effective equipment technical condition control, operation in unstable connection conditions, and centralized data management through administrative panel.",
+    "image": "/projects/serviceplus.png",
+    "technologies": ["React Native", "Node.js", "PostgreSQL"],
+    "features": [
+      "Equipment inspection and damage recording",
+      "Offline mode operation",
+      "Device data storage with memory check",
+      "Automatic synchronization when network available",
+      "Employee ID login",
+      "Employee login history",
+      "Administrative panel for customization",
+      "Company logo and color changes",
+      "Holdings management",
+      "Defect analytics and reporting"
+    ],
+    "demoUrl": "https://servicplus.ru/",
+    "githubUrl": "#"
+  },
+  {
+    "id": "amch",
+    "title": "AMCH: Venture Investment Service",
+    "description": "Website redesign and Python backend development for venture investment service.",
+    "fullDescription": "## AMCH: Venture Investment Service\n\nComprehensive work on website redesign and backend development for venture investment platform. The project includes user interface update and creation of reliable server-side on Python.\n\n### Website Redesign\n\n- **Modern Interface:** Complete user interface redesign with focus on usability\n- **Responsive Layout:** Optimization for all device types — desktop, tablet, mobile\n- **Improved Navigation:** Intuitive website structure for convenient information search\n- **Visual Identity:** Design update in accordance with modern trends\n\n### Python Backend Development\n\n- **Server Architecture:** Development of reliable backend on Python\n- **API Integration:** Creation of RESTful API for frontend and backend interaction\n- **Data Processing:** Efficient processing of venture investment data\n- **Security:** Implementation of security measures for financial data protection\n\n### Platform Functionality\n\n- **Investment Management:** System for managing venture investment portfolio\n- **Analytics:** Tools for analyzing investment opportunities\n- **Document Management:** Automation of document and reporting work\n- **User Accounts:** Personal accounts for investors and companies\n\n### Technical Features\n\n- **Performance:** Optimization of website and API speed\n- **Scalability:** Architecture ready for load growth\n- **Reliability:** Stable system operation without failures\n- **Integrations:** Ability to integrate with external services\n\n### Business Benefits\n\n- **Modern Look:** Updated design increases user trust\n- **Usability:** Improved UX increases conversion\n- **Efficiency:** Process automation reduces operational costs\n- **Competitive Advantage:** Modern platform stands out in the market\n\n### Conclusion\n\nAMCH project demonstrates comprehensive approach to venture investment platform development, combining modern design with reliable Python backend. The solution ensures efficient investment work and convenient user experience.",
+    "image": "/projects/amch.png",
+    "technologies": ["Python", "React.js", "PostgreSQL"],
+    "features": [
+      "Website redesign with modern interface",
+      "Python backend development",
+      "RESTful API for integration",
+      "Responsive layout for all devices",
+      "Venture investment management",
+      "Analytics and reporting",
+      "User accounts",
+      "Data security",
+      "Performance optimization",
+      "External service integrations"
+    ],
+    "demoUrl": "https://amch.ltd/ru/venture",
+    "githubUrl": "#"
+  },
+  {
+    "id": "notion-analog",
+    "title": "Notion Analog for Federal Companies",
+    "description": "Development of Notion analog for large federal companies with licensing system, Russian localization and support for Russian OS.",
+    "fullDescription": "## Notion Analog for Federal Companies\n\nDevelopment of corporate solution based on Notion analog for large federal companies. The project included work with product team on creating full-featured platform for document management and knowledge management considering specifics of Russian market.\n\n### Platform Development\n\n- **Notion Analog:** Creation of full-featured platform for creating and managing documents, knowledge bases and projects\n- **Product Team Collaboration:** Close collaboration with product team to implement business requirements\n- **Corporate Features:** Adaptation of functionality to needs of large federal companies\n- **Scalability:** Architecture designed for work with large number of users and data\n\n### Licensing System\n\n- **Flexible Licensing:** Implementation of licensing system for managing user access\n- **Corporate Licenses:** Support for various license types for different access levels\n- **Usage Control:** Tracking license usage and management\n- **Security:** Protection against unauthorized use\n\n### Russian Localization\n\n- **Full Localization:** Translation of entire interface to Russian language\n- **Content Adaptation:** Adaptation of functionality to Russian standards and practices\n- **Format Localization:** Support for Russian date, number and document formats\n- **Cultural Adaptation:** Consideration of Russian company work specifics\n\n### Deployment for Russian OS\n\n- **Russian OS Support:** Deployment of application versions for work on Russian operating systems\n- **Compatibility:** Ensuring compatibility with various Russian distributions\n- **Testing:** Verification of functionality on target platforms\n- **Optimization:** Performance adaptation to Russian OS specifics\n\n### Platform Functionality\n\n- **Document Creation:** Rich editor for creating various document types\n- **Knowledge Bases:** Organization and structuring of corporate knowledge\n- **Project Management:** Tools for planning and tracking projects\n- **Collaboration:** Capabilities for collaborative work on documents and projects\n- **Integrations:** Connection to corporate systems and services\n\n### Technical Features\n\n- **Performance:** Optimization for work with large data volumes\n- **Reliability:** Stable operation in corporate environment\n- **Security:** Compliance with security requirements for federal companies\n- **Scalability:** Ability to scale to growing needs\n\n### Business Benefits\n\n- **Regulatory Compliance:** Solution complies with Russian legislation requirements\n- **Data Security:** Data storage on Russian servers\n- **Corporate Control:** Full control over data and access\n- **Efficiency:** Improvement of document management and knowledge management processes\n\n### Conclusion\n\nProject demonstrates successful development of corporate solution based on Notion analog considering specifics of Russian market. Solution provides large federal companies with modern platform for work with documents and knowledge with full support of Russian standards and operating systems.",
+    "image": "/projects/notion.png",
+    "technologies": ["React.js", "Node.js", "PostgreSQL"],
+    "features": [
+      "Notion analog for corporate use",
+      "Licensing system and access management",
+      "Full Russian interface localization",
+      "Deployment for Russian OS",
+      "Product team collaboration",
+      "Corporate features and integrations",
+      "Knowledge bases and document management",
+      "Project management",
+      "Collaboration and teamwork",
+      "Security and regulatory compliance"
+    ],
+    "demoUrl": "https://affine.pro/",
+    "githubUrl": "#"
+  }
+]
+

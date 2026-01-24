@@ -20,6 +20,54 @@ function stripFirstMarkdownH1(md: string) {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
 }
 
+function stripMd(md: string): string {
+  return md
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[`*_>#-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractLegacyMeta(md: string): Partial<CrmPostMeta> {
+  const tagsLine =
+    md.match(/\*\*(?:Теги|Tags)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Теги|Tags)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
+  const dateLine =
+    md.match(/\*\*(?:Дата публикации|Publication Date)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Дата публикации|Publication Date)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
+  const tags = tagsLine
+    ? tagsLine
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];
+  return { tags, date: dateLine.trim() };
+}
+
+function estimateReadTime(md: string, lang: string): string {
+  const words = stripMd(md).split(/\s+/).filter(Boolean).length;
+  const minutes = Math.max(1, Math.round(words / 200));
+  return lang === "ru" ? `${minutes} мин` : `${minutes} min`;
+}
+
+function deriveMetaFromMarkdown(md: string, lang: string): CrmPostMeta {
+  const titleMatch = md.match(/^\s*#\s+(.+)\s*$/m);
+  const title = (titleMatch?.[1] || "Article").trim();
+  const body = stripFirstMarkdownH1(md);
+  const blocks = body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const excerpt = stripMd(blocks[0] || title).slice(0, 180);
+  const legacy = extractLegacyMeta(md);
+  return {
+    title,
+    excerpt,
+    date: legacy.date || "",
+    readTime: estimateReadTime(md, lang),
+    tags: legacy.tags || [],
+  };
+}
+
 function parseDateToISO(dateStr: string): string {
   const monthsRu: Record<string, string> = {
     января: "01",
@@ -113,12 +161,7 @@ export function KrasotulyaCrmPostPage() {
     }
 
     const postMeta = postsData[slug];
-    if (!postMeta) {
-      navigateGoBack();
-      return;
-    }
-
-    setMeta(postMeta);
+    if (postMeta) setMeta(postMeta);
 
     const langSuffix = i18n.language === "ru" ? "" : ".en";
 
@@ -147,9 +190,21 @@ export function KrasotulyaCrmPostPage() {
         if (!response.ok) throw new Error("Failed to load");
         const text = await response.text();
         setContent(stripFirstMarkdownH1(text));
+        if (!postMeta) {
+          setMeta(deriveMetaFromMarkdown(text, i18n.language === "ru" ? "ru" : "en"));
+        }
       } catch (error) {
         console.error("Error loading markdown:", error);
         setContent("# Error Loading\n\nFailed to load article content.");
+        if (!postMeta) {
+          setMeta({
+            title: "Error Loading",
+            excerpt: "Failed to load article content.",
+            date: "",
+            readTime: "",
+            tags: [],
+          });
+        }
       } finally {
         setLoading(false);
       }

@@ -1,0 +1,168 @@
+[
+  {
+    "slug": "harmonize-me-story",
+    "lang": "ru",
+    "title": "\"HarmonizeMe я снова сорвалась…\" — Дарья знает, почему это происходит, и научит, как избежать срывов",
+    "excerpt": "История сервиса",
+    "date": "27 января 2025",
+    "readTime": "2 мин",
+    "tags": [
+      "Веб-платформа",
+      "Психология",
+      "ИИ",
+      "Образование",
+      "Next.js"
+    ],
+    "mtimeMs": 1766738451239.7668
+  },
+  {
+    "slug": "government-contractors-guide",
+    "lang": "ru",
+    "title": "Как эффективно взаимодействовать с госзаказчиками в IT-сфере?",
+    "excerpt": "Мой телеграм канал о моей студии, жизни, менеджменте, умных мыслях (надеюсь), личной эффективности, юмор",
+    "date": "27 января 2025",
+    "readTime": "12 мин",
+    "tags": [
+      "Госзакупки",
+      "Переговоры",
+      "44-ФЗ",
+      "Бизнес",
+      "Менеджмент"
+    ],
+    "mtimeMs": 1766738278377.0227
+  },
+  {
+    "slug": "argumentation-guide",
+    "lang": "ru",
+    "title": "Хватит терять переговоры! Железная аргументация, которая ломает сопротивление даже упрямых клиентов",
+    "excerpt": "Пост написан после прочтения книги Никиты Непряхина «Аргументируй это!» — очень советую, там очень подробно расписано про аргументацию.",
+    "date": "27 января 2025",
+    "readTime": "3 мин",
+    "tags": [
+      "Переговоры",
+      "Аргументация",
+      "Коммуникация",
+      "Бизнес"
+    ],
+    "mtimeMs": 1766737161318.3157
+  },
+  {
+    "slug": "sims-dynasty-tree-platform",
+    "lang": "ru",
+    "title": "SimsDynastyTree: разработка сервиса генеалогических древ на основе графов для фанатов The Sims",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "7 мин",
+    "tags": [],
+    "mtimeMs": 1766498499073.8845
+  },
+  {
+    "slug": "harmonize-me-platform",
+    "lang": "ru",
+    "title": "Платформа Harmonize Me: комплексная разработка онлайн-курсов психологии с геймификацией и ИИ-поддержкой",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "7 мин",
+    "tags": [],
+    "mtimeMs": 1766496436738.2
+  },
+  {
+    "slug": "stone-calculator-automation",
+    "lang": "ru",
+    "title": "Калькулятор изделий из камня: автоматизация сметы и экономия до 80% времени",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1766496115163.5425
+  },
+  {
+    "slug": "crm-implementation",
+    "lang": "ru",
+    "title": "Внедрение CRM систем: полное руководство по автоматизации продаж в 2025 году",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1766496115162.388
+  },
+  {
+    "slug": "react-native-best-practices",
+    "lang": "ru",
+    "title": "Лучшие практики разработки на React Native в 2025 году",
+    "excerpt": "Введение",
+    "date": "20 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "React Native",
+      "Mobile Development",
+      "Best Practices"
+    ],
+    "mtimeMs": 1766496115159.2732
+  },
+  {
+    "slug": "business-automation",
+    "lang": "ru",
+    "title": "Автоматизация бизнес-процессов: как повысить эффективность компании в 2025 году",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1766496115158.638
+  },
+  {
+    "slug": "nodejs-microservices",
+    "lang": "ru",
+    "title": "Микросервисная архитектура на Node.js с NestJS",
+    "excerpt": "Почему микросервисы?",
+    "date": "15 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "Node.js",
+      "NestJS",
+      "Microservices",
+      "Backend"
+    ],
+    "mtimeMs": 1766496115158.2722
+  },
+  {
+    "slug": "laravel-api-development",
+    "lang": "ru",
+    "title": "Разработка RESTful API на Laravel: Полное руководство",
+    "excerpt": "Введение",
+    "date": "5 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "Laravel",
+      "PHP",
+      "API Development",
+      "REST"
+    ],
+    "mtimeMs": 1766496115157.994
+  },
+  {
+    "slug": "wordpress-optimization",
+    "lang": "ru",
+    "title": "Оптимизация производительности WordPress сайтов",
+    "excerpt": "Введение",
+    "date": "10 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "WordPress",
+      "Optimization",
+      "Performance",
+      "PHP"
+    ],
+    "mtimeMs": 1766496115157.698
+  },
+  {
+    "slug": "telegram-broadcast-automation",
+    "lang": "ru",
+    "title": "Автоматизация массовой рассылки в Telegram: экономия 16 часов работы для Kusidis PRO",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1766496115157.3022
+  }
+]
