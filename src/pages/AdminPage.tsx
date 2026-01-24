@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -20,10 +20,6 @@ type ContentMeta = {
   tags: string[];
   mtimeMs?: number;
 };
-
-function langSuffix(lang: Lang) {
-  return lang === "en" ? ".en" : "";
-}
 
 function authHeaders(authHeaderValue: string) {
   return authHeaderValue ? { Authorization: authHeaderValue } : {};
@@ -55,7 +51,7 @@ export function AdminPage() {
   const [password, setPassword] = useState<string>(() => localStorage.getItem("ADMIN_PASSWORD") || "");
   const [authHeaderValue, setAuthHeaderValue] = useState<string>(() => localStorage.getItem("ADMIN_AUTH") || "");
   const [isAuthed, setIsAuthed] = useState(false);
-  const [activeTab, setActiveTab] = useState<"blog" | "krasotulya" | "projects">("blog");
+  const [activeTab, setActiveTab] = useState<"blog" | "krasotulya" | "projects" | "service">("blog");
   const [lang, setLang] = useState<Lang>("ru");
 
   // Indexes
@@ -68,6 +64,9 @@ export function AdminPage() {
   const [blogTitle, setBlogTitle] = useState<string>("");
   const [blogSlugOverride, setBlogSlugOverride] = useState<string>("");
   const [blogContent, setBlogContent] = useState<string>("");
+  const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
+  const blogTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const blogImageInputRef = useRef<HTMLInputElement | null>(null);
 
   // CRM editor
   const [crmSelectedSlug, setCrmSelectedSlug] = useState<string>("");
@@ -112,6 +111,11 @@ export function AdminPage() {
     }
   }, [lang]);
 
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadIndexes(), loadProjects()]);
+    toast.success("Данные обновлены");
+  }, [loadIndexes, loadProjects]);
+
   useEffect(() => {
     localStorage.setItem("ADMIN_USERNAME", username);
   }, [username]);
@@ -140,6 +144,65 @@ export function AdminPage() {
     return false;
   }, [authHeaderValue]);
 
+  const insertIntoBlog = useCallback((snippet: string) => {
+    const el = blogTextareaRef.current;
+    if (!el) {
+      setBlogContent((prev) => prev + snippet);
+      return;
+    }
+    const start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
+    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
+    setBlogContent((prev) => prev.slice(0, start) + snippet + prev.slice(end));
+    requestAnimationFrame(() => {
+      try {
+        el.focus();
+        const pos = start + snippet.length;
+        el.setSelectionRange(pos, pos);
+      } catch {
+        // ignore
+      }
+    });
+  }, []);
+
+  const uploadBlogImage = useCallback(
+    async (file: File) => {
+      try {
+        if (!(await verifyAuth())) {
+          toast.error("Нужна авторизация");
+          return;
+        }
+        if (!file.type?.startsWith("image/")) {
+          toast.error("Можно загрузить только изображение");
+          return;
+        }
+
+        setUploadingBlogImage(true);
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+          reader.readAsDataURL(file);
+        });
+
+        const resp = await fetchJson<{ url: string }>(`/api/admin/upload-blog-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
+          body: JSON.stringify({ dataUrl, filename: file.name }),
+        });
+
+        insertIntoBlog(`\n\n![](${resp.url})\n`);
+        toast.success("Фото загружено");
+      } catch (e: any) {
+        console.warn(e);
+        toast.error(`Ошибка загрузки: ${e?.message || "unknown"}`);
+      } finally {
+        setUploadingBlogImage(false);
+        if (blogImageInputRef.current) blogImageInputRef.current.value = "";
+      }
+    },
+    [authHeaderValue, insertIntoBlog, verifyAuth],
+  );
+
   useEffect(() => {
     loadIndexes();
     loadProjects();
@@ -149,20 +212,12 @@ export function AdminPage() {
     verifyAuth();
   }, [verifyAuth]);
 
-  const selectedBlogMeta = useMemo(
-    () => blogIndex.find((x) => x.slug === blogSelectedSlug) || null,
-    [blogIndex, blogSelectedSlug]
-  );
-  const selectedCrmMeta = useMemo(
-    () => crmIndex.find((x) => x.slug === crmSelectedSlug) || null,
-    [crmIndex, crmSelectedSlug]
-  );
-
   const onSelectBlog = useCallback(
     async (slug: string) => {
       setBlogSelectedSlug(slug);
       setBlogSlugOverride(slug);
-      setBlogTitle(selectedBlogMeta?.title || slug);
+      const meta = blogIndex.find((x) => x.slug === slug) || null;
+      setBlogTitle(meta?.title || slug);
       try {
         const data = await fetchJson<{ post: { content: string } }>(`/api/posts/${slug}?lang=${lang}`);
         setBlogContent(data.post.content || "");
@@ -171,7 +226,7 @@ export function AdminPage() {
         toast.error("Не удалось загрузить markdown поста");
       }
     },
-    [lang, selectedBlogMeta]
+    [blogIndex, lang]
   );
 
   const onSelectCrm = useCallback(
@@ -440,42 +495,31 @@ export function AdminPage() {
   return (
     <div className="min-h-screen pt-24">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-semibold">Admin</h1>
-            <p className="text-muted-foreground">
-              Управление markdown (blog / krasotulya-crm) и projects.json. API по умолчанию: `http://localhost:3001`.
-            </p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-semibold">Админка</h1>
           </div>
-          <div className="flex flex-col md:flex-row gap-3 md:items-center">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <div className="flex gap-2 items-center">
-              <Button variant={lang === "ru" ? "default" : "outline"} onClick={() => setLang("ru")}>
+              <Button size="sm" variant={lang === "ru" ? "default" : "outline"} onClick={() => setLang("ru")}>
                 RU
               </Button>
-              <Button variant={lang === "en" ? "default" : "outline"} onClick={() => setLang("en")}>
+              <Button size="sm" variant={lang === "en" ? "default" : "outline"} onClick={() => setLang("en")}>
                 EN
               </Button>
             </div>
-            <Button variant="outline" onClick={logout}>
-              Logout
-            </Button>
-            <Button variant="outline" onClick={loadIndexes} disabled={loadingIndex}>
-              Обновить индекс
-            </Button>
-            <Button variant="outline" onClick={generateStatic}>
-              Generate static
-            </Button>
-            <Button variant="outline" onClick={generateIndex}>
-              Generate index
+            <Button size="sm" variant="outline" onClick={logout}>
+              Выйти
             </Button>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList>
-            <TabsTrigger value="blog">Blog</TabsTrigger>
+            <TabsTrigger value="blog">Блог</TabsTrigger>
             <TabsTrigger value="krasotulya">Красотуля</TabsTrigger>
-            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="projects">Проекты</TabsTrigger>
+            <TabsTrigger value="service">Сервис</TabsTrigger>
           </TabsList>
 
           <TabsContent value="blog" className="mt-6">
@@ -527,15 +571,16 @@ export function AdminPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input placeholder="Title (для создания)" value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} />
+                    <Input placeholder="Заголовок" value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} />
                     <Input
-                      placeholder="Slug override (optional)"
+                      placeholder="Slug (опционально)"
                       value={blogSlugOverride}
                       onChange={(e) => setBlogSlugOverride(e.target.value)}
                       disabled={Boolean(blogSelectedSlug)}
                     />
                   </div>
                   <Textarea
+                    ref={blogTextareaRef}
                     value={blogContent}
                     onChange={(e) => setBlogContent(e.target.value)}
                     className="min-h-[320px] font-mono"
@@ -547,6 +592,24 @@ export function AdminPage() {
                     <Button variant="destructive" onClick={deleteBlog} disabled={!blogSelectedSlug}>
                       Удалить
                     </Button>
+                    <input
+                      ref={blogImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) uploadBlogImage(f);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={uploadingBlogImage}
+                      onClick={() => blogImageInputRef.current?.click()}
+                    >
+                      {uploadingBlogImage ? "Загрузка..." : "Загрузить фото"}
+                    </Button>
                     {blogSelectedSlug && (
                       <Button asChild variant="outline">
                         <a href={`/blog/${blogSelectedSlug}`} target="_blank" rel="noreferrer">
@@ -554,42 +617,12 @@ export function AdminPage() {
                         </a>
                       </Button>
                     )}
-                    {blogSelectedSlug && (
-                      <Button asChild variant="outline">
-                        <a
-                          href={`/blog/${blogSelectedSlug}${langSuffix(lang)}.md`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          MD
-                        </a>
-                      </Button>
-                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border">
-                    <div>
-                      <div className="text-sm font-medium mb-2">Preview</div>
-                      <div className="prose prose-invert max-w-none bg-secondary/20 rounded-lg p-4">
-                        <ReactMarkdown>{blogContent}</ReactMarkdown>
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <div className="font-medium text-foreground mb-2">Подсказка</div>
-                      <ul className="list-disc ml-5 space-y-1">
-                        <li>Заголовок берётся из первой строки `# ...`.</li>
-                        <li>Теги/дата можно писать внизу как в существующих статьях.</li>
-                        <li>
-                          Индекс на сайте будет строиться из файлов в `public/blog` через `/api/content/blog`.
-                        </li>
-                      </ul>
-                      {selectedBlogMeta && (
-                        <div className="mt-4">
-                          <div className="font-medium text-foreground mb-1">Текущая мета</div>
-                          <div>Дата: {selectedBlogMeta.date || "—"}</div>
-                          <div>Read time: {selectedBlogMeta.readTime || "—"}</div>
-                        </div>
-                      )}
+                  <div className="pt-4 border-t border-border">
+                    <div className="text-sm font-medium mb-2">Предпросмотр</div>
+                    <div className="prose dark:prose-invert max-w-none bg-secondary/20 rounded-lg p-4">
+                      <ReactMarkdown>{blogContent}</ReactMarkdown>
                     </div>
                   </div>
                 </CardContent>
@@ -638,7 +671,7 @@ export function AdminPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Input
-                    placeholder="Slug (required for create)"
+                    placeholder="Slug"
                     value={crmSlug}
                     onChange={(e) => setCrmSlug(e.target.value)}
                     disabled={Boolean(crmSelectedSlug)}
@@ -661,40 +694,12 @@ export function AdminPage() {
                         </a>
                       </Button>
                     )}
-                    {crmSelectedSlug && (
-                      <Button asChild variant="outline">
-                        <a
-                          href={`/krasotulya-crm/${crmSelectedSlug}${langSuffix(lang)}.md`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          MD
-                        </a>
-                      </Button>
-                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border">
-                    <div>
-                      <div className="text-sm font-medium mb-2">Preview</div>
-                      <div className="prose prose-invert max-w-none bg-secondary/20 rounded-lg p-4">
-                        <ReactMarkdown>{crmContent}</ReactMarkdown>
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <div className="font-medium text-foreground mb-2">Подсказка</div>
-                      <ul className="list-disc ml-5 space-y-1">
-                        <li>Slug обязателен (используется в URL).</li>
-                        <li>Мета (title/excerpt/tags/date) берётся из markdown.</li>
-                        <li>Индекс на сайте будет строиться из `public/krasotulya-crm` через `/api/content/krasotulya-crm`.</li>
-                      </ul>
-                      {selectedCrmMeta && (
-                        <div className="mt-4">
-                          <div className="font-medium text-foreground mb-1">Текущая мета</div>
-                          <div>Дата: {selectedCrmMeta.date || "—"}</div>
-                          <div>Read time: {selectedCrmMeta.readTime || "—"}</div>
-                        </div>
-                      )}
+                  <div className="pt-4 border-t border-border">
+                    <div className="text-sm font-medium mb-2">Предпросмотр</div>
+                    <div className="prose dark:prose-invert max-w-none bg-secondary/20 rounded-lg p-4">
+                      <ReactMarkdown>{crmContent}</ReactMarkdown>
                     </div>
                   </div>
                 </CardContent>
@@ -705,49 +710,39 @@ export function AdminPage() {
           <TabsContent value="projects" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Projects JSON</CardTitle>
+                <CardTitle>Проекты</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={loadProjects}>
-                    Reload
+                    Обновить
                   </Button>
-                  <Button onClick={saveProjects}>Save</Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setProjectsJson(
-                        JSON.stringify(
-                          [
-                            {
-                              id: "new-project",
-                              title: "New project",
-                              description: "Short description",
-                              fullDescription: "## Details\n\nWrite markdown here.",
-                              image: "/projects/your.png",
-                              technologies: ["React"],
-                              features: ["Feature 1"],
-                              demoUrl: "https://example.com",
-                              githubUrl: "#",
-                            },
-                          ],
-                          null,
-                          2
-                        ) + "\n"
-                      );
-                    }}
-                  >
-                    Template
-                  </Button>
+                  <Button onClick={saveProjects}>Сохранить</Button>
                 </div>
                 <Textarea
                   value={projectsJson}
                   onChange={(e) => setProjectsJson(e.target.value)}
                   className="min-h-[520px] font-mono"
                 />
-                <div className="text-sm text-muted-foreground">
-                  Файл сохраняется в `public/content/projects.{lang}.json` (и в dist, если задан `CONTENT_DIST_ROOT`).
-                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="service" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Сервис</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={refreshAll} disabled={loadingIndex}>
+                  Обновить данные
+                </Button>
+                <Button variant="outline" onClick={generateIndex}>
+                  Обновить индексы
+                </Button>
+                <Button variant="outline" onClick={generateStatic}>
+                  Пересобрать статику
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

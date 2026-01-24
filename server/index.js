@@ -16,8 +16,9 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Support base64 image uploads from admin (JSON payload can be large)
+app.use(express.json({ limit: process.env.JSON_LIMIT || "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: process.env.URLENCODED_LIMIT || "25mb" }));
 
 // Логирование запросов
 app.use((req, res, next) => {
