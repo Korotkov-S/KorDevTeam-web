@@ -143,7 +143,7 @@ function markdownToHtml(md) {
   return out.join("\n");
 }
 
-function injectSeoAndBody({ indexHtml, title, description, canonicalUrl, bodyHtml }) {
+function injectSeoAndBody({ indexHtml, title, description, canonicalUrl, ogImage, bodyHtml }) {
   let html = indexHtml;
 
   // Title
@@ -191,6 +191,7 @@ function injectSeoAndBody({ indexHtml, title, description, canonicalUrl, bodyHtm
   replaceOrAddMeta("og:title", title);
   replaceOrAddMeta("og:description", description);
   replaceOrAddMeta("og:url", canonicalUrl);
+  if (ogImage) replaceOrAddMeta("og:image", ogImage);
 
   // Twitter tags (nice-to-have)
   const replaceOrAddTwitter = (name, content) => {
@@ -201,6 +202,7 @@ function injectSeoAndBody({ indexHtml, title, description, canonicalUrl, bodyHtm
   };
   replaceOrAddTwitter("twitter:title", title);
   replaceOrAddTwitter("twitter:description", description);
+  if (ogImage) replaceOrAddTwitter("twitter:image", ogImage);
 
   // Inject pre-rendered content for crawlers (React will overwrite on load; that's OK)
   html = html.replace(
@@ -209,6 +211,18 @@ function injectSeoAndBody({ indexHtml, title, description, canonicalUrl, bodyHtm
   );
 
   return html;
+}
+
+function extractFirstMarkdownImage(md) {
+  const match = md.match(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/m);
+  return (match?.[1] || "").trim();
+}
+
+function toAbsoluteOgImage(src) {
+  if (!src) return "";
+  if (/^https?:\/\//i.test(src)) return src;
+  if (src.startsWith("/")) return `${SITE_URL}${src}`;
+  return "";
 }
 
 function getSlugsFromPublic() {
@@ -287,6 +301,7 @@ function main() {
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
     const mdBody = stripFirstMarkdownH1(md);
+    const ogImage = toAbsoluteOgImage(extractFirstMarkdownImage(mdBody) || extractFirstMarkdownImage(md));
 
     const bodyHtml = [
       `<div class="min-h-screen pt-20">`,
@@ -309,6 +324,7 @@ function main() {
       title,
       description: excerpt,
       canonicalUrl,
+      ogImage,
       bodyHtml,
     });
 

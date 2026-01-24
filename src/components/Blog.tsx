@@ -232,6 +232,11 @@ export function Blog() {
     setCurrentPage(page);
   };
 
+  const postCardImageBySlug: Record<string, string> = {
+    "krasotulya-crm-launch": "/blog/krasotula1.jpeg",
+    "krasotulya-problem-1-data-fragmentation": "/blog/krasotula2.jpeg",
+  };
+
   const cardImages = ["/opengraphlogo.jpeg", "/projects/wowbanner.png", "/projects/harmonizeMe.png", "/projects/sims.png"];
   const gradients = ["from-blue-500 to-cyan-500", "from-purple-500 to-pink-500", "from-cyan-500 to-blue-500"];
 
@@ -315,8 +320,10 @@ export function Blog() {
               <div className="relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300">
                 <div className="relative aspect-video overflow-hidden">
                   <ImageWithFallback
-                    src={cardImages[index % cardImages.length]}
+                    src={postCardImageBySlug[post.slug] ?? cardImages[index % cardImages.length]}
                     alt={post.title}
+                    fallbackSrc="/opengraphlogo.jpeg"
+                    fallbackClassName="block w-full h-full object-contain box-border p-4"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                   <div

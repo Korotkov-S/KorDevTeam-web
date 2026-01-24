@@ -2376,34 +2376,33 @@ body [data-slot="dialog-overlay"] {
   .under-metup-page {
     /* pt-20 = 80px (фиксированная шапка) + служебные элементы (заголовок/бейджи/кнопки) */
     --under-metup-top-offset: 80px;
-    --under-metup-ui-offset: 240px;
+    --under-metup-ui-offset: 200px;
   }
 
   .video-container {
     aspect-ratio: 16/9 !important;
-    min-height: 180px !important;
-    /* ориентация на высоту viewport (dvh), с фолбэком на vh */
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 240px)
+    /* clamp: гарантируем, что блок не станет "узким" по высоте */
+    height: clamp(
+      420px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 200px)
+      ),
+      820px
     ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 240px)
+    max-height: clamp(
+      420px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 200px)
+      ),
+      820px
     ) !important;
   }
 
   .video-container iframe {
     width: 100% !important;
     height: 100% !important;
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 240px)
-    ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 240px)
-    ) !important;
   }
 }
 
@@ -2411,32 +2410,30 @@ body [data-slot="dialog-overlay"] {
 @media (max-width: 768px) {
   .under-metup-page {
     --under-metup-top-offset: 80px;
-    --under-metup-ui-offset: 190px;
+    --under-metup-ui-offset: 170px;
   }
 
   .video-container {
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 190px)
+    height: clamp(
+      260px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 170px)
+      ),
+      560px
     ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 190px)
+    max-height: clamp(
+      260px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 170px)
+      ),
+      560px
     ) !important;
-    min-height: 200px !important;
     aspect-ratio: 16/9 !important;
   }
 
   .video-container iframe {
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 190px)
-    ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 190px)
-    ) !important;
-    min-height: 200px !important;
     width: 100% !important;
     height: 100% !important;
   }
@@ -2445,32 +2442,30 @@ body [data-slot="dialog-overlay"] {
 @media (max-width: 640px) {
   .under-metup-page {
     --under-metup-top-offset: 80px;
-    --under-metup-ui-offset: 210px;
+    --under-metup-ui-offset: 190px;
   }
 
   .video-container {
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 210px)
+    height: clamp(
+      240px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 190px)
+      ),
+      520px
     ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 210px)
+    max-height: clamp(
+      240px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 190px)
+      ),
+      520px
     ) !important;
-    min-height: 180px !important;
     aspect-ratio: 16/9 !important;
   }
 
   .video-container iframe {
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 210px)
-    ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 210px)
-    ) !important;
-    min-height: 180px !important;
     width: 100% !important;
     height: 100% !important;
   }
@@ -2479,32 +2474,30 @@ body [data-slot="dialog-overlay"] {
 @media (max-width: 480px) {
   .under-metup-page {
     --under-metup-top-offset: 80px;
-    --under-metup-ui-offset: 220px;
+    --under-metup-ui-offset: 200px;
   }
 
   .video-container {
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 220px)
+    height: clamp(
+      220px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 200px)
+      ),
+      480px
     ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 220px)
+    max-height: clamp(
+      220px,
+      calc(
+        100dvh - var(--under-metup-top-offset, 80px) -
+          var(--under-metup-ui-offset, 200px)
+      ),
+      480px
     ) !important;
-    min-height: 150px !important;
     aspect-ratio: 16/9 !important;
   }
 
   .video-container iframe {
-    max-height: calc(
-      100vh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 220px)
-    ) !important;
-    max-height: calc(
-      100dvh - var(--under-metup-top-offset, 80px) -
-        var(--under-metup-ui-offset, 220px)
-    ) !important;
-    min-height: 150px !important;
     width: 100% !important;
     height: 100% !important;
   }

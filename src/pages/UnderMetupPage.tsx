@@ -124,7 +124,7 @@ export function UnderMetupPage() {
         </div>
 
         {meta && (
-          <article className="max-w-4xl mx-auto">
+          <article className="max-w-6xl mx-auto">
             {/* Video Header */}
             <header className="mb-2 md:mb-12 pb-2 md:pb-8 border-b border-border">
               <h1 className="text-xl md:text-4xl lg:text-5xl mb-2 md:mb-6">{meta.title}</h1>

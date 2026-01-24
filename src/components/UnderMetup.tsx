@@ -1,14 +1,5 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
 import { Calendar, ArrowUpRight, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
@@ -31,6 +22,15 @@ interface UnderMetupVideo {
   tags: string[];
   slug: string;
   vkUrl: string;
+}
+
+function toVkPreviewUrl(url: string): string {
+  // В списке нам нужен именно превью-кадр, а не автоплей.
+  // В переводах сейчас часто лежит `...&autoplay=1`, поэтому нормализуем.
+  if (!url) return url;
+  if (url.includes("autoplay=1")) return url.replace("autoplay=1", "autoplay=0");
+  // Если autoplay параметра нет — добавлять не будем, чтобы не ломать embed.
+  return url;
 }
 
 export function UnderMetup() {
@@ -148,11 +148,24 @@ export function UnderMetup() {
             >
               <div className="relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300">
                 <div className="relative aspect-video overflow-hidden">
-                  <ImageWithFallback
-                    src="/opengraphlogo.jpeg"
-                    alt={video.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
+                  {video.vkUrl ? (
+                    <iframe
+                      src={toVkPreviewUrl(video.vkUrl)}
+                      title={video.title}
+                      className="w-full h-full pointer-events-none"
+                      style={{ backgroundColor: "#000" }}
+                      allow="encrypted-media; fullscreen; picture-in-picture; screen-wake-lock"
+                      allowFullScreen
+                      frameBorder="0"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <ImageWithFallback
+                      src="/opengraphlogo.jpeg"
+                      alt={video.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-500 opacity-20 group-hover:opacity-40 transition-opacity" />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">

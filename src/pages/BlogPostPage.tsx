@@ -15,6 +15,19 @@ interface BlogPostMeta {
   tags: string[];
 }
 
+function extractFirstMarkdownImage(md: string): string {
+  // Matches: ![alt](src "title")
+  const match = md.match(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/m);
+  return (match?.[1] || "").trim();
+}
+
+function toAbsoluteOgImage(src: string): string | undefined {
+  if (!src) return undefined;
+  if (/^https?:\/\//i.test(src)) return src;
+  if (src.startsWith("/")) return `https://kordev.team${src}`;
+  return undefined;
+}
+
 function stripFirstMarkdownH1(md: string): string {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
 }
@@ -115,6 +128,7 @@ export function BlogPostPage() {
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [meta, setMeta] = useState<BlogPostMeta | null>(null);
+  const [ogImage, setOgImage] = useState<string | undefined>(undefined);
 
   // Получаем метаданные из переводов
 
@@ -285,6 +299,8 @@ export function BlogPostPage() {
         }
         const text = await response.text();
         setContent(stripFirstMarkdownH1(text));
+        const firstImg = extractFirstMarkdownImage(text);
+        setOgImage(toAbsoluteOgImage(firstImg));
         if (!postMeta) {
           setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
         }
@@ -315,6 +331,7 @@ export function BlogPostPage() {
           title={meta.title}
           description={meta.excerpt}
           canonical={`https://kordev.team/blog/${slug}`}
+          ogImage={ogImage}
           ogType="article"
           article={{
             publishedTime: parseDateToISO(meta.date),

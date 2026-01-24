@@ -2,6 +2,8 @@ import ReactMarkdown from "react-markdown";
 
 import { cn } from "./ui/utils";
 
+const DEFAULT_FALLBACK_IMAGE_SRC = "/opengraphlogo.jpeg";
+
 const markdownComponents = {
   h1: ({ node, ...props }: any) => (
     <h1 className="text-4xl mb-8 mt-12 text-foreground" {...props} />
@@ -42,6 +44,30 @@ const markdownComponents = {
   ),
   hr: ({ node, ...props }: any) => <hr className="border-border my-8" {...props} />,
   strong: ({ node, ...props }: any) => <strong className="text-foreground" {...props} />,
+  img: ({ node, ...props }: any) => {
+    const rawSrc = typeof props.src === "string" ? props.src.trim() : "";
+    const src = rawSrc || DEFAULT_FALLBACK_IMAGE_SRC;
+
+    return (
+      <img
+        {...props}
+        src={src}
+        alt={typeof props.alt === "string" ? props.alt : ""}
+        loading={props.loading ?? "lazy"}
+        className={cn(
+          "max-w-full h-auto rounded-xl border border-border/50 my-6",
+          props.className
+        )}
+        onError={(e) => {
+          // Avoid infinite loop if fallback also fails for some reason
+          const target = e.currentTarget;
+          if (target.getAttribute("data-fallback-applied") === "1") return;
+          target.setAttribute("data-fallback-applied", "1");
+          target.src = DEFAULT_FALLBACK_IMAGE_SRC;
+        }}
+      />
+    );
+  },
 };
 
 type MarkdownContentProps = {
