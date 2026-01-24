@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -148,8 +148,15 @@ export function ProjectPage() {
   const [projects, setProjects] = useState<Project[]>(fallbackProjects);
   const [loadingProjects, setLoadingProjects] = useState(false);
 
+  const stripFirstMarkdownHeading = (md: string): string => {
+    // Keep parity with blog pages: the page header already renders the title.
+    // Remove the first markdown heading line to avoid duplicated big titles inside the body.
+    return md.replace(/^\s*#{1,6}\s+.+\s*$/m, "").trim();
+  };
+
   useEffect(() => {
-    const lang = i18n.language === "ru" ? "ru" : "en";
+    const resolved = (i18n.resolvedLanguage || i18n.language || "en").toLowerCase();
+    const lang = resolved === "ru" || resolved.startsWith("ru-") ? "ru" : "en";
     const load = async () => {
       setLoadingProjects(true);
       try {
@@ -176,7 +183,7 @@ export function ProjectPage() {
       }
     };
     load();
-  }, [fallbackProjects, i18n.language]);
+  }, [fallbackProjects, i18n.language, i18n.resolvedLanguage]);
 
   const project = projects.find((p) => p.id === projectId);
 
@@ -240,144 +247,82 @@ export function ProjectPage() {
               {project.description}
             </p>
           </header>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Изображение */}
-            <div className="space-y-4">
-              <div className="aspect-video rounded-lg overflow-hidden">
-                <ImageWithFallback
-                  src={project.image}
-                  alt={project.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+          {/* Media */}
+          <div className="space-y-4 mb-10">
+            <div className="w-full aspect-video rounded-lg overflow-hidden">
+              <ImageWithFallback
+                src={project.image}
+                alt={project.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
 
-              {/* Кнопки действий */}
-              <div className="flex gap-4">
-                <Button asChild className="flex-1">
-                  <a
-                    href={project.demoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    {t("projectPage.demo")}
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button asChild className="sm:flex-1">
+                <a href={project.demoUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  {t("projectPage.demo")}
+                </a>
+              </Button>
+              {project.githubUrl && project.githubUrl !== "#" && (
+                <Button variant="outline" asChild className="sm:flex-1">
+                  <a href={project.githubUrl} target="_blank" rel="noopener noreferrer">
+                    <Github className="w-4 h-4 mr-2" />
+                    GitHub
                   </a>
                 </Button>
-                {project.githubUrl && project.githubUrl !== "#" && (
-                  <Button variant="outline" asChild className="flex-1">
-                    <a
-                      href={project.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Github className="w-4 h-4 mr-2" />
-                      GitHub
-                    </a>
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
+          </div>
 
-            {/* Описание */}
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-6">
-                  <h2 className="text-xl font-semibold mb-4">
-                    {t("projectPage.projectDescription")}
-                  </h2>
-                  <div className="prose prose-invert prose-lg max-w-none">
-                    <ReactMarkdown
-                      components={{
-                        h1: ({ node, ...props }) => (
-                          <h1
-                            className="text-3xl mb-6 mt-8 text-foreground"
-                            {...props}
-                          />
-                        ),
-                        h2: ({ node, ...props }) => (
-                          <h2
-                            className="text-2xl mt-8 mb-4 text-foreground"
-                            {...props}
-                          />
-                        ),
-                        h3: ({ node, ...props }) => (
-                          <h3
-                            className="text-xl mt-6 mb-3 text-foreground"
-                            {...props}
-                          />
-                        ),
-                        h4: ({ node, ...props }) => (
-                          <h4
-                            className="text-lg mt-4 mb-2 text-foreground"
-                            {...props}
-                          />
-                        ),
-                        p: ({ node, ...props }) => (
-                          <p
-                            className="text-muted-foreground mb-4 leading-relaxed"
-                            {...props}
-                          />
-                        ),
-                        strong: ({ node, ...props }) => (
-                          <strong
-                            className="text-foreground font-semibold"
-                            {...props}
-                          />
-                        ),
-                        ul: ({ node, ...props }) => (
-                          <ul
-                            className="list-disc list-inside text-muted-foreground mb-4 space-y-2 ml-4"
-                            {...props}
-                          />
-                        ),
-                        li: ({ node, ...props }) => (
-                          <li className="text-muted-foreground" {...props} />
-                        ),
-                      }}
+          {/* Content */}
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-xl font-semibold mb-4">
+                  {t("projectPage.projectDescription")}
+                </h2>
+                <MarkdownContent markdown={stripFirstMarkdownHeading(project.fullDescription)} />
+              </CardContent>
+            </Card>
+
+            {/* Технологии */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">
+                  {t("projectPage.usedTechnologies")}
+                </h3>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {project.technologies.map((tech, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="border-primary/30 text-primary h-6 min-h-6 flex items-center justify-center py-0 leading-none"
                     >
-                      {project.fullDescription}
-                    </ReactMarkdown>
-                  </div>
-                </CardContent>
-              </Card>
+                      {tech}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Технологии */}
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">
-                    {t("projectPage.usedTechnologies")}
-                  </h3>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    {project.technologies.map((tech, index) => (
-                      <Badge
-                        key={index}
-                        variant="outline"
-                        className="border-primary/30 text-primary h-6 min-h-6 flex items-center justify-center py-0 leading-none"
-                      >
-                        {tech}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Функциональность */}
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">
-                    {t("projectPage.mainFeatures")}
-                  </h3>
-                  <ul className="space-y-2">
-                    {project.features.map((feature, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="w-2 h-2 bg-primary rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                        <span className="text-muted-foreground">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Функциональность */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">
+                  {t("projectPage.mainFeatures")}
+                </h3>
+                <ul className="space-y-2">
+                  {project.features.map((feature, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="w-2 h-2 bg-primary rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      <span className="text-muted-foreground">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Back to Projects Button */}

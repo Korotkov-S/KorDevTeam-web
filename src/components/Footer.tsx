@@ -1,19 +1,27 @@
 import { Code2, Github, Linkedin, Twitter } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { motion } from "motion/react";
 
 export function Footer() {
   const { t } = useTranslation();
 
   return (
-    <footer className="bg-card border-t border-border py-12" style={{ zIndex: 999999, position: 'relative' }}>
-      <div className="container mx-auto px-4">
+    <motion.footer
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.6 }}
+      className="border-t border-border dark:border-white/10 py-12 bg-card/60 dark:bg-white/5 backdrop-blur-xl"
+      style={{ zIndex: 999999, position: "relative" }}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground">KOR</span>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600">
+                <span className="text-white">KOR</span>
               </div>
-              <span className="text-foreground">DevTeam</span>
+              <span className="text-foreground font-semibold">DevTeam</span>
             </div>
             <p className="text-muted-foreground max-w-md">
               {t("footer.description")}
@@ -26,7 +34,7 @@ export function Footer() {
               <li>
                 <a
                   href="#services"
-                  className="hover:text-primary transition-colors"
+                  className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.webServices")}
                 </a>
@@ -34,7 +42,7 @@ export function Footer() {
               <li>
                 <a
                   href="#services"
-                  className="hover:text-primary transition-colors"
+                  className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.reactNative")}
                 </a>
@@ -42,7 +50,7 @@ export function Footer() {
               <li>
                 <a
                   href="#services"
-                  className="hover:text-primary transition-colors"
+                  className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.backend")}
                 </a>
@@ -50,7 +58,7 @@ export function Footer() {
               <li>
                 <a
                   href="#services"
-                  className="hover:text-primary transition-colors"
+                  className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.wordpressSupport")}
                 </a>
@@ -64,7 +72,7 @@ export function Footer() {
               <li>
                 <a
                   href="mailto:team@korotkov.dev"
-                  className="hover:text-primary transition-colors"
+                  className="hover:text-blue-300 transition-colors"
                 >
                   team@korotkov.dev
                 </a>
@@ -74,7 +82,7 @@ export function Footer() {
                   href="https://t.me/ideamen51"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-primary transition-colors"
+                  className="hover:text-blue-300 transition-colors"
                 >
                   Telegram
                 </a>
@@ -93,13 +101,13 @@ export function Footer() {
               href="https://github.com/Korotkov-S"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-primary transition-colors"
+              className="text-muted-foreground hover:text-blue-300 transition-colors"
             >
               <Github className="w-5 h-5" />
             </a>
           </div>
         </div>
       </div>
-    </footer>
+    </motion.footer>
   );
 }

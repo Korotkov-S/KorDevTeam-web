@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -19,6 +19,18 @@ type ContentMeta = {
   readTime: string;
   tags: string[];
   mtimeMs?: number;
+};
+
+type Project = {
+  id: string;
+  title: string;
+  description: string;
+  fullDescription: string;
+  image: string;
+  technologies: string[];
+  features: string[];
+  demoUrl?: string;
+  githubUrl?: string;
 };
 
 function authHeaders(authHeaderValue: string) {
@@ -69,6 +81,21 @@ export function AdminPage() {
 
   // Projects editor (raw JSON)
   const [projectsJson, setProjectsJson] = useState<string>("[]\n");
+  const [projectsList, setProjectsList] = useState<Project[]>([]);
+  const [projectSelectedId, setProjectSelectedId] = useState<string>("");
+  const [projectDraft, setProjectDraft] = useState<Project>({
+    id: "",
+    title: "",
+    description: "",
+    fullDescription: "",
+    image: "",
+    technologies: [],
+    features: [],
+    demoUrl: "",
+    githubUrl: "",
+  });
+  const [uploadingProjectImage, setUploadingProjectImage] = useState(false);
+  const projectImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadIndexes = useCallback(async () => {
     setLoadingIndex(true);
@@ -87,6 +114,26 @@ export function AdminPage() {
     try {
       const raw = await fetchText(`/content/projects.${lang}.json`);
       setProjectsJson(raw.endsWith("\n") ? raw : raw + "\n");
+      try {
+        const parsed = JSON.parse(raw);
+        setProjectsList(
+          Array.isArray(parsed)
+            ? parsed.map((p: any) => ({
+                id: String(p?.id || ""),
+                title: String(p?.title || p?.id || ""),
+                description: String(p?.description || ""),
+                fullDescription: String(p?.fullDescription || ""),
+                image: String(p?.image || ""),
+                technologies: Array.isArray(p?.technologies) ? p.technologies.map((x: any) => String(x)) : [],
+                features: Array.isArray(p?.features) ? p.features.map((x: any) => String(x)) : [],
+                demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
+                githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
+              }))
+            : [],
+        );
+      } catch {
+        setProjectsList([]);
+      }
       return;
     } catch {
       // ignore, fallback to api
@@ -94,9 +141,26 @@ export function AdminPage() {
     try {
       const data = await fetchJson<{ projects: unknown }>(`/api/projects?lang=${lang}`);
       setProjectsJson(JSON.stringify(data.projects ?? [], null, 2) + "\n");
+      const parsed = data.projects;
+      setProjectsList(
+        Array.isArray(parsed)
+          ? (parsed as any[]).map((p: any) => ({
+              id: String(p?.id || ""),
+              title: String(p?.title || p?.id || ""),
+              description: String(p?.description || ""),
+              fullDescription: String(p?.fullDescription || ""),
+              image: String(p?.image || ""),
+              technologies: Array.isArray(p?.technologies) ? p.technologies.map((x: any) => String(x)) : [],
+              features: Array.isArray(p?.features) ? p.features.map((x: any) => String(x)) : [],
+              demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
+              githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
+            }))
+          : [],
+      );
     } catch (e) {
       console.warn(e);
       setProjectsJson("[]\n");
+      setProjectsList([]);
       toast.error("Не удалось загрузить projects. Создай новый список и сохрани.");
     }
   }, [lang]);
@@ -350,6 +414,139 @@ export function AdminPage() {
       toast.error(`Ошибка projects: ${e?.message || "unknown"}`);
     }
   }, [authHeaderValue, lang, projectsJson, verifyAuth]);
+
+  const persistProjectsList = useCallback(
+    async (next: Project[]) => {
+      if (!(await verifyAuth())) {
+        toast.error("Нужна авторизация");
+        return;
+      }
+      await fetchJson(`/api/projects?lang=${lang}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
+        body: JSON.stringify({ projects: next }),
+      });
+      setProjectsList(next);
+      setProjectsJson(JSON.stringify(next, null, 2) + "\n");
+      toast.success("Projects сохранены");
+    },
+    [authHeaderValue, lang, verifyAuth],
+  );
+
+  const selectProject = useCallback(
+    (id: string) => {
+      setProjectSelectedId(id);
+      const p = projectsList.find((x) => x.id === id) || null;
+      if (!p) return;
+      setProjectDraft({
+        id: p.id || "",
+        title: p.title || "",
+        description: p.description || "",
+        fullDescription: p.fullDescription || "",
+        image: p.image || "",
+        technologies: Array.isArray(p.technologies) ? p.technologies : [],
+        features: Array.isArray(p.features) ? p.features : [],
+        demoUrl: p.demoUrl || "",
+        githubUrl: p.githubUrl || "",
+      });
+    },
+    [projectsList],
+  );
+
+  const resetProjectDraft = useCallback(() => {
+    setProjectSelectedId("");
+    setProjectDraft({
+      id: "",
+      title: "",
+      description: "",
+      fullDescription: "",
+      image: "",
+      technologies: [],
+      features: [],
+      demoUrl: "",
+      githubUrl: "",
+    });
+  }, []);
+
+  const upsertProject = useCallback(async () => {
+    const id = projectDraft.id.trim();
+    if (!id) {
+      toast.error("Нужен id проекта (он же используется в URL)");
+      return;
+    }
+    const nextItem: Project = {
+      id,
+      title: projectDraft.title.trim() || id,
+      description: projectDraft.description || "",
+      fullDescription: projectDraft.fullDescription || "",
+      image: projectDraft.image || "",
+      technologies: Array.isArray(projectDraft.technologies) ? projectDraft.technologies : [],
+      features: Array.isArray(projectDraft.features) ? projectDraft.features : [],
+      demoUrl: (projectDraft.demoUrl || "").trim(),
+      githubUrl: (projectDraft.githubUrl || "").trim(),
+    };
+    const existingIdx = projectsList.findIndex((p) => p.id === id);
+    const isEditingExisting = Boolean(projectSelectedId) && projectsList.some((p) => p.id === projectSelectedId);
+    if (!isEditingExisting && existingIdx !== -1) {
+      toast.error("Проект с таким id уже существует. Выбери его слева и редактируй.");
+      return;
+    }
+    const next = [...projectsList];
+    if (isEditingExisting) {
+      const idx = next.findIndex((p) => p.id === projectSelectedId);
+      if (idx === -1) next.push(nextItem);
+      else next[idx] = nextItem;
+      // if id changed, ensure selection updates too
+      setProjectSelectedId(nextItem.id);
+    } else {
+      next.push(nextItem);
+      setProjectSelectedId(nextItem.id);
+    }
+    await persistProjectsList(next);
+  }, [persistProjectsList, projectDraft, projectSelectedId, projectsList]);
+
+  const deleteProject = useCallback(async () => {
+    if (!projectSelectedId) return;
+    const next = projectsList.filter((p) => p.id !== projectSelectedId);
+    await persistProjectsList(next);
+    resetProjectDraft();
+  }, [persistProjectsList, projectSelectedId, projectsList, resetProjectDraft]);
+
+  const uploadProjectImage = useCallback(
+    async (file: File) => {
+      try {
+        if (!(await verifyAuth())) {
+          toast.error("Нужна авторизация");
+          return;
+        }
+        if (!file.type?.startsWith("image/")) {
+          toast.error("Можно загрузить только изображение");
+          return;
+        }
+        setUploadingProjectImage(true);
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+          reader.readAsDataURL(file);
+        });
+        const resp = await fetchJson<{ url: string }>(`/api/admin/upload-project-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
+          body: JSON.stringify({ dataUrl, filename: file.name }),
+        });
+        setProjectDraft((prev) => ({ ...prev, image: resp.url }));
+        toast.success("Фото загружено");
+      } catch (e: any) {
+        console.warn(e);
+        toast.error(`Ошибка загрузки: ${e?.message || "unknown"}`);
+      } finally {
+        setUploadingProjectImage(false);
+        if (projectImageInputRef.current) projectImageInputRef.current.value = "";
+      }
+    },
+    [authHeaderValue, verifyAuth],
+  );
 
   const generateStatic = useCallback(async () => {
     try {
@@ -627,9 +824,10 @@ export function AdminPage() {
 
                   <div className="pt-4 border-t border-border">
                     <div className="text-sm font-medium mb-2">Предпросмотр</div>
-                    <div className="prose dark:prose-invert max-w-none bg-secondary/20 rounded-lg p-4">
-                      <ReactMarkdown>{blogContent}</ReactMarkdown>
-                    </div>
+                    <MarkdownContent
+                      markdown={blogContent}
+                      proseClassName="max-w-none bg-secondary/20 rounded-lg p-4 dark:prose-invert"
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -637,24 +835,191 @@ export function AdminPage() {
           </TabsContent>
 
           <TabsContent value="projects" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Проекты</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={loadProjects}>
-                    Обновить
-                  </Button>
-                  <Button onClick={saveProjects}>Сохранить</Button>
-                </div>
-                <Textarea
-                  value={projectsJson}
-                  onChange={(e) => setProjectsJson(e.target.value)}
-                  className="min-h-[520px] font-mono"
-                />
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <CardTitle>Проекты</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex gap-2">
+                    <Button className="flex-1" variant="secondary" onClick={resetProjectDraft}>
+                      + Новый проект
+                    </Button>
+                    <Button className="shrink-0" variant="outline" onClick={loadProjects}>
+                      Обновить
+                    </Button>
+                  </div>
+                  <div className="max-h-[520px] overflow-auto space-y-2">
+                    {projectsList.map((p) => (
+                      <button
+                        key={p.id}
+                        className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 ${
+                          p.id === projectSelectedId ? "border-primary" : "border-border"
+                        }`}
+                        onClick={() => selectProject(p.id)}
+                      >
+                        <div className="font-medium">{p.title || p.id}</div>
+                        <div className="text-xs text-muted-foreground">{p.id}</div>
+                        {p.image ? <div className="text-xs text-muted-foreground mt-1">{p.image}</div> : null}
+                      </button>
+                    ))}
+                    {!projectsList.length && (
+                      <div className="text-sm text-muted-foreground">Пока нет проектов (или файл пустой).</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Редактор проекта</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Input
+                      placeholder="ID (используется в URL, напр. stroyrem)"
+                      value={projectDraft.id}
+                      onChange={(e) => setProjectDraft((p) => ({ ...p, id: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Заголовок"
+                      value={projectDraft.title}
+                      onChange={(e) => setProjectDraft((p) => ({ ...p, title: e.target.value }))}
+                    />
+                  </div>
+
+                  <Textarea
+                    value={projectDraft.description}
+                    onChange={(e) => setProjectDraft((p) => ({ ...p, description: e.target.value }))}
+                    placeholder="Короткое описание (карточка проекта)"
+                    className="min-h-[90px]"
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Input
+                      placeholder="Image URL (например /projects/my.png)"
+                      value={projectDraft.image}
+                      onChange={(e) => setProjectDraft((p) => ({ ...p, image: e.target.value }))}
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        ref={projectImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadProjectImage(f);
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        disabled={uploadingProjectImage}
+                        onClick={() => projectImageInputRef.current?.click()}
+                      >
+                        {uploadingProjectImage ? "Загрузка..." : "Загрузить фото"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {projectDraft.image ? (
+                    <div className="rounded-md border border-border overflow-hidden">
+                      <img src={projectDraft.image} alt={projectDraft.title || projectDraft.id} className="w-full h-auto" />
+                    </div>
+                  ) : null}
+
+                  <Textarea
+                    value={projectDraft.fullDescription}
+                    onChange={(e) => setProjectDraft((p) => ({ ...p, fullDescription: e.target.value }))}
+                    placeholder="Полное описание (markdown)"
+                    className="min-h-[220px] font-mono"
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Textarea
+                      value={projectDraft.technologies.join(", ")}
+                      onChange={(e) =>
+                        setProjectDraft((p) => ({
+                          ...p,
+                          technologies: e.target.value
+                            .split(",")
+                            .map((x) => x.trim())
+                            .filter(Boolean),
+                        }))
+                      }
+                      placeholder="Технологии (через запятую)"
+                      className="min-h-[90px]"
+                    />
+                    <Textarea
+                      value={projectDraft.features.join("\n")}
+                      onChange={(e) =>
+                        setProjectDraft((p) => ({
+                          ...p,
+                          features: e.target.value
+                            .split("\n")
+                            .map((x) => x.trim())
+                            .filter(Boolean),
+                        }))
+                      }
+                      placeholder="Фичи (каждая с новой строки)"
+                      className="min-h-[90px]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Input
+                      placeholder="Demo URL"
+                      value={projectDraft.demoUrl || ""}
+                      onChange={(e) => setProjectDraft((p) => ({ ...p, demoUrl: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="GitHub URL"
+                      value={projectDraft.githubUrl || ""}
+                      onChange={(e) => setProjectDraft((p) => ({ ...p, githubUrl: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button onClick={upsertProject}>Сохранить проект</Button>
+                    <Button variant="destructive" onClick={deleteProject} disabled={!projectSelectedId}>
+                      Удалить
+                    </Button>
+                    {projectSelectedId && (
+                      <Button asChild variant="outline">
+                        <a href={`/projects/${projectSelectedId}`} target="_blank" rel="noreferrer">
+                          Открыть
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-border space-y-3">
+                    <div className="text-sm font-medium">Raw JSON (опционально)</div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={loadProjects}>
+                        Обновить JSON
+                      </Button>
+                      <Button onClick={saveProjects}>Сохранить JSON</Button>
+                    </div>
+                    <Textarea
+                      value={projectsJson}
+                      onChange={(e) => setProjectsJson(e.target.value)}
+                      className="min-h-[240px] font-mono"
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t border-border">
+                    <div className="text-sm font-medium mb-2">Предпросмотр описания</div>
+                    <MarkdownContent
+                      markdown={projectDraft.fullDescription}
+                      proseClassName="max-w-none bg-secondary/20 rounded-lg p-4 dark:prose-invert"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="service" className="mt-6">

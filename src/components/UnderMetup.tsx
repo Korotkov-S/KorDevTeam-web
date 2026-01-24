@@ -9,8 +9,10 @@ import {
 } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Calendar, Clock, ArrowRight, Play } from "lucide-react";
+import { Calendar, ArrowUpRight, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { motion } from "motion/react";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
 import {
   Pagination,
   PaginationContent,
@@ -83,76 +85,114 @@ export function UnderMetup() {
   };
 
   return (
-    <section id="under-metup" className="py-20">
-      <div className="container mx-auto px-4">
+    <section id="under-metup" className="py-28 px-4 sm:px-6 relative">
+      <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4">{t("underMetup.title")}</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="inline-block mb-4"
+          >
+            <span className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-300 text-sm">
+              {t("underMetup.title")}
+            </span>
+          </motion.div>
+
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-4xl md:text-6xl font-bold text-foreground mb-6"
+          >
+            {t("underMetup.title")}
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-xl text-muted-foreground max-w-2xl mx-auto"
+          >
             {t("underMetup.subtitle")}
-          </p>
+          </motion.p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
-          {currentVideos.map((video) => (
-              <Card 
-                key={video.id} 
-                onClick={(e) => {
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          {currentVideos.map((video, index) => (
+            <motion.article
+              key={video.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              whileHover={{ y: -8 }}
+              className="group cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigate(`/under-metup/${video.slug}`);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  e.stopPropagation();
                   navigate(`/under-metup/${video.slug}`);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    navigate(`/under-metup/${video.slug}`);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer group h-full relative z-50"
-                style={{ zIndex: 50 }}
-              >
-                <CardHeader>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              style={{ zIndex: 50 }}
+            >
+              <div className="relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300">
+                <div className="relative aspect-video overflow-hidden">
+                  <ImageWithFallback
+                    src="/opengraphlogo.jpeg"
+                    alt={video.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-500 opacity-20 group-hover:opacity-40 transition-opacity" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                      <Play className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <div className="absolute top-4 left-4">
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-background/40 dark:bg-white/10 backdrop-blur-md border border-border dark:border-white/20 text-foreground dark:text-white">
+                      {video.tags?.[0] ?? "Video"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                     <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
+                      <Calendar className="w-3 h-3" />
                       <span>{video.date}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Play className="w-4 h-4" />
+                      <Play className="w-3 h-3" />
                       <span>{video.duration}</span>
                     </div>
                   </div>
-                  <CardTitle className="group-hover:text-primary transition-colors">
+
+                  <h3 className="text-xl font-bold text-foreground mb-3 group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-purple-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
                     {video.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-muted-foreground mb-4 leading-relaxed">
-                    {video.excerpt.split('\n').map((line, index) => (
-                      <React.Fragment key={index}>
-                        {line}
-                        {index < video.excerpt.split('\n').length - 1 && <br />}
-                      </React.Fragment>
-                    ))}
-                  </CardDescription>
-                  <div className="flex flex-wrap gap-2 mb-4 pointer-events-none">
-                    {video.tags.map((tag, index) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors pointer-events-none"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
+                  </h3>
+
+                  <p className="text-muted-foreground mb-4 leading-relaxed">
+                    {video.excerpt.split("\n")[0]}
+                  </p>
+
+                  <div className="flex items-center gap-2 text-blue-400 group-hover:text-purple-400 transition-colors">
+                    <span className="text-sm font-medium">{t("underMetup.watchVideo")}</span>
+                    <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                   </div>
-                  <div className="group/btn flex items-center pointer-events-none">
-                    <span className="text-primary">{t("underMetup.watchVideo")}</span>
-                    <ArrowRight className="ml-2 w-4 h-4 text-primary group-hover/btn:translate-x-1 transition-transform" />
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
+            </motion.article>
           ))}
         </div>
 

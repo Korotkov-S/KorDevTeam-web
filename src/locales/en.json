@@ -37,6 +37,7 @@
     "subtitle": "We specialize in developing web services and mobile applications. From concept to launch and support.",
     "discussProject": "Discuss Project",
     "ourServices": "Our Services",
+    "scroll": "Scroll",
     "stats": {
       "clients": "clients were satisfied",
       "cheaper": "Cheaper than competitors",
@@ -84,6 +85,7 @@
   "projects": {
     "title": "Our Projects",
     "subtitle": "Examples of our work — from web applications to mobile solutions",
+    "viewProject": "View project",
     "filters": {
       "all": "All",
       "mobile": "Mobile Apps",
@@ -450,5 +452,14 @@
   },
   "floatingButtons": {
     "learnPrices": "Learn Prices"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "morePages": "More pages"
+  },
+  "carousel": {
+    "previousSlide": "Previous slide",
+    "nextSlide": "Next slide"
   }
 }

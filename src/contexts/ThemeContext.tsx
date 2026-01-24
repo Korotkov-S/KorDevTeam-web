@@ -18,12 +18,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return savedTheme;
     }
 
-    // Проверяем системные настройки
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
-    }
-
-    return "light";
+    // По умолчанию стартуем в dark (как в WOW-дизайне)
+    return "dark";
   });
 
   const setTheme = (newTheme: Theme) => {

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Calendar, Clock } from "lucide-react";
 import { Badge } from "../components/ui/badge";
@@ -253,7 +253,9 @@ export function BlogPostPage() {
     const postMeta = blogPostsData[slug];
     if (postMeta) setMeta(postMeta);
 
-    const langSuffix = i18n.language === "ru" ? "" : ".en";
+    const resolved = (i18n.resolvedLanguage || i18n.language || "en").toLowerCase();
+    const isRu = resolved === "ru" || resolved.startsWith("ru-");
+    const langSuffix = isRu ? "" : ".en";
 
     // If this page was statically pre-rendered, grab the markdown immediately to avoid a flash/spinner.
     let hasPrerender = false;
@@ -284,7 +286,7 @@ export function BlogPostPage() {
         const text = await response.text();
         setContent(stripFirstMarkdownH1(text));
         if (!postMeta) {
-          setMeta(deriveMetaFromMarkdown(text, i18n.language === "ru" ? "ru" : "en"));
+          setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
         }
       } catch (error) {
         console.error("Error loading markdown:", error);
@@ -304,7 +306,7 @@ export function BlogPostPage() {
     };
 
     loadMarkdown();
-  }, [slug, navigate, i18n.language, blogPostsData, navigateGoBack]);
+  }, [slug, navigate, i18n.language, i18n.resolvedLanguage, blogPostsData, navigateGoBack]);
 
   return (
     <>
@@ -385,92 +387,7 @@ export function BlogPostPage() {
             )}
 
             {/* Article Content */}
-            <div className="prose prose-invert prose-lg max-w-none" itemProp="articleBody">
-              <ReactMarkdown
-                components={{
-                  h1: ({ node, ...props }) => (
-                    <h1
-                      className="text-4xl mb-8 mt-12 text-foreground"
-                      {...props}
-                    />
-                  ),
-                  h2: ({ node, ...props }) => (
-                    <h2
-                      className="text-3xl mt-12 mb-6 text-foreground"
-                      {...props}
-                    />
-                  ),
-                  h3: ({ node, ...props }) => (
-                    <h3
-                      className="text-2xl mt-8 mb-4 text-foreground"
-                      {...props}
-                    />
-                  ),
-                  h4: ({ node, ...props }) => (
-                    <h4
-                      className="text-xl mt-6 mb-3 text-foreground"
-                      {...props}
-                    />
-                  ),
-                  p: ({ node, ...props }) => (
-                    <p
-                      className="text-muted-foreground mb-4 leading-relaxed"
-                      {...props}
-                    />
-                  ),
-                  a: ({ node, ...props }) => (
-                    <a className="text-primary hover:underline" {...props} />
-                  ),
-                  code: ({ node, inline, ...props }: any) =>
-                    inline ? (
-                      <code
-                        className="bg-secondary text-foreground px-1.5 py-0.5 rounded text-sm"
-                        {...props}
-                      />
-                    ) : (
-                      <code
-                        className="block bg-secondary text-foreground p-4 rounded-lg overflow-x-auto text-sm"
-                        {...props}
-                      />
-                    ),
-                  pre: ({ node, ...props }) => (
-                    <pre
-                      className="bg-secondary rounded-lg p-4 overflow-x-auto mb-6"
-                      {...props}
-                    />
-                  ),
-                  ul: ({ node, ...props }) => (
-                    <ul
-                      className="list-disc list-inside text-muted-foreground mb-4 space-y-2 ml-4"
-                      {...props}
-                    />
-                  ),
-                  ol: ({ node, ...props }) => (
-                    <ol
-                      className="list-decimal list-inside text-muted-foreground mb-4 space-y-2 ml-4"
-                      {...props}
-                    />
-                  ),
-                  li: ({ node, ...props }) => (
-                    <li className="text-muted-foreground" {...props} />
-                  ),
-                  blockquote: ({ node, ...props }) => (
-                    <blockquote
-                      className="border-l-4 border-primary pl-4 italic text-muted-foreground my-6"
-                      {...props}
-                    />
-                  ),
-                  hr: ({ node, ...props }) => (
-                    <hr className="border-border my-8" {...props} />
-                  ),
-                  strong: ({ node, ...props }) => (
-                    <strong className="text-foreground" {...props} />
-                  ),
-                }}
-              >
-                {content}
-              </ReactMarkdown>
-            </div>
+            <MarkdownContent markdown={content} itemProp="articleBody" />
 
             {/* Back to Blog Button */}
             <div className="mt-12 pt-8 border-t border-border relative" style={{ zIndex: 99999 }}>

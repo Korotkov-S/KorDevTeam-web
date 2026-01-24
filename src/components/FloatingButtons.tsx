@@ -31,7 +31,7 @@ export function FloatingButtons() {
           <span className="hidden sm:inline">
             {t("floatingButtons.learnPrices")}
           </span>
-          <span className="sm:hidden">Цены</span>
+          <span className="sm:hidden">{t("floatingButtons.learnPrices")}</span>
         </a>
       </Button>
     </div>

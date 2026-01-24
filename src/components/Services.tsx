@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui/card";
+import { motion } from "motion/react";
 import {
   Globe,
   Smartphone,
@@ -53,35 +54,71 @@ export function Services() {
   ];
 
   return (
-    <section id="services" className="py-20 bg-card/50">
-      <div className="container mx-auto px-4">
+    <section id="services" className="py-28 px-4 sm:px-6 relative">
+      <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4">{t("services.title")}</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="inline-block mb-4"
+          >
+            <span className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 text-blue-400 text-sm">
+              {t("services.title")}
+            </span>
+          </motion.div>
+
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-4xl md:text-6xl font-bold text-foreground mb-6"
+          >
+            {t("services.title")}
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-xl text-muted-foreground max-w-2xl mx-auto"
+          >
             {t("services.subtitle")}
-          </p>
+          </motion.p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
-              <Card
+              <motion.div
                 key={index}
-                className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ y: -8 }}
+                className="group relative"
               >
-                <CardHeader>
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                    <Icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <CardTitle>{service.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-muted-foreground">
-                    {service.description}
-                  </CardDescription>
-                </CardContent>
-              </Card>
+                <Card className="relative h-full p-0 rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300">
+                  <CardHeader className="px-8 pt-8">
+                    <div className="inline-flex w-12 h-12 items-center justify-center rounded-xl bg-blue-600 mb-6 group-hover:scale-110 transition-transform duration-300">
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <CardTitle className="text-2xl font-bold text-foreground mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
+                      {service.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-8 pb-8">
+                    <CardDescription className="text-muted-foreground leading-relaxed">
+                      {service.description}
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              </motion.div>
             );
           })}
         </div>

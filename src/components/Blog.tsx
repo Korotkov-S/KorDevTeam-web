@@ -9,9 +9,11 @@ import {
 } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Calendar, Clock, ArrowRight } from "lucide-react";
+import { Calendar, Clock, ArrowUpRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SEO } from "./SEO";
+import { motion } from "motion/react";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
 import {
   Pagination,
   PaginationContent,
@@ -164,7 +166,8 @@ export function Blog() {
   const [loadedFromApi, setLoadedFromApi] = useState(false);
 
   useEffect(() => {
-    const lang = i18n.language === "ru" ? "ru" : "en";
+    const resolved = (i18n.resolvedLanguage || i18n.language || "en").toLowerCase();
+    const lang = resolved === "ru" || resolved.startsWith("ru-") ? "ru" : "en";
     const load = async () => {
       try {
         // Prefer static index (works on static hosting)
@@ -218,7 +221,7 @@ export function Blog() {
       }
     };
     load();
-  }, [fallbackPosts, i18n.language]);
+  }, [fallbackPosts, i18n.language, i18n.resolvedLanguage]);
 
   const totalPages = Math.ceil(blogPosts.length / postsPerPage);
   const startIndex = (currentPage - 1) * postsPerPage;
@@ -229,14 +232,51 @@ export function Blog() {
     setCurrentPage(page);
   };
 
+  const cardImages = ["/opengraphlogo.jpeg", "/projects/wowbanner.png", "/projects/harmonizeMe.png", "/projects/sims.png"];
+  const gradients = ["from-blue-500 to-cyan-500", "from-purple-500 to-pink-500", "from-cyan-500 to-blue-500"];
+
   return (
-    <section id="blog" className="py-20" itemScope itemType="https://schema.org/Blog">
-      <div className="container mx-auto px-4">
+    <section
+      id="blog"
+      className="py-28 px-4 sm:px-6 relative"
+      itemScope
+      itemType="https://schema.org/Blog"
+    >
+      <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl mb-4" itemProp="name">{t("blog.title")}</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto" itemProp="description">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="inline-block mb-4"
+          >
+            <span className="px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-sm">
+              {t("blog.title")}
+            </span>
+          </motion.div>
+
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-4xl md:text-6xl font-bold text-foreground mb-6"
+            itemProp="name"
+          >
+            {t("blog.title")}
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-xl text-muted-foreground max-w-2xl mx-auto"
+            itemProp="description"
+          >
             {t("blog.subtitle")}
-          </p>
+          </motion.p>
           {loadedFromApi && (
             <p className="text-xs text-muted-foreground mt-2">
               Список статей загружен динамически (из markdown файлов).
@@ -244,66 +284,88 @@ export function Blog() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8" itemScope itemType="https://schema.org/ItemList">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8" itemScope itemType="https://schema.org/ItemList">
           {currentPosts.map((post, index) => (
-                    <Card
-                      key={post.id}
-                      itemScope
-                      itemType="https://schema.org/BlogPosting"
-                      itemProp="itemListElement"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        navigate(`/blog/${post.slug}`);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          navigate(`/blog/${post.slug}`);
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer group h-full relative z-50"
-                      style={{ zIndex: 50 }}
-                    >
-                      <CardHeader>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            <time dateTime={post.date} itemProp="datePublished">{post.date}</time>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{post.readTime}</span>
-                          </div>
-                        </div>
-                        <CardTitle className="group-hover:text-primary transition-colors" itemProp="headline">
-                          {post.title}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <CardDescription className="text-muted-foreground mb-4" itemProp="description">
-                          {post.excerpt}
-                        </CardDescription>
-                        <meta itemProp="url" content={`https://kordev.team/blog/${post.slug}`} />
-                        <div className="flex flex-wrap gap-2 mb-4 pointer-events-none">
-                          {post.tags.map((tag, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors pointer-events-none"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="group/btn flex items-center pointer-events-none">
-                          <span className="text-primary">{t("blog.readMore")}</span>
-                          <ArrowRight className="ml-2 w-4 h-4 text-primary group-hover/btn:translate-x-1 transition-transform" />
-                        </div>
-                      </CardContent>
-                    </Card>
+            <motion.article
+              key={post.id}
+              itemScope
+              itemType="https://schema.org/BlogPosting"
+              itemProp="itemListElement"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              whileHover={{ y: -8 }}
+              className="group cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigate(`/blog/${post.slug}`);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate(`/blog/${post.slug}`);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              style={{ zIndex: 50 }}
+            >
+              <div className="relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300">
+                <div className="relative aspect-video overflow-hidden">
+                  <ImageWithFallback
+                    src={cardImages[index % cardImages.length]}
+                    alt={post.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${
+                      gradients[index % gradients.length]
+                    } opacity-30 group-hover:opacity-50 transition-opacity`}
+                  />
+
+                  <div className="absolute top-4 left-4">
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-background/40 dark:bg-white/10 backdrop-blur-md border border-border dark:border-white/20 text-foreground dark:text-white">
+                      {post.tags?.[0] ?? "Blog"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <time dateTime={post.date} itemProp="datePublished">
+                        {post.date}
+                      </time>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{post.readTime}</span>
+                    </div>
+                  </div>
+
+                  <h3
+                    className="text-xl font-bold text-foreground mb-3 group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-purple-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300"
+                    itemProp="headline"
+                  >
+                    {post.title}
+                  </h3>
+
+                  <p className="text-muted-foreground mb-4 leading-relaxed" itemProp="description">
+                    {post.excerpt}
+                  </p>
+
+                  <meta itemProp="url" content={`https://kordev.team/blog/${post.slug}`} />
+
+                  <div className="flex items-center gap-2 text-blue-400 group-hover:text-purple-400 transition-colors">
+                    <span className="text-sm font-medium">{t("blog.readMore")}</span>
+                    <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </motion.article>
           ))}
         </div>
 

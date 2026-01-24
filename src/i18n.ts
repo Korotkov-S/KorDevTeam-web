@@ -20,6 +20,10 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
+    supportedLngs: ['ru', 'en'],
+    nonExplicitSupportedLngs: true,
+    load: 'languageOnly',
+    cleanCode: true,
     
     detection: {
       // Определяем язык автоматически
@@ -35,5 +39,12 @@ i18n
       useSuspense: false,
     },
   });
+
+// Keep <html lang=""> in sync for accessibility/SEO.
+i18n.on("languageChanged", (lng) => {
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = (lng || "").split("-")[0] || "en";
+  }
+});
 
 export default i18n;
