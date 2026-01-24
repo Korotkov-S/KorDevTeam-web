@@ -281,6 +281,92 @@ function buildSitemapBlogXml(slugs) {
   ].join("\n");
 }
 
+function buildFullSitemapXml(blogSlugs) {
+  const today = new Date().toISOString().slice(0, 10);
+  
+  // Static pages
+  const staticPages = [
+    { loc: "/", priority: "1.0", changefreq: "weekly" },
+    { loc: "/video", priority: "0.8", changefreq: "monthly" },
+    { loc: "/krasotulya-crm", priority: "0.9", changefreq: "weekly" },
+  ];
+  
+  // Projects
+  const projects = [
+    "Media%20%26%20Entertainment",
+    "web-site",
+    "web-service",
+    "harmonize-me",
+    "stroyrem",
+    "wowbanner",
+    "serviceplus",
+    "amch",
+    "notion-analog",
+  ];
+  
+  // Under Metup videos
+  const underMetupVideos = ["video-1", "video-2", "video-3"];
+  
+  const urls = [];
+  
+  // Static pages
+  for (const page of staticPages) {
+    urls.push([
+      "  <url>",
+      `    <loc>${SITE_URL}${page.loc}</loc>`,
+      `    <lastmod>${today}</lastmod>`,
+      `    <changefreq>${page.changefreq}</changefreq>`,
+      `    <priority>${page.priority}</priority>`,
+      "  </url>",
+    ].join("\n"));
+  }
+  
+  // Blog posts
+  for (const slug of blogSlugs) {
+    urls.push([
+      "  <url>",
+      `    <loc>${SITE_URL}/blog/${slug}</loc>`,
+      `    <lastmod>${today}</lastmod>`,
+      "    <changefreq>monthly</changefreq>",
+      "    <priority>0.9</priority>",
+      "  </url>",
+    ].join("\n"));
+  }
+  
+  // Under Metup videos
+  for (const video of underMetupVideos) {
+    urls.push([
+      "  <url>",
+      `    <loc>${SITE_URL}/under-metup/${video}</loc>`,
+      `    <lastmod>${today}</lastmod>`,
+      "    <changefreq>monthly</changefreq>",
+      "    <priority>0.8</priority>",
+      "  </url>",
+    ].join("\n"));
+  }
+  
+  // Projects
+  for (const project of projects) {
+    urls.push([
+      "  <url>",
+      `    <loc>${SITE_URL}/project/${project}</loc>`,
+      `    <lastmod>${today}</lastmod>`,
+      "    <changefreq>monthly</changefreq>",
+      "    <priority>0.8</priority>",
+      "  </url>",
+    ].join("\n"));
+  }
+  
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
+    '        xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    urls.join("\n"),
+    "</urlset>",
+    "",
+  ].join("\n");
+}
+
 function main() {
   if (!fs.existsSync(DIST_INDEX_HTML)) {
     console.error(`[generate-blog-pages] Missing ${DIST_INDEX_HTML}. Run build first.`);
@@ -349,12 +435,17 @@ function main() {
   fs.writeFileSync(path.join(DIST_DIR, "_redirects"), redirects, "utf-8");
   fs.writeFileSync(path.join(ROOT, "public", "_redirects"), redirects, "utf-8");
 
-  // Blog-only sitemap (keeps existing sitemap.xml untouched; robots.txt can reference both)
+  // Blog-only sitemap
   const sitemapBlog = buildSitemapBlogXml(slugs);
   fs.writeFileSync(path.join(DIST_DIR, "sitemap-blog.xml"), sitemapBlog, "utf-8");
   fs.writeFileSync(path.join(ROOT, "public", "sitemap-blog.xml"), sitemapBlog, "utf-8");
 
-  console.log(`[generate-blog-pages] Generated ${slugs.length} blog pages + _redirects`);
+  // Full sitemap with all pages (auto-generated, includes new blogs)
+  const sitemapFull = buildFullSitemapXml(slugs);
+  fs.writeFileSync(path.join(DIST_DIR, "sitemap.xml"), sitemapFull, "utf-8");
+  fs.writeFileSync(path.join(ROOT, "public", "sitemap.xml"), sitemapFull, "utf-8");
+
+  console.log(`[generate-blog-pages] Generated ${slugs.length} blog pages + sitemaps + _redirects`);
 }
 
 main();
