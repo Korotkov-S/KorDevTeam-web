@@ -7,12 +7,16 @@ const contentRouter = require("./routes/content");
 const projectsRouter = require("./routes/projects");
 const adminRouter = require("./routes/admin");
 const path = require('path');
+const fs = require("node:fs");
 
 // Загружаем переменные окружения
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const DIST_ROOT =
+  process.env.CONTENT_DIST_ROOT ||
+  path.join(__dirname, "..", "dist");
 
 // Middleware
 app.use(cors());
@@ -37,6 +41,35 @@ app.use("/api/admin", adminRouter);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Serve built static site (dist) in production-like setups.
+// This avoids nginx returning 405 for POST/PUT to /api/* when the site is served as pure static.
+if (fs.existsSync(DIST_ROOT)) {
+  app.use(express.static(DIST_ROOT));
+
+  // SPA + pre-rendered HTML fallback (similar to nginx `try_files $uri $uri/ $uri.html /index.html;`)
+  // Note: Express 5 (router/path-to-regexp) doesn't accept "*" string patterns.
+  app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith("/api/")) return next();
+
+    const tryFiles = [
+      path.join(DIST_ROOT, req.path),
+      path.join(DIST_ROOT, `${req.path}.html`),
+      path.join(DIST_ROOT, req.path, "index.html"),
+    ];
+
+    for (const p of tryFiles) {
+      try {
+        const st = fs.statSync(p);
+        if (st.isFile()) return res.sendFile(p);
+      } catch {
+        // ignore
+      }
+    }
+
+    return res.sendFile(path.join(DIST_ROOT, "index.html"));
+  });
+}
 
 // Обработка ошибок
 app.use((err, req, res, next) => {

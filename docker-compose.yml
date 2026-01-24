@@ -5,10 +5,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production-app
     ports:
       - "8080:80"
     environment:
       - NODE_ENV=production
+      - PORT=80
+      # Where the API should read/write runtime content (uploads, editable markdown/json)
+      - CONTENT_DIST_ROOT=/app/dist
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
