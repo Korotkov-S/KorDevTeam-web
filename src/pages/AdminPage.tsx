@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -51,12 +51,11 @@ export function AdminPage() {
   const [password, setPassword] = useState<string>(() => localStorage.getItem("ADMIN_PASSWORD") || "");
   const [authHeaderValue, setAuthHeaderValue] = useState<string>(() => localStorage.getItem("ADMIN_AUTH") || "");
   const [isAuthed, setIsAuthed] = useState(false);
-  const [activeTab, setActiveTab] = useState<"blog" | "krasotulya" | "projects" | "service">("blog");
+  const [activeTab, setActiveTab] = useState<"blog" | "projects" | "service">("blog");
   const [lang, setLang] = useState<Lang>("ru");
 
   // Indexes
   const [blogIndex, setBlogIndex] = useState<ContentMeta[]>([]);
-  const [crmIndex, setCrmIndex] = useState<ContentMeta[]>([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
 
   // Blog editor
@@ -68,23 +67,14 @@ export function AdminPage() {
   const blogTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const blogImageInputRef = useRef<HTMLInputElement | null>(null);
 
-  // CRM editor
-  const [crmSelectedSlug, setCrmSelectedSlug] = useState<string>("");
-  const [crmSlug, setCrmSlug] = useState<string>("");
-  const [crmContent, setCrmContent] = useState<string>("");
-
   // Projects editor (raw JSON)
   const [projectsJson, setProjectsJson] = useState<string>("[]\n");
 
   const loadIndexes = useCallback(async () => {
     setLoadingIndex(true);
     try {
-      const [blog, crm] = await Promise.all([
-        fetchJson<{ items: ContentMeta[] }>(`/api/content/blog?lang=${lang}`),
-        fetchJson<{ items: ContentMeta[] }>(`/api/content/krasotulya-crm?lang=${lang}`),
-      ]);
+      const blog = await fetchJson<{ items: ContentMeta[] }>(`/api/content/blog?lang=${lang}`);
       setBlogIndex(blog.items || []);
-      setCrmIndex(crm.items || []);
     } catch (e) {
       console.warn(e);
       toast.error("Не удалось загрузить индексы контента. Проверь, что API сервер запущен.");
@@ -164,6 +154,53 @@ export function AdminPage() {
     });
   }, []);
 
+  const wrapBlogSelection = useCallback((before: string, after: string, placeholder: string) => {
+    const el = blogTextareaRef.current;
+    if (!el) {
+      insertIntoBlog(`${before}${placeholder}${after}`);
+      return;
+    }
+    const start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
+    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
+    const selected = blogContent.slice(start, end);
+    const inner = selected || placeholder;
+    const snippet = `${before}${inner}${after}`;
+
+    setBlogContent((prev) => prev.slice(0, start) + snippet + prev.slice(end));
+    requestAnimationFrame(() => {
+      try {
+        el.focus();
+        const innerStart = start + before.length;
+        const innerEnd = innerStart + inner.length;
+        el.setSelectionRange(innerStart, innerEnd);
+      } catch {
+        // ignore
+      }
+    });
+  }, [blogContent, insertIntoBlog]);
+
+  const prefixBlogLines = useCallback((prefix: string) => {
+    const el = blogTextareaRef.current;
+    if (!el) {
+      insertIntoBlog(`\n${prefix}`);
+      return;
+    }
+    const start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
+    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
+    const selected = blogContent.slice(start, end) || "Пункт";
+    const lines = selected.split("\n").map((l) => (l.trim() ? `${prefix}${l}` : l));
+    const snippet = lines.join("\n");
+    setBlogContent((prev) => prev.slice(0, start) + snippet + prev.slice(end));
+    requestAnimationFrame(() => {
+      try {
+        el.focus();
+        el.setSelectionRange(start, start + snippet.length);
+      } catch {
+        // ignore
+      }
+    });
+  }, [blogContent, insertIntoBlog]);
+
   const uploadBlogImage = useCallback(
     async (file: File) => {
       try {
@@ -229,21 +266,6 @@ export function AdminPage() {
     [blogIndex, lang]
   );
 
-  const onSelectCrm = useCallback(
-    async (slug: string) => {
-      setCrmSelectedSlug(slug);
-      setCrmSlug(slug);
-      try {
-        const data = await fetchJson<{ content: string }>(`/api/krasotulya-crm/${slug}?lang=${lang}`);
-        setCrmContent(data.content || "");
-      } catch (e) {
-        console.warn(e);
-        toast.error("Не удалось загрузить markdown страницы Красотули");
-      }
-    },
-    [lang]
-  );
-
   const saveBlog = useCallback(async () => {
     try {
       if (!(await verifyAuth())) {
@@ -305,61 +327,6 @@ export function AdminPage() {
       toast.error(`Ошибка удаления: ${e?.message || "unknown"}`);
     }
   }, [authHeaderValue, blogSelectedSlug, lang, loadIndexes, verifyAuth]);
-
-  const saveCrm = useCallback(async () => {
-    try {
-      if (!(await verifyAuth())) {
-        toast.error("Нужна авторизация");
-        return;
-      }
-      if (!crmSlug.trim() || !crmContent.trim()) {
-        toast.error("Нужны slug и content");
-        return;
-      }
-      const isUpdate = Boolean(crmSelectedSlug);
-      if (isUpdate) {
-        await fetchJson(`/api/krasotulya-crm/${crmSelectedSlug}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
-          body: JSON.stringify({ content: crmContent, lang }),
-        });
-      } else {
-        await fetchJson(`/api/krasotulya-crm`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
-          body: JSON.stringify({ slug: crmSlug, content: crmContent, lang }),
-        });
-        setCrmSelectedSlug(crmSlug);
-      }
-      toast.success("Сохранено");
-      await loadIndexes();
-    } catch (e: any) {
-      console.warn(e);
-      toast.error(`Ошибка сохранения: ${e?.message || "unknown"}`);
-    }
-  }, [authHeaderValue, crmContent, crmSelectedSlug, crmSlug, lang, loadIndexes, verifyAuth]);
-
-  const deleteCrm = useCallback(async () => {
-    if (!crmSelectedSlug) return;
-    try {
-      if (!(await verifyAuth())) {
-        toast.error("Нужна авторизация");
-        return;
-      }
-      await fetchJson(`/api/krasotulya-crm/${crmSelectedSlug}?lang=${lang}`, {
-        method: "DELETE",
-        headers: { ...authHeaders(authHeaderValue) },
-      });
-      toast.success("Удалено");
-      setCrmSelectedSlug("");
-      setCrmSlug("");
-      setCrmContent("");
-      await loadIndexes();
-    } catch (e: any) {
-      console.warn(e);
-      toast.error(`Ошибка удаления: ${e?.message || "unknown"}`);
-    }
-  }, [authHeaderValue, crmSelectedSlug, lang, loadIndexes, verifyAuth]);
 
   const saveProjects = useCallback(async () => {
     try {
@@ -517,7 +484,6 @@ export function AdminPage() {
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList>
             <TabsTrigger value="blog">Блог</TabsTrigger>
-            <TabsTrigger value="krasotulya">Красотуля</TabsTrigger>
             <TabsTrigger value="projects">Проекты</TabsTrigger>
             <TabsTrigger value="service">Сервис</TabsTrigger>
           </TabsList>
@@ -572,13 +538,53 @@ export function AdminPage() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <Input placeholder="Заголовок" value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} />
-                    <Input
-                      placeholder="Slug (опционально)"
-                      value={blogSlugOverride}
-                      onChange={(e) => setBlogSlugOverride(e.target.value)}
-                      disabled={Boolean(blogSelectedSlug)}
-                    />
+                    <div className="space-y-1">
+                      <Input
+                        placeholder="Slug (опционально)"
+                        value={blogSlugOverride}
+                        onChange={(e) => setBlogSlugOverride(e.target.value)}
+                        disabled={Boolean(blogSelectedSlug)}
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        Slug — это часть ссылки (URL). Например: <span className="font-mono">/blog/my-post</span>.
+                      </div>
+                    </div>
                   </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => wrapBlogSelection("**", "**", "жирный")}>
+                      Жирный
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => wrapBlogSelection("*", "*", "курсив")}>
+                      Курсив
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => prefixBlogLines("## ")}>
+                      H2
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => prefixBlogLines("- ")}>
+                      Список
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => wrapBlogSelection("[", "](https://example.com)", "ссылка")}
+                    >
+                      Ссылка
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => wrapBlogSelection("`", "`", "код")}>
+                      Код
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertIntoBlog("\n\n```text\nТекст...\n```\n")}
+                    >
+                      Блок кода
+                    </Button>
+                  </div>
+
                   <Textarea
                     ref={blogTextareaRef}
                     value={blogContent}
@@ -623,83 +629,6 @@ export function AdminPage() {
                     <div className="text-sm font-medium mb-2">Предпросмотр</div>
                     <div className="prose dark:prose-invert max-w-none bg-secondary/20 rounded-lg p-4">
                       <ReactMarkdown>{blogContent}</ReactMarkdown>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="krasotulya" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1">
-                <CardHeader>
-                  <CardTitle>Страницы</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button
-                    className="w-full"
-                    variant="secondary"
-                    onClick={() => {
-                      setCrmSelectedSlug("");
-                      setCrmSlug("");
-                      setCrmContent("");
-                    }}
-                  >
-                    + Новая страница
-                  </Button>
-                  <div className="max-h-[520px] overflow-auto space-y-2">
-                    {crmIndex.map((p) => (
-                      <button
-                        key={p.slug}
-                        className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 ${
-                          p.slug === crmSelectedSlug ? "border-primary" : "border-border"
-                        }`}
-                        onClick={() => onSelectCrm(p.slug)}
-                      >
-                        <div className="font-medium">{p.title}</div>
-                        <div className="text-xs text-muted-foreground">{p.slug}</div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Редактор</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Input
-                    placeholder="Slug"
-                    value={crmSlug}
-                    onChange={(e) => setCrmSlug(e.target.value)}
-                    disabled={Boolean(crmSelectedSlug)}
-                  />
-                  <Textarea
-                    value={crmContent}
-                    onChange={(e) => setCrmContent(e.target.value)}
-                    className="min-h-[320px] font-mono"
-                    placeholder={"# Заголовок\n\nТекст...\n\n---\n\n**Теги**: ...\n**Дата публикации**: ...\n"}
-                  />
-                  <div className="flex gap-2">
-                    <Button onClick={saveCrm}>Сохранить</Button>
-                    <Button variant="destructive" onClick={deleteCrm} disabled={!crmSelectedSlug}>
-                      Удалить
-                    </Button>
-                    {crmSelectedSlug && (
-                      <Button asChild variant="outline">
-                        <a href={`/krasotulya-crm/${crmSelectedSlug}`} target="_blank" rel="noreferrer">
-                          Открыть
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-border">
-                    <div className="text-sm font-medium mb-2">Предпросмотр</div>
-                    <div className="prose dark:prose-invert max-w-none bg-secondary/20 rounded-lg p-4">
-                      <ReactMarkdown>{crmContent}</ReactMarkdown>
                     </div>
                   </div>
                 </CardContent>
