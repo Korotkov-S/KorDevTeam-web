@@ -58,12 +58,14 @@ export function Header() {
             >
               {t("header.projects")}
             </button>
-            <button
-              onClick={() => scrollToSection("krasotulya-crm")}
+            <a
+              href="https://krasotula.com"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {t("header.krasotulyaCrm")}
-            </button>
+            </a>
             <button
               onClick={() => scrollToSection("blog")}
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -126,12 +128,15 @@ export function Header() {
             >
               {t("header.projects")}
             </button>
-            <button
-              onClick={() => scrollToSection("krasotulya-crm")}
+            <a
+              href="https://krasotula.com"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
+              onClick={() => setIsMenuOpen(false)}
             >
               {t("header.krasotulyaCrm")}
-            </button>
+            </a>
             <button
               onClick={() => scrollToSection("blog")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"

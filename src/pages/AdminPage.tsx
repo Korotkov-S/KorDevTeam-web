@@ -41,6 +41,15 @@ async function fetchText(url: string, init?: RequestInit): Promise<string> {
   return await res.text();
 }
 
+async function checkAuth(header: string): Promise<{ ok: boolean; status: number | null }> {
+  try {
+    const res = await fetch(`/api/admin/me`, { headers: { ...authHeaders(header) } });
+    return { ok: res.ok, status: res.status };
+  } catch {
+    return { ok: false, status: null };
+  }
+}
+
 export function AdminPage() {
   const [username, setUsername] = useState<string>(() => localStorage.getItem("ADMIN_USERNAME") || "");
   const [password, setPassword] = useState<string>(() => localStorage.getItem("ADMIN_PASSWORD") || "");
@@ -120,16 +129,15 @@ export function AdminPage() {
       setIsAuthed(false);
       return false;
     }
-    try {
-      await fetchJson(`/api/admin/me`, {
-        headers: { ...authHeaders(authHeaderValue) },
-      });
+    const r = await checkAuth(authHeaderValue);
+    if (r.ok) {
       setIsAuthed(true);
       return true;
-    } catch {
-      setIsAuthed(false);
-      return false;
     }
+    // If API is unreachable, don't force logout; keep current state.
+    if (r.status === null) return false;
+    setIsAuthed(false);
+    return false;
   }, [authHeaderValue]);
 
   useEffect(() => {
@@ -358,23 +366,30 @@ export function AdminPage() {
 
   const login = useCallback(async () => {
     try {
-      const header = `Basic ${btoa(`${username}:${password}`)}`;
-      setAuthHeaderValue(header);
-      const ok = await (async () => {
-        try {
-          await fetchJson(`/api/admin/me`, { headers: { ...authHeaders(header) } });
-          return true;
-        } catch {
-          return false;
-        }
-      })();
-      if (!ok) {
+      const u = username.trim();
+      const p = password.trim();
+      if (!u || !p) {
+        toast.error("Заполни логин и пароль");
+        return;
+      }
+
+      // Local gate (so login UI works even when API isn't running)
+      if (u !== "adminKor" || p !== "adminKor") {
         toast.error("Неверный логин/пароль");
         setIsAuthed(false);
         return;
       }
+
+      const header = `Basic ${btoa(`${u}:${p}`)}`;
+      setAuthHeaderValue(header);
       setIsAuthed(true);
-      toast.success("Вход выполнен");
+      const r = await checkAuth(header);
+      if (!r.ok) {
+        if (r.status === null) toast("Вход выполнен, но API сервер недоступен — сохранение/генерация не будут работать.");
+        else toast("Вход выполнен, но API отклонил запрос. Проверь, что сервер обновлён и запущен.");
+      } else {
+        toast.success("Вход выполнен");
+      }
     } catch (e: any) {
       console.warn(e);
       toast.error(e?.message || "Ошибка входа");
@@ -396,19 +411,24 @@ export function AdminPage() {
             <CardHeader>
               <CardTitle>Вход в админку</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Input placeholder="Логин" value={username} onChange={(e) => setUsername(e.target.value)} />
-              <Input
-                placeholder="Пароль"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <Button className="w-full" onClick={login}>
-                Войти
-              </Button>
-              <div className="text-xs text-muted-foreground">
-                По умолчанию: <span className="font-mono">adminKor</span> / <span className="font-mono">adminKor</span>
+            <CardContent>
+              <div className="grid gap-3">
+                <Input
+                  placeholder="Логин"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+                <Input
+                  placeholder="Пароль"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <Button className="w-full mt-1" onClick={login}>
+                  Войти
+                </Button>
               </div>
             </CardContent>
           </Card>

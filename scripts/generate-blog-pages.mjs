@@ -3,10 +3,8 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const PUBLIC_BLOG_DIR = path.join(ROOT, "public", "blog");
-const PUBLIC_KRASOTULYA_CRM_DIR = path.join(ROOT, "public", "krasotulya-crm");
 const DIST_DIR = path.join(ROOT, "dist");
 const DIST_BLOG_DIR = path.join(DIST_DIR, "blog");
-const DIST_KRASOTULYA_CRM_DIR = path.join(DIST_DIR, "krasotulya-crm");
 const DIST_INDEX_HTML = path.join(DIST_DIR, "index.html");
 const SITE_URL = (process.env.SITE_URL || "https://kordev.team").replace(/\/+$/, "");
 
@@ -213,9 +211,9 @@ function injectSeoAndBody({ indexHtml, title, description, canonicalUrl, bodyHtm
   return html;
 }
 
-function getSlugsFromPublic(dir) {
-  if (!fs.existsSync(dir)) return [];
-  const files = fs.readdirSync(dir);
+function getSlugsFromPublic() {
+  if (!fs.existsSync(PUBLIC_BLOG_DIR)) return [];
+  const files = fs.readdirSync(PUBLIC_BLOG_DIR);
   const slugs = new Set();
   for (const f of files) {
     if (!f.endsWith(".md")) continue;
@@ -226,18 +224,13 @@ function getSlugsFromPublic(dir) {
   return [...slugs].sort();
 }
 
-function buildRedirects({ blogSlugs, krasotulyaCrmSlugs }) {
+function buildRedirects(slugs) {
   const lines = [];
   lines.push("# Auto-generated. Do not edit by hand.");
   lines.push("");
   lines.push("# Static blog pages (preferred for SEO)");
-  for (const slug of blogSlugs) {
+  for (const slug of slugs) {
     lines.push(`/blog/${slug}    /blog/${slug}.html    200`);
-  }
-  lines.push("");
-  lines.push("# Static Krasotulya-CRM pages (preferred for SEO)");
-  for (const slug of krasotulyaCrmSlugs) {
-    lines.push(`/krasotulya-crm/${slug}    /krasotulya-crm/${slug}.html    200`);
   }
   lines.push("");
   lines.push("# SPA fallback");
@@ -274,40 +267,23 @@ function buildSitemapBlogXml(slugs) {
   ].join("\n");
 }
 
-function buildSitemapKrasotulyaCrmXml(slugs) {
-  const today = new Date().toISOString().slice(0, 10);
-  const urls = slugs
-    .map((slug) => {
-      const loc = `${SITE_URL}/krasotulya-crm/${slug}`;
-      return [
-        "  <url>",
-        `    <loc>${escapeHtml(loc)}</loc>`,
-        `    <lastmod>${today}</lastmod>`,
-        "    <changefreq>monthly</changefreq>",
-        "    <priority>0.8</priority>",
-        "  </url>",
-      ].join("\n");
-    })
-    .join("\n");
+function main() {
+  if (!fs.existsSync(DIST_INDEX_HTML)) {
+    console.error(`[generate-blog-pages] Missing ${DIST_INDEX_HTML}. Run build first.`);
+    process.exit(1);
+  }
 
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    urls,
-    "</urlset>",
-    "",
-  ].join("\n");
-}
-
-function generateSection({ publicDir, distDir, routeBase, prerenderScriptId }) {
-  const slugs = getSlugsFromPublic(publicDir);
-  if (slugs.length === 0) return [];
+  const slugs = getSlugsFromPublic();
+  if (slugs.length === 0) {
+    console.warn("[generate-blog-pages] No blog slugs found in public/blog");
+    return;
+  }
 
   const indexHtml = fs.readFileSync(DIST_INDEX_HTML, "utf-8");
-  ensureDir(distDir);
+  ensureDir(DIST_BLOG_DIR);
 
   for (const slug of slugs) {
-    const mdPath = path.join(publicDir, `${slug}.md`);
+    const mdPath = path.join(PUBLIC_BLOG_DIR, `${slug}.md`);
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
     const mdBody = stripFirstMarkdownH1(md);
@@ -327,7 +303,7 @@ function generateSection({ publicDir, distDir, routeBase, prerenderScriptId }) {
       `</div>`,
     ].join("\n");
 
-    const canonicalUrl = `${SITE_URL}${routeBase}/${slug}`;
+    const canonicalUrl = `${SITE_URL}/blog/${slug}`;
     const pageHtml = injectSeoAndBody({
       indexHtml,
       title,
@@ -340,66 +316,29 @@ function generateSection({ publicDir, distDir, routeBase, prerenderScriptId }) {
     const prerenderJson = JSON.stringify({ slug, lang: "ru", md: mdBody }).replaceAll("</script", "<\\/script");
     const pageHtmlWithPrerender = pageHtml.replace(
       /<\/body>/i,
-      `<script id="${prerenderScriptId}" type="application/json">${prerenderJson}</script>\n</body>`
+      `<script id="__BLOG_PRERENDER_DATA__" type="application/json">${prerenderJson}</script>\n</body>`
     );
 
-    fs.writeFileSync(path.join(distDir, `${slug}.html`), pageHtmlWithPrerender, "utf-8");
+    // 1) Classic "slug.html" (works great with nginx try_files $uri.html)
+    fs.writeFileSync(path.join(DIST_BLOG_DIR, `${slug}.html`), pageHtmlWithPrerender, "utf-8");
 
-    const dirStyle = path.join(distDir, slug);
+    // 2) Folder-style "/blog/slug/index.html" (works on many static hosts without rewrite rules)
+    const dirStyle = path.join(DIST_BLOG_DIR, slug);
     ensureDir(dirStyle);
     fs.writeFileSync(path.join(dirStyle, "index.html"), pageHtmlWithPrerender, "utf-8");
   }
 
-  return slugs;
-}
-
-function main() {
-  if (!fs.existsSync(DIST_INDEX_HTML)) {
-    console.error(`[generate-blog-pages] Missing ${DIST_INDEX_HTML}. Run build first.`);
-    process.exit(1);
-  }
-
-  const blogSlugs = generateSection({
-    publicDir: PUBLIC_BLOG_DIR,
-    distDir: DIST_BLOG_DIR,
-    routeBase: "/blog",
-    prerenderScriptId: "__BLOG_PRERENDER_DATA__",
-  });
-
-  const krasotulyaCrmSlugs = generateSection({
-    publicDir: PUBLIC_KRASOTULYA_CRM_DIR,
-    distDir: DIST_KRASOTULYA_CRM_DIR,
-    routeBase: "/krasotulya-crm",
-    prerenderScriptId: "__KRASOTULYA_CRM_PRERENDER_DATA__",
-  });
-
-  if (blogSlugs.length === 0) console.warn("[generate-blog-pages] No blog slugs found in public/blog");
-  if (krasotulyaCrmSlugs.length === 0) {
-    console.warn("[generate-blog-pages] No Krasotulya-CRM slugs found in public/krasotulya-crm");
-  }
-  if (blogSlugs.length === 0 && krasotulyaCrmSlugs.length === 0) return;
-
   // Netlify-style redirects (also useful as documentation/source-of-truth)
-  const redirects = buildRedirects({ blogSlugs, krasotulyaCrmSlugs });
+  const redirects = buildRedirects(slugs);
   fs.writeFileSync(path.join(DIST_DIR, "_redirects"), redirects, "utf-8");
   fs.writeFileSync(path.join(ROOT, "public", "_redirects"), redirects, "utf-8");
 
-  // Sitemaps (keeps existing sitemap.xml untouched; robots.txt can reference extra sitemaps)
-  if (blogSlugs.length > 0) {
-    const sitemapBlog = buildSitemapBlogXml(blogSlugs);
-    fs.writeFileSync(path.join(DIST_DIR, "sitemap-blog.xml"), sitemapBlog, "utf-8");
-    fs.writeFileSync(path.join(ROOT, "public", "sitemap-blog.xml"), sitemapBlog, "utf-8");
-  }
+  // Blog-only sitemap (keeps existing sitemap.xml untouched; robots.txt can reference both)
+  const sitemapBlog = buildSitemapBlogXml(slugs);
+  fs.writeFileSync(path.join(DIST_DIR, "sitemap-blog.xml"), sitemapBlog, "utf-8");
+  fs.writeFileSync(path.join(ROOT, "public", "sitemap-blog.xml"), sitemapBlog, "utf-8");
 
-  if (krasotulyaCrmSlugs.length > 0) {
-    const sitemapCrm = buildSitemapKrasotulyaCrmXml(krasotulyaCrmSlugs);
-    fs.writeFileSync(path.join(DIST_DIR, "sitemap-krasotulya-crm.xml"), sitemapCrm, "utf-8");
-    fs.writeFileSync(path.join(ROOT, "public", "sitemap-krasotulya-crm.xml"), sitemapCrm, "utf-8");
-  }
-
-  console.log(
-    `[generate-blog-pages] Generated ${blogSlugs.length} blog pages + ${krasotulyaCrmSlugs.length} Krasotulya-CRM pages + _redirects`
-  );
+  console.log(`[generate-blog-pages] Generated ${slugs.length} blog pages + _redirects`);
 }
 
 main();

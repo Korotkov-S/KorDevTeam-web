@@ -8,7 +8,6 @@ import { BlogPostPage } from "./pages/BlogPostPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { VideoPage } from "./pages/VideoPage";
 import { UnderMetupPage } from "./pages/UnderMetupPage";
-import { KrasotulyaCrmPostPage } from "./pages/KrasotulyaCrmPostPage";
 import { Root } from "./pages/Root";
 import { AdminPage } from "./pages/AdminPage";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -26,10 +25,6 @@ const router = createBrowserRouter([
       {
         path: "/blog/:slug",
         element: <BlogPostPage />,
-      },
-      {
-        path: "/krasotulya-crm/:slug",
-        element: <KrasotulyaCrmPostPage />,
       },
       {
         path: "/project/:projectId",
