@@ -235,6 +235,7 @@ export function Blog() {
   const postCardImageBySlug: Record<string, string> = {
     "krasotulya-crm-launch": "/blog/krasotula1.jpeg",
     "krasotulya-problem-1-data-fragmentation": "/blog/krasotula2.jpeg",
+    "krasotulya-problem-4-email-campaigns": "/krasotula4.png",
   };
 
   const cardImages = ["/opengraphlogo.jpeg", "/projects/wowbanner.png", "/projects/harmonizeMe.png", "/projects/sims.png"];
