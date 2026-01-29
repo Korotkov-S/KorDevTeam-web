@@ -1,92 +1,104 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
+    <loc>https://kordev.team/blog</loc>
+    <lastmod>2026-01-29</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://kordev.team/blog/argumentation-guide</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/business-automation</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/crm-implementation</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/government-contractors-guide</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/harmonize-me-platform</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/harmonize-me-story</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/krasotulya-crm-launch</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kordev.team/blog/krasotulya-problem-4-email-campaigns</loc>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/krasotulya-problem-1-data-fragmentation</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/laravel-api-development</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/nodejs-microservices</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/react-native-best-practices</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/sims-dynasty-tree-platform</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/stone-calculator-automation</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/telegram-broadcast-automation</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://kordev.team/blog/wordpress-optimization</loc>
-    <lastmod>2026-01-24</lastmod>
+    <lastmod>2026-01-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>

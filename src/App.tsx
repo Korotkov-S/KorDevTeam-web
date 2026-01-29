@@ -4,6 +4,7 @@ import {
   RouterProvider,
 } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
+import { BlogIndexPage } from "./pages/BlogIndexPage";
 import { BlogPostPage } from "./pages/BlogPostPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { VideoPage } from "./pages/VideoPage";
@@ -21,6 +22,10 @@ const router = createBrowserRouter([
       {
         path: "/",
         element: <HomePage />,
+      },
+      {
+        path: "/blog",
+        element: <BlogIndexPage />,
       },
       {
         path: "/blog/:slug",

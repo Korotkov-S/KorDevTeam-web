@@ -1,6 +1,7 @@
 # Auto-generated. Do not edit by hand.
 
 # Static blog pages (preferred for SEO)
+/blog    /blog/index.html    200
 /blog/argumentation-guide    /blog/argumentation-guide.html    200
 /blog/business-automation    /blog/business-automation.html    200
 /blog/crm-implementation    /blog/crm-implementation.html    200
@@ -9,6 +10,7 @@
 /blog/harmonize-me-story    /blog/harmonize-me-story.html    200
 /blog/krasotulya-crm-launch    /blog/krasotulya-crm-launch.html    200
 /blog/krasotulya-problem-1-data-fragmentation    /blog/krasotulya-problem-1-data-fragmentation.html    200
+/blog/krasotulya-problem-4-email-campaigns    /blog/krasotulya-problem-4-email-campaigns.html    200
 /blog/laravel-api-development    /blog/laravel-api-development.html    200
 /blog/nodejs-microservices    /blog/nodejs-microservices.html    200
 /blog/react-native-best-practices    /blog/react-native-best-practices.html    200

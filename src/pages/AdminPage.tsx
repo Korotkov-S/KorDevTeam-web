@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
+import { SEO } from "../components/SEO";
 
 type Lang = "ru" | "en";
 
@@ -49,9 +60,13 @@ async function fetchText(url: string, init?: RequestInit): Promise<string> {
   return await res.text();
 }
 
-async function checkAuth(header: string): Promise<{ ok: boolean; status: number | null }> {
+async function checkAuth(
+  header: string,
+): Promise<{ ok: boolean; status: number | null }> {
   try {
-    const res = await fetch(`/api/admin/me`, { headers: { ...authHeaders(header) } });
+    const res = await fetch(`/api/admin/me`, {
+      headers: { ...authHeaders(header) },
+    });
     return { ok: res.ok, status: res.status };
   } catch {
     return { ok: false, status: null };
@@ -59,11 +74,19 @@ async function checkAuth(header: string): Promise<{ ok: boolean; status: number 
 }
 
 export function AdminPage() {
-  const [username, setUsername] = useState<string>(() => localStorage.getItem("ADMIN_USERNAME") || "");
-  const [password, setPassword] = useState<string>(() => localStorage.getItem("ADMIN_PASSWORD") || "");
-  const [authHeaderValue, setAuthHeaderValue] = useState<string>(() => localStorage.getItem("ADMIN_AUTH") || "");
+  const [username, setUsername] = useState<string>(
+    () => localStorage.getItem("ADMIN_USERNAME") || "",
+  );
+  const [password, setPassword] = useState<string>(
+    () => localStorage.getItem("ADMIN_PASSWORD") || "",
+  );
+  const [authHeaderValue, setAuthHeaderValue] = useState<string>(
+    () => localStorage.getItem("ADMIN_AUTH") || "",
+  );
   const [isAuthed, setIsAuthed] = useState(false);
-  const [activeTab, setActiveTab] = useState<"blog" | "projects" | "service">("blog");
+  const [activeTab, setActiveTab] = useState<"blog" | "projects" | "service">(
+    "blog",
+  );
   const [lang, setLang] = useState<Lang>("ru");
 
   // Indexes
@@ -100,11 +123,15 @@ export function AdminPage() {
   const loadIndexes = useCallback(async () => {
     setLoadingIndex(true);
     try {
-      const blog = await fetchJson<{ items: ContentMeta[] }>(`/api/content/blog?lang=${lang}`);
+      const blog = await fetchJson<{ items: ContentMeta[] }>(
+        `/api/content/blog?lang=${lang}`,
+      );
       setBlogIndex(blog.items || []);
     } catch (e) {
       console.warn(e);
-      toast.error("Не удалось загрузить индексы контента. Проверь, что API сервер запущен.");
+      toast.error(
+        "Не удалось загрузить индексы контента. Проверь, что API сервер запущен.",
+      );
     } finally {
       setLoadingIndex(false);
     }
@@ -124,8 +151,12 @@ export function AdminPage() {
                 description: String(p?.description || ""),
                 fullDescription: String(p?.fullDescription || ""),
                 image: String(p?.image || ""),
-                technologies: Array.isArray(p?.technologies) ? p.technologies.map((x: any) => String(x)) : [],
-                features: Array.isArray(p?.features) ? p.features.map((x: any) => String(x)) : [],
+                technologies: Array.isArray(p?.technologies)
+                  ? p.technologies.map((x: any) => String(x))
+                  : [],
+                features: Array.isArray(p?.features)
+                  ? p.features.map((x: any) => String(x))
+                  : [],
                 demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
                 githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
               }))
@@ -139,7 +170,9 @@ export function AdminPage() {
       // ignore, fallback to api
     }
     try {
-      const data = await fetchJson<{ projects: unknown }>(`/api/projects?lang=${lang}`);
+      const data = await fetchJson<{ projects: unknown }>(
+        `/api/projects?lang=${lang}`,
+      );
       setProjectsJson(JSON.stringify(data.projects ?? [], null, 2) + "\n");
       const parsed = data.projects;
       setProjectsList(
@@ -150,8 +183,12 @@ export function AdminPage() {
               description: String(p?.description || ""),
               fullDescription: String(p?.fullDescription || ""),
               image: String(p?.image || ""),
-              technologies: Array.isArray(p?.technologies) ? p.technologies.map((x: any) => String(x)) : [],
-              features: Array.isArray(p?.features) ? p.features.map((x: any) => String(x)) : [],
+              technologies: Array.isArray(p?.technologies)
+                ? p.technologies.map((x: any) => String(x))
+                : [],
+              features: Array.isArray(p?.features)
+                ? p.features.map((x: any) => String(x))
+                : [],
               demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
               githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
             }))
@@ -161,7 +198,9 @@ export function AdminPage() {
       console.warn(e);
       setProjectsJson("[]\n");
       setProjectsList([]);
-      toast.error("Не удалось загрузить projects. Создай новый список и сохрани.");
+      toast.error(
+        "Не удалось загрузить projects. Создай новый список и сохрани.",
+      );
     }
   }, [lang]);
 
@@ -218,52 +257,66 @@ export function AdminPage() {
     });
   }, []);
 
-  const wrapBlogSelection = useCallback((before: string, after: string, placeholder: string) => {
-    const el = blogTextareaRef.current;
-    if (!el) {
-      insertIntoBlog(`${before}${placeholder}${after}`);
-      return;
-    }
-    const start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
-    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
-    const selected = blogContent.slice(start, end);
-    const inner = selected || placeholder;
-    const snippet = `${before}${inner}${after}`;
-
-    setBlogContent((prev) => prev.slice(0, start) + snippet + prev.slice(end));
-    requestAnimationFrame(() => {
-      try {
-        el.focus();
-        const innerStart = start + before.length;
-        const innerEnd = innerStart + inner.length;
-        el.setSelectionRange(innerStart, innerEnd);
-      } catch {
-        // ignore
+  const wrapBlogSelection = useCallback(
+    (before: string, after: string, placeholder: string) => {
+      const el = blogTextareaRef.current;
+      if (!el) {
+        insertIntoBlog(`${before}${placeholder}${after}`);
+        return;
       }
-    });
-  }, [blogContent, insertIntoBlog]);
+      const start =
+        typeof el.selectionStart === "number" ? el.selectionStart : 0;
+      const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
+      const selected = blogContent.slice(start, end);
+      const inner = selected || placeholder;
+      const snippet = `${before}${inner}${after}`;
 
-  const prefixBlogLines = useCallback((prefix: string) => {
-    const el = blogTextareaRef.current;
-    if (!el) {
-      insertIntoBlog(`\n${prefix}`);
-      return;
-    }
-    const start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
-    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
-    const selected = blogContent.slice(start, end) || "Пункт";
-    const lines = selected.split("\n").map((l) => (l.trim() ? `${prefix}${l}` : l));
-    const snippet = lines.join("\n");
-    setBlogContent((prev) => prev.slice(0, start) + snippet + prev.slice(end));
-    requestAnimationFrame(() => {
-      try {
-        el.focus();
-        el.setSelectionRange(start, start + snippet.length);
-      } catch {
-        // ignore
+      setBlogContent(
+        (prev) => prev.slice(0, start) + snippet + prev.slice(end),
+      );
+      requestAnimationFrame(() => {
+        try {
+          el.focus();
+          const innerStart = start + before.length;
+          const innerEnd = innerStart + inner.length;
+          el.setSelectionRange(innerStart, innerEnd);
+        } catch {
+          // ignore
+        }
+      });
+    },
+    [blogContent, insertIntoBlog],
+  );
+
+  const prefixBlogLines = useCallback(
+    (prefix: string) => {
+      const el = blogTextareaRef.current;
+      if (!el) {
+        insertIntoBlog(`\n${prefix}`);
+        return;
       }
-    });
-  }, [blogContent, insertIntoBlog]);
+      const start =
+        typeof el.selectionStart === "number" ? el.selectionStart : 0;
+      const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
+      const selected = blogContent.slice(start, end) || "Пункт";
+      const lines = selected
+        .split("\n")
+        .map((l) => (l.trim() ? `${prefix}${l}` : l));
+      const snippet = lines.join("\n");
+      setBlogContent(
+        (prev) => prev.slice(0, start) + snippet + prev.slice(end),
+      );
+      requestAnimationFrame(() => {
+        try {
+          el.focus();
+          el.setSelectionRange(start, start + snippet.length);
+        } catch {
+          // ignore
+        }
+      });
+    },
+    [blogContent, insertIntoBlog],
+  );
 
   const uploadBlogImage = useCallback(
     async (file: File) => {
@@ -285,11 +338,17 @@ export function AdminPage() {
           reader.readAsDataURL(file);
         });
 
-        const resp = await fetchJson<{ url: string }>(`/api/admin/upload-blog-image`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
-          body: JSON.stringify({ dataUrl, filename: file.name }),
-        });
+        const resp = await fetchJson<{ url: string }>(
+          `/api/admin/upload-blog-image`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeaders(authHeaderValue),
+            },
+            body: JSON.stringify({ dataUrl, filename: file.name }),
+          },
+        );
 
         insertIntoBlog(`\n\n![](${resp.url})\n`);
         toast.success("Фото загружено");
@@ -320,14 +379,16 @@ export function AdminPage() {
       const meta = blogIndex.find((x) => x.slug === slug) || null;
       setBlogTitle(meta?.title || slug);
       try {
-        const data = await fetchJson<{ post: { content: string } }>(`/api/posts/${slug}?lang=${lang}`);
+        const data = await fetchJson<{ post: { content: string } }>(
+          `/api/posts/${slug}?lang=${lang}`,
+        );
         setBlogContent(data.post.content || "");
       } catch (e) {
         console.warn(e);
         toast.error("Не удалось загрузить markdown поста");
       }
     },
-    [blogIndex, lang]
+    [blogIndex, lang],
   );
 
   const saveBlog = useCallback(async () => {
@@ -344,14 +405,24 @@ export function AdminPage() {
       if (isUpdate) {
         await fetchJson(`/api/posts/${blogSelectedSlug}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
-          body: JSON.stringify({ title: blogTitle, content: blogContent, lang }),
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(authHeaderValue),
+          },
+          body: JSON.stringify({
+            title: blogTitle,
+            content: blogContent,
+            lang,
+          }),
         });
         toast.success("Сохранено");
       } else {
         const resp = await fetchJson<{ post: { slug: string } }>(`/api/posts`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(authHeaderValue),
+          },
           body: JSON.stringify({
             title: blogTitle,
             slug: blogSlugOverride || undefined,
@@ -367,7 +438,16 @@ export function AdminPage() {
       console.warn(e);
       toast.error(`Ошибка сохранения: ${e?.message || "unknown"}`);
     }
-  }, [authHeaderValue, blogContent, blogSelectedSlug, blogSlugOverride, blogTitle, lang, loadIndexes, verifyAuth]);
+  }, [
+    authHeaderValue,
+    blogContent,
+    blogSelectedSlug,
+    blogSlugOverride,
+    blogTitle,
+    lang,
+    loadIndexes,
+    verifyAuth,
+  ]);
 
   const deleteBlog = useCallback(async () => {
     if (!blogSelectedSlug) return;
@@ -405,7 +485,10 @@ export function AdminPage() {
       }
       await fetchJson(`/api/projects?lang=${lang}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(authHeaderValue),
+        },
         body: JSON.stringify({ projects: parsed }),
       });
       toast.success("Projects сохранены");
@@ -423,7 +506,10 @@ export function AdminPage() {
       }
       await fetchJson(`/api/projects?lang=${lang}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(authHeaderValue),
+        },
         body: JSON.stringify({ projects: next }),
       });
       setProjectsList(next);
@@ -480,15 +566,23 @@ export function AdminPage() {
       description: projectDraft.description || "",
       fullDescription: projectDraft.fullDescription || "",
       image: projectDraft.image || "",
-      technologies: Array.isArray(projectDraft.technologies) ? projectDraft.technologies : [],
-      features: Array.isArray(projectDraft.features) ? projectDraft.features : [],
+      technologies: Array.isArray(projectDraft.technologies)
+        ? projectDraft.technologies
+        : [],
+      features: Array.isArray(projectDraft.features)
+        ? projectDraft.features
+        : [],
       demoUrl: (projectDraft.demoUrl || "").trim(),
       githubUrl: (projectDraft.githubUrl || "").trim(),
     };
     const existingIdx = projectsList.findIndex((p) => p.id === id);
-    const isEditingExisting = Boolean(projectSelectedId) && projectsList.some((p) => p.id === projectSelectedId);
+    const isEditingExisting =
+      Boolean(projectSelectedId) &&
+      projectsList.some((p) => p.id === projectSelectedId);
     if (!isEditingExisting && existingIdx !== -1) {
-      toast.error("Проект с таким id уже существует. Выбери его слева и редактируй.");
+      toast.error(
+        "Проект с таким id уже существует. Выбери его слева и редактируй.",
+      );
       return;
     }
     const next = [...projectsList];
@@ -530,11 +624,17 @@ export function AdminPage() {
           reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
           reader.readAsDataURL(file);
         });
-        const resp = await fetchJson<{ url: string }>(`/api/admin/upload-project-image`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders(authHeaderValue) },
-          body: JSON.stringify({ dataUrl, filename: file.name }),
-        });
+        const resp = await fetchJson<{ url: string }>(
+          `/api/admin/upload-project-image`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeaders(authHeaderValue),
+            },
+            body: JSON.stringify({ dataUrl, filename: file.name }),
+          },
+        );
         setProjectDraft((prev) => ({ ...prev, image: resp.url }));
         toast.success("Фото загружено");
       } catch (e: any) {
@@ -542,7 +642,8 @@ export function AdminPage() {
         toast.error(`Ошибка загрузки: ${e?.message || "unknown"}`);
       } finally {
         setUploadingProjectImage(false);
-        if (projectImageInputRef.current) projectImageInputRef.current.value = "";
+        if (projectImageInputRef.current)
+          projectImageInputRef.current.value = "";
       }
     },
     [authHeaderValue, verifyAuth],
@@ -604,8 +705,14 @@ export function AdminPage() {
       setIsAuthed(true);
       const r = await checkAuth(header);
       if (!r.ok) {
-        if (r.status === null) toast("Вход выполнен, но API сервер недоступен — сохранение/генерация не будут работать.");
-        else toast("Вход выполнен, но API отклонил запрос. Проверь, что сервер обновлён и запущен.");
+        if (r.status === null)
+          toast(
+            "Вход выполнен, но API сервер недоступен — сохранение/генерация не будут работать.",
+          );
+        else
+          toast(
+            "Вход выполнен, но API отклонил запрос. Проверь, что сервер обновлён и запущен.",
+          );
       } else {
         toast.success("Вход выполнен");
       }
@@ -624,425 +731,580 @@ export function AdminPage() {
 
   if (!isAuthed) {
     return (
-      <div className="min-h-screen pt-24">
-        <div className="container mx-auto px-4 py-8">
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle>Вход в админку</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3">
-                <Input
-                  placeholder="Логин"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-                <Input
-                  placeholder="Пароль"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <Button className="w-full mt-1" onClick={login}>
-                  Войти
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <>
+        <SEO
+          title="Админка"
+          description="Административная панель"
+          canonical="https://kordev.team/admin"
+          robots="noindex,nofollow"
+          ogType="website"
+        />
+        <div className="min-h-screen pt-24">
+          <div className="container mx-auto px-4 py-8">
+            <Card className="max-w-md mx-auto">
+              <CardHeader>
+                <CardTitle>Вход в админку</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3">
+                  <Input
+                    placeholder="Логин"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Пароль"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <Button className="w-full mt-1" onClick={login}>
+                    Войти
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen pt-24">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-semibold">Админка</h1>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            <div className="flex gap-2 items-center">
-              <Button size="sm" variant={lang === "ru" ? "default" : "outline"} onClick={() => setLang("ru")}>
-                RU
-              </Button>
-              <Button size="sm" variant={lang === "en" ? "default" : "outline"} onClick={() => setLang("en")}>
-                EN
+    <>
+      <SEO
+        title="Админка"
+        description="Административная панель"
+        canonical="https://kordev.team/admin"
+        robots="noindex,nofollow"
+        ogType="website"
+      />
+      <div className="min-h-screen pt-24">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-semibold">Админка</h1>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="sm"
+                  variant={lang === "ru" ? "default" : "outline"}
+                  onClick={() => setLang("ru")}
+                >
+                  RU
+                </Button>
+                <Button
+                  size="sm"
+                  variant={lang === "en" ? "default" : "outline"}
+                  onClick={() => setLang("en")}
+                >
+                  EN
+                </Button>
+              </div>
+              <Button size="sm" variant="outline" onClick={logout}>
+                Выйти
               </Button>
             </div>
-            <Button size="sm" variant="outline" onClick={logout}>
-              Выйти
-            </Button>
           </div>
-        </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList>
-            <TabsTrigger value="blog">Блог</TabsTrigger>
-            <TabsTrigger value="projects">Проекты</TabsTrigger>
-            <TabsTrigger value="service">Сервис</TabsTrigger>
-          </TabsList>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+            <TabsList>
+              <TabsTrigger value="blog">Блог</TabsTrigger>
+              <TabsTrigger value="projects">Проекты</TabsTrigger>
+              <TabsTrigger value="service">Сервис</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="blog" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1">
-                <CardHeader>
-                  <CardTitle>Посты</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button
-                    className="w-full"
-                    variant="secondary"
-                    onClick={() => {
-                      setBlogSelectedSlug("");
-                      setBlogTitle("");
-                      setBlogSlugOverride("");
-                      setBlogContent("");
-                    }}
-                  >
-                    + Новый пост
-                  </Button>
-                  <div className="max-h-[520px] overflow-auto space-y-2">
-                    {blogIndex.map((p) => (
-                      <button
-                        key={p.slug}
-                        className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 ${
-                          p.slug === blogSelectedSlug ? "border-primary" : "border-border"
-                        }`}
-                        onClick={() => onSelectBlog(p.slug)}
-                      >
-                        <div className="font-medium">{p.title}</div>
-                        <div className="text-xs text-muted-foreground">{p.slug}</div>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {p.tags.slice(0, 4).map((t) => (
-                            <Badge key={t} variant="secondary" className="text-xs">
-                              {t}
-                            </Badge>
-                          ))}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            <TabsContent value="blog" className="mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-1">
+                  <CardHeader>
+                    <CardTitle>Посты</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button
+                      className="w-full"
+                      variant="secondary"
+                      onClick={() => {
+                        setBlogSelectedSlug("");
+                        setBlogTitle("");
+                        setBlogSlugOverride("");
+                        setBlogContent("");
+                      }}
+                    >
+                      + Новый пост
+                    </Button>
+                    <div className="max-h-[520px] overflow-auto space-y-2">
+                      {blogIndex.map((p) => (
+                        <button
+                          key={p.slug}
+                          className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 ${
+                            p.slug === blogSelectedSlug
+                              ? "border-primary"
+                              : "border-border"
+                          }`}
+                          onClick={() => onSelectBlog(p.slug)}
+                        >
+                          <div className="font-medium">{p.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {p.slug}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {p.tags.slice(0, 4).map((t) => (
+                              <Badge
+                                key={t}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {t}
+                              </Badge>
+                            ))}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Редактор</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input placeholder="Заголовок" value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} />
-                    <div className="space-y-1">
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Редактор</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <Input
-                        placeholder="Slug (опционально)"
-                        value={blogSlugOverride}
-                        onChange={(e) => setBlogSlugOverride(e.target.value)}
-                        disabled={Boolean(blogSelectedSlug)}
+                        placeholder="Заголовок"
+                        value={blogTitle}
+                        onChange={(e) => setBlogTitle(e.target.value)}
                       />
-                      <div className="text-xs text-muted-foreground">
-                        Slug — это часть ссылки (URL). Например: <span className="font-mono">/blog/my-post</span>.
+                      <div className="space-y-1">
+                        <Input
+                          placeholder="Slug (опционально)"
+                          value={blogSlugOverride}
+                          onChange={(e) => setBlogSlugOverride(e.target.value)}
+                          disabled={Boolean(blogSelectedSlug)}
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Slug — это часть ссылки (URL). Например:{" "}
+                          <span className="font-mono">/blog/my-post</span>.
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => wrapBlogSelection("**", "**", "жирный")}>
-                      Жирный
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => wrapBlogSelection("*", "*", "курсив")}>
-                      Курсив
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => prefixBlogLines("## ")}>
-                      H2
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => prefixBlogLines("- ")}>
-                      Список
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => wrapBlogSelection("[", "](https://example.com)", "ссылка")}
-                    >
-                      Ссылка
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => wrapBlogSelection("`", "`", "код")}>
-                      Код
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => insertIntoBlog("\n\n```text\nТекст...\n```\n")}
-                    >
-                      Блок кода
-                    </Button>
-                  </div>
-
-                  <Textarea
-                    ref={blogTextareaRef}
-                    value={blogContent}
-                    onChange={(e) => setBlogContent(e.target.value)}
-                    className="min-h-[320px] font-mono"
-                    placeholder={"# Title\n\nText...\n\n---\n\n**Теги**: ...\n**Дата публикации**: ...\n"}
-                  />
-
-                  <div className="flex gap-2">
-                    <Button onClick={saveBlog}>Сохранить</Button>
-                    <Button variant="destructive" onClick={deleteBlog} disabled={!blogSelectedSlug}>
-                      Удалить
-                    </Button>
-                    <input
-                      ref={blogImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) uploadBlogImage(f);
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={uploadingBlogImage}
-                      onClick={() => blogImageInputRef.current?.click()}
-                    >
-                      {uploadingBlogImage ? "Загрузка..." : "Загрузить фото"}
-                    </Button>
-                    {blogSelectedSlug && (
-                      <Button asChild variant="outline">
-                        <a href={`/blog/${blogSelectedSlug}`} target="_blank" rel="noreferrer">
-                          Открыть
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-border">
-                    <div className="text-sm font-medium mb-2">Предпросмотр</div>
-                    <MarkdownContent
-                      markdown={blogContent}
-                      proseClassName="max-w-none bg-secondary/20 rounded-lg p-4 dark:prose-invert"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="projects" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1">
-                <CardHeader>
-                  <CardTitle>Проекты</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex gap-2">
-                    <Button className="flex-1" variant="secondary" onClick={resetProjectDraft}>
-                      + Новый проект
-                    </Button>
-                    <Button className="shrink-0" variant="outline" onClick={loadProjects}>
-                      Обновить
-                    </Button>
-                  </div>
-                  <div className="max-h-[520px] overflow-auto space-y-2">
-                    {projectsList.map((p) => (
-                      <button
-                        key={p.id}
-                        className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 ${
-                          p.id === projectSelectedId ? "border-primary" : "border-border"
-                        }`}
-                        onClick={() => selectProject(p.id)}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => wrapBlogSelection("**", "**", "жирный")}
                       >
-                        <div className="font-medium">{p.title || p.id}</div>
-                        <div className="text-xs text-muted-foreground">{p.id}</div>
-                        {p.image ? <div className="text-xs text-muted-foreground mt-1">{p.image}</div> : null}
-                      </button>
-                    ))}
-                    {!projectsList.length && (
-                      <div className="text-sm text-muted-foreground">Пока нет проектов (или файл пустой).</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                        Жирный
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => wrapBlogSelection("*", "*", "курсив")}
+                      >
+                        Курсив
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => prefixBlogLines("## ")}
+                      >
+                        H2
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => prefixBlogLines("- ")}
+                      >
+                        Список
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          wrapBlogSelection(
+                            "[",
+                            "](https://example.com)",
+                            "ссылка",
+                          )
+                        }
+                      >
+                        Ссылка
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => wrapBlogSelection("`", "`", "код")}
+                      >
+                        Код
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          insertIntoBlog("\n\n```text\nТекст...\n```\n")
+                        }
+                      >
+                        Блок кода
+                      </Button>
+                    </div>
 
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Редактор проекта</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input
-                      placeholder="ID (используется в URL, напр. stroyrem)"
-                      value={projectDraft.id}
-                      onChange={(e) => setProjectDraft((p) => ({ ...p, id: e.target.value }))}
+                    <Textarea
+                      ref={blogTextareaRef}
+                      value={blogContent}
+                      onChange={(e) => setBlogContent(e.target.value)}
+                      className="min-h-[320px] font-mono"
+                      placeholder={
+                        "# Title\n\nText...\n\n---\n\n**Теги**: ...\n**Дата публикации**: ...\n"
+                      }
                     />
-                    <Input
-                      placeholder="Заголовок"
-                      value={projectDraft.title}
-                      onChange={(e) => setProjectDraft((p) => ({ ...p, title: e.target.value }))}
-                    />
-                  </div>
 
-                  <Textarea
-                    value={projectDraft.description}
-                    onChange={(e) => setProjectDraft((p) => ({ ...p, description: e.target.value }))}
-                    placeholder="Короткое описание (карточка проекта)"
-                    className="min-h-[90px]"
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input
-                      placeholder="Image URL (например /projects/my.png)"
-                      value={projectDraft.image}
-                      onChange={(e) => setProjectDraft((p) => ({ ...p, image: e.target.value }))}
-                    />
                     <div className="flex gap-2">
+                      <Button onClick={saveBlog}>Сохранить</Button>
+                      <Button
+                        variant="destructive"
+                        onClick={deleteBlog}
+                        disabled={!blogSelectedSlug}
+                      >
+                        Удалить
+                      </Button>
                       <input
-                        ref={projectImageInputRef}
+                        ref={blogImageInputRef}
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
-                          if (f) uploadProjectImage(f);
+                          if (f) uploadBlogImage(f);
                         }}
                       />
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full"
-                        disabled={uploadingProjectImage}
-                        onClick={() => projectImageInputRef.current?.click()}
+                        disabled={uploadingBlogImage}
+                        onClick={() => blogImageInputRef.current?.click()}
                       >
-                        {uploadingProjectImage ? "Загрузка..." : "Загрузить фото"}
+                        {uploadingBlogImage ? "Загрузка..." : "Загрузить фото"}
                       </Button>
+                      {blogSelectedSlug && (
+                        <Button asChild variant="outline">
+                          <a
+                            href={`/blog/${blogSelectedSlug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Открыть
+                          </a>
+                        </Button>
+                      )}
                     </div>
-                  </div>
 
-                  {projectDraft.image ? (
-                    <div className="rounded-md border border-border overflow-hidden">
-                      <img src={projectDraft.image} alt={projectDraft.title || projectDraft.id} className="w-full h-auto" />
+                    <div className="pt-4 border-t border-border">
+                      <div className="text-sm font-medium mb-2">
+                        Предпросмотр
+                      </div>
+                      <MarkdownContent
+                        markdown={blogContent}
+                        proseClassName="max-w-none bg-secondary/20 rounded-lg p-4 dark:prose-invert"
+                      />
                     </div>
-                  ) : null}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
 
-                  <Textarea
-                    value={projectDraft.fullDescription}
-                    onChange={(e) => setProjectDraft((p) => ({ ...p, fullDescription: e.target.value }))}
-                    placeholder="Полное описание (markdown)"
-                    className="min-h-[220px] font-mono"
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Textarea
-                      value={projectDraft.technologies.join(", ")}
-                      onChange={(e) =>
-                        setProjectDraft((p) => ({
-                          ...p,
-                          technologies: e.target.value
-                            .split(",")
-                            .map((x) => x.trim())
-                            .filter(Boolean),
-                        }))
-                      }
-                      placeholder="Технологии (через запятую)"
-                      className="min-h-[90px]"
-                    />
-                    <Textarea
-                      value={projectDraft.features.join("\n")}
-                      onChange={(e) =>
-                        setProjectDraft((p) => ({
-                          ...p,
-                          features: e.target.value
-                            .split("\n")
-                            .map((x) => x.trim())
-                            .filter(Boolean),
-                        }))
-                      }
-                      placeholder="Фичи (каждая с новой строки)"
-                      className="min-h-[90px]"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input
-                      placeholder="Demo URL"
-                      value={projectDraft.demoUrl || ""}
-                      onChange={(e) => setProjectDraft((p) => ({ ...p, demoUrl: e.target.value }))}
-                    />
-                    <Input
-                      placeholder="GitHub URL"
-                      value={projectDraft.githubUrl || ""}
-                      onChange={(e) => setProjectDraft((p) => ({ ...p, githubUrl: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button onClick={upsertProject}>Сохранить проект</Button>
-                    <Button variant="destructive" onClick={deleteProject} disabled={!projectSelectedId}>
-                      Удалить
-                    </Button>
-                    {projectSelectedId && (
-                      <Button asChild variant="outline">
-                        <a href={`/projects/${projectSelectedId}`} target="_blank" rel="noreferrer">
-                          Открыть
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-border space-y-3">
-                    <div className="text-sm font-medium">Raw JSON (опционально)</div>
+            <TabsContent value="projects" className="mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-1">
+                  <CardHeader>
+                    <CardTitle>Проекты</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={loadProjects}>
-                        Обновить JSON
+                      <Button
+                        className="flex-1"
+                        variant="secondary"
+                        onClick={resetProjectDraft}
+                      >
+                        + Новый проект
                       </Button>
-                      <Button onClick={saveProjects}>Сохранить JSON</Button>
+                      <Button
+                        className="shrink-0"
+                        variant="outline"
+                        onClick={loadProjects}
+                      >
+                        Обновить
+                      </Button>
                     </div>
-                    <Textarea
-                      value={projectsJson}
-                      onChange={(e) => setProjectsJson(e.target.value)}
-                      className="min-h-[240px] font-mono"
-                    />
-                  </div>
+                    <div className="max-h-[520px] overflow-auto space-y-2">
+                      {projectsList.map((p) => (
+                        <button
+                          key={p.id}
+                          className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 ${
+                            p.id === projectSelectedId
+                              ? "border-primary"
+                              : "border-border"
+                          }`}
+                          onClick={() => selectProject(p.id)}
+                        >
+                          <div className="font-medium">{p.title || p.id}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {p.id}
+                          </div>
+                          {p.image ? (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {p.image}
+                            </div>
+                          ) : null}
+                        </button>
+                      ))}
+                      {!projectsList.length && (
+                        <div className="text-sm text-muted-foreground">
+                          Пока нет проектов (или файл пустой).
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="pt-4 border-t border-border">
-                    <div className="text-sm font-medium mb-2">Предпросмотр описания</div>
-                    <MarkdownContent
-                      markdown={projectDraft.fullDescription}
-                      proseClassName="max-w-none bg-secondary/20 rounded-lg p-4 dark:prose-invert"
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Редактор проекта</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Input
+                        placeholder="ID (используется в URL, напр. stroyrem)"
+                        value={projectDraft.id}
+                        onChange={(e) =>
+                          setProjectDraft((p) => ({ ...p, id: e.target.value }))
+                        }
+                      />
+                      <Input
+                        placeholder="Заголовок"
+                        value={projectDraft.title}
+                        onChange={(e) =>
+                          setProjectDraft((p) => ({
+                            ...p,
+                            title: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <Textarea
+                      value={projectDraft.description}
+                      onChange={(e) =>
+                        setProjectDraft((p) => ({
+                          ...p,
+                          description: e.target.value,
+                        }))
+                      }
+                      placeholder="Короткое описание (карточка проекта)"
+                      className="min-h-[90px]"
                     />
-                  </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Input
+                        placeholder="Image URL (например /projects/my.png)"
+                        value={projectDraft.image}
+                        onChange={(e) =>
+                          setProjectDraft((p) => ({
+                            ...p,
+                            image: e.target.value,
+                          }))
+                        }
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          ref={projectImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) uploadProjectImage(f);
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          disabled={uploadingProjectImage}
+                          onClick={() => projectImageInputRef.current?.click()}
+                        >
+                          {uploadingProjectImage
+                            ? "Загрузка..."
+                            : "Загрузить фото"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {projectDraft.image ? (
+                      <div className="rounded-md border border-border overflow-hidden">
+                        <img
+                          src={projectDraft.image}
+                          alt={projectDraft.title || projectDraft.id}
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    ) : null}
+
+                    <Textarea
+                      value={projectDraft.fullDescription}
+                      onChange={(e) =>
+                        setProjectDraft((p) => ({
+                          ...p,
+                          fullDescription: e.target.value,
+                        }))
+                      }
+                      placeholder="Полное описание (markdown)"
+                      className="min-h-[220px] font-mono"
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Textarea
+                        value={projectDraft.technologies.join(", ")}
+                        onChange={(e) =>
+                          setProjectDraft((p) => ({
+                            ...p,
+                            technologies: e.target.value
+                              .split(",")
+                              .map((x) => x.trim())
+                              .filter(Boolean),
+                          }))
+                        }
+                        placeholder="Технологии (через запятую)"
+                        className="min-h-[90px]"
+                      />
+                      <Textarea
+                        value={projectDraft.features.join("\n")}
+                        onChange={(e) =>
+                          setProjectDraft((p) => ({
+                            ...p,
+                            features: e.target.value
+                              .split("\n")
+                              .map((x) => x.trim())
+                              .filter(Boolean),
+                          }))
+                        }
+                        placeholder="Фичи (каждая с новой строки)"
+                        className="min-h-[90px]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Input
+                        placeholder="Demo URL"
+                        value={projectDraft.demoUrl || ""}
+                        onChange={(e) =>
+                          setProjectDraft((p) => ({
+                            ...p,
+                            demoUrl: e.target.value,
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="GitHub URL"
+                        value={projectDraft.githubUrl || ""}
+                        onChange={(e) =>
+                          setProjectDraft((p) => ({
+                            ...p,
+                            githubUrl: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button onClick={upsertProject}>Сохранить проект</Button>
+                      <Button
+                        variant="destructive"
+                        onClick={deleteProject}
+                        disabled={!projectSelectedId}
+                      >
+                        Удалить
+                      </Button>
+                      {projectSelectedId && (
+                        <Button asChild variant="outline">
+                          <a
+                            href={`/projects/${projectSelectedId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Открыть
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="pt-4 border-t border-border space-y-3">
+                      <div className="text-sm font-medium">
+                        Raw JSON (опционально)
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={loadProjects}>
+                          Обновить JSON
+                        </Button>
+                        <Button onClick={saveProjects}>Сохранить JSON</Button>
+                      </div>
+                      <Textarea
+                        value={projectsJson}
+                        onChange={(e) => setProjectsJson(e.target.value)}
+                        className="min-h-[240px] font-mono"
+                      />
+                    </div>
+
+                    <div className="pt-4 border-t border-border">
+                      <div className="text-sm font-medium mb-2">
+                        Предпросмотр описания
+                      </div>
+                      <MarkdownContent
+                        markdown={projectDraft.fullDescription}
+                        proseClassName="max-w-none bg-secondary/20 rounded-lg p-4 dark:prose-invert"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="service" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Сервис</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={refreshAll}
+                    disabled={loadingIndex}
+                  >
+                    Обновить данные
+                  </Button>
+                  <Button variant="outline" onClick={generateIndex}>
+                    Обновить индексы
+                  </Button>
+                  <Button variant="outline" onClick={generateStatic}>
+                    Пересобрать статику
+                  </Button>
                 </CardContent>
               </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="service" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Сервис</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" onClick={refreshAll} disabled={loadingIndex}>
-                  Обновить данные
-                </Button>
-                <Button variant="outline" onClick={generateIndex}>
-                  Обновить индексы
-                </Button>
-                <Button variant="outline" onClick={generateStatic}>
-                  Пересобрать статику
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
-
