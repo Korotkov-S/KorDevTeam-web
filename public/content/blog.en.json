@@ -5,7 +5,7 @@
     "title": "\"Krasotulya\": why micro & small businesses need it (card #4 — email campaigns for clients)",
     "excerpt": "Gennadiy Korotkov here — head of KorDev Team.",
     "date": "January 25, 2026",
-    "readTime": "2 min",
+    "readTime": "1 min",
     "tags": [
       "Krasotulya",
       "CRM",
@@ -13,7 +13,7 @@
       "Beauty business",
       "Small business"
     ],
-    "mtimeMs": 1769360000000
+    "mtimeMs": 1769486110550.0293
   },
   {
     "slug": "krasotulya-problem-1-data-fragmentation",
@@ -29,7 +29,7 @@
       "Beauty business",
       "Small business"
     ],
-    "mtimeMs": 1769273452777.128
+    "mtimeMs": 1769273452000
   },
   {
     "slug": "krasotulya-crm-launch",
@@ -45,7 +45,7 @@
       "Beauty business",
       "Small business"
     ],
-    "mtimeMs": 1769273020350.5156
+    "mtimeMs": 1769273020000
   },
   {
     "slug": "harmonize-me-story",
@@ -61,7 +61,7 @@
       "Education",
       "Next.js"
     ],
-    "mtimeMs": 1766738451252.6172
+    "mtimeMs": 1766738451000
   },
   {
     "slug": "government-contractors-guide",
@@ -77,7 +77,7 @@
       "Business",
       "Management"
     ],
-    "mtimeMs": 1766738278378.7131
+    "mtimeMs": 1766738278000
   },
   {
     "slug": "argumentation-guide",
@@ -92,7 +92,7 @@
       "Communication",
       "Business"
     ],
-    "mtimeMs": 1766737161320.4043
+    "mtimeMs": 1766737161000
   },
   {
     "slug": "sims-dynasty-tree-platform",
@@ -102,7 +102,7 @@
     "date": "",
     "readTime": "7 min",
     "tags": [],
-    "mtimeMs": 1766498499075.9436
+    "mtimeMs": 1766498499000
   },
   {
     "slug": "harmonize-me-platform",
@@ -112,7 +112,7 @@
     "date": "",
     "readTime": "8 min",
     "tags": [],
-    "mtimeMs": 1766496436739.9602
+    "mtimeMs": 1766496436000
   },
   {
     "slug": "business-automation",
@@ -122,7 +122,17 @@
     "date": "",
     "readTime": "4 min",
     "tags": [],
-    "mtimeMs": 1766496115163.054
+    "mtimeMs": 1766496115000
+  },
+  {
+    "slug": "crm-implementation",
+    "lang": "en",
+    "title": "CRM Implementation: Complete Guide to Sales Automation in 2025",
+    "excerpt": "Introduction",
+    "date": "",
+    "readTime": "4 min",
+    "tags": [],
+    "mtimeMs": 1766496115000
   },
   {
     "slug": "laravel-api-development",
@@ -137,46 +147,7 @@
       "API Development",
       "REST"
     ],
-    "mtimeMs": 1766496115162.7827
-  },
-  {
-    "slug": "stone-calculator-automation",
-    "lang": "en",
-    "title": "Stone Products Calculator: Automating Estimates and Saving Up to 80% of Time",
-    "excerpt": "Introduction",
-    "date": "",
-    "readTime": "4 min",
-    "tags": [],
-    "mtimeMs": 1766496115161.8398
-  },
-  {
-    "slug": "react-native-best-practices",
-    "lang": "en",
-    "title": "Best Practices for React Native Development in 2025",
-    "excerpt": "Introduction",
-    "date": "October 20, 2025",
-    "readTime": "1 min",
-    "tags": [
-      "React Native",
-      "Mobile Development",
-      "Best Practices"
-    ],
-    "mtimeMs": 1766496115161.517
-  },
-  {
-    "slug": "wordpress-optimization",
-    "lang": "en",
-    "title": "WordPress Site Performance Optimization",
-    "excerpt": "Introduction",
-    "date": "October 10, 2025",
-    "readTime": "1 min",
-    "tags": [
-      "WordPress",
-      "Optimization",
-      "Performance",
-      "PHP"
-    ],
-    "mtimeMs": 1766496115161.2783
+    "mtimeMs": 1766496115000
   },
   {
     "slug": "nodejs-microservices",
@@ -191,7 +162,31 @@
       "Microservices",
       "Backend"
     ],
-    "mtimeMs": 1766496115160.999
+    "mtimeMs": 1766496115000
+  },
+  {
+    "slug": "react-native-best-practices",
+    "lang": "en",
+    "title": "Best Practices for React Native Development in 2025",
+    "excerpt": "Introduction",
+    "date": "October 20, 2025",
+    "readTime": "1 min",
+    "tags": [
+      "React Native",
+      "Mobile Development",
+      "Best Practices"
+    ],
+    "mtimeMs": 1766496115000
+  },
+  {
+    "slug": "stone-calculator-automation",
+    "lang": "en",
+    "title": "Stone Products Calculator: Automating Estimates and Saving Up to 80% of Time",
+    "excerpt": "Introduction",
+    "date": "",
+    "readTime": "4 min",
+    "tags": [],
+    "mtimeMs": 1766496115000
   },
   {
     "slug": "telegram-broadcast-automation",
@@ -201,16 +196,21 @@
     "date": "",
     "readTime": "4 min",
     "tags": [],
-    "mtimeMs": 1766496115159.6228
+    "mtimeMs": 1766496115000
   },
   {
-    "slug": "crm-implementation",
+    "slug": "wordpress-optimization",
     "lang": "en",
-    "title": "CRM Implementation: Complete Guide to Sales Automation in 2025",
+    "title": "WordPress Site Performance Optimization",
     "excerpt": "Introduction",
-    "date": "",
-    "readTime": "4 min",
-    "tags": [],
-    "mtimeMs": 1766496115156.8237
+    "date": "October 10, 2025",
+    "readTime": "1 min",
+    "tags": [
+      "WordPress",
+      "Optimization",
+      "Performance",
+      "PHP"
+    ],
+    "mtimeMs": 1766496115000
   }
 ]

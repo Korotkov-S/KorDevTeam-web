@@ -1,11 +1,26 @@
 [
   {
+    "slug": "krasotulya-landing-launch",
+    "lang": "ru",
+    "title": "Запустили лендинг «Красотуля» — krasotula.com",
+    "excerpt": "На связи Геннадий Коротков, руководитель команды KorDev Team!",
+    "date": "31 января 2026",
+    "readTime": "1 мин",
+    "tags": [
+      "KorDevTeam",
+      "Красотуля",
+      "CRM",
+      "Лендинг"
+    ],
+    "mtimeMs": 1769851793942.0337
+  },
+  {
     "slug": "krasotulya-problem-4-email-campaigns",
     "lang": "ru",
     "title": "«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №4 — электронные рассылки для клиентов)",
     "excerpt": "На связи Геннадий Коротков, руководитель команды KorDev Team.",
     "date": "25 января 2026",
-    "readTime": "2 мин",
+    "readTime": "1 мин",
     "tags": [
       "Красотуля",
       "CRM",
@@ -13,7 +28,7 @@
       "Бьюти-бизнес",
       "Малый бизнес"
     ],
-    "mtimeMs": 1769360000000
+    "mtimeMs": 1769486110550.0525
   },
   {
     "slug": "krasotulya-problem-1-data-fragmentation",
@@ -29,7 +44,7 @@
       "Бьюти-бизнес",
       "Малый бизнес"
     ],
-    "mtimeMs": 1769273452777.2822
+    "mtimeMs": 1769273452000
   },
   {
     "slug": "krasotulya-crm-launch",
@@ -46,7 +61,7 @@
       "Бьюти-бизнес",
       "Малый бизнес"
     ],
-    "mtimeMs": 1769272800752.0903
+    "mtimeMs": 1769272800000
   },
   {
     "slug": "harmonize-me-story",
@@ -62,7 +77,7 @@
       "Образование",
       "Next.js"
     ],
-    "mtimeMs": 1766738451239.7668
+    "mtimeMs": 1766738451000
   },
   {
     "slug": "government-contractors-guide",
@@ -78,7 +93,7 @@
       "Бизнес",
       "Менеджмент"
     ],
-    "mtimeMs": 1766738278377.0227
+    "mtimeMs": 1766738278000
   },
   {
     "slug": "argumentation-guide",
@@ -93,7 +108,7 @@
       "Коммуникация",
       "Бизнес"
     ],
-    "mtimeMs": 1766737161318.3157
+    "mtimeMs": 1766737161000
   },
   {
     "slug": "sims-dynasty-tree-platform",
@@ -103,7 +118,7 @@
     "date": "",
     "readTime": "7 мин",
     "tags": [],
-    "mtimeMs": 1766498499073.8845
+    "mtimeMs": 1766498499000
   },
   {
     "slug": "harmonize-me-platform",
@@ -113,41 +128,7 @@
     "date": "",
     "readTime": "7 мин",
     "tags": [],
-    "mtimeMs": 1766496436738.2
-  },
-  {
-    "slug": "stone-calculator-automation",
-    "lang": "ru",
-    "title": "Калькулятор изделий из камня: автоматизация сметы и экономия до 80% времени",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "4 мин",
-    "tags": [],
-    "mtimeMs": 1766496115163.5425
-  },
-  {
-    "slug": "crm-implementation",
-    "lang": "ru",
-    "title": "Внедрение CRM систем: полное руководство по автоматизации продаж в 2025 году",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "4 мин",
-    "tags": [],
-    "mtimeMs": 1766496115162.388
-  },
-  {
-    "slug": "react-native-best-practices",
-    "lang": "ru",
-    "title": "Лучшие практики разработки на React Native в 2025 году",
-    "excerpt": "Введение",
-    "date": "20 октября 2025",
-    "readTime": "1 мин",
-    "tags": [
-      "React Native",
-      "Mobile Development",
-      "Best Practices"
-    ],
-    "mtimeMs": 1766496115159.2732
+    "mtimeMs": 1766496436000
   },
   {
     "slug": "business-automation",
@@ -157,22 +138,17 @@
     "date": "",
     "readTime": "4 мин",
     "tags": [],
-    "mtimeMs": 1766496115158.638
+    "mtimeMs": 1766496115000
   },
   {
-    "slug": "nodejs-microservices",
+    "slug": "crm-implementation",
     "lang": "ru",
-    "title": "Микросервисная архитектура на Node.js с NestJS",
-    "excerpt": "Почему микросервисы?",
-    "date": "15 октября 2025",
-    "readTime": "1 мин",
-    "tags": [
-      "Node.js",
-      "NestJS",
-      "Microservices",
-      "Backend"
-    ],
-    "mtimeMs": 1766496115158.2722
+    "title": "Внедрение CRM систем: полное руководство по автоматизации продаж в 2025 году",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1766496115000
   },
   {
     "slug": "laravel-api-development",
@@ -187,7 +163,56 @@
       "API Development",
       "REST"
     ],
-    "mtimeMs": 1766496115157.994
+    "mtimeMs": 1766496115000
+  },
+  {
+    "slug": "nodejs-microservices",
+    "lang": "ru",
+    "title": "Микросервисная архитектура на Node.js с NestJS",
+    "excerpt": "Почему микросервисы?",
+    "date": "15 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "Node.js",
+      "NestJS",
+      "Microservices",
+      "Backend"
+    ],
+    "mtimeMs": 1766496115000
+  },
+  {
+    "slug": "react-native-best-practices",
+    "lang": "ru",
+    "title": "Лучшие практики разработки на React Native в 2025 году",
+    "excerpt": "Введение",
+    "date": "20 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "React Native",
+      "Mobile Development",
+      "Best Practices"
+    ],
+    "mtimeMs": 1766496115000
+  },
+  {
+    "slug": "stone-calculator-automation",
+    "lang": "ru",
+    "title": "Калькулятор изделий из камня: автоматизация сметы и экономия до 80% времени",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1766496115000
+  },
+  {
+    "slug": "telegram-broadcast-automation",
+    "lang": "ru",
+    "title": "Автоматизация массовой рассылки в Telegram: экономия 16 часов работы для Kusidis PRO",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1766496115000
   },
   {
     "slug": "wordpress-optimization",
@@ -202,16 +227,6 @@
       "Performance",
       "PHP"
     ],
-    "mtimeMs": 1766496115157.698
-  },
-  {
-    "slug": "telegram-broadcast-automation",
-    "lang": "ru",
-    "title": "Автоматизация массовой рассылки в Telegram: экономия 16 часов работы для Kusidis PRO",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "4 мин",
-    "tags": [],
-    "mtimeMs": 1766496115157.3022
+    "mtimeMs": 1766496115000
   }
 ]

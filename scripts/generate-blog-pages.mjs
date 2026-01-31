@@ -32,6 +32,17 @@ function stripMd(md) {
     .trim();
 }
 
+function isImageOnlyBlock(block) {
+  const lines = block
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return false;
+  return lines.every((l) =>
+    /^!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*$/.test(l),
+  );
+}
+
 function extractTitleAndExcerpt(md) {
   const titleMatch = md.match(/^\s*#\s+(.+)\s*$/m);
   const title = (titleMatch?.[1] || "Blog").trim();
@@ -42,7 +53,8 @@ function extractTitleAndExcerpt(md) {
     .split(/\n\s*\n/)
     .map((b) => b.trim())
     .filter(Boolean);
-  const excerpt = stripMd(blocks[0] || title).slice(0, 180);
+  const firstTextBlock = blocks.find((b) => !isImageOnlyBlock(b)) || "";
+  const excerpt = stripMd(firstTextBlock || title).slice(0, 180);
 
   return { title, excerpt };
 }

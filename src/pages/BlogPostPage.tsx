@@ -40,6 +40,17 @@ function stripMd(md: string): string {
     .trim();
 }
 
+function isImageOnlyBlock(block: string): boolean {
+  const lines = block
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return false;
+  return lines.every((l) =>
+    /^!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*$/.test(l),
+  );
+}
+
 function extractLegacyMeta(md: string): Partial<BlogPostMeta> {
   const tagsLine =
     md.match(/\*\*(?:Теги|Tags)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
@@ -68,8 +79,12 @@ function deriveMetaFromMarkdown(md: string, lang: string): BlogPostMeta {
   const titleMatch = md.match(/^\s*#\s+(.+)\s*$/m);
   const title = (titleMatch?.[1] || "Blog").trim();
   const body = stripFirstMarkdownH1(md);
-  const blocks = body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-  const excerpt = stripMd(blocks[0] || title).slice(0, 180);
+  const blocks = body
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+  const firstTextBlock = blocks.find((b) => !isImageOnlyBlock(b)) || "";
+  const excerpt = stripMd(firstTextBlock || title).slice(0, 180);
   const legacy = extractLegacyMeta(md);
   return {
     title,

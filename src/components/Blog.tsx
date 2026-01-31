@@ -270,6 +270,7 @@ export function Blog() {
     "krasotulya-crm-launch": "/blog/krasotula1.jpeg",
     "krasotulya-problem-1-data-fragmentation": "/blog/krasotula2.jpeg",
     "krasotulya-problem-4-email-campaigns": "/krasotula4.png",
+    "krasotulya-landing-launch": "/krasotula6.png",
   };
 
   const cardImages = [
