@@ -86,12 +86,12 @@ export function Header() {
             >
               {t("header.krasotulyaCrm")}
             </a>
-            <button
-              onClick={() => scrollToSection("blog")}
+            <Link
+              to="/blog"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {t("header.blog")}
-            </button>
+            </Link>
             <button
               onClick={() => scrollToSection("under-metup")}
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -160,12 +160,13 @@ export function Header() {
             >
               {t("header.krasotulyaCrm")}
             </a>
-            <button
-              onClick={() => scrollToSection("blog")}
+            <Link
+              to="/blog"
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
+              onClick={() => setIsMenuOpen(false)}
             >
               {t("header.blog")}
-            </button>
+            </Link>
             <button
               onClick={() => scrollToSection("under-metup")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"

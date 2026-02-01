@@ -134,6 +134,7 @@
     "subtitle": "Sharing experience, knowledge and best practices in development",
     "readMore": "Read More",
     "backToBlog": "Back to Blog",
+    "allArticles": "All blog articles",
     "filters": {
       "all": "All",
       "reactNative": "React Native",

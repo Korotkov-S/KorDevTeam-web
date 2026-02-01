@@ -327,6 +327,20 @@ export function Blog() {
           >
             {t("blog.subtitle")}
           </motion.p>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.25 }}
+            className="mt-4"
+          >
+            <a
+              href="/blog"
+              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline underline-offset-4"
+            >
+              {t("blog.allArticles")} →
+            </a>
+          </motion.p>
           {loadedFromApi && (
             <p className="text-xs text-muted-foreground mt-2">
               Список статей загружен динамически (из markdown файлов).

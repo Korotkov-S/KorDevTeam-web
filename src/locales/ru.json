@@ -134,6 +134,7 @@
     "subtitle": "Делимся опытом, знаниями и лучшими практиками в разработке",
     "readMore": "Читать далее",
     "backToBlog": "Вернуться к блогу",
+    "allArticles": "Все статьи в блоге",
     "filters": {
       "all": "Все",
       "reactNative": "React Native",
