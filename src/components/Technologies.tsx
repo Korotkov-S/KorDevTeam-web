@@ -1,8 +1,9 @@
+import React from "react";
 import { Badge } from "./ui/badge";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 
-export function Technologies() {
+export function Technologies({ withId = true }: { withId?: boolean } = {}) {
   const { t } = useTranslation();
 
   const techStacks = [
@@ -47,7 +48,10 @@ export function Technologies() {
   ];
 
   return (
-    <section id="technologies" className="py-28 px-4 sm:px-6 relative">
+    <section
+      {...(withId ? { id: "technologies" } : {})}
+      className="py-28 px-4 sm:px-6 relative"
+    >
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <motion.div

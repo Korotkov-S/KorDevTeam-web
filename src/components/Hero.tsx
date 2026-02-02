@@ -16,8 +16,9 @@ import { useTranslation } from "react-i18next";
 
 export function Hero() {
   const { t } = useTranslation();
-  const containerRef = useRef<HTMLElement>(null);
+  const containerRef = useRef();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [reduceEffects, setReduceEffects] = useState(false);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -27,6 +28,40 @@ export function Hero() {
   const smoothMouseY = useSpring(mouseY, springConfig);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mqMobile = window.matchMedia("(max-width: 767px)");
+    const mqReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const update = () => {
+      setReduceEffects(Boolean(mqMobile.matches || mqReducedMotion.matches));
+    };
+    update();
+
+    // Safari < 14 fallback: addListener/removeListener
+    const add = (mq: MediaQueryList) => {
+      // eslint-disable-next-line deprecation/deprecation
+      if (mq.addEventListener) mq.addEventListener("change", update);
+      // eslint-disable-next-line deprecation/deprecation
+      else mq.addListener(update);
+    };
+    const remove = (mq: MediaQueryList) => {
+      // eslint-disable-next-line deprecation/deprecation
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      // eslint-disable-next-line deprecation/deprecation
+      else mq.removeListener(update);
+    };
+
+    add(mqMobile);
+    add(mqReducedMotion);
+    return () => {
+      remove(mqMobile);
+      remove(mqReducedMotion);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceEffects) return;
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
       mouseX.set(e.clientX);
@@ -35,7 +70,7 @@ export function Hero() {
 
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
+  }, [mouseX, mouseY, reduceEffects]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -67,62 +102,96 @@ export function Hero() {
       ref={containerRef}
       className="relative min-h-screen flex items-center justify-center pt-32 pb-20 px-4 sm:px-6 overflow-hidden"
     >
-      {/* Animated grid background with parallax */}
-      <motion.div
-        className="absolute inset-0 opacity-10"
-        style={{
-          x: smoothMouseX,
-          y: smoothMouseY,
-        }}
-      >
-        <motion.div
-          className="absolute inset-0"
-          animate={{
-            backgroundPosition: ["0% 0%", "100% 100%"],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, rgba(59, 130, 246, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(59, 130, 246, 0.15) 1px, transparent 1px)",
-            backgroundSize: "80px 80px",
-          }}
-        />
-      </motion.div>
+      {/* Background effects: disable heavy animation on mobile / reduced motion */}
+      {reduceEffects ? (
+        <>
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(59, 130, 246, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(59, 130, 246, 0.15) 1px, transparent 1px)",
+              backgroundSize: "80px 80px",
+            }}
+          />
+          <div
+            className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%)",
+              filter: "blur(60px)",
+            }}
+          />
+          <div
+            className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, transparent 70%)",
+              filter: "blur(60px)",
+            }}
+          />
+        </>
+      ) : (
+        <>
+          {/* Animated grid background with parallax */}
+          <motion.div
+            className="absolute inset-0 opacity-10"
+            style={{
+              x: smoothMouseX,
+              y: smoothMouseY,
+            }}
+          >
+            <motion.div
+              className="absolute inset-0"
+              animate={{
+                backgroundPosition: ["0% 0%", "100% 100%"],
+              }}
+              transition={{
+                duration: 20,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              style={{
+                backgroundImage:
+                  "linear-gradient(to right, rgba(59, 130, 246, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(59, 130, 246, 0.15) 1px, transparent 1px)",
+                backgroundSize: "80px 80px",
+              }}
+            />
+          </motion.div>
 
-      {/* Radiant gradient orbs */}
-      <motion.div
-        className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full"
-        animate={{
-          scale: [1, 1.3, 1],
-          x: [0, 50, 0],
-          y: [0, 30, 0],
-        }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          background:
-            "radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)",
-          filter: "blur(60px)",
-        }}
-      />
-      <motion.div
-        className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full"
-        animate={{
-          scale: [1, 1.4, 1],
-          x: [0, -50, 0],
-          y: [0, -30, 0],
-        }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          background:
-            "radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%)",
-          filter: "blur(60px)",
-        }}
-      />
+          {/* Radiant gradient orbs */}
+          <motion.div
+            className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full"
+            animate={{
+              scale: [1, 1.3, 1],
+              x: [0, 50, 0],
+              y: [0, 30, 0],
+            }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              background:
+                "radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)",
+              filter: "blur(60px)",
+            }}
+          />
+          <motion.div
+            className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full"
+            animate={{
+              scale: [1, 1.4, 1],
+              x: [0, -50, 0],
+              y: [0, -30, 0],
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              background:
+                "radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%)",
+              filter: "blur(60px)",
+            }}
+          />
+        </>
+      )}
 
+      {!reduceEffects && (
+      <>
       {/* Floating particles with glow */}
       <div className="absolute inset-0 pointer-events-none">
         {[...Array(30)].map((_, i) => (
@@ -322,6 +391,8 @@ export function Hero() {
           />
         </motion.div>
       ))}
+      </>
+      )}
 
       {/* Animated code/terminal effect */}
       <div className="absolute top-32 right-10 hidden lg:block pointer-events-none">
@@ -602,24 +673,20 @@ function AnimatedTitle({ a, b, c }: { a: string; b: string; c: string }) {
   );
 }
 
-function MagneticButton({
-  children,
-  mousePosition,
-}: {
-  children: React.ReactNode;
-  mousePosition: { x: number; y: number };
-}) {
-  const ref = useRef<HTMLDivElement>(null);
+function MagneticButton(props: any) {
+  const { children, mousePosition } = props || {};
+  const ref = useRef();
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (!ref.current) return;
+    const el = (ref as any).current;
+    if (!el) return;
 
-    const rect = ref.current.getBoundingClientRect();
+    const rect = el.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const distanceX = mousePosition.x - centerX;
-    const distanceY = mousePosition.y - centerY;
+    const distanceX = (mousePosition?.x ?? 0) - centerX;
+    const distanceY = (mousePosition?.y ?? 0) - centerY;
     const distance = Math.sqrt(distanceX ** 2 + distanceY ** 2);
 
     if (distance < 120) {

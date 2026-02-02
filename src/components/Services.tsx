@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-export function Services() {
+export function Services({ withId = true }: { withId?: boolean } = {}) {
   const { t } = useTranslation();
 
   const services = [
@@ -54,7 +54,7 @@ export function Services() {
   ];
 
   return (
-    <section id="services" className="py-28 px-4 sm:px-6 relative">
+    <section {...(withId ? { id: "services" } : {})} className="py-28 px-4 sm:px-6 relative">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <motion.div

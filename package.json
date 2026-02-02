@@ -59,7 +59,10 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.3",
     "@types/node": "^20.10.0",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.0",
+    "@squoosh/lib": "^0.5.3",
     "cheerio": "^1.1.2",
     "puppeteer": "^24.26.1",
     "tailwindcss": "^4.1.3",
@@ -69,11 +72,12 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/generate-blog-pages.mjs && node scripts/generate-content-index.mjs",
+    "optimize:images": "node scripts/optimize-images.mjs",
+    "build": "node scripts/optimize-images.mjs && vite build && node scripts/generate-blog-pages.mjs && node scripts/generate-content-index.mjs",
     "preview": "vite preview",
-    "build:static": "vite build --mode production",
+    "build:static": "node scripts/optimize-images.mjs && vite build --mode production",
     "serve": "vite preview --port 4173",
-    "build:blog": "vite build && node scripts/generate-blog-pages.mjs",
+    "build:blog": "node scripts/optimize-images.mjs && vite build && node scripts/generate-blog-pages.mjs",
     "generate:blog": "node scripts/generate-blog-pages.mjs",
     "generate:content-index": "node scripts/generate-content-index.mjs"
   },

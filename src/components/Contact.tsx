@@ -9,12 +9,12 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { Mail, MessageSquare, Send } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner@2.0.3";
+import React, { useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 
-export function Contact() {
+export function Contact({ withId = true }: { withId?: boolean } = {}) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
@@ -22,16 +22,14 @@ export function Contact() {
     message: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: any) => {
     e.preventDefault();
     // В реальном приложении здесь будет отправка данных на сервер
     toast.success(t("contact.thanks"));
     setFormData({ name: "", email: "", message: "" });
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: any) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
@@ -39,7 +37,7 @@ export function Contact() {
   };
 
   return (
-    <section id="contact" className="py-28 px-4 sm:px-6 relative">
+    <section {...(withId ? { id: "contact" } : {})} className="py-28 px-4 sm:px-6 relative">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <motion.div

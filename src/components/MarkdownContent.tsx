@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 
 import { cn } from "./ui/utils";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 const DEFAULT_FALLBACK_IMAGE_SRC = "/opengraphlogo.jpeg";
 
@@ -49,22 +50,17 @@ const markdownComponents = {
     const src = rawSrc || DEFAULT_FALLBACK_IMAGE_SRC;
 
     return (
-      <img
+      <ImageWithFallback
         {...props}
         src={src}
         alt={typeof props.alt === "string" ? props.alt : ""}
         loading={props.loading ?? "lazy"}
+        decoding={props.decoding ?? "async"}
+        fallbackSrc={DEFAULT_FALLBACK_IMAGE_SRC}
         className={cn(
           "max-w-full h-auto rounded-xl border border-border/50 my-6",
-          props.className
+          props.className,
         )}
-        onError={(e) => {
-          // Avoid infinite loop if fallback also fails for some reason
-          const target = e.currentTarget;
-          if (target.getAttribute("data-fallback-applied") === "1") return;
-          target.setAttribute("data-fallback-applied", "1");
-          target.src = DEFAULT_FALLBACK_IMAGE_SRC;
-        }}
       />
     );
   },

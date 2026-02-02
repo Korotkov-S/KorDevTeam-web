@@ -33,7 +33,7 @@ function toVkPreviewUrl(url: string): string {
   return url;
 }
 
-export function UnderMetup() {
+export function UnderMetup({ withId = true }: { withId?: boolean } = {}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,7 +85,10 @@ export function UnderMetup() {
   };
 
   return (
-    <section id="under-metup" className="py-28 px-4 sm:px-6 relative">
+    <section
+      {...(withId ? { id: "under-metup" } : {})}
+      className="py-28 px-4 sm:px-6 relative"
+    >
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <motion.div

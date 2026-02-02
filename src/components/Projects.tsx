@@ -15,10 +15,10 @@ import {
   PaginationPrevious,
 } from "./ui/pagination";
 
-export function Projects() {
+export function Projects({ withId = true }: { withId?: boolean } = {}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState();
   const projectsPerPage = 3;
 
   const fallbackProjects = useMemo(
@@ -98,8 +98,15 @@ export function Projects() {
     technologies: string[];
   };
 
-  const [projects, setProjects] = useState<ProjectCard[]>(fallbackProjects as any);
-  const [loadedFromJson, setLoadedFromJson] = useState(false);
+  // Примечание: без типовых деклараций React TS может некорректно вывести сигнатуру useState из JS.
+  // Поэтому инициализируем состояние без аргументов и задаём значение эффектом.
+  const [projects, setProjects] = useState();
+  const [loadedFromJson, setLoadedFromJson] = useState();
+
+  useEffect(() => {
+    // Обновляем фоллбек при смене языка/переводов
+    setProjects(fallbackProjects as any);
+  }, [fallbackProjects]);
 
   useEffect(() => {
     const resolved = (i18n.resolvedLanguage || i18n.language || "en").toLowerCase();
@@ -128,17 +135,19 @@ export function Projects() {
     load();
   }, [fallbackProjects, i18n.language, i18n.resolvedLanguage]);
 
-  const totalPages = Math.ceil(projects.length / projectsPerPage);
-  const startIndex = (currentPage - 1) * projectsPerPage;
+  const safeCurrentPage = Number(currentPage ?? 1);
+  const safeProjects = Array.isArray(projects) && projects.length ? projects : (fallbackProjects as any);
+  const totalPages = Math.ceil(safeProjects.length / projectsPerPage);
+  const startIndex = (safeCurrentPage - 1) * projectsPerPage;
   const endIndex = startIndex + projectsPerPage;
-  const currentProjects = projects.slice(startIndex, endIndex);
+  const currentProjects = safeProjects.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
   return (
-    <section id="projects" className="py-28 px-4 sm:px-6 relative">
+    <section {...(withId ? { id: "projects" } : {})} className="py-28 px-4 sm:px-6 relative">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <motion.div
@@ -269,12 +278,12 @@ export function Projects() {
                 <PaginationPrevious
                   onClick={(e) => {
                     e.preventDefault();
-                    if (currentPage > 1) {
-                      handlePageChange(currentPage - 1);
+                    if (safeCurrentPage > 1) {
+                      handlePageChange(safeCurrentPage - 1);
                     }
                   }}
                   className={
-                    currentPage === 1
+                    safeCurrentPage === 1
                       ? "pointer-events-none opacity-50"
                       : "cursor-pointer"
                   }
@@ -302,12 +311,12 @@ export function Projects() {
                 <PaginationNext
                   onClick={(e) => {
                     e.preventDefault();
-                    if (currentPage < totalPages) {
-                      handlePageChange(currentPage + 1);
+                    if (safeCurrentPage < totalPages) {
+                      handlePageChange(safeCurrentPage + 1);
                     }
                   }}
                   className={
-                    currentPage === totalPages
+                    safeCurrentPage === totalPages
                       ? "pointer-events-none opacity-50"
                       : "cursor-pointer"
                   }

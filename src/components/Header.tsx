@@ -5,7 +5,6 @@ import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { useTranslation } from "react-i18next";
-import { VideoStory } from "./VideoStory";
 import { motion } from "motion/react";
 
 export function Header() {
@@ -107,7 +106,6 @@ export function Header() {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            <VideoStory />
             <LanguageToggle />
             <ThemeToggle />
             <Button
@@ -120,7 +118,6 @@ export function Header() {
 
           {/* Mobile: VideoStory и кнопка меню */}
           <div className="md:hidden flex items-center" style={{ gap: '10px' }}>
-            <VideoStory />
             <button
               className="text-foreground"
               onClick={() => setIsMenuOpen(!isMenuOpen)}

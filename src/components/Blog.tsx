@@ -33,7 +33,7 @@ interface BlogPost {
   slug: string;
 }
 
-export function Blog() {
+export function Blog({ withId = true }: { withId?: boolean } = {}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
@@ -287,7 +287,7 @@ export function Blog() {
 
   return (
     <section
-      id="blog"
+      {...(withId ? { id: "blog" } : {})}
       className="py-28 px-4 sm:px-6 relative"
       itemScope
       itemType="https://schema.org/Blog"
