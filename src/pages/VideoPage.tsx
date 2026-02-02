@@ -17,6 +17,7 @@ export function VideoPage() {
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isVideoError, setIsVideoError] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -34,8 +35,7 @@ export function VideoPage() {
   useEffect(() => {
     // Автозапуск видео при загрузке страницы
     if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
-      setIsPlaying(true);
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   }, []);
 
@@ -110,22 +110,31 @@ export function VideoPage() {
           {/* Видео */}
           <div className="w-[80%] mx-auto">
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden pointer-events-none">
-              <video
-                ref={videoRef}
-                muted={isMuted}
-                loop
-                playsInline
-                className="w-full h-full object-contain pointer-events-auto"
-              >
-                <source
-                  src={isMobile ? "/defaultMob.MOV" : "/default.mp4"}
-                  type={isMobile ? "video/quicktime" : "video/mp4"}
-                />
-              </video>
+              {isVideoError ? (
+                <div className="w-full h-full flex items-center justify-center text-white/80 px-6 text-center">
+                  Видео не найдено или временно недоступно.
+                </div>
+              ) : (
+                <video
+                  ref={videoRef}
+                  muted={isMuted}
+                  loop
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-contain pointer-events-auto"
+                  onError={() => setIsVideoError(true)}
+                >
+                  <source
+                    src={isMobile ? "/defaultMob.MOV" : "/default.mp4"}
+                    type={isMobile ? "video/quicktime" : "video/mp4"}
+                  />
+                </video>
+              )}
             </div>
           </div>
 
           {/* Video controls */}
+          {!isVideoError && (
           <div
             className="w-[80%] mx-auto mt-4 flex items-center justify-center gap-4 relative"
             style={{ zIndex: 9999 }}
@@ -169,6 +178,7 @@ export function VideoPage() {
               <RotateCw className="h-6 w-6" />
             </button>
           </div>
+          )}
         </div>
       </div>
     </>

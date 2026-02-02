@@ -540,7 +540,7 @@ function AnimatedTitle({ a, b, c }: { a: string; b: string; c: string }) {
   ].filter((x) => x.text);
 
   return (
-    <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight">
+    <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight">
       {parts.map((word, wordIndex) => (
         <motion.div
           key={`${word.text}-${wordIndex}`}
