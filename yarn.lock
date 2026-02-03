@@ -1900,6 +1900,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@squoosh/lib@npm:^0.5.3":
+  version: 0.5.3
+  resolution: "@squoosh/lib@npm:0.5.3"
+  dependencies:
+    wasm-feature-detect: ^1.2.11
+    web-streams-polyfill: ^3.0.3
+  checksum: d21da5876e2845727a3ad802ef4cd5637a01294eb2b423beeff24acd0a8200801f827982964964f8185bee074e2a5257cc32752ba57adc7f242aa2045c686a7c
+  languageName: node
+  linkType: hard
+
 "@tailwindcss/node@npm:4.1.18":
   version: 4.1.18
   resolution: "@tailwindcss/node@npm:4.1.18"
@@ -4228,6 +4238,7 @@ __metadata:
     "@radix-ui/react-toggle": ^1.1.2
     "@radix-ui/react-toggle-group": ^1.1.2
     "@radix-ui/react-tooltip": ^1.1.8
+    "@squoosh/lib": ^0.5.3
     "@tailwindcss/vite": ^4.1.3
     "@types/node": ^20.10.0
     "@types/react": ^19.2.10
@@ -6603,6 +6614,20 @@ __metadata:
   version: 3.1.0
   resolution: "void-elements@npm:3.1.0"
   checksum: 0390f818107fa8fce55bb0a5c3f661056001c1d5a2a48c28d582d4d847347c2ab5b7f8272314cac58acf62345126b6b09bea623a185935f6b1c3bbce0dfd7f7f
+  languageName: node
+  linkType: hard
+
+"wasm-feature-detect@npm:^1.2.11":
+  version: 1.8.0
+  resolution: "wasm-feature-detect@npm:1.8.0"
+  checksum: 5972a95fb4064d23d828cd23e70f59ebf612db0fff2209365cc47190886328af570d1d40db00c8d41982fef2b446a8f143cf292482bbf3e1214e60b292c78ccc
+  languageName: node
+  linkType: hard
+
+"web-streams-polyfill@npm:^3.0.3":
+  version: 3.3.3
+  resolution: "web-streams-polyfill@npm:3.3.3"
+  checksum: 21ab5ea08a730a2ef8023736afe16713b4f2023ec1c7085c16c8e293ee17ed085dff63a0ad8722da30c99c4ccbd4ccd1b2e79c861829f7ef2963d7de7004c2cb
   languageName: node
   linkType: hard
 
