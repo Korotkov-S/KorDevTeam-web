@@ -136,7 +136,7 @@ async function runWriteBatch(fn) {
 
 async function getPost({ slug, lang }) {
   const row = await queryGet(
-    `SELECT slug, lang, title, content_md, excerpt, tags_json, date_text, read_time_text, created_at_ms, updated_at_ms
+    `SELECT slug, lang, title, cover_url, content_md, excerpt, tags_json, date_text, read_time_text, created_at_ms, updated_at_ms
      FROM posts
      WHERE slug = ? AND lang = ?`,
     [String(slug), safeLang(lang)]
@@ -146,6 +146,7 @@ async function getPost({ slug, lang }) {
     slug: row.slug,
     lang: row.lang,
     title: row.title,
+    coverUrl: row.cover_url || "",
     content: row.content_md,
     excerpt: row.excerpt,
     tags: fromJson(row.tags_json, []),
@@ -160,6 +161,7 @@ async function upsertPost({
   slug,
   lang,
   title,
+  coverUrl,
   content,
   excerpt,
   tags,
@@ -184,10 +186,11 @@ async function upsertPost({
     const db = await getDb();
     db.run(
       `INSERT INTO posts (
-          slug, lang, title, content_md, excerpt, tags_json, date_text, read_time_text, created_at_ms, updated_at_ms
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          slug, lang, title, cover_url, content_md, excerpt, tags_json, date_text, read_time_text, created_at_ms, updated_at_ms
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(slug, lang) DO UPDATE SET
           title = excluded.title,
+          cover_url = excluded.cover_url,
           content_md = excluded.content_md,
           excerpt = excluded.excerpt,
           tags_json = excluded.tags_json,
@@ -198,6 +201,7 @@ async function upsertPost({
         String(slug),
         l,
         String(title || ""),
+        String(coverUrl || ""),
         String(content || ""),
         String(excerpt || ""),
         toJson(Array.isArray(tags) ? tags : [], "[]"),
@@ -229,7 +233,7 @@ async function deletePost({ slug, lang }) {
 async function listPostMetas({ lang }) {
   const l = safeLang(lang);
   const rows = await queryAll(
-    `SELECT slug, lang, title, excerpt, tags_json, date_text, read_time_text, updated_at_ms
+    `SELECT slug, lang, title, cover_url, excerpt, tags_json, date_text, read_time_text, updated_at_ms
      FROM posts
      WHERE lang = ?
      ORDER BY updated_at_ms DESC`,
@@ -239,6 +243,7 @@ async function listPostMetas({ lang }) {
     slug: r.slug,
     lang: r.lang,
     title: r.title,
+    coverUrl: r.cover_url || "",
     excerpt: r.excerpt,
     date: r.date_text,
     readTime: r.read_time_text,

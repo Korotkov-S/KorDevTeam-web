@@ -65,6 +65,12 @@ function parseFrontmatter(md) {
   return { frontmatter: fm, content };
 }
 
+function extractFirstMarkdownImage(md) {
+  // Matches: ![alt](src "title")
+  const match = md.match(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/m);
+  return (match?.[1] || "").trim();
+}
+
 function parseLegacyMeta(md) {
   // Supports blocks like:
   // **Теги**: ...
@@ -115,6 +121,12 @@ async function extractMetaFromMarkdown({ slug, md, lang, filePathForStat }) {
   const title = (frontmatter?.title || extractFirstH1(content) || slug).toString().trim();
   const excerpt = (frontmatter?.excerpt || extractFirstParagraph(content) || title).toString().trim().slice(0, 180);
 
+  const coverUrl = (
+    frontmatter?.coverUrl ||
+    frontmatter?.cover ||
+    extractFirstMarkdownImage(content)
+  ).toString().trim();
+
   const legacy = parseLegacyMeta(content);
   const tags = Array.isArray(frontmatter?.tags)
     ? frontmatter.tags.map((x) => String(x).trim()).filter(Boolean)
@@ -129,6 +141,7 @@ async function extractMetaFromMarkdown({ slug, md, lang, filePathForStat }) {
     slug,
     lang,
     title,
+    coverUrl,
     excerpt,
     date,
     readTime,
@@ -141,6 +154,7 @@ module.exports = {
   stripFirstMarkdownH1,
   parseFrontmatter,
   parseLegacyMeta,
+  extractFirstMarkdownImage,
   estimateReadTime,
   extractMetaFromMarkdown,
 };

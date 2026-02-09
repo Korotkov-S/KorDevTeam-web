@@ -63,6 +63,15 @@ function migrate(db) {
     v = 2;
   }
 
+  if (v < 3) {
+    // Blog cover image (public URL)
+    // SQL.js supports ALTER TABLE ADD COLUMN.
+    db.exec(`
+      ALTER TABLE posts ADD COLUMN cover_url TEXT NOT NULL DEFAULT '';
+    `);
+    v = 3;
+  }
+
   if (v !== current) {
     db.run(
       `INSERT INTO _meta(key, value) VALUES('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`,

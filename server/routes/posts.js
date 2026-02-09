@@ -22,7 +22,7 @@ const { extractMetaFromMarkdown } = require("../utils/contentMeta");
  */
 router.post('/', authenticate, async (req, res, next) => {
   try {
-    const { slug: slugOverride, title, content, excerpt, tags, date, readTime, lang = 'ru' } = req.body;
+    const { slug: slugOverride, title, content, excerpt, tags, date, readTime, coverUrl, lang = 'ru' } = req.body;
 
     // Валидация обязательных полей
     if (!title || !content) {
@@ -48,6 +48,8 @@ router.post('/', authenticate, async (req, res, next) => {
       slug,
       lang: l,
       title: String(title),
+      coverUrl:
+        (typeof coverUrl === "string" && coverUrl.trim()) ? coverUrl.trim() : (meta.coverUrl || ""),
       content: String(content),
       excerpt: typeof excerpt === "string" && excerpt.trim() ? excerpt.trim() : meta.excerpt,
       tags: Array.isArray(tags) ? tags : meta.tags,
@@ -113,6 +115,7 @@ router.get('/:slug', async (req, res, next) => {
         slug,
         lang: l,
         title: meta.title,
+        coverUrl: meta.coverUrl || "",
         content: legacy.content,
         excerpt: meta.excerpt,
         tags: meta.tags,
@@ -136,7 +139,7 @@ router.get('/:slug', async (req, res, next) => {
 router.put('/:slug', authenticate, async (req, res, next) => {
   try {
     const { slug } = req.params;
-    const { title, content, excerpt, tags, date, readTime, lang = 'ru' } = req.body;
+    const { title, content, excerpt, tags, date, readTime, coverUrl, lang = 'ru' } = req.body;
 
     const l = safeLang(lang);
     const existing = await getDbPost({ slug, lang: l });
@@ -158,6 +161,10 @@ router.put('/:slug', authenticate, async (req, res, next) => {
       slug,
       lang: l,
       title: typeof title === "string" && title.trim() ? title.trim() : meta.title,
+      coverUrl:
+        (typeof coverUrl === "string" && coverUrl.trim())
+          ? coverUrl.trim()
+          : (existing?.coverUrl || meta.coverUrl || ""),
       content: String(nextContent),
       excerpt: typeof excerpt === "string" && excerpt.trim() ? excerpt.trim() : meta.excerpt,
       tags: Array.isArray(tags) ? tags : meta.tags,

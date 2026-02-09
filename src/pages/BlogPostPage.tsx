@@ -6,6 +6,7 @@ import { ArrowLeft, Calendar, Clock } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { useTranslation } from "react-i18next";
 import { SEO } from "../components/SEO";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 
 interface BlogPostMeta {
   title: string;
@@ -144,6 +145,7 @@ export function BlogPostPage() {
   const [loading, setLoading] = useState(true);
   const [meta, setMeta] = useState<BlogPostMeta | null>(null);
   const [ogImage, setOgImage] = useState<string | undefined>(undefined);
+  const [coverUrl, setCoverUrl] = useState<string>("");
 
   // Получаем метаданные из переводов
 
@@ -307,17 +309,57 @@ export function BlogPostPage() {
     const loadMarkdown = async () => {
       try {
         if (!hasPrerender) setLoading(true);
-        // Определяем язык и загружаем соответствующую версию статьи
-        const response = await fetch(`/blog/${slug}${langSuffix}.md`);
-        if (!response.ok) {
-          throw new Error("Failed to load");
+        // Prefer API (runtime edits), fallback to static markdown.
+        let loaded = false;
+        try {
+          const apiRes = await fetch(`/api/posts/${slug}?lang=${isRu ? "ru" : "en"}`);
+          if (apiRes.ok) {
+            const data = (await apiRes.json()) as {
+              post?: {
+                content?: string;
+                title?: string;
+                excerpt?: string;
+                date?: string;
+                readTime?: string;
+                tags?: string[];
+                coverUrl?: string;
+              };
+            };
+            const md = String(data?.post?.content || "");
+            const cover = String(data?.post?.coverUrl || "");
+            setCoverUrl(cover);
+            setContent(stripFirstMarkdownH1(md));
+            setOgImage(toAbsoluteOgImage(cover || extractFirstMarkdownImage(md)));
+            if (!postMeta) {
+              if (data?.post?.title) {
+                setMeta({
+                  title: String(data.post.title),
+                  excerpt: String(data.post.excerpt || ""),
+                  date: String(data.post.date || ""),
+                  readTime: String(data.post.readTime || ""),
+                  tags: Array.isArray(data.post.tags) ? data.post.tags : [],
+                });
+              } else {
+                setMeta(deriveMetaFromMarkdown(md, isRu ? "ru" : "en"));
+              }
+            }
+            loaded = true;
+          }
+        } catch {
+          // ignore API errors, try static
         }
-        const text = await response.text();
-        setContent(stripFirstMarkdownH1(text));
-        const firstImg = extractFirstMarkdownImage(text);
-        setOgImage(toAbsoluteOgImage(firstImg));
-        if (!postMeta) {
-          setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
+
+        if (!loaded) {
+          const response = await fetch(`/blog/${slug}${langSuffix}.md`);
+          if (!response.ok) throw new Error("Failed to load");
+          const text = await response.text();
+          const firstImg = extractFirstMarkdownImage(text);
+          setCoverUrl(firstImg);
+          setContent(stripFirstMarkdownH1(text));
+          setOgImage(toAbsoluteOgImage(firstImg));
+          if (!postMeta) {
+            setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
+          }
         }
       } catch (error) {
         console.error("Error loading markdown:", error);
@@ -417,6 +459,20 @@ export function BlogPostPage() {
                 </div>
               </header>
             )}
+
+            {/* Cover image */}
+            {coverUrl ? (
+              <div className="mb-10">
+                <div className="w-full aspect-video rounded-lg overflow-hidden">
+                  <ImageWithFallback
+                    src={coverUrl}
+                    alt={meta?.title || slug || "cover"}
+                    fallbackSrc="/opengraphlogo.jpeg"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            ) : null}
 
             {/* Article Content */}
             <MarkdownContent markdown={content} itemProp="articleBody" />

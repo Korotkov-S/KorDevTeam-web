@@ -31,6 +31,7 @@ interface BlogPost {
   readTime: string;
   tags: string[];
   slug: string;
+  coverUrl?: string;
 }
 
 export function Blog({ withId = true }: { withId?: boolean } = {}) {
@@ -198,60 +199,60 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
     const lang = resolved === "ru" || resolved.startsWith("ru-") ? "ru" : "en";
     const load = async () => {
       try {
-        // Prefer static index (works on static hosting)
-        const resStatic = await fetch(`/content/blog.${lang}.json`);
-        if (!resStatic.ok) throw new Error("no static index");
-        const items = (await resStatic.json()) as any[];
-        const mapped: BlogPost[] = (Array.isArray(items) ? items : []).map(
-          (x) => ({
-            id: String(x.slug),
-            slug: String(x.slug),
-            title: String(x.title || x.slug),
-            excerpt: String(x.excerpt || ""),
-            date: String(x.date || ""),
-            readTime: String(x.readTime || ""),
-            tags: Array.isArray(x.tags)
-              ? x.tags.map((t: any) => String(t))
-              : [],
-          }),
-        );
+        // Prefer API index when available (reflects runtime edits in SQLite)
+        const res = await fetch(`/api/content/blog?lang=${lang}`);
+        if (!res.ok) throw new Error("api unavailable");
+        const data = (await res.json()) as { items?: any[] };
+        const items = Array.isArray(data.items) ? data.items : [];
+        const mapped: BlogPost[] = items.map((x) => ({
+          id: String(x.slug),
+          slug: String(x.slug),
+          title: String(x.title || x.slug),
+          excerpt: String(x.excerpt || ""),
+          date: String(x.date || ""),
+          readTime: String(x.readTime || ""),
+          tags: Array.isArray(x.tags) ? x.tags.map((t: any) => String(t)) : [],
+          coverUrl: x.coverUrl ? String(x.coverUrl) : "",
+        }));
         if (mapped.length) {
           setBlogPosts(mapped);
           setLoadedFromApi(true);
           setCurrentPage(1);
-        } else {
+          return;
+        }
+        throw new Error("empty api index");
+      } catch {
+        // Fallback to static index (works on static hosting)
+        try {
+          const resStatic = await fetch(`/content/blog.${lang}.json`);
+          if (!resStatic.ok) throw new Error("no static index");
+          const items = (await resStatic.json()) as any[];
+          const mapped: BlogPost[] = (Array.isArray(items) ? items : []).map(
+            (x) => ({
+              id: String(x.slug),
+              slug: String(x.slug),
+              title: String(x.title || x.slug),
+              excerpt: String(x.excerpt || ""),
+              date: String(x.date || ""),
+              readTime: String(x.readTime || ""),
+              tags: Array.isArray(x.tags)
+                ? x.tags.map((t: any) => String(t))
+                : [],
+              coverUrl: x.coverUrl ? String(x.coverUrl) : "",
+            }),
+          );
+          if (mapped.length) {
+            setBlogPosts(mapped);
+            setLoadedFromApi(false);
+            setCurrentPage(1);
+          } else {
+            setBlogPosts(fallbackPosts);
+            setLoadedFromApi(false);
+          }
+        } catch {
           setBlogPosts(fallbackPosts);
           setLoadedFromApi(false);
         }
-      } catch {
-        // Fallback to API index (dev/with server)
-        try {
-          const res = await fetch(`/api/content/blog?lang=${lang}`);
-          if (!res.ok) throw new Error("failed");
-          const data = (await res.json()) as { items?: any[] };
-          const items = Array.isArray(data.items) ? data.items : [];
-          const mapped: BlogPost[] = items.map((x) => ({
-            id: String(x.slug),
-            slug: String(x.slug),
-            title: String(x.title || x.slug),
-            excerpt: String(x.excerpt || ""),
-            date: String(x.date || ""),
-            readTime: String(x.readTime || ""),
-            tags: Array.isArray(x.tags)
-              ? x.tags.map((t: any) => String(t))
-              : [],
-          }));
-          if (mapped.length) {
-            setBlogPosts(mapped);
-            setLoadedFromApi(true);
-            setCurrentPage(1);
-            return;
-          }
-        } catch {
-          // ignore
-        }
-        setBlogPosts(fallbackPosts);
-        setLoadedFromApi(false);
       }
     };
     load();
@@ -343,7 +344,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
           </motion.p>
           {loadedFromApi && (
             <p className="text-xs text-muted-foreground mt-2">
-              Список статей загружен динамически (из markdown файлов).
+              Список статей загружен динамически (из API/SQLite).
             </p>
           )}
         </div>
@@ -374,6 +375,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
                 <div className="relative aspect-video overflow-hidden">
                   <ImageWithFallback
                     src={
+                      post.coverUrl ||
                       postCardImageBySlug[post.slug] ??
                       cardImages[index % cardImages.length]
                     }

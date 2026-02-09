@@ -43,6 +43,31 @@ function extractTitleAndExcerpt(md) {
   return { title, excerpt };
 }
 
+function extractFirstMarkdownImage(md) {
+  const match = md.match(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/m);
+  return (match?.[1] || "").trim();
+}
+
+function extractCoverUrl(md) {
+  // Try frontmatter keys cover/coverUrl (very small subset)
+  if (md.startsWith("---\n")) {
+    const end = md.indexOf("\n---\n", 4);
+    if (end !== -1) {
+      const fmRaw = md.slice(4, end);
+      const m =
+        fmRaw.match(/^\s*(?:coverUrl|cover)\s*:\s*(.+)\s*$/im) ||
+        null;
+      if (m?.[1]) {
+        return String(m[1]).trim().replace(/^"(.*)"$/, "$1");
+      }
+      const content = md.slice(end + "\n---\n".length);
+      const img = extractFirstMarkdownImage(content);
+      return img;
+    }
+  }
+  return extractFirstMarkdownImage(md);
+}
+
 function parseLegacyMeta(md) {
   const tags =
     md.match(/\*\*(?:Теги|Tags)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
@@ -87,6 +112,7 @@ function buildIndexForDir({ dir, slugs, lang }) {
     if (!fs.existsSync(mdPath)) continue;
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
+    const coverUrl = extractCoverUrl(md);
     const legacy = parseLegacyMeta(md);
     const readTime = estimateReadTime(md, lang);
     const mtimeMs = fs.statSync(mdPath).mtimeMs;
@@ -94,6 +120,7 @@ function buildIndexForDir({ dir, slugs, lang }) {
       slug,
       lang,
       title,
+      coverUrl,
       excerpt,
       date: legacy.date || "",
       readTime,

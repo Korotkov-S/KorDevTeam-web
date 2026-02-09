@@ -26,6 +26,7 @@ type ContentMeta = {
   lang: Lang;
   title: string;
   excerpt: string;
+  coverUrl?: string;
   date: string;
   readTime: string;
   tags: string[];
@@ -92,30 +93,43 @@ export function AdminPage() {
   // Indexes
   const [blogIndex, setBlogIndex] = useState<ContentMeta[]>([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
-  type BlogFilter = "all" | "new" | "past" | "completed";
-  const [blogFilter, setBlogFilter] = useState<BlogFilter>("all");
-  const blogFiltered = useMemo(() => {
-    if (blogFilter === "all") return blogIndex;
-    const now = Date.now();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    return blogIndex.filter((p) => {
-      const m = p.mtimeMs ?? now;
-      const isNew = now - m < thirtyDaysMs;
-      const isPast = now - m >= thirtyDaysMs;
-      if (blogFilter === "new") return isNew;
-      if (blogFilter === "past" || blogFilter === "completed") return isPast;
-      return true;
-    });
-  }, [blogIndex, blogFilter]);
+  const blogFiltered = useMemo(() => blogIndex, [blogIndex]);
 
   // Blog editor
   const [blogSelectedSlug, setBlogSelectedSlug] = useState<string>("");
   const [blogTitle, setBlogTitle] = useState<string>("");
   const [blogSlugOverride, setBlogSlugOverride] = useState<string>("");
+  const [blogCoverUrl, setBlogCoverUrl] = useState<string>("");
+  const [blogTags, setBlogTags] = useState<string[]>([]);
+  const [blogTagDraft, setBlogTagDraft] = useState<string>("");
   const [blogContent, setBlogContent] = useState<string>("");
   const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
   const blogTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const blogImageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const blogKnownTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of blogIndex) {
+      for (const t of p.tags || []) {
+        const s = String(t || "").trim();
+        if (s) set.add(s);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [blogIndex]);
+
+  const addBlogTag = useCallback((raw: string) => {
+    const t = String(raw || "").trim();
+    if (!t) return;
+    setBlogTags((prev) => {
+      if (prev.some((x) => x.toLowerCase() === t.toLowerCase())) return prev;
+      return [...prev, t];
+    });
+  }, []);
+
+  const removeBlogTag = useCallback((tag: string) => {
+    setBlogTags((prev) => prev.filter((t) => t !== tag));
+  }, []);
 
   // Projects editor (raw JSON)
   const [projectsJson, setProjectsJson] = useState<string>("[]\n");
@@ -365,7 +379,22 @@ export function AdminPage() {
           }
         );
 
-        insertIntoBlog(`\n\n![](${resp.url})\n`);
+        // Use uploaded image as cover and also insert into markdown (for "same cover inside article")
+        setBlogCoverUrl(resp.url);
+        const alreadyHasUrl = blogContent.includes(resp.url);
+        if (!alreadyHasUrl) {
+          // Insert right after the first H1 if present, otherwise at the top.
+          const md = blogContent || "";
+          const h1Match = md.match(/^\s*#\s+.+\s*$/m);
+          if (h1Match?.index != null) {
+            const idx = h1Match.index + h1Match[0].length;
+            const next =
+              md.slice(0, idx) + `\n\n![](${resp.url})\n\n` + md.slice(idx);
+            setBlogContent(next);
+          } else {
+            setBlogContent(`![](${resp.url})\n\n` + md);
+          }
+        }
         toast.success("Фото загружено");
       } catch (e: any) {
         console.warn(e);
@@ -375,7 +404,7 @@ export function AdminPage() {
         if (blogImageInputRef.current) blogImageInputRef.current.value = "";
       }
     },
-    [authHeaderValue, insertIntoBlog, verifyAuth]
+    [authHeaderValue, blogContent, verifyAuth]
   );
 
   useEffect(() => {
@@ -394,10 +423,14 @@ export function AdminPage() {
       const meta = blogIndex.find((x) => x.slug === slug) || null;
       setBlogTitle(meta?.title || slug);
       try {
-        const data = await fetchJson<{ post: { content: string } }>(
-          `/api/posts/${slug}?lang=${lang}`
-        );
+        const data = await fetchJson<{
+          post: { content: string; coverUrl?: string; title?: string; tags?: string[] };
+        }>(`/api/posts/${slug}?lang=${lang}`);
         setBlogContent(data.post.content || "");
+        setBlogCoverUrl(String(data.post.coverUrl || ""));
+        setBlogTitle(String(data.post.title || meta?.title || slug));
+        setBlogTags(Array.isArray(data.post.tags) ? data.post.tags : meta?.tags || []);
+        setBlogTagDraft("");
       } catch (e) {
         console.warn(e);
         toast.error("Не удалось загрузить markdown поста");
@@ -426,6 +459,8 @@ export function AdminPage() {
           },
           body: JSON.stringify({
             title: blogTitle,
+            coverUrl: blogCoverUrl || undefined,
+            tags: blogTags,
             content: blogContent,
             lang,
           }),
@@ -441,6 +476,8 @@ export function AdminPage() {
           body: JSON.stringify({
             title: blogTitle,
             slug: blogSlugOverride || undefined,
+            coverUrl: blogCoverUrl || undefined,
+            tags: blogTags,
             content: blogContent,
             lang,
           }),
@@ -455,6 +492,8 @@ export function AdminPage() {
     }
   }, [
     authHeaderValue,
+    blogCoverUrl,
+    blogTags,
     blogContent,
     blogSelectedSlug,
     blogSlugOverride,
@@ -479,6 +518,9 @@ export function AdminPage() {
       setBlogSelectedSlug("");
       setBlogTitle("");
       setBlogSlugOverride("");
+      setBlogCoverUrl("");
+      setBlogTags([]);
+      setBlogTagDraft("");
       setBlogContent("");
       await loadIndexes();
     } catch (e: any) {
@@ -839,26 +881,6 @@ export function AdminPage() {
                     <CardTitle>Записи</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {(
-                        [
-                          { v: "all" as const, l: "Все" },
-                          { v: "new" as const, l: "Новые" },
-                          { v: "past" as const, l: "Прошедшие" },
-                          { v: "completed" as const, l: "Выполненные" },
-                        ] as const
-                      ).map(({ v, l }) => (
-                        <Button
-                          key={v}
-                          type="button"
-                          variant={blogFilter === v ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setBlogFilter(v)}
-                        >
-                          {l}
-                        </Button>
-                      ))}
-                    </div>
                     <Button
                       className="w-full"
                       variant="secondary"
@@ -866,6 +888,9 @@ export function AdminPage() {
                         setBlogSelectedSlug("");
                         setBlogTitle("");
                         setBlogSlugOverride("");
+                        setBlogCoverUrl("");
+                        setBlogTags([]);
+                        setBlogTagDraft("");
                         setBlogContent("");
                       }}
                     >
@@ -926,6 +951,81 @@ export function AdminPage() {
                           <span className="font-mono">/blog/my-post</span>.
                         </div>
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Input
+                        placeholder="Cover URL (обложка)"
+                        value={blogCoverUrl}
+                        onChange={(e) => setBlogCoverUrl(e.target.value)}
+                      />
+                      {blogCoverUrl ? (
+                        <div className="text-xs text-muted-foreground self-center break-all">
+                          Используется в карточке и вверху статьи.
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground self-center">
+                          Можно загрузить фото — оно станет обложкой.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Теги</div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          list="blog-tags-suggestions"
+                          placeholder="Добавить тег"
+                          value={blogTagDraft}
+                          onChange={(e) => setBlogTagDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addBlogTag(blogTagDraft);
+                              setBlogTagDraft("");
+                            }
+                          }}
+                        />
+                        <datalist id="blog-tags-suggestions">
+                          {blogKnownTags.map((t) => (
+                            <option key={t} value={t} />
+                          ))}
+                        </datalist>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            addBlogTag(blogTagDraft);
+                            setBlogTagDraft("");
+                          }}
+                        >
+                          Добавить
+                        </Button>
+                      </div>
+                      {blogTags.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {blogTags.map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => removeBlogTag(t)}
+                              className="text-left"
+                              title="Удалить тег"
+                            >
+                              <Badge
+                                variant="secondary"
+                                className="cursor-pointer select-none"
+                              >
+                                {t} ×
+                              </Badge>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          Можно выбрать из подсказок или ввести новый тег.
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -1044,6 +1144,16 @@ export function AdminPage() {
                         </Button>
                       )}
                     </div>
+
+                    {blogCoverUrl ? (
+                      <div className="rounded-md border border-border overflow-hidden">
+                        <img
+                          src={blogCoverUrl}
+                          alt={blogTitle || blogSelectedSlug || "cover"}
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    ) : null}
 
                     <div className="pt-4 border-t border-border">
                       <div className="text-sm font-medium mb-2">
