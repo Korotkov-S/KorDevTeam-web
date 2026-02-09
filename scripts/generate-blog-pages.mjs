@@ -32,6 +32,42 @@ function stripMd(md) {
     .trim();
 }
 
+function parseFrontmatter(md) {
+  // Very small subset of YAML frontmatter:
+  // ---
+  // title: ...
+  // excerpt: ...
+  // coverUrl: ...
+  // cover: ...
+  // ---
+  if (!md.startsWith("---\n")) return { frontmatter: null, content: md };
+  const end = md.indexOf("\n---\n", 4);
+  if (end === -1) return { frontmatter: null, content: md };
+
+  const fmRaw = md.slice(4, end).trim();
+  const content = md.slice(end + "\n---\n".length);
+  const fm = {};
+  const lines = fmRaw.split("\n");
+  let currentKey = null;
+
+  for (const line of lines) {
+    const keyVal = line.match(/^([A-Za-z0-9_]+)\s*:\s*(.*)\s*$/);
+    if (keyVal) {
+      currentKey = keyVal[1];
+      const val = keyVal[2];
+      fm[currentKey] = val === "" ? "" : val.replace(/^"(.*)"$/, "$1");
+      continue;
+    }
+    const listItem = line.match(/^\s*-\s+(.*)\s*$/);
+    if (listItem && currentKey) {
+      if (!Array.isArray(fm[currentKey])) fm[currentKey] = [];
+      fm[currentKey].push(listItem[1]);
+    }
+  }
+
+  return { frontmatter: fm, content };
+}
+
 function isImageOnlyBlock(block) {
   const lines = block
     .split("\n")
@@ -44,11 +80,16 @@ function isImageOnlyBlock(block) {
 }
 
 function extractTitleAndExcerpt(md) {
-  const titleMatch = md.match(/^\s*#\s+(.+)\s*$/m);
-  const title = (titleMatch?.[1] || "Blog").trim();
+  const { frontmatter, content } = parseFrontmatter(md);
+  const titleMatch = content.match(/^\s*#\s+(.+)\s*$/m);
+  const title = (frontmatter?.title || titleMatch?.[1] || "Blog").toString().trim();
 
   // First "paragraph-ish" block after title (or from start)
-  const withoutTitle = md.replace(/^\s*#\s+.+\s*$/m, "").trim();
+  if (frontmatter?.excerpt) {
+    return { title, excerpt: String(frontmatter.excerpt).trim().slice(0, 180) };
+  }
+
+  const withoutTitle = content.replace(/^\s*#\s+.+\s*$/m, "").trim();
   const blocks = withoutTitle
     .split(/\n\s*\n/)
     .map((b) => b.trim())
@@ -247,6 +288,25 @@ function injectSeoAndBody({
 function extractFirstMarkdownImage(md) {
   const match = md.match(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/m);
   return (match?.[1] || "").trim();
+}
+
+function extractFirstHtmlImage(md) {
+  const match = md.match(/<img[^>]+src=["']([^"']+)["']/im);
+  return (match?.[1] || "").trim();
+}
+
+function extractCoverUrl(md) {
+  const { frontmatter, content } = parseFrontmatter(md);
+  const cover = (
+    frontmatter?.coverUrl ||
+    frontmatter?.cover ||
+    extractFirstMarkdownImage(content) ||
+    extractFirstHtmlImage(content)
+  )
+    .toString()
+    .trim()
+    .replace(/^"(.*)"$/, "$1");
+  return cover;
 }
 
 function toAbsoluteOgImage(src) {
@@ -487,9 +547,11 @@ function main() {
     const mdPath = path.join(PUBLIC_BLOG_DIR, `${slug}.md`);
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
-    const mdBody = stripFirstMarkdownH1(md);
+    const { content } = parseFrontmatter(md);
+    const mdBody = stripFirstMarkdownH1(content);
+    const coverUrl = extractCoverUrl(md);
     const ogImage = toAbsoluteOgImage(
-      extractFirstMarkdownImage(mdBody) || extractFirstMarkdownImage(md),
+      coverUrl || extractFirstMarkdownImage(mdBody) || extractFirstMarkdownImage(md),
     );
 
     const bodyHtml = [

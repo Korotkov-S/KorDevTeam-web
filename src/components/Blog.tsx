@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -36,7 +36,6 @@ interface BlogPost {
 
 export function Blog({ withId = true }: { withId?: boolean } = {}) {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const postsPerPage = 3;
 
@@ -335,12 +334,12 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
             transition={{ duration: 0.6, delay: 0.25 }}
             className="mt-4"
           >
-            <a
-              href="/blog"
+            <Link
+              to="/blog"
               className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline underline-offset-4"
             >
               {t("blog.allArticles")} →
-            </a>
+            </Link>
           </motion.p>
           {loadedFromApi && (
             <p className="text-xs text-muted-foreground mt-2">
@@ -368,8 +367,8 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
               className="group"
               style={{ zIndex: 50 }}
             >
-              <a
-                href={`/blog/${post.slug}`}
+              <Link
+                to={`/blog/${post.slug}`}
                 className="block relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300"
               >
                 <div className="relative aspect-video overflow-hidden">
@@ -437,7 +436,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
                     <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                   </div>
                 </div>
-              </a>
+              </Link>
             </motion.article>
           ))}
         </div>

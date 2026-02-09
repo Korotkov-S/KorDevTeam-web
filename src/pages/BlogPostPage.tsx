@@ -22,6 +22,15 @@ function extractFirstMarkdownImage(md: string): string {
   return (match?.[1] || "").trim();
 }
 
+function extractFirstHtmlImage(md: string): string {
+  const match = md.match(/<img[^>]+src=["']([^"']+)["']/im);
+  return (match?.[1] || "").trim();
+}
+
+function extractFirstImage(md: string): string {
+  return extractFirstMarkdownImage(md) || extractFirstHtmlImage(md);
+}
+
 function toAbsoluteOgImage(src: string): string | undefined {
   if (!src) return undefined;
   if (/^https?:\/\//i.test(src)) return src;
@@ -327,9 +336,11 @@ export function BlogPostPage() {
             };
             const md = String(data?.post?.content || "");
             const cover = String(data?.post?.coverUrl || "");
-            setCoverUrl(cover);
+            const firstImg = extractFirstImage(md);
+            const coverForUi = cover || firstImg;
+            setCoverUrl(coverForUi);
             setContent(stripFirstMarkdownH1(md));
-            setOgImage(toAbsoluteOgImage(cover || extractFirstMarkdownImage(md)));
+            setOgImage(toAbsoluteOgImage(coverForUi));
             if (!postMeta) {
               if (data?.post?.title) {
                 setMeta({
@@ -353,7 +364,7 @@ export function BlogPostPage() {
           const response = await fetch(`/blog/${slug}${langSuffix}.md`);
           if (!response.ok) throw new Error("Failed to load");
           const text = await response.text();
-          const firstImg = extractFirstMarkdownImage(text);
+          const firstImg = extractFirstImage(text);
           setCoverUrl(firstImg);
           setContent(stripFirstMarkdownH1(text));
           setOgImage(toAbsoluteOgImage(firstImg));

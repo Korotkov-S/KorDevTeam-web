@@ -48,6 +48,11 @@ function extractFirstMarkdownImage(md) {
   return (match?.[1] || "").trim();
 }
 
+function extractFirstHtmlImage(md) {
+  const match = md.match(/<img[^>]+src=["']([^"']+)["']/im);
+  return (match?.[1] || "").trim();
+}
+
 function extractCoverUrl(md) {
   // Try frontmatter keys cover/coverUrl (very small subset)
   if (md.startsWith("---\n")) {
@@ -61,11 +66,11 @@ function extractCoverUrl(md) {
         return String(m[1]).trim().replace(/^"(.*)"$/, "$1");
       }
       const content = md.slice(end + "\n---\n".length);
-      const img = extractFirstMarkdownImage(content);
+      const img = extractFirstMarkdownImage(content) || extractFirstHtmlImage(content);
       return img;
     }
   }
-  return extractFirstMarkdownImage(md);
+  return extractFirstMarkdownImage(md) || extractFirstHtmlImage(md);
 }
 
 function parseLegacyMeta(md) {

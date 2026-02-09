@@ -71,6 +71,11 @@ function extractFirstMarkdownImage(md) {
   return (match?.[1] || "").trim();
 }
 
+function extractFirstHtmlImage(md) {
+  const match = md.match(/<img[^>]+src=["']([^"']+)["']/im);
+  return (match?.[1] || "").trim();
+}
+
 function parseLegacyMeta(md) {
   // Supports blocks like:
   // **Теги**: ...
@@ -124,7 +129,8 @@ async function extractMetaFromMarkdown({ slug, md, lang, filePathForStat }) {
   const coverUrl = (
     frontmatter?.coverUrl ||
     frontmatter?.cover ||
-    extractFirstMarkdownImage(content)
+    extractFirstMarkdownImage(content) ||
+    extractFirstHtmlImage(content)
   ).toString().trim();
 
   const legacy = parseLegacyMeta(content);
