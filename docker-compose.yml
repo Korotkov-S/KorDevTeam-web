@@ -31,6 +31,8 @@ services:
       - "8081:80"
     environment:
       - NODE_ENV=production
+      # Where the API should read/write runtime content (uploads, editable markdown/json)
+      - CONTENT_DIST_ROOT=/app/dist
       - SQLITE_PATH=/app/server/data/content.sqlite
     restart: unless-stopped
     volumes:

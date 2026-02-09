@@ -295,6 +295,15 @@ function extractFirstHtmlImage(md) {
   return (match?.[1] || "").trim();
 }
 
+function normalizePublicAssetUrl(url) {
+  const s = String(url || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  return `/${s.replace(/^\.\//, "")}`;
+}
+
 function extractCoverUrl(md) {
   const { frontmatter, content } = parseFrontmatter(md);
   const cover = (
@@ -306,7 +315,7 @@ function extractCoverUrl(md) {
     .toString()
     .trim()
     .replace(/^"(.*)"$/, "$1");
-  return cover;
+  return normalizePublicAssetUrl(cover);
 }
 
 function toAbsoluteOgImage(src) {

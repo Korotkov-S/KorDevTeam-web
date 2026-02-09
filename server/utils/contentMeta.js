@@ -76,6 +76,16 @@ function extractFirstHtmlImage(md) {
   return (match?.[1] || "").trim();
 }
 
+function normalizePublicAssetUrl(url) {
+  const s = String(url || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  // Convert common relative forms to absolute-from-root paths
+  return `/${s.replace(/^\.\//, "")}`;
+}
+
 function parseLegacyMeta(md) {
   // Supports blocks like:
   // **Теги**: ...
@@ -132,6 +142,7 @@ async function extractMetaFromMarkdown({ slug, md, lang, filePathForStat }) {
     extractFirstMarkdownImage(content) ||
     extractFirstHtmlImage(content)
   ).toString().trim();
+  const coverUrlNorm = normalizePublicAssetUrl(coverUrl);
 
   const legacy = parseLegacyMeta(content);
   const tags = Array.isArray(frontmatter?.tags)
@@ -147,7 +158,7 @@ async function extractMetaFromMarkdown({ slug, md, lang, filePathForStat }) {
     slug,
     lang,
     title,
-    coverUrl,
+    coverUrl: coverUrlNorm,
     excerpt,
     date,
     readTime,

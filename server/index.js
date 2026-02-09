@@ -48,6 +48,14 @@ app.get('/api/health', (req, res) => {
 if (fs.existsSync(DIST_ROOT)) {
   app.use(express.static(DIST_ROOT));
 
+  // Also serve /public as a fallback for runtime-edited content (uploads, markdown),
+  // especially when CONTENT_DIST_ROOT isn't set or isn't writable.
+  // Dist stays higher priority because it's mounted first.
+  const PUBLIC_ROOT = path.join(process.cwd(), "public");
+  if (fs.existsSync(PUBLIC_ROOT)) {
+    app.use(express.static(PUBLIC_ROOT));
+  }
+
   // SPA + pre-rendered HTML fallback (similar to nginx `try_files $uri $uri/ $uri.html /index.html;`)
   // Note: Express 5 (router/path-to-regexp) doesn't accept "*" string patterns.
   app.get(/.*/, (req, res, next) => {

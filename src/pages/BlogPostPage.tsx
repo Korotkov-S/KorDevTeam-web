@@ -31,6 +31,15 @@ function extractFirstImage(md: string): string {
   return extractFirstMarkdownImage(md) || extractFirstHtmlImage(md);
 }
 
+function normalizePublicAssetUrl(url: string): string {
+  const s = String(url || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  return `/${s.replace(/^\.\//, "")}`;
+}
+
 function toAbsoluteOgImage(src: string): string | undefined {
   if (!src) return undefined;
   if (/^https?:\/\//i.test(src)) return src;
@@ -337,7 +346,7 @@ export function BlogPostPage() {
             const md = String(data?.post?.content || "");
             const cover = String(data?.post?.coverUrl || "");
             const firstImg = extractFirstImage(md);
-            const coverForUi = cover || firstImg;
+            const coverForUi = normalizePublicAssetUrl(cover || firstImg);
             setCoverUrl(coverForUi);
             setContent(stripFirstMarkdownH1(md));
             setOgImage(toAbsoluteOgImage(coverForUi));
@@ -365,9 +374,10 @@ export function BlogPostPage() {
           if (!response.ok) throw new Error("Failed to load");
           const text = await response.text();
           const firstImg = extractFirstImage(text);
-          setCoverUrl(firstImg);
+          const coverForUi = normalizePublicAssetUrl(firstImg);
+          setCoverUrl(coverForUi);
           setContent(stripFirstMarkdownH1(text));
-          setOgImage(toAbsoluteOgImage(firstImg));
+          setOgImage(toAbsoluteOgImage(coverForUi));
           if (!postMeta) {
             setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
           }

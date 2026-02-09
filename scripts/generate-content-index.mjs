@@ -53,6 +53,15 @@ function extractFirstHtmlImage(md) {
   return (match?.[1] || "").trim();
 }
 
+function normalizePublicAssetUrl(url) {
+  const s = String(url || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  return `/${s.replace(/^\.\//, "")}`;
+}
+
 function extractCoverUrl(md) {
   // Try frontmatter keys cover/coverUrl (very small subset)
   if (md.startsWith("---\n")) {
@@ -67,10 +76,10 @@ function extractCoverUrl(md) {
       }
       const content = md.slice(end + "\n---\n".length);
       const img = extractFirstMarkdownImage(content) || extractFirstHtmlImage(content);
-      return img;
+      return normalizePublicAssetUrl(img);
     }
   }
-  return extractFirstMarkdownImage(md) || extractFirstHtmlImage(md);
+  return normalizePublicAssetUrl(extractFirstMarkdownImage(md) || extractFirstHtmlImage(md));
 }
 
 function parseLegacyMeta(md) {

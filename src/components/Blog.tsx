@@ -34,6 +34,15 @@ interface BlogPost {
   coverUrl?: string;
 }
 
+function normalizePublicAssetUrl(url: string | undefined): string {
+  const s = String(url || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  return `/${s.replace(/^\.\//, "")}`;
+}
+
 export function Blog({ withId = true }: { withId?: boolean } = {}) {
   const { t, i18n } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
@@ -211,7 +220,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
           date: String(x.date || ""),
           readTime: String(x.readTime || ""),
           tags: Array.isArray(x.tags) ? x.tags.map((t: any) => String(t)) : [],
-          coverUrl: x.coverUrl ? String(x.coverUrl) : "",
+          coverUrl: normalizePublicAssetUrl(x.coverUrl ? String(x.coverUrl) : ""),
         }));
         if (mapped.length) {
           setBlogPosts(mapped);
@@ -237,7 +246,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
               tags: Array.isArray(x.tags)
                 ? x.tags.map((t: any) => String(t))
                 : [],
-              coverUrl: x.coverUrl ? String(x.coverUrl) : "",
+              coverUrl: normalizePublicAssetUrl(x.coverUrl ? String(x.coverUrl) : ""),
             }),
           );
           if (mapped.length) {
