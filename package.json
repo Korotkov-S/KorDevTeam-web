@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.985.0",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -53,6 +54,7 @@
     "react-router-dom": "*",
     "recharts": "^2.15.2",
     "sonner": "^2.0.3",
+    "sql.js": "^1.13.0",
     "tailwind-merge": "*",
     "vaul": "^1.1.2"
   },

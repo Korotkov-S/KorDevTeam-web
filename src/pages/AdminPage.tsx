@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import {
   Tabs,
@@ -61,7 +61,7 @@ async function fetchText(url: string, init?: RequestInit): Promise<string> {
 }
 
 async function checkAuth(
-  header: string,
+  header: string
 ): Promise<{ ok: boolean; status: number | null }> {
   try {
     const res = await fetch(`/api/admin/me`, {
@@ -75,23 +75,38 @@ async function checkAuth(
 
 export function AdminPage() {
   const [username, setUsername] = useState<string>(
-    () => localStorage.getItem("ADMIN_USERNAME") || "",
+    () => localStorage.getItem("ADMIN_USERNAME") || ""
   );
   const [password, setPassword] = useState<string>(
-    () => localStorage.getItem("ADMIN_PASSWORD") || "",
+    () => localStorage.getItem("ADMIN_PASSWORD") || ""
   );
   const [authHeaderValue, setAuthHeaderValue] = useState<string>(
-    () => localStorage.getItem("ADMIN_AUTH") || "",
+    () => localStorage.getItem("ADMIN_AUTH") || ""
   );
   const [isAuthed, setIsAuthed] = useState(false);
   const [activeTab, setActiveTab] = useState<"blog" | "projects" | "service">(
-    "blog",
+    "blog"
   );
   const [lang, setLang] = useState<Lang>("ru");
 
   // Indexes
   const [blogIndex, setBlogIndex] = useState<ContentMeta[]>([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
+  type BlogFilter = "all" | "new" | "past" | "completed";
+  const [blogFilter, setBlogFilter] = useState<BlogFilter>("all");
+  const blogFiltered = useMemo(() => {
+    if (blogFilter === "all") return blogIndex;
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    return blogIndex.filter((p) => {
+      const m = p.mtimeMs ?? now;
+      const isNew = now - m < thirtyDaysMs;
+      const isPast = now - m >= thirtyDaysMs;
+      if (blogFilter === "new") return isNew;
+      if (blogFilter === "past" || blogFilter === "completed") return isPast;
+      return true;
+    });
+  }, [blogIndex, blogFilter]);
 
   // Blog editor
   const [blogSelectedSlug, setBlogSelectedSlug] = useState<string>("");
@@ -124,13 +139,13 @@ export function AdminPage() {
     setLoadingIndex(true);
     try {
       const blog = await fetchJson<{ items: ContentMeta[] }>(
-        `/api/content/blog?lang=${lang}`,
+        `/api/content/blog?lang=${lang}`
       );
       setBlogIndex(blog.items || []);
     } catch (e) {
       console.warn(e);
       toast.error(
-        "Не удалось загрузить индексы контента. Проверь, что API сервер запущен.",
+        "Не удалось загрузить индексы контента. Проверь, что API сервер запущен."
       );
     } finally {
       setLoadingIndex(false);
@@ -160,7 +175,7 @@ export function AdminPage() {
                 demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
                 githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
               }))
-            : [],
+            : []
         );
       } catch {
         setProjectsList([]);
@@ -171,7 +186,7 @@ export function AdminPage() {
     }
     try {
       const data = await fetchJson<{ projects: unknown }>(
-        `/api/projects?lang=${lang}`,
+        `/api/projects?lang=${lang}`
       );
       setProjectsJson(JSON.stringify(data.projects ?? [], null, 2) + "\n");
       const parsed = data.projects;
@@ -192,14 +207,14 @@ export function AdminPage() {
               demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
               githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
             }))
-          : [],
+          : []
       );
     } catch (e) {
       console.warn(e);
       setProjectsJson("[]\n");
       setProjectsList([]);
       toast.error(
-        "Не удалось загрузить projects. Создай новый список и сохрани.",
+        "Не удалось загрузить projects. Создай новый список и сохрани."
       );
     }
   }, [lang]);
@@ -272,7 +287,7 @@ export function AdminPage() {
       const snippet = `${before}${inner}${after}`;
 
       setBlogContent(
-        (prev) => prev.slice(0, start) + snippet + prev.slice(end),
+        (prev) => prev.slice(0, start) + snippet + prev.slice(end)
       );
       requestAnimationFrame(() => {
         try {
@@ -285,7 +300,7 @@ export function AdminPage() {
         }
       });
     },
-    [blogContent, insertIntoBlog],
+    [blogContent, insertIntoBlog]
   );
 
   const prefixBlogLines = useCallback(
@@ -304,7 +319,7 @@ export function AdminPage() {
         .map((l) => (l.trim() ? `${prefix}${l}` : l));
       const snippet = lines.join("\n");
       setBlogContent(
-        (prev) => prev.slice(0, start) + snippet + prev.slice(end),
+        (prev) => prev.slice(0, start) + snippet + prev.slice(end)
       );
       requestAnimationFrame(() => {
         try {
@@ -315,7 +330,7 @@ export function AdminPage() {
         }
       });
     },
-    [blogContent, insertIntoBlog],
+    [blogContent, insertIntoBlog]
   );
 
   const uploadBlogImage = useCallback(
@@ -347,7 +362,7 @@ export function AdminPage() {
               ...authHeaders(authHeaderValue),
             },
             body: JSON.stringify({ dataUrl, filename: file.name }),
-          },
+          }
         );
 
         insertIntoBlog(`\n\n![](${resp.url})\n`);
@@ -360,7 +375,7 @@ export function AdminPage() {
         if (blogImageInputRef.current) blogImageInputRef.current.value = "";
       }
     },
-    [authHeaderValue, insertIntoBlog, verifyAuth],
+    [authHeaderValue, insertIntoBlog, verifyAuth]
   );
 
   useEffect(() => {
@@ -380,7 +395,7 @@ export function AdminPage() {
       setBlogTitle(meta?.title || slug);
       try {
         const data = await fetchJson<{ post: { content: string } }>(
-          `/api/posts/${slug}?lang=${lang}`,
+          `/api/posts/${slug}?lang=${lang}`
         );
         setBlogContent(data.post.content || "");
       } catch (e) {
@@ -388,7 +403,7 @@ export function AdminPage() {
         toast.error("Не удалось загрузить markdown поста");
       }
     },
-    [blogIndex, lang],
+    [blogIndex, lang]
   );
 
   const saveBlog = useCallback(async () => {
@@ -516,7 +531,7 @@ export function AdminPage() {
       setProjectsJson(JSON.stringify(next, null, 2) + "\n");
       toast.success("Projects сохранены");
     },
-    [authHeaderValue, lang, verifyAuth],
+    [authHeaderValue, lang, verifyAuth]
   );
 
   const selectProject = useCallback(
@@ -536,7 +551,7 @@ export function AdminPage() {
         githubUrl: p.githubUrl || "",
       });
     },
-    [projectsList],
+    [projectsList]
   );
 
   const resetProjectDraft = useCallback(() => {
@@ -581,7 +596,7 @@ export function AdminPage() {
       projectsList.some((p) => p.id === projectSelectedId);
     if (!isEditingExisting && existingIdx !== -1) {
       toast.error(
-        "Проект с таким id уже существует. Выбери его слева и редактируй.",
+        "Проект с таким id уже существует. Выбери его слева и редактируй."
       );
       return;
     }
@@ -633,7 +648,7 @@ export function AdminPage() {
               ...authHeaders(authHeaderValue),
             },
             body: JSON.stringify({ dataUrl, filename: file.name }),
-          },
+          }
         );
         setProjectDraft((prev) => ({ ...prev, image: resp.url }));
         toast.success("Фото загружено");
@@ -646,7 +661,7 @@ export function AdminPage() {
           projectImageInputRef.current.value = "";
       }
     },
-    [authHeaderValue, verifyAuth],
+    [authHeaderValue, verifyAuth]
   );
 
   const generateStatic = useCallback(async () => {
@@ -707,11 +722,11 @@ export function AdminPage() {
       if (!r.ok) {
         if (r.status === null)
           toast(
-            "Вход выполнен, но API сервер недоступен — сохранение/генерация не будут работать.",
+            "Вход выполнен, но API сервер недоступен — сохранение/генерация не будут работать."
           );
         else
           toast(
-            "Вход выполнен, но API отклонил запрос. Проверь, что сервер обновлён и запущен.",
+            "Вход выполнен, но API отклонил запрос. Проверь, что сервер обновлён и запущен."
           );
       } else {
         toast.success("Вход выполнен");
@@ -821,9 +836,29 @@ export function AdminPage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-1">
                   <CardHeader>
-                    <CardTitle>Посты</CardTitle>
+                    <CardTitle>Записи</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {(
+                        [
+                          { v: "all" as const, l: "Все" },
+                          { v: "new" as const, l: "Новые" },
+                          { v: "past" as const, l: "Прошедшие" },
+                          { v: "completed" as const, l: "Выполненные" },
+                        ] as const
+                      ).map(({ v, l }) => (
+                        <Button
+                          key={v}
+                          type="button"
+                          variant={blogFilter === v ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setBlogFilter(v)}
+                        >
+                          {l}
+                        </Button>
+                      ))}
+                    </div>
                     <Button
                       className="w-full"
                       variant="secondary"
@@ -837,7 +872,7 @@ export function AdminPage() {
                       + Новый пост
                     </Button>
                     <div className="max-h-[520px] overflow-auto space-y-2">
-                      {blogIndex.map((p) => (
+                      {blogFiltered.map((p) => (
                         <button
                           key={p.slug}
                           className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 ${
@@ -934,7 +969,7 @@ export function AdminPage() {
                           wrapBlogSelection(
                             "[",
                             "](https://example.com)",
-                            "ссылка",
+                            "ссылка"
                           )
                         }
                       >

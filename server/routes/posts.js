@@ -1,14 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
-const { 
-  createPost, 
-  getPost, 
-  getAllPosts, 
-  updatePost, 
-  deletePost,
-  generateSlug 
-} = require('../utils/fileHandler');
+const {
+  getPost: getDbPost,
+  upsertPost,
+  deletePost: deleteDbPost,
+  listPostMetas,
+  safeLang,
+} = require("../db");
+const {
+  getPost: getFilePost,
+  saveMarkdownFile,
+  deleteMarkdownFile,
+  generateSlug,
+} = require("../utils/fileHandler");
+const { extractMetaFromMarkdown } = require("../utils/contentMeta");
 
 /**
  * POST /api/posts
@@ -30,21 +36,29 @@ router.post('/', authenticate, async (req, res, next) => {
       ? generateSlug(slugOverride)
       : generateSlug(title);
 
-    // Создание поста
-    const post = await createPost({
+    const l = safeLang(lang);
+    const meta = await extractMetaFromMarkdown({
       slug,
-      title,
-      content,
-      excerpt: excerpt || content.substring(0, 200) + '...',
-      tags: tags || [],
-      date: date || new Date().toLocaleDateString('ru-RU', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }),
-      readTime: readTime || '5 мин',
-      lang
+      md: String(content || ""),
+      lang: l,
+      filePathForStat: undefined,
     });
+
+    const post = await upsertPost({
+      slug,
+      lang: l,
+      title: String(title),
+      content: String(content),
+      excerpt: typeof excerpt === "string" && excerpt.trim() ? excerpt.trim() : meta.excerpt,
+      tags: Array.isArray(tags) ? tags : meta.tags,
+      date: typeof date === "string" && date.trim() ? date.trim() : meta.date,
+      readTime: typeof readTime === "string" && readTime.trim() ? readTime.trim() : meta.readTime,
+      createdAtMs: meta.mtimeMs,
+      updatedAtMs: meta.mtimeMs,
+    });
+
+    // Backward compatibility: still write markdown file for static builds.
+    await saveMarkdownFile(slug, String(content), l);
 
     res.status(201).json({
       message: 'Post created successfully',
@@ -61,7 +75,10 @@ router.post('/', authenticate, async (req, res, next) => {
  */
 router.get('/', async (req, res, next) => {
   try {
-    const posts = await getAllPosts();
+    // Keep endpoint for debugging: returns metas for both languages.
+    const ru = await listPostMetas({ lang: "ru" });
+    const en = await listPostMetas({ lang: "en" });
+    const posts = { ru, en };
     res.json({ posts });
   } catch (error) {
     next(error);
@@ -77,10 +94,33 @@ router.get('/:slug', async (req, res, next) => {
     const { slug } = req.params;
     const { lang = 'ru' } = req.query;
     
-    const post = await getPost(slug, lang);
-    
+    const l = safeLang(lang?.toString?.() || "ru");
+    let post = await getDbPost({ slug, lang: l });
+
+    // Legacy fallback: if missing in DB, try markdown file and import on the fly.
     if (!post) {
-      return res.status(404).json({ error: 'Post not found' });
+      const legacy = await getFilePost(slug, l);
+      if (!legacy?.content) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      const meta = await extractMetaFromMarkdown({
+        slug,
+        md: legacy.content,
+        lang: l,
+        filePathForStat: undefined,
+      });
+      post = await upsertPost({
+        slug,
+        lang: l,
+        title: meta.title,
+        content: legacy.content,
+        excerpt: meta.excerpt,
+        tags: meta.tags,
+        date: meta.date,
+        readTime: meta.readTime,
+        createdAtMs: meta.mtimeMs,
+        updatedAtMs: meta.mtimeMs,
+      });
     }
 
     res.json({ post });
@@ -98,19 +138,36 @@ router.put('/:slug', authenticate, async (req, res, next) => {
     const { slug } = req.params;
     const { title, content, excerpt, tags, date, readTime, lang = 'ru' } = req.body;
 
-    const updatedPost = await updatePost(slug, {
-      title,
-      content,
-      excerpt,
-      tags,
-      date,
-      readTime,
-      lang
+    const l = safeLang(lang);
+    const existing = await getDbPost({ slug, lang: l });
+    if (!existing) {
+      // If DB doesn't have it, allow legacy file update (it will import too)
+      const legacy = await getFilePost(slug, l);
+      if (!legacy?.content) return res.status(404).json({ error: "Post not found" });
+    }
+
+    const nextContent = typeof content === "string" ? content : existing?.content || "";
+    const meta = await extractMetaFromMarkdown({
+      slug,
+      md: String(nextContent),
+      lang: l,
+      filePathForStat: undefined,
     });
 
-    if (!updatedPost) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
+    const updatedPost = await upsertPost({
+      slug,
+      lang: l,
+      title: typeof title === "string" && title.trim() ? title.trim() : meta.title,
+      content: String(nextContent),
+      excerpt: typeof excerpt === "string" && excerpt.trim() ? excerpt.trim() : meta.excerpt,
+      tags: Array.isArray(tags) ? tags : meta.tags,
+      date: typeof date === "string" && date.trim() ? date.trim() : meta.date,
+      readTime: typeof readTime === "string" && readTime.trim() ? readTime.trim() : meta.readTime,
+      updatedAtMs: meta.mtimeMs,
+    });
+
+    // Backward compatibility: keep markdown file updated for static builds.
+    await saveMarkdownFile(slug, String(nextContent), l);
 
     res.json({
       message: 'Post updated successfully',
@@ -130,11 +187,12 @@ router.delete('/:slug', authenticate, async (req, res, next) => {
     const { slug } = req.params;
     const { lang = 'ru' } = req.query;
 
-    const deleted = await deletePost(slug, lang);
+    const l = safeLang(lang?.toString?.() || "ru");
+    const deleted = await deleteDbPost({ slug, lang: l });
+    // Legacy cleanup (ignore errors)
+    await deleteMarkdownFile(slug, l);
 
-    if (!deleted) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
+    if (!deleted) return res.status(404).json({ error: "Post not found" });
 
     res.json({ message: 'Post deleted successfully' });
   } catch (error) {

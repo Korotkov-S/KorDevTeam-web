@@ -2,6 +2,7 @@ const express = require("express");
 const fs = require("fs").promises;
 const path = require("path");
 const { authenticate } = require("../middleware/auth");
+const { getProjects, replaceProjects, safeLang } = require("../db");
 
 const router = express.Router();
 
@@ -44,12 +45,19 @@ async function writeAll(writeRoots, relPath, raw) {
 
 router.get("/", async (req, res, next) => {
   try {
-    const lang = (req.query.lang || "ru").toString() === "en" ? "en" : "ru";
+    const lang = safeLang((req.query.lang || "ru").toString());
+    const projects = await getProjects({ lang });
+    if (projects.length) return res.json({ lang, projects });
+
+    // Legacy fallback: read JSON from disk and import into DB.
     const { readRoots } = getRoots();
     const rel = path.join("public", "content", getFilename(lang));
     const { raw } = await readFirstExisting(readRoots, rel);
-    if (!raw) return res.status(404).json({ error: "Projects file not found" });
-    res.json({ lang, projects: JSON.parse(raw) });
+    if (!raw) return res.status(404).json({ error: "Projects not found" });
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return res.status(500).json({ error: "Invalid legacy projects format" });
+    const imported = await replaceProjects({ lang, projects: parsed });
+    return res.json({ lang, projects: imported, source: "legacy_file_imported" });
   } catch (e) {
     next(e);
   }
@@ -57,16 +65,18 @@ router.get("/", async (req, res, next) => {
 
 router.put("/", authenticate, async (req, res, next) => {
   try {
-    const lang = (req.query.lang || "ru").toString() === "en" ? "en" : "ru";
+    const lang = safeLang((req.query.lang || "ru").toString());
     const projects = req.body?.projects;
     if (!Array.isArray(projects)) return res.status(400).json({ error: "projects must be an array" });
 
-    const raw = JSON.stringify(projects, null, 2) + "\n";
+    const next = await replaceProjects({ lang, projects });
+
+    const raw = JSON.stringify(next, null, 2) + "\n";
     const { writeRoots } = getRoots();
     const rel = path.join("public", "content", getFilename(lang));
     const paths = await writeAll(writeRoots, rel, raw);
 
-    res.json({ message: "Saved", lang, paths });
+    res.json({ message: "Saved", lang, paths, count: next.length });
   } catch (e) {
     next(e);
   }

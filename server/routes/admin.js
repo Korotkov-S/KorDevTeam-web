@@ -4,6 +4,7 @@ const { execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const crypto = require("node:crypto");
+const { isS3Enabled, uploadBufferToS3 } = require("../utils/s3");
 
 const router = express.Router();
 
@@ -69,13 +70,30 @@ router.post("/upload-blog-image", authenticate, async (req, res, next) => {
     const outName = `${Date.now()}-${safeBase}-${id}.${ext}`.slice(0, 160);
     const relUrl = `/blog/uploads/${outName}`;
 
-    // Write to repo `public/` for dev (vite serves from it)
-    const repoRoot = process.cwd();
-    await writeFileIfRoot(repoRoot, path.posix.join("public", "blog", "uploads", outName), buf);
+    // Prefer S3 (if configured). Fallback to local filesystem for dev.
+    if (isS3Enabled()) {
+      const key = path.posix.join("blog", "uploads", outName);
+      const uploaded = await uploadBufferToS3({
+        key,
+        buffer: buf,
+        contentType: mime,
+      });
+      return res.json({
+        ok: true,
+        url: uploaded.url,
+        key: uploaded.key,
+        bytes: buf.length,
+        mime,
+      });
+    } else {
+      // Write to repo `public/` for dev (vite serves from it)
+      const repoRoot = process.cwd();
+      await writeFileIfRoot(repoRoot, path.posix.join("public", "blog", "uploads", outName), buf);
 
-    // Optional: write to dist root for production runtime updates (nginx serves it)
-    const distRoot = process.env.CONTENT_DIST_ROOT;
-    await writeFileIfRoot(distRoot, path.posix.join("blog", "uploads", outName), buf);
+      // Optional: write to dist root for production runtime updates (nginx serves it)
+      const distRoot = process.env.CONTENT_DIST_ROOT;
+      await writeFileIfRoot(distRoot, path.posix.join("blog", "uploads", outName), buf);
+    }
 
     return res.json({
       ok: true,
@@ -122,13 +140,30 @@ router.post("/upload-project-image", authenticate, async (req, res, next) => {
     const outName = `${Date.now()}-${safeBase}-${id}.${ext}`.slice(0, 160);
     const relUrl = `/projects/${outName}`;
 
-    // Write to repo `public/` for dev (vite serves from it)
-    const repoRoot = process.cwd();
-    await writeFileIfRoot(repoRoot, path.posix.join("public", "projects", outName), buf);
+    // Prefer S3 (if configured). Fallback to local filesystem for dev.
+    if (isS3Enabled()) {
+      const key = path.posix.join("projects", outName);
+      const uploaded = await uploadBufferToS3({
+        key,
+        buffer: buf,
+        contentType: mime,
+      });
+      return res.json({
+        ok: true,
+        url: uploaded.url,
+        key: uploaded.key,
+        bytes: buf.length,
+        mime,
+      });
+    } else {
+      // Write to repo `public/` for dev (vite serves from it)
+      const repoRoot = process.cwd();
+      await writeFileIfRoot(repoRoot, path.posix.join("public", "projects", outName), buf);
 
-    // Optional: write to dist root for production runtime updates (nginx serves it)
-    const distRoot = process.env.CONTENT_DIST_ROOT;
-    await writeFileIfRoot(distRoot, path.posix.join("projects", outName), buf);
+      // Optional: write to dist root for production runtime updates (nginx serves it)
+      const distRoot = process.env.CONTENT_DIST_ROOT;
+      await writeFileIfRoot(distRoot, path.posix.join("projects", outName), buf);
+    }
 
     return res.json({
       ok: true,

@@ -8,6 +8,7 @@ const projectsRouter = require("./routes/projects");
 const adminRouter = require("./routes/admin");
 const path = require('path');
 const fs = require("node:fs");
+const { bootstrapFromLegacyContentIfEmpty } = require("./db/bootstrap");
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -80,10 +81,23 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Запуск сервера
-app.listen(PORT, () => {
-  console.log(`🚀 API Server running on http://localhost:${PORT}`);
-  console.log(`📝 Posts API available at http://localhost:${PORT}/api/posts`);
-});
+async function main() {
+  try {
+    const r = await bootstrapFromLegacyContentIfEmpty();
+    if (process.env.NODE_ENV !== "test") {
+      console.log("[sqlite] bootstrap:", JSON.stringify(r));
+    }
+  } catch (e) {
+    console.warn("[sqlite] bootstrap failed:", e?.message || e);
+  }
+
+  // Запуск сервера
+  app.listen(PORT, () => {
+    console.log(`🚀 API Server running on http://localhost:${PORT}`);
+    console.log(`📝 Posts API available at http://localhost:${PORT}/api/posts`);
+  });
+}
+
+main();
 
 module.exports = app;

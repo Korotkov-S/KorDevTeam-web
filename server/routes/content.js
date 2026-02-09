@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const { createSectionHandler } = require("../utils/sectionFileHandler");
 const { extractMetaFromMarkdown } = require("../utils/contentMeta");
+const { listPostMetas, safeLang } = require("../db");
 
 const router = express.Router();
 
@@ -46,7 +47,13 @@ function buildHandlerFor(section) {
 router.get("/:section", async (req, res, next) => {
   try {
     const section = req.params.section;
-    const lang = (req.query.lang || "ru").toString() === "en" ? "en" : "ru";
+    const lang = safeLang((req.query.lang || "ru").toString());
+
+    // Blog index is now sourced from SQLite (markdown files are optional/legacy).
+    if (section === "blog") {
+      const items = await listPostMetas({ lang });
+      return res.json({ section, lang, items });
+    }
 
     const handler = buildHandlerFor(section);
     if (!handler) return res.status(404).json({ error: "Unknown section" });
