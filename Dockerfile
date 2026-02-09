@@ -45,12 +45,15 @@ COPY --from=build /app/src/blog /app/src/blog
 ENV NODE_ENV=production
 ENV PORT=80
 ENV CONTENT_DIST_ROOT=/app/dist
+# Persisted content DB (override via SQLITE_PATH)
+ENV SQLITE_PATH=/app/server/data/content.sqlite
 
 EXPOSE 80
 CMD ["node", "server/index.js"]
 
-# Production stage with Nginx
-FROM nginx:1.25-alpine AS production
+# Static-only stage with Nginx (NO API).
+# Use only if you don't need /admin editing at runtime.
+FROM nginx:1.25-alpine AS production-nginx
 
 # Copy custom nginx configuration (SPA fallback, optional static .html pages)
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -62,3 +65,6 @@ EXPOSE 80
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
+
+# Default final stage: production app with API
+FROM production-app AS production

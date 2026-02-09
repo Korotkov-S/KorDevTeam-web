@@ -1,7 +1,14 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
-const { getDb, safeLang, upsertPost, replaceProjects } = require("./index");
+const {
+  getDb,
+  safeLang,
+  upsertPost,
+  replaceProjects,
+  getPost,
+  getProjects,
+} = require("./index");
 const { extractMetaFromMarkdown } = require("../utils/contentMeta");
 
 async function existsDir(p) {
@@ -39,19 +46,16 @@ async function readFirstExistingFile(candidates) {
 }
 
 async function bootstrapPostsFromMarkdown() {
-  const db = getDb();
-  const realDb = await db;
-  const res = realDb.exec(`SELECT COUNT(*) AS c FROM posts`);
-  const c = Number(res?.[0]?.values?.[0]?.[0] || 0);
-  if (c > 0) return { ok: true, skipped: true, reason: "posts_not_empty" };
-
   const { repoRoot, distRoot } = roots();
   const candidates = [
     distRoot ? path.join(distRoot, "blog") : null,
     path.join(repoRoot, "public", "blog"),
   ].filter(Boolean);
 
+  const syncUpdates = String(process.env.SQLITE_SYNC_FROM_FS || "").trim() === "1";
   let imported = 0;
+  let updated = 0;
+  let skippedExisting = 0;
 
   for (const dir of candidates) {
     if (!(await existsDir(dir))) continue;
@@ -66,6 +70,8 @@ async function bootstrapPostsFromMarkdown() {
       const slug = filename.replace(/\.en\.md$/i, "").replace(/\.md$/i, "");
       const lang = isEn ? "en" : "ru";
       const filePath = path.join(dir, filename);
+
+      const existing = await getPost({ slug, lang });
       let md = null;
       try {
         md = await fs.readFile(filePath, "utf-8");
@@ -80,6 +86,29 @@ async function bootstrapPostsFromMarkdown() {
         lang,
         filePathForStat: filePath,
       });
+
+      if (existing) {
+        if (
+          syncUpdates &&
+          Number(meta.mtimeMs || 0) > Number(existing.updatedAtMs || 0)
+        ) {
+          await upsertPost({
+            slug,
+            lang,
+            title: meta.title,
+            content: md,
+            excerpt: meta.excerpt,
+            tags: meta.tags,
+            date: meta.date,
+            readTime: meta.readTime,
+            updatedAtMs: meta.mtimeMs,
+          });
+          updated += 1;
+        } else {
+          skippedExisting += 1;
+        }
+        continue;
+      }
 
       await upsertPost({
         slug,
@@ -97,24 +126,22 @@ async function bootstrapPostsFromMarkdown() {
     }
 
     // If we imported something from dist, don't double-import from repoRoot
-    if (imported > 0) break;
+    if (imported > 0 || updated > 0) break;
   }
 
-  return { ok: true, imported };
+  return { ok: true, imported, updated, skippedExisting };
 }
 
 async function bootstrapProjectsFromJson() {
-  const realDb = await getDb();
-  const res = realDb.exec(`SELECT COUNT(*) AS c FROM projects`);
-  const c = Number(res?.[0]?.values?.[0]?.[0] || 0);
-  if (c > 0) return { ok: true, skipped: true, reason: "projects_not_empty" };
-
   const { repoRoot, distRoot } = roots();
   const rootsToTry = [distRoot, repoRoot].filter(Boolean);
 
   let importedLangs = [];
 
   for (const lang of ["ru", "en"]) {
+    const existing = await getProjects({ lang: safeLang(lang) });
+    if (Array.isArray(existing) && existing.length) continue;
+
     const filename = `projects.${lang}.json`;
     const candidates = [];
     for (const root of rootsToTry) {

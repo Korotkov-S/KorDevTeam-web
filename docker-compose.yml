@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production-app
+      target: production
     ports:
       - "8080:80"
     environment:
@@ -13,7 +13,11 @@ services:
       - PORT=80
       # Where the API should read/write runtime content (uploads, editable markdown/json)
       - CONTENT_DIST_ROOT=/app/dist
+      # Persist SQLite DB to a docker volume
+      - SQLITE_PATH=/app/server/data/content.sqlite
     restart: unless-stopped
+    volumes:
+      - kordevteam_sqlite:/app/server/data
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kordevteam.rule=Host(`kordevteam.local`)"
@@ -27,6 +31,13 @@ services:
       - "8081:80"
     environment:
       - NODE_ENV=production
+      - SQLITE_PATH=/app/server/data/content.sqlite
     restart: unless-stopped
+    volumes:
+      - kordevteam_sqlite_registry:/app/server/data
     profiles:
       - registry
+
+volumes:
+  kordevteam_sqlite:
+  kordevteam_sqlite_registry:

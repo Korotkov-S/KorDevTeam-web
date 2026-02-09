@@ -7,4 +7,10 @@ services:
       - "8081:80"
     environment:
       - NODE_ENV=production
+      - SQLITE_PATH=/app/server/data/content.sqlite
     restart: unless-stopped
+    volumes:
+      - kordevteam_sqlite:/app/server/data
+
+volumes:
+  kordevteam_sqlite:
