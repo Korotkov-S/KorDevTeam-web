@@ -376,8 +376,8 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
                   <ImageWithFallback
                     src={
                       post.coverUrl ||
-                      postCardImageBySlug[post.slug] ??
-                      cardImages[index % cardImages.length]
+                      (postCardImageBySlug[post.slug] ??
+                        cardImages[index % cardImages.length])
                     }
                     alt={post.title}
                     fallbackSrc="/opengraphlogo.jpeg"

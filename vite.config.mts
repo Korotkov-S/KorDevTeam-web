@@ -1,14 +1,19 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "path";
 import tailwindcss from "@tailwindcss/vite";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// ESM-friendly __dirname for Vite 6 config loading
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   // Базовый путь для деплоя (можно изменить в зависимости от хостинга)
   base: "/",
-  
+
   plugins: [react(), tailwindcss()],
-  
+
   resolve: {
     extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
     alias: {
@@ -54,17 +59,17 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  
+
   build: {
     // Директория для статичных файлов
     outDir: "dist",
-    
+
     // Целевая платформа для сборки
     target: "es2015",
-    
+
     // Минификация
     minify: "terser",
-    
+
     // Настройки для статичного сайта
     rollupOptions: {
       output: {
@@ -72,7 +77,11 @@ export default defineConfig({
         manualChunks: {
           vendor: ["react", "react-dom"],
           router: ["react-router-dom"],
-          ui: ["@radix-ui/react-accordion", "@radix-ui/react-alert-dialog", "@radix-ui/react-aspect-ratio"],
+          ui: [
+            "@radix-ui/react-accordion",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-aspect-ratio",
+          ],
         },
         // Настройка имен файлов для лучшего кэширования
         chunkFileNames: "assets/js/[name]-[hash].js",
@@ -80,17 +89,17 @@ export default defineConfig({
         assetFileNames: "assets/[ext]/[name]-[hash].[ext]",
       },
     },
-    
+
     // Оптимизация размера
     chunkSizeWarningLimit: 1000,
-    
+
     // Генерация source maps для продакшена (опционально)
     sourcemap: false,
-    
+
     // Очистка директории перед сборкой
     emptyOutDir: true,
   },
-  
+
   // Настройки для предварительного просмотра статичного сайта
   preview: {
     port: 4173,
@@ -102,7 +111,7 @@ export default defineConfig({
       },
     },
   },
-  
+
   // Настройки dev сервера
   server: {
     port: 3000,
@@ -114,7 +123,8 @@ export default defineConfig({
       },
     },
   },
-  
+
   // Копируем markdown файлы в public для доступа
   publicDir: "public",
 });
+
