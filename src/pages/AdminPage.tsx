@@ -106,6 +106,12 @@ export function AdminPage() {
   const [blogTagDraft, setBlogTagDraft] = useState<string>("");
   const [blogContent, setBlogContent] = useState<string>("");
   const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
+  const [uploadConfig, setUploadConfig] = useState<{
+    s3Enabled: boolean;
+    bucket?: string | null;
+    region?: string | null;
+    endpoint?: string | null;
+  } | null>(null);
   const blogImageInputRef = useRef<HTMLInputElement | null>(null);
   /** Last uploaded cover URL — used when saving so we don't lose it if user clicks Save before state updates */
   const lastUploadedCoverUrlRef = useRef<string>("");
@@ -289,17 +295,18 @@ export function AdminPage() {
           reader.readAsDataURL(file);
         });
 
-        const resp = await fetchJson<{ url?: string; imageUrl?: string }>(
-          `/api/admin/upload-blog-image`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...authHeaders(authHeaderValue),
-            },
-            body: JSON.stringify({ dataUrl, filename: file.name }),
-          }
-        );
+        const resp = await fetchJson<{
+          url?: string;
+          imageUrl?: string;
+          storage?: "s3" | "local";
+        }>(`/api/admin/upload-blog-image`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(authHeaderValue),
+          },
+          body: JSON.stringify({ dataUrl, filename: file.name }),
+        });
 
         const uploadedUrl = (resp.url ?? (resp as { imageUrl?: string }).imageUrl ?? "").trim();
         if (!uploadedUrl) {
@@ -331,7 +338,10 @@ export function AdminPage() {
             setBlogContent(`![](${coverUrlToUse})\n\n` + md);
           }
         }
-        toast.success("Фото загружено");
+        const storageLabel = resp.storage === "s3" ? " (S3)" : " (локально)";
+        toast.success(`Фото загружено${storageLabel}`, {
+          description: uploadedUrl.length <= 80 ? uploadedUrl : `${uploadedUrl.slice(0, 77)}…`,
+        });
       } catch (e: any) {
         console.warn(e);
         toast.error(`Ошибка загрузки: ${e?.message || "unknown"}`);
@@ -351,6 +361,27 @@ export function AdminPage() {
   useEffect(() => {
     verifyAuth();
   }, [verifyAuth]);
+
+  useEffect(() => {
+    if (!isAuthed || !authHeaderValue) {
+      setUploadConfig(null);
+      return;
+    }
+    let cancelled = false;
+    fetchJson<{ s3Enabled: boolean; bucket?: string; region?: string; endpoint?: string }>(
+      "/api/admin/upload-config",
+      { headers: authHeaders(authHeaderValue) }
+    )
+      .then((c) => {
+        if (!cancelled) setUploadConfig(c);
+      })
+      .catch(() => {
+        if (!cancelled) setUploadConfig(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed, authHeaderValue]);
 
   const onSelectBlog = useCallback(
     async (slug: string) => {
@@ -1028,6 +1059,13 @@ export function AdminPage() {
                       >
                         {uploadingBlogImage ? "Загрузка..." : "Загрузить фото"}
                       </Button>
+                      {uploadConfig !== null && (
+                        <span className="text-xs text-muted-foreground self-center">
+                          {uploadConfig.s3Enabled
+                            ? `Загрузки в S3${uploadConfig.bucket ? ` (${uploadConfig.bucket})` : ""}`
+                            : "Загрузки локально (S3 не настроен)"}
+                        </span>
+                      )}
                       {blogSelectedSlug && (
                         <Button asChild variant="outline">
                           <a

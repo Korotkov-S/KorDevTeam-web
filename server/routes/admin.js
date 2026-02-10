@@ -4,12 +4,24 @@ const { execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const crypto = require("node:crypto");
-const { isS3Enabled, uploadBufferToS3 } = require("../utils/s3");
+const { isS3Enabled, getS3Config, uploadBufferToS3 } = require("../utils/s3");
 
 const router = express.Router();
 
 router.get("/me", authenticate, async (req, res) => {
   res.json({ ok: true });
+});
+
+/** Для проверки: куда идут загрузки (S3 или локально). Без секретов. */
+router.get("/upload-config", authenticate, (req, res) => {
+  const enabled = isS3Enabled();
+  const config = getS3Config();
+  res.json({
+    s3Enabled: enabled,
+    bucket: enabled ? config.bucket : null,
+    region: enabled ? config.region : null,
+    endpoint: enabled && config.endpoint ? config.endpoint : null,
+  });
 });
 
 function safeExtForMime(mime) {
@@ -69,31 +81,38 @@ router.post("/upload-blog-image", authenticate, async (req, res, next) => {
     const id = crypto.randomBytes(6).toString("hex");
     const outName = `${Date.now()}-${safeBase}-${id}.${ext}`.slice(0, 160);
     const relUrl = `/blog/uploads/${outName}`;
+    const s3Enabled = isS3Enabled();
 
-    // Prefer S3 (if configured). Fallback to local filesystem for dev.
-    if (isS3Enabled()) {
+    if (s3Enabled) {
       const key = path.posix.join("blog", "uploads", outName);
-      const uploaded = await uploadBufferToS3({
-        key,
-        buffer: buf,
-        contentType: mime,
-      });
-      return res.json({
-        ok: true,
-        url: uploaded.url,
-        key: uploaded.key,
-        bytes: buf.length,
-        mime,
-      });
-    } else {
-      // Write to repo `public/` for dev (vite serves from it)
-      const repoRoot = process.cwd();
-      await writeFileIfRoot(repoRoot, path.posix.join("public", "blog", "uploads", outName), buf);
-
-      // Optional: write to dist root for production runtime updates (nginx serves it)
-      const distRoot = process.env.CONTENT_DIST_ROOT;
-      await writeFileIfRoot(distRoot, path.posix.join("blog", "uploads", outName), buf);
+      try {
+        const uploaded = await uploadBufferToS3({
+          key,
+          buffer: buf,
+          contentType: mime,
+        });
+        console.log("[upload-blog-image] S3 OK key=%s url=%s", uploaded.key, uploaded.url);
+        return res.json({
+          ok: true,
+          url: uploaded.url,
+          key: uploaded.key,
+          bytes: buf.length,
+          mime,
+          storage: "s3",
+        });
+      } catch (s3Err) {
+        console.error("[upload-blog-image] S3 failed:", s3Err.message || s3Err);
+        if (s3Err.code) console.error("[upload-blog-image] S3 code:", s3Err.code);
+        throw s3Err;
+      }
     }
+
+    // Локальное сохранение
+    const repoRoot = process.cwd();
+    await writeFileIfRoot(repoRoot, path.posix.join("public", "blog", "uploads", outName), buf);
+    const distRoot = process.env.CONTENT_DIST_ROOT;
+    await writeFileIfRoot(distRoot, path.posix.join("blog", "uploads", outName), buf);
+    console.log("[upload-blog-image] local path=%s", relUrl);
 
     return res.json({
       ok: true,
@@ -101,8 +120,10 @@ router.post("/upload-blog-image", authenticate, async (req, res, next) => {
       filename: outName,
       bytes: buf.length,
       mime,
+      storage: "local",
     });
   } catch (e) {
+    console.error("[upload-blog-image] error:", e.message || e);
     next(e);
   }
 });
