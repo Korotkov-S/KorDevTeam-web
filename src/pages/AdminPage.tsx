@@ -108,6 +108,7 @@ export function AdminPage() {
   const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
   const [uploadConfig, setUploadConfig] = useState<{
     s3Enabled: boolean;
+    reason?: string;
     bucket?: string | null;
     region?: string | null;
     endpoint?: string | null;
@@ -368,10 +369,15 @@ export function AdminPage() {
       return;
     }
     let cancelled = false;
-    fetchJson<{ s3Enabled: boolean; bucket?: string; region?: string; endpoint?: string }>(
-      "/api/admin/upload-config",
-      { headers: authHeaders(authHeaderValue) }
-    )
+    fetchJson<{
+      s3Enabled: boolean;
+      reason?: string;
+      bucket?: string;
+      region?: string;
+      endpoint?: string;
+    }>("/api/admin/upload-config", {
+      headers: authHeaders(authHeaderValue),
+    })
       .then((c) => {
         if (!cancelled) setUploadConfig(c);
       })
@@ -1060,10 +1066,13 @@ export function AdminPage() {
                         {uploadingBlogImage ? "Загрузка..." : "Загрузить фото"}
                       </Button>
                       {uploadConfig !== null && (
-                        <span className="text-xs text-muted-foreground self-center">
+                        <span
+                          className="text-xs text-muted-foreground self-center"
+                          title={uploadConfig.reason || undefined}
+                        >
                           {uploadConfig.s3Enabled
                             ? `Загрузки в S3${uploadConfig.bucket ? ` (${uploadConfig.bucket})` : ""}`
-                            : "Загрузки локально (S3 не настроен)"}
+                            : `Загрузки локально. ${uploadConfig.reason ?? "S3 не настроен."}`}
                         </span>
                       )}
                       {blogSelectedSlug && (

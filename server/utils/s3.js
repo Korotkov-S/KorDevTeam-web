@@ -39,6 +39,18 @@ function isS3Enabled() {
   return Boolean(bucket);
 }
 
+/** Возвращает статус S3 и причину, если отключён (для логов и API). */
+function getS3Status() {
+  const config = getS3Config();
+  if (config.bucket && config.bucket.trim()) {
+    return { enabled: true, reason: null };
+  }
+  return {
+    enabled: false,
+    reason: "S3_BUCKET не задан. Задайте переменную окружения S3_BUCKET (имя бакета).",
+  };
+}
+
 function makeClient() {
   const { region, endpoint, forcePathStyle } = getS3Config();
   const cfg = { region };
@@ -105,6 +117,7 @@ async function uploadBufferToS3({ key, buffer, contentType, cacheControl }) {
 module.exports = {
   isS3Enabled,
   getS3Config,
+  getS3Status,
   uploadBufferToS3,
   buildPublicUrl,
 };

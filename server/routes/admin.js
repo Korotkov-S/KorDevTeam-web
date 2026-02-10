@@ -4,7 +4,7 @@ const { execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const crypto = require("node:crypto");
-const { isS3Enabled, getS3Config, uploadBufferToS3 } = require("../utils/s3");
+const { isS3Enabled, getS3Config, getS3Status, uploadBufferToS3 } = require("../utils/s3");
 
 const router = express.Router();
 
@@ -14,13 +14,17 @@ router.get("/me", authenticate, async (req, res) => {
 
 /** Для проверки: куда идут загрузки (S3 или локально). Без секретов. */
 router.get("/upload-config", authenticate, (req, res) => {
-  const enabled = isS3Enabled();
+  const status = getS3Status();
   const config = getS3Config();
+  if (!status.enabled) {
+    console.log("[upload-config] S3 отключён:", status.reason);
+  }
   res.json({
-    s3Enabled: enabled,
-    bucket: enabled ? config.bucket : null,
-    region: enabled ? config.region : null,
-    endpoint: enabled && config.endpoint ? config.endpoint : null,
+    s3Enabled: status.enabled,
+    reason: status.reason || undefined,
+    bucket: status.enabled ? config.bucket : null,
+    region: status.enabled ? config.region : null,
+    endpoint: status.enabled && config.endpoint ? config.endpoint : null,
   });
 });
 
