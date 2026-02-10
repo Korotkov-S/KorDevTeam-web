@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { BlogMarkdownEditor } from "../components/BlogMarkdownEditor";
 import {
   Tabs,
   TabsContent,
@@ -100,12 +101,14 @@ export function AdminPage() {
   const [blogTitle, setBlogTitle] = useState<string>("");
   const [blogSlugOverride, setBlogSlugOverride] = useState<string>("");
   const [blogCoverUrl, setBlogCoverUrl] = useState<string>("");
+  const [blogDate, setBlogDate] = useState<string>("");
   const [blogTags, setBlogTags] = useState<string[]>([]);
   const [blogTagDraft, setBlogTagDraft] = useState<string>("");
   const [blogContent, setBlogContent] = useState<string>("");
   const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
-  const blogTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const blogImageInputRef = useRef<HTMLInputElement | null>(null);
+  /** Last uploaded cover URL — used when saving so we don't lose it if user clicks Save before state updates */
+  const lastUploadedCoverUrlRef = useRef<string>("");
 
   const blogKnownTags = useMemo(() => {
     const set = new Set<string>();
@@ -266,87 +269,6 @@ export function AdminPage() {
     return false;
   }, [authHeaderValue]);
 
-  const insertIntoBlog = useCallback((snippet: string) => {
-    const el = blogTextareaRef.current;
-    if (!el) {
-      setBlogContent((prev) => prev + snippet);
-      return;
-    }
-    const start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
-    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
-    setBlogContent((prev) => prev.slice(0, start) + snippet + prev.slice(end));
-    requestAnimationFrame(() => {
-      try {
-        el.focus();
-        const pos = start + snippet.length;
-        el.setSelectionRange(pos, pos);
-      } catch {
-        // ignore
-      }
-    });
-  }, []);
-
-  const wrapBlogSelection = useCallback(
-    (before: string, after: string, placeholder: string) => {
-      const el = blogTextareaRef.current;
-      if (!el) {
-        insertIntoBlog(`${before}${placeholder}${after}`);
-        return;
-      }
-      const start =
-        typeof el.selectionStart === "number" ? el.selectionStart : 0;
-      const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
-      const selected = blogContent.slice(start, end);
-      const inner = selected || placeholder;
-      const snippet = `${before}${inner}${after}`;
-
-      setBlogContent(
-        (prev) => prev.slice(0, start) + snippet + prev.slice(end)
-      );
-      requestAnimationFrame(() => {
-        try {
-          el.focus();
-          const innerStart = start + before.length;
-          const innerEnd = innerStart + inner.length;
-          el.setSelectionRange(innerStart, innerEnd);
-        } catch {
-          // ignore
-        }
-      });
-    },
-    [blogContent, insertIntoBlog]
-  );
-
-  const prefixBlogLines = useCallback(
-    (prefix: string) => {
-      const el = blogTextareaRef.current;
-      if (!el) {
-        insertIntoBlog(`\n${prefix}`);
-        return;
-      }
-      const start =
-        typeof el.selectionStart === "number" ? el.selectionStart : 0;
-      const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
-      const selected = blogContent.slice(start, end) || "Пункт";
-      const lines = selected
-        .split("\n")
-        .map((l) => (l.trim() ? `${prefix}${l}` : l));
-      const snippet = lines.join("\n");
-      setBlogContent(
-        (prev) => prev.slice(0, start) + snippet + prev.slice(end)
-      );
-      requestAnimationFrame(() => {
-        try {
-          el.focus();
-          el.setSelectionRange(start, start + snippet.length);
-        } catch {
-          // ignore
-        }
-      });
-    },
-    [blogContent, insertIntoBlog]
-  );
-
   const uploadBlogImage = useCallback(
     async (file: File) => {
       try {
@@ -367,7 +289,7 @@ export function AdminPage() {
           reader.readAsDataURL(file);
         });
 
-        const resp = await fetchJson<{ url: string }>(
+        const resp = await fetchJson<{ url?: string; imageUrl?: string }>(
           `/api/admin/upload-blog-image`,
           {
             method: "POST",
@@ -379,9 +301,18 @@ export function AdminPage() {
           }
         );
 
+        const uploadedUrl = (resp.url ?? (resp as { imageUrl?: string }).imageUrl ?? "").trim();
+        if (!uploadedUrl) {
+          toast.error("Сервер не вернул URL изображения");
+          return;
+        }
+        // Normalize relative path so it works from site root
+        const coverUrlToUse = uploadedUrl.startsWith("/") ? uploadedUrl : `/${uploadedUrl.replace(/^\.\//, "")}`;
+
         // Use uploaded image as cover and also insert into markdown (for "same cover inside article")
-        setBlogCoverUrl(resp.url);
-        const alreadyHasUrl = blogContent.includes(resp.url);
+        lastUploadedCoverUrlRef.current = coverUrlToUse;
+        setBlogCoverUrl(coverUrlToUse);
+        const alreadyHasUrl = blogContent.includes(coverUrlToUse) || blogContent.includes(uploadedUrl);
         if (!alreadyHasUrl) {
           // Insert right after the first H1 if present, otherwise at the top.
           const md = blogContent || "";
@@ -389,10 +320,10 @@ export function AdminPage() {
           if (h1Match?.index != null) {
             const idx = h1Match.index + h1Match[0].length;
             const next =
-              md.slice(0, idx) + `\n\n![](${resp.url})\n\n` + md.slice(idx);
+              md.slice(0, idx) + `\n\n![](${coverUrlToUse})\n\n` + md.slice(idx);
             setBlogContent(next);
           } else {
-            setBlogContent(`![](${resp.url})\n\n` + md);
+            setBlogContent(`![](${coverUrlToUse})\n\n` + md);
           }
         }
         toast.success("Фото загружено");
@@ -424,10 +355,13 @@ export function AdminPage() {
       setBlogTitle(meta?.title || slug);
       try {
         const data = await fetchJson<{
-          post: { content: string; coverUrl?: string; title?: string; tags?: string[] };
+          post: { content: string; coverUrl?: string; title?: string; tags?: string[]; date?: string };
         }>(`/api/posts/${slug}?lang=${lang}`);
+        const loadedCover = String(data.post.coverUrl || "").trim();
         setBlogContent(data.post.content || "");
-        setBlogCoverUrl(String(data.post.coverUrl || ""));
+        setBlogCoverUrl(loadedCover);
+        lastUploadedCoverUrlRef.current = loadedCover;
+        setBlogDate(String(data.post.date ?? meta?.date ?? ""));
         setBlogTitle(String(data.post.title || meta?.title || slug));
         setBlogTags(Array.isArray(data.post.tags) ? data.post.tags : meta?.tags || []);
         setBlogTagDraft("");
@@ -451,6 +385,8 @@ export function AdminPage() {
       }
       const isUpdate = Boolean(blogSelectedSlug);
       if (isUpdate) {
+        const coverToSave =
+          (blogCoverUrl && blogCoverUrl.trim()) || lastUploadedCoverUrlRef.current || undefined;
         await fetchJson(`/api/posts/${blogSelectedSlug}`, {
           method: "PUT",
           headers: {
@@ -459,14 +395,18 @@ export function AdminPage() {
           },
           body: JSON.stringify({
             title: blogTitle,
-            coverUrl: blogCoverUrl || undefined,
+            coverUrl: coverToSave,
+            date: blogDate.trim() || undefined,
             tags: blogTags,
             content: blogContent,
             lang,
           }),
         });
+        if (coverToSave) lastUploadedCoverUrlRef.current = coverToSave;
         toast.success("Сохранено");
       } else {
+        const coverToSave =
+          (blogCoverUrl && blogCoverUrl.trim()) || lastUploadedCoverUrlRef.current || undefined;
         const resp = await fetchJson<{ post: { slug: string } }>(`/api/posts`, {
           method: "POST",
           headers: {
@@ -476,12 +416,14 @@ export function AdminPage() {
           body: JSON.stringify({
             title: blogTitle,
             slug: blogSlugOverride || undefined,
-            coverUrl: blogCoverUrl || undefined,
+            coverUrl: coverToSave,
+            date: blogDate.trim() || undefined,
             tags: blogTags,
             content: blogContent,
             lang,
           }),
         });
+        if (coverToSave) lastUploadedCoverUrlRef.current = coverToSave;
         toast.success(`Создано: ${resp.post.slug}`);
         setBlogSelectedSlug(resp.post.slug);
       }
@@ -493,6 +435,7 @@ export function AdminPage() {
   }, [
     authHeaderValue,
     blogCoverUrl,
+    blogDate,
     blogTags,
     blogContent,
     blogSelectedSlug,
@@ -519,6 +462,8 @@ export function AdminPage() {
       setBlogTitle("");
       setBlogSlugOverride("");
       setBlogCoverUrl("");
+      setBlogDate("");
+      lastUploadedCoverUrlRef.current = "";
       setBlogTags([]);
       setBlogTagDraft("");
       setBlogContent("");
@@ -796,7 +741,7 @@ export function AdminPage() {
           robots="noindex,nofollow"
           ogType="website"
         />
-        <div className="min-h-screen pt-24">
+        <div className="min-h-screen pt-8">
           <div className="container mx-auto px-4 py-8">
             <Card className="max-w-md mx-auto">
               <CardHeader>
@@ -838,7 +783,7 @@ export function AdminPage() {
         robots="noindex,nofollow"
         ogType="website"
       />
-      <div className="min-h-screen pt-24">
+      <div className="min-h-screen pt-8">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -970,6 +915,21 @@ export function AdminPage() {
                       )}
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Дата публикации</label>
+                        <Input
+                          type="date"
+                          value={/^\d{4}-\d{2}-\d{2}$/.test(blogDate) ? blogDate : ""}
+                          onChange={(e) => setBlogDate(e.target.value)}
+                          className="w-full"
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Формат: год-месяц-день. Оставьте пустым, чтобы подставилась дата из текста.
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Теги</div>
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -1028,81 +988,12 @@ export function AdminPage() {
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => wrapBlogSelection("**", "**", "жирный")}
-                      >
-                        Жирный
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => wrapBlogSelection("*", "*", "курсив")}
-                      >
-                        Курсив
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => prefixBlogLines("## ")}
-                      >
-                        H2
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => prefixBlogLines("- ")}
-                      >
-                        Список
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          wrapBlogSelection(
-                            "[",
-                            "](https://example.com)",
-                            "ссылка"
-                          )
-                        }
-                      >
-                        Ссылка
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => wrapBlogSelection("`", "`", "код")}
-                      >
-                        Код
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          insertIntoBlog("\n\n```text\nТекст...\n```\n")
-                        }
-                      >
-                        Блок кода
-                      </Button>
-                    </div>
-
-                    <Textarea
-                      ref={blogTextareaRef}
+                    <BlogMarkdownEditor
                       value={blogContent}
-                      onChange={(e) => setBlogContent(e.target.value)}
-                      className="min-h-[320px] font-mono"
-                      placeholder={
-                        "# Title\n\nText...\n\n---\n\n**Теги**: ...\n**Дата публикации**: ...\n"
-                      }
+                      onChange={setBlogContent}
+                      onInsertImage={() => blogImageInputRef.current?.click()}
+                      minHeight="min-h-[420px]"
+                      showPreview={true}
                     />
 
                     <div className="flex gap-2">

@@ -1,4 +1,4 @@
-import { Outlet, ScrollRestoration } from "react-router-dom";
+import { Outlet, ScrollRestoration, useLocation } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
@@ -6,6 +6,9 @@ import { Toaster } from "../components/ui/sonner";
 import { FloatingButtons } from "../components/FloatingButtons";
 
 export function Root() {
+  const { pathname } = useLocation();
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+
   return (
     <HelmetProvider>
       <div
@@ -21,12 +24,12 @@ export function Root() {
         </div>
 
         <div className="relative z-10">
-          <Header />
+          {!isAdmin && <Header />}
           <main>
             <Outlet />
           </main>
-          <Footer />
-          <FloatingButtons />
+          {!isAdmin && <Footer />}
+          {!isAdmin && <FloatingButtons />}
           <Toaster />
           <ScrollRestoration />
         </div>
