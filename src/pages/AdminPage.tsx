@@ -306,8 +306,13 @@ export function AdminPage() {
           toast.error("Сервер не вернул URL изображения");
           return;
         }
-        // Normalize relative path so it works from site root
-        const coverUrlToUse = uploadedUrl.startsWith("/") ? uploadedUrl : `/${uploadedUrl.replace(/^\.\//, "")}`;
+        // Absolute URL (S3/CDN) — use as-is. Relative path — ensure leading slash.
+        const coverUrlToUse =
+          /^https?:\/\//i.test(uploadedUrl)
+            ? uploadedUrl
+            : uploadedUrl.startsWith("/")
+              ? uploadedUrl
+              : `/${uploadedUrl.replace(/^\.\//, "")}`;
 
         // Use uploaded image as cover and also insert into markdown (for "same cover inside article")
         lastUploadedCoverUrlRef.current = coverUrlToUse;
