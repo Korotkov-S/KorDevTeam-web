@@ -1045,16 +1045,6 @@ export function AdminPage() {
                         />
                       </div>
                     ) : null}
-
-                    <div className="pt-4 border-t border-border">
-                      <div className="text-sm font-medium mb-2">
-                        Предпросмотр
-                      </div>
-                      <MarkdownContent
-                        markdown={blogContent}
-                        proseClassName="max-w-none bg-secondary/20 rounded-lg p-4 dark:prose-invert"
-                      />
-                    </div>
                   </CardContent>
                 </Card>
               </div>

@@ -11,6 +11,7 @@ import {
   Code,
   SquareCode,
   ImageIcon,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -71,28 +72,30 @@ export const BlogMarkdownEditor = React.forwardRef<
 ) {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
-  const insertAtCursor = React.useCallback((snippet: string) => {
-    const el = textareaRef.current;
-    if (!el) {
-      onChange(value + snippet);
-      return;
-    }
-    const start =
-      typeof el.selectionStart === "number" ? el.selectionStart : 0;
-    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : start;
-    const next =
-      value.slice(0, start) + snippet + value.slice(end);
-    onChange(next);
-    requestAnimationFrame(() => {
-      try {
-        el.focus();
-        const pos = start + snippet.length;
-        el.setSelectionRange(pos, pos);
-      } catch {
-        // ignore
-      }
-    });
-  }, [value, onChange]);
+  const insertAtCursor = React.useCallback(
+    (snippet: string, cursorOffset?: number) => {
+      const el = textareaRef.current;
+      const start =
+        el && typeof el.selectionStart === "number" ? el.selectionStart : 0;
+      const end =
+        el && typeof el.selectionEnd === "number" ? el.selectionEnd : start;
+      const next = value.slice(0, start) + snippet + value.slice(end);
+      onChange(next);
+      const pos =
+        typeof cursorOffset === "number"
+          ? start + Math.max(0, Math.min(cursorOffset, snippet.length))
+          : start + snippet.length;
+      requestAnimationFrame(() => {
+        try {
+          textareaRef.current?.focus();
+          textareaRef.current?.setSelectionRange(pos, pos);
+        } catch {
+          // ignore
+        }
+      });
+    },
+    [value, onChange]
+  );
 
   const wrapSelection = React.useCallback(
     (before: string, after: string, placeholderText: string) => {
@@ -200,11 +203,16 @@ export const BlogMarkdownEditor = React.forwardRef<
         label: "Блок кода",
         run: () => insertAtCursor("\n\n```text\nТекст...\n```\n"),
       },
+      {
+        icon: ImageIcon,
+        label: "Вставить изображение по ссылке (например /blog/uploads/файл.jpg)",
+        run: () => insertAtCursor("![]()", 4),
+      },
       ...(onInsertImage
         ? [
             {
-              icon: ImageIcon,
-              label: "Вставить изображение",
+              icon: Upload,
+              label: "Загрузить фото",
               run: onInsertImage,
             },
           ]
