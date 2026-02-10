@@ -18,6 +18,8 @@ services:
     restart: unless-stopped
     volumes:
       - kordevteam_sqlite:/app/server/data
+      # Persist blog uploaded images across rebuilds (served from /blog/uploads/*)
+      - kordevteam_blog_uploads:/app/dist/blog/uploads
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kordevteam.rule=Host(`kordevteam.local`)"
@@ -37,9 +39,16 @@ services:
     restart: unless-stopped
     volumes:
       - kordevteam_sqlite_registry:/app/server/data
+      - kordevteam_blog_uploads_registry:/app/dist/blog/uploads
     profiles:
       - registry
 
 volumes:
   kordevteam_sqlite:
+    name: kordevteam_sqlite
   kordevteam_sqlite_registry:
+    name: kordevteam_sqlite_registry
+  kordevteam_blog_uploads:
+    name: kordevteam_blog_uploads
+  kordevteam_blog_uploads_registry:
+    name: kordevteam_blog_uploads_registry
