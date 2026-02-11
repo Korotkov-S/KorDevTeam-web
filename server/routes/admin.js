@@ -4,7 +4,7 @@ const { execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const crypto = require("node:crypto");
-const { isS3Enabled, getS3Config, getS3Status, uploadBufferToS3 } = require("../utils/s3");
+const { isS3Enabled, getS3Config, getS3Status, uploadBufferToS3, deleteObjectFromS3 } = require("../utils/s3");
 
 const router = express.Router();
 
@@ -25,7 +25,100 @@ router.get("/upload-config", authenticate, (req, res) => {
     bucket: status.enabled ? config.bucket : null,
     region: status.enabled ? config.region : null,
     endpoint: status.enabled && config.endpoint ? config.endpoint : null,
+    publicBaseUrl: status.enabled && config.publicBaseUrl ? config.publicBaseUrl : null,
   });
+});
+
+function normalizePosixKey(raw) {
+  const k = String(raw || "").replace(/^\/+/, "");
+  if (!k) return "";
+  const n = path.posix.normalize(k);
+  // prevent traversal
+  if (n === ".." || n.startsWith("../")) return "";
+  return n;
+}
+
+function decodeKeyFromUrlPathname(pathname) {
+  // pathname is like "/blog/uploads/a%20b.png"
+  const parts = String(pathname || "")
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => {
+      try {
+        return decodeURIComponent(seg);
+      } catch {
+        return seg;
+      }
+    });
+  return parts.join("/");
+}
+
+async function deleteLocalIfExists(absPath) {
+  try {
+    await fs.unlink(absPath);
+    return true;
+  } catch (e) {
+    if (e && (e.code === "ENOENT" || e.code === "ENOTDIR")) return false;
+    throw e;
+  }
+}
+
+/**
+ * Deletes blog image by key/url.
+ * Security: only allows keys under "blog/uploads/".
+ */
+router.post("/delete-blog-image", authenticate, async (req, res, next) => {
+  try {
+    const { key: rawKey, url } = req.body || {};
+    const config = getS3Config();
+
+    let key = normalizePosixKey(rawKey);
+    const urlStr = typeof url === "string" ? url.trim() : "";
+
+    // Derive key from URL if not provided
+    if (!key && urlStr) {
+      if (urlStr.startsWith("/blog/uploads/")) {
+        key = normalizePosixKey(urlStr.replace(/^\/+/, "")); // blog/uploads/...
+      } else if (config.publicBaseUrl && /^https?:\/\//i.test(urlStr)) {
+        // If URL points to our configured public base, extract path as key.
+        const base = config.publicBaseUrl.replace(/\/+$/, "");
+        if (urlStr.startsWith(base + "/") || urlStr === base) {
+          const u = new URL(urlStr);
+          key = normalizePosixKey(decodeKeyFromUrlPathname(u.pathname));
+        }
+      }
+    }
+
+    if (!key || !key.startsWith("blog/uploads/")) {
+      return res.status(400).json({ error: "Invalid key/url. Only blog/uploads/* can be deleted." });
+    }
+
+    if (isS3Enabled()) {
+      await deleteObjectFromS3({ key });
+      return res.json({ ok: true, storage: "s3", key });
+    }
+
+    // Local delete (dev / fallback)
+    const repoRoot = process.cwd();
+    const distRoot = process.env.CONTENT_DIST_ROOT;
+    const deleted = {
+      repo: false,
+      dist: false,
+    };
+
+    // repo has "public/" prefix
+    deleted.repo = await deleteLocalIfExists(
+      path.join(repoRoot, "public", ...key.split("/"))
+    );
+
+    if (distRoot) {
+      deleted.dist = await deleteLocalIfExists(path.join(distRoot, ...key.split("/")));
+    }
+
+    return res.json({ ok: true, storage: "local", key, deleted });
+  } catch (e) {
+    next(e);
+  }
 });
 
 function safeExtForMime(mime) {
@@ -99,6 +192,7 @@ router.post("/upload-blog-image", authenticate, async (req, res, next) => {
         return res.json({
           ok: true,
           url: uploaded.url,
+          proxyUrl: `/api/media/${uploaded.key}`,
           key: uploaded.key,
           bytes: buf.length,
           mime,
@@ -176,6 +270,7 @@ router.post("/upload-project-image", authenticate, async (req, res, next) => {
       return res.json({
         ok: true,
         url: uploaded.url,
+        proxyUrl: `/api/media/${uploaded.key}`,
         key: uploaded.key,
         bytes: buf.length,
         mime,

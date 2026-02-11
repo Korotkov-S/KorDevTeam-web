@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { BlogMarkdownEditor } from "../components/BlogMarkdownEditor";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import {
   Tabs,
   TabsContent,
@@ -75,6 +76,61 @@ async function checkAuth(
   }
 }
 
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function decodeKeyFromUrlPathname(pathname: string) {
+  const parts = String(pathname || "")
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => {
+      try {
+        return decodeURIComponent(seg);
+      } catch {
+        return seg;
+      }
+    });
+  return parts.join("/");
+}
+
+function deriveBlogUploadsKeyFromUrl(url: string, publicBaseUrl?: string | null): string {
+  const u = String(url || "").trim();
+  if (!u) return "";
+
+  if (u.startsWith("/blog/uploads/")) {
+    return u.replace(/^\/+/, ""); // blog/uploads/...
+  }
+
+  if (publicBaseUrl && /^https?:\/\//i.test(u)) {
+    const base = String(publicBaseUrl).replace(/\/+$/, "");
+    if (base && (u.startsWith(base + "/") || u === base)) {
+      try {
+        const parsed = new URL(u);
+        return decodeKeyFromUrlPathname(parsed.pathname);
+      } catch {
+        return "";
+      }
+    }
+  }
+
+  return "";
+}
+
+function removeMarkdownImagesByUrl(markdown: string, url: string) {
+  const u = String(url || "").trim();
+  if (!u) return markdown;
+
+  const escaped = escapeRegExp(u);
+  // Matches: ![alt](url) or ![alt](<url>) with optional title
+  const re = new RegExp(
+    String.raw`!\[[^\]]*\]\(\s*<?${escaped}>?\s*(?:(?:"[^"]*")|(?:'[^']*'))?\s*\)`,
+    "g"
+  );
+
+  return markdown.replace(re, "").replace(/\n{3,}/g, "\n\n").trimStart();
+}
+
 export function AdminPage() {
   const [username, setUsername] = useState<string>(
     () => localStorage.getItem("ADMIN_USERNAME") || ""
@@ -106,16 +162,19 @@ export function AdminPage() {
   const [blogTagDraft, setBlogTagDraft] = useState<string>("");
   const [blogContent, setBlogContent] = useState<string>("");
   const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
+  const [deletingBlogImage, setDeletingBlogImage] = useState(false);
   const [uploadConfig, setUploadConfig] = useState<{
     s3Enabled: boolean;
     reason?: string;
     bucket?: string | null;
     region?: string | null;
     endpoint?: string | null;
+    publicBaseUrl?: string | null;
   } | null>(null);
   const blogImageInputRef = useRef<HTMLInputElement | null>(null);
   /** Last uploaded cover URL — used when saving so we don't lose it if user clicks Save before state updates */
   const lastUploadedCoverUrlRef = useRef<string>("");
+  const lastUploadedCoverKeyRef = useRef<string>("");
 
   const blogKnownTags = useMemo(() => {
     const set = new Set<string>();
@@ -298,7 +357,9 @@ export function AdminPage() {
 
         const resp = await fetchJson<{
           url?: string;
+          proxyUrl?: string;
           imageUrl?: string;
+          key?: string;
           storage?: "s3" | "local";
         }>(`/api/admin/upload-blog-image`, {
           method: "POST",
@@ -310,20 +371,24 @@ export function AdminPage() {
         });
 
         const uploadedUrl = (resp.url ?? (resp as { imageUrl?: string }).imageUrl ?? "").trim();
+        const proxyUrl = String(resp.proxyUrl || "").trim();
         if (!uploadedUrl) {
           toast.error("Сервер не вернул URL изображения");
           return;
         }
         // Absolute URL (S3/CDN) — use as-is. Relative path — ensure leading slash.
-        const coverUrlToUse =
+        const resolvedUploadedUrl =
           /^https?:\/\//i.test(uploadedUrl)
             ? uploadedUrl
             : uploadedUrl.startsWith("/")
               ? uploadedUrl
               : `/${uploadedUrl.replace(/^\.\//, "")}`;
+        // For S3 uploads, prefer same-origin proxy URL (works for private buckets too).
+        const coverUrlToUse = proxyUrl || resolvedUploadedUrl;
 
         // Use uploaded image as cover and also insert into markdown (for "same cover inside article")
         lastUploadedCoverUrlRef.current = coverUrlToUse;
+        lastUploadedCoverKeyRef.current = String(resp.key || "").trim();
         setBlogCoverUrl(coverUrlToUse);
         const alreadyHasUrl = blogContent.includes(coverUrlToUse) || blogContent.includes(uploadedUrl);
         if (!alreadyHasUrl) {
@@ -354,6 +419,59 @@ export function AdminPage() {
     [authHeaderValue, blogContent, verifyAuth]
   );
 
+  const deleteBlogCoverImage = useCallback(async () => {
+    const coverUrlToDelete = String(blogCoverUrl || "").trim();
+    if (!coverUrlToDelete) return;
+
+    const clearFromEditor = () => {
+      setBlogCoverUrl("");
+      lastUploadedCoverUrlRef.current = "";
+      lastUploadedCoverKeyRef.current = "";
+      setBlogContent((prev) => removeMarkdownImagesByUrl(prev, coverUrlToDelete));
+    };
+
+    try {
+      if (!(await verifyAuth())) {
+        toast.error("Нужна авторизация");
+        return;
+      }
+
+      setDeletingBlogImage(true);
+      const keyFromLastUpload =
+        coverUrlToDelete === String(lastUploadedCoverUrlRef.current || "").trim()
+          ? String(lastUploadedCoverKeyRef.current || "").trim()
+          : "";
+      const derivedKey = deriveBlogUploadsKeyFromUrl(
+        coverUrlToDelete,
+        uploadConfig?.publicBaseUrl ?? null
+      );
+      const keyToDelete = (keyFromLastUpload || derivedKey).trim();
+
+      // Try to delete from storage (only works for blog/uploads/*). Even if it fails, clear from editor.
+      await fetchJson<{ ok: boolean }>(`/api/admin/delete-blog-image`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(authHeaderValue),
+        },
+        body: JSON.stringify({
+          key: keyToDelete || undefined,
+          url: coverUrlToDelete,
+        }),
+      });
+
+      clearFromEditor();
+      toast.success("Фото удалено");
+    } catch (e: any) {
+      console.warn(e);
+      // Still remove from the editor so user can continue.
+      clearFromEditor();
+      toast.error(`Не удалось удалить файл из хранилища: ${e?.message || "unknown"}`);
+    } finally {
+      setDeletingBlogImage(false);
+    }
+  }, [authHeaderValue, blogCoverUrl, uploadConfig?.publicBaseUrl, verifyAuth]);
+
   useEffect(() => {
     loadIndexes();
     loadProjects();
@@ -375,6 +493,7 @@ export function AdminPage() {
       bucket?: string;
       region?: string;
       endpoint?: string;
+      publicBaseUrl?: string;
     }>("/api/admin/upload-config", {
       headers: authHeaders(authHeaderValue),
     })
@@ -403,6 +522,7 @@ export function AdminPage() {
         setBlogContent(data.post.content || "");
         setBlogCoverUrl(loadedCover);
         lastUploadedCoverUrlRef.current = loadedCover;
+        lastUploadedCoverKeyRef.current = "";
         setBlogDate(String(data.post.date ?? meta?.date ?? ""));
         setBlogTitle(String(data.post.title || meta?.title || slug));
         setBlogTags(Array.isArray(data.post.tags) ? data.post.tags : meta?.tags || []);
@@ -506,6 +626,7 @@ export function AdminPage() {
       setBlogCoverUrl("");
       setBlogDate("");
       lastUploadedCoverUrlRef.current = "";
+      lastUploadedCoverKeyRef.current = "";
       setBlogTags([]);
       setBlogTagDraft("");
       setBlogContent("");
@@ -1065,6 +1186,16 @@ export function AdminPage() {
                       >
                         {uploadingBlogImage ? "Загрузка..." : "Загрузить фото"}
                       </Button>
+                      {blogCoverUrl ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={deletingBlogImage}
+                          onClick={deleteBlogCoverImage}
+                        >
+                          {deletingBlogImage ? "Удаление..." : "Удалить фото"}
+                        </Button>
+                      ) : null}
                       {uploadConfig !== null && (
                         <span
                           className="text-xs text-muted-foreground self-center"
@@ -1090,9 +1221,10 @@ export function AdminPage() {
 
                     {blogCoverUrl ? (
                       <div className="rounded-md border border-border overflow-hidden">
-                        <img
+                        <ImageWithFallback
                           src={blogCoverUrl}
                           alt={blogTitle || blogSelectedSlug || "cover"}
+                          fallbackSrc="/opengraphlogo.jpeg"
                           className="w-full h-auto"
                         />
                       </div>

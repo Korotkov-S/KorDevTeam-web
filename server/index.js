@@ -6,6 +6,7 @@ const krasotulyaCrmRouter = require("./routes/krasotulyaCrm");
 const contentRouter = require("./routes/content");
 const projectsRouter = require("./routes/projects");
 const adminRouter = require("./routes/admin");
+const mediaRouter = require("./routes/media");
 const path = require('path');
 const fs = require("node:fs");
 const { bootstrapFromLegacyContentIfEmpty } = require("./db/bootstrap");
@@ -37,6 +38,7 @@ app.use("/api/krasotulya-crm", krasotulyaCrmRouter);
 app.use("/api/content", contentRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/media", mediaRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

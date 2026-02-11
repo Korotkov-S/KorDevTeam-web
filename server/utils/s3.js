@@ -1,4 +1,9 @@
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} = require("@aws-sdk/client-s3");
 
 function getCredentialsFromEnv() {
   // Prefer standard AWS env vars (supported by SDK automatically),
@@ -28,7 +33,11 @@ function getS3Config() {
   const endpoint = process.env.S3_ENDPOINT || ""; // for S3-compatible (e.g. MinIO)
   const forcePathStyle = String(process.env.S3_FORCE_PATH_STYLE || "").trim() === "1";
   const publicBaseUrl = (process.env.S3_PUBLIC_BASE_URL || "").trim(); // recommended
-  const acl = (process.env.S3_ACL || "").trim(); // e.g. public-read (optional)
+  // If you provide S3_PUBLIC_BASE_URL, you likely expect the uploaded objects to be readable by browsers.
+  // Most S3-compatible providers default to private objects unless ACL/bucket policy says otherwise.
+  // You can override this explicitly with S3_ACL (or set it empty to rely on bucket policy).
+  const aclFromEnv = (process.env.S3_ACL || "").trim(); // e.g. public-read (optional)
+  const acl = aclFromEnv || (publicBaseUrl ? "public-read" : "");
 
   return { bucket, region, endpoint, forcePathStyle, publicBaseUrl, acl };
 }
@@ -91,16 +100,37 @@ async function uploadBufferToS3({ key, buffer, contentType, cacheControl }) {
   const client = makeClient();
   const cleanKey = String(key || "").replace(/^\/+/, "");
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: cleanKey,
-      Body: buffer,
-      ContentType: contentType || "application/octet-stream",
-      CacheControl: cacheControl || "public, max-age=31536000, immutable",
-      ...(acl ? { ACL: acl } : {}),
-    })
-  );
+  const putParams = {
+    Bucket: bucket,
+    Key: cleanKey,
+    Body: buffer,
+    ContentType: contentType || "application/octet-stream",
+    CacheControl: cacheControl || "public, max-age=31536000, immutable",
+    ...(acl ? { ACL: acl } : {}),
+  };
+
+  try {
+    await client.send(new PutObjectCommand(putParams));
+  } catch (err) {
+    // Some AWS accounts/buckets have ACLs disabled (Object Ownership "Bucket owner enforced"),
+    // or some providers reject ACL parameter. In this case, retry without ACL.
+    const msg = String(err?.message || "");
+    const code = err?.name || err?.Code || err?.code;
+    const looksLikeAclUnsupported =
+      Boolean(acl) &&
+      (code === "AccessControlListNotSupported" ||
+        /acl/i.test(msg) ||
+        /AccessControlListNotSupported/i.test(msg) ||
+        /The bucket does not allow ACLs/i.test(msg));
+
+    if (looksLikeAclUnsupported) {
+      console.warn("[s3] ACL rejected by bucket/provider; retrying without ACL");
+      const { ACL, ...noAclParams } = putParams;
+      await client.send(new PutObjectCommand(noAclParams));
+    } else {
+      throw err;
+    }
+  }
 
   const url = buildPublicUrl({
     bucket,
@@ -114,11 +144,42 @@ async function uploadBufferToS3({ key, buffer, contentType, cacheControl }) {
   return { bucket, key: cleanKey, url };
 }
 
+async function deleteObjectFromS3({ key }) {
+  const { bucket } = getS3Config();
+  if (!bucket) throw new Error("S3_BUCKET is required");
+  const client = makeClient();
+  const cleanKey = String(key || "").replace(/^\/+/, "");
+  if (!cleanKey) throw new Error("key is required");
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: cleanKey,
+    })
+  );
+  return { bucket, key: cleanKey };
+}
+
+async function getObjectFromS3({ key }) {
+  const { bucket } = getS3Config();
+  if (!bucket) throw new Error("S3_BUCKET is required");
+  const client = makeClient();
+  const cleanKey = String(key || "").replace(/^\/+/, "");
+  if (!cleanKey) throw new Error("key is required");
+  return await client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: cleanKey,
+    })
+  );
+}
+
 module.exports = {
   isS3Enabled,
   getS3Config,
   getS3Status,
   uploadBufferToS3,
+  deleteObjectFromS3,
+  getObjectFromS3,
   buildPublicUrl,
 };
 

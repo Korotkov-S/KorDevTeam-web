@@ -19,6 +19,70 @@ function toWebpCandidate(src: string): string | null {
   return s.replace(/\.(png|jpe?g)$/i, ".webp");
 }
 
+function toTwcS3AlternateUrl(src: string): string | null {
+  // Timeweb Cloud S3 supports both:
+  // - virtual-hosted: https://<bucket>.s3.twcstorage.ru/<key>
+  // - path-style:     https://s3.twcstorage.ru/<bucket>/<key>
+  // If one fails (common misconfig), try the other before giving up.
+  try {
+    const u = new URL(src);
+    const host = u.hostname.toLowerCase();
+    const pathNoLead = u.pathname.replace(/^\/+/, "");
+    if (!pathNoLead) return null;
+
+    if (host === "s3.twcstorage.ru") {
+      const [bucket, ...rest] = pathNoLead.split("/");
+      if (!bucket || !rest.length) return null;
+      const key = rest.join("/");
+      const alt = new URL(u.toString());
+      alt.hostname = `${bucket}.s3.twcstorage.ru`;
+      alt.pathname = `/${key}`;
+      return alt.toString();
+    }
+
+    if (host.endsWith(".s3.twcstorage.ru")) {
+      const bucket = host.split(".")[0];
+      if (!bucket) return null;
+      const alt = new URL(u.toString());
+      alt.hostname = "s3.twcstorage.ru";
+      alt.pathname = `/${bucket}/${u.pathname.replace(/^\/+/, "")}`;
+      return alt.toString();
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function toMediaProxyCandidate(src: string): string | null {
+  // If bucket/object is private, a same-origin proxy is the most reliable.
+  // Our API exposes: /api/media/<key> where key is like "blog/uploads/..." or "projects/..."
+  try {
+    const u = new URL(src);
+    const host = u.hostname.toLowerCase();
+    const pathNoLead = u.pathname.replace(/^\/+/, "");
+    if (!pathNoLead) return null;
+
+    // Extract key from twc styles.
+    let key = "";
+    if (host === "s3.twcstorage.ru") {
+      const [, ...rest] = pathNoLead.split("/"); // drop bucket
+      key = rest.join("/");
+    } else if (host.endsWith(".s3.twcstorage.ru")) {
+      key = pathNoLead;
+    } else {
+      return null;
+    }
+
+    if (!key) return null;
+    if (!(key.startsWith("blog/uploads/") || key.startsWith("projects/"))) return null;
+    // Preserve queryless URL to keep caching simple.
+    return `/api/media/${key}`;
+  } catch {
+    return null;
+  }
+}
+
 export function ImageWithFallback(props: ImageWithFallbackProps) {
   const [didError, setDidError] = useState(false)
 
@@ -58,6 +122,32 @@ export function ImageWithFallback(props: ImageWithFallbackProps) {
           target.setAttribute("data-webp-fallback", "1");
           target.src = src;
           return;
+        }
+
+        // Timeweb Cloud S3: try alternate URL style first.
+        if (
+          typeof src === "string" &&
+          target.getAttribute("data-s3-url-fallback") !== "1"
+        ) {
+          const alt = toTwcS3AlternateUrl(src);
+          if (alt && alt !== src) {
+            target.setAttribute("data-s3-url-fallback", "1");
+            target.src = alt;
+            return;
+          }
+        }
+
+        // If still failing, try same-origin media proxy for known S3 URLs.
+        if (
+          typeof src === "string" &&
+          target.getAttribute("data-media-proxy-fallback") !== "1"
+        ) {
+          const proxy = toMediaProxyCandidate(src);
+          if (proxy) {
+            target.setAttribute("data-media-proxy-fallback", "1");
+            target.src = proxy;
+            return;
+          }
         }
 
         setDidError(true);
