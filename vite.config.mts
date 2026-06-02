@@ -12,7 +12,7 @@ export default defineConfig({
   // Базовый путь для деплоя (можно изменить в зависимости от хостинга)
   base: "/",
 
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss({ optimize: false })],
 
   resolve: {
     extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
@@ -100,6 +100,10 @@ export default defineConfig({
     emptyOutDir: true,
   },
 
+  optimizeDeps: {
+    entries: ["index.html"],
+  },
+
   // Настройки для предварительного просмотра статичного сайта
   preview: {
     port: 4173,
@@ -127,4 +131,3 @@ export default defineConfig({
   // Копируем markdown файлы в public для доступа
   publicDir: "public",
 });
-
