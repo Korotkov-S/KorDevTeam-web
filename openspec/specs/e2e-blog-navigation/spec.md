@@ -1,19 +1,19 @@
-# E2E Blog Navigation
+# E2E-навигация блога
 
 ## Purpose
 
-Define regression coverage for opening blog articles from the blog index.
+Определить регрессионное покрытие для открытия статей блога со страницы списка.
 
 ## Requirements
 
-### Requirement: Blog article navigation
+### Requirement: Навигация к статье блога
 
-The site SHALL allow a visitor to open blog articles from the blog index and land on the corresponding article page.
+Сайт SHALL позволять посетителю открыть статью блога со страницы списка и попасть на соответствующую страницу статьи.
 
-#### Scenario: Opening article links from the blog index
+#### Scenario: Открытие ссылки статьи со страницы блога
 
-- **GIVEN** a visitor opens the blog index at `/blog`
-- **WHEN** the visitor selects a visible blog article link
-- **THEN** the browser SHALL navigate to that article's `/blog/<slug>` route
-- **AND** the destination page SHALL render a visible article heading
-- **AND** the destination page SHALL render visible article content
+- **GIVEN** посетитель открывает страницу списка блога по адресу `/blog`
+- **WHEN** посетитель выбирает видимую ссылку на статью блога
+- **THEN** браузер SHALL перейти на маршрут этой статьи `/blog/<slug>`
+- **AND** целевая страница SHALL отобразить видимый заголовок статьи
+- **AND** целевая страница SHALL отобразить видимый контент статьи

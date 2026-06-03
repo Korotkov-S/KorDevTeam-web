@@ -1,17 +1,17 @@
-# Project
+# Проект
 
-KorDevTeam web site built with React, Vite, TypeScript, React Router, Tailwind-style utility classes, and Cypress-style e2e specs.
+Сайт KorDevTeam построен на React, Vite, TypeScript, React Router, utility-классах в стиле Tailwind и e2e-спецификациях в стиле Cypress.
 
-## Conventions
+## Соглашения
 
-- Prefer existing project patterns and components.
-- Keep e2e specs in `cypress/e2e/*.cy.ts`.
-- External site checks currently target `https://kordev.team`.
-- Do not touch unrelated generated content or public assets while adding tests.
-- Use Russian-facing assertions where the live page defaults to Russian, with English fallbacks when language can vary.
+- Предпочитать существующие паттерны и компоненты проекта.
+- Хранить e2e-спецификации в `cypress/e2e/*.cy.ts`.
+- Проверки внешнего сайта сейчас направлены на `https://kordev.team`.
+- При добавлении тестов не трогать несвязанный с задачей сгенерированный контент и публичные ассеты.
+- Использовать русскоязычные проверки там, где live-страница по умолчанию открывается на русском, и добавлять английский fallback, если язык может отличаться.
 
-## Verification
+## Проверка
 
-- Run focused e2e checks when Cypress is installed/configured.
-- Run project build when relevant and practical.
-- Document blocked checks in the implementation summary.
+- Запускать сфокусированные e2e-проверки, когда Cypress установлен и настроен.
+- Запускать сборку проекта, когда это уместно и практически возможно.
+- Фиксировать заблокированные проверки в итоговом описании реализации.

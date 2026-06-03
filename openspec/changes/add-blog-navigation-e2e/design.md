@@ -1,20 +1,20 @@
-# Design: Blog navigation e2e coverage
+# Дизайн: e2e-покрытие навигации блога
 
-## Approach
+## Подход
 
-Create a Cypress e2e spec in `cypress/e2e/blog-page.cy.ts`.
+Создать Cypress e2e-спеку в `cypress/e2e/blog-page.cy.ts`.
 
-The test opens `https://kordev.team/blog`, collects visible article links matching `/blog/<slug>`, and clicks a small sample of links. For each clicked link, it asserts that:
+Тест открывает `https://kordev.team/blog`, собирает видимые ссылки на статьи формата `/blog/<slug>` и кликает по небольшой выборке ссылок. Для каждой выбранной ссылки он проверяет, что:
 
-- `location.pathname` equals the link href.
-- A visible `h1` exists on the destination page.
-- A visible `article` exists on the destination page.
+- `location.pathname` равен `href` ссылки.
+- На целевой странице есть видимый `h1`.
+- На целевой странице есть видимый `article`.
 
-## Rationale
+## Обоснование
 
-Using the visible links from the index keeps the spec resilient to blog ordering changes while still exercising the real navigation behavior. Sampling the first three visible articles keeps runtime bounded and catches regressions in the shared card/link behavior.
+Использование видимых ссылок со страницы списка делает спеку устойчивой к изменению порядка статей и при этом проверяет реальное поведение навигации. Выборка первых трёх видимых статей ограничивает время выполнения и ловит регрессии в общем поведении карточек и ссылок.
 
-## Risks
+## Риски
 
-- The test depends on the live `https://kordev.team` site being reachable.
-- Cypress is not currently declared in `package.json`, so local execution requires an existing Cypress setup or an added dependency in a separate change.
+- Тест зависит от доступности live-сайта `https://kordev.team`.
+- Cypress сейчас не объявлен в `package.json`, поэтому локальный запуск требует уже существующей настройки Cypress или добавления зависимости отдельным изменением.

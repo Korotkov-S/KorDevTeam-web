@@ -1,7 +1,7 @@
-# Tasks
+# Задачи
 
-- [x] Inspect existing e2e specs and project test conventions.
-- [x] Define expected blog-index-to-article navigation behavior in OpenSpec.
-- [x] Add Cypress spec for visible blog article links.
-- [x] Keep unrelated public content and generated files untouched.
-- [x] Attempt relevant project verification and record any blockers.
+- [x] Изучить существующие e2e-спеки и тестовые соглашения проекта.
+- [x] Описать в OpenSpec ожидаемое поведение перехода от списка блога к статье.
+- [x] Добавить Cypress-спеку для видимых ссылок на статьи блога.
+- [x] Не трогать несвязанный публичный контент и сгенерированные файлы.
+- [x] Попробовать релевантную проверку проекта и зафиксировать блокеры.

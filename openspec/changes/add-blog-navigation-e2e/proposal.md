@@ -1,22 +1,22 @@
-# Proposal: Add blog navigation e2e coverage
+# Предложение: добавить e2e-покрытие навигации блога
 
-## Intent
+## Намерение
 
-Add an executable e2e specification that verifies blog cards on the live site open article pages through a real user navigation flow.
+Добавить исполняемую e2e-спецификацию, которая проверяет, что карточки блога на live-сайте открывают страницы статей через реальный пользовательский переход.
 
-## Scope
+## Область работ
 
-- Add a Cypress spec for the `/blog` index.
-- Use visible blog article links from the page instead of hardcoding every current article.
-- Verify that clicking a link changes the route to `/blog/<slug>`.
-- Verify that the destination page renders an article heading and article content.
+- Добавить Cypress-спеку для страницы списка `/blog`.
+- Использовать видимые ссылки на статьи со страницы, а не хардкодить все текущие статьи.
+- Проверять, что клик по ссылке меняет маршрут на `/blog/<slug>`.
+- Проверять, что целевая страница отображает заголовок и контент статьи.
 
-## Out of Scope
+## Вне области работ
 
-- Changing blog UI behavior.
-- Changing blog content, generated indexes, sitemap files, or public images.
-- Installing Cypress or adding new npm/yarn dependencies.
+- Изменение поведения интерфейса блога.
+- Изменение контента блога, сгенерированных индексов, sitemap-файлов или публичных изображений.
+- Установка Cypress или добавление новых npm/yarn-зависимостей.
 
-## Impact
+## Влияние
 
-The project gains regression coverage for the blog index to article-page navigation path.
+Проект получает регрессионное покрытие пути навигации от списка блога к странице статьи.
