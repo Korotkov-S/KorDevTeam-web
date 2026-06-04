@@ -100,6 +100,61 @@ function parseLegacyMeta(md) {
   return { tags: tagsArr, date: date.trim() };
 }
 
+function parseDateMs(dateStr) {
+  const s = String(dateStr || "").trim();
+  if (!s) return 0;
+
+  const monthsRu = {
+    января: 0,
+    февраля: 1,
+    марта: 2,
+    апреля: 3,
+    мая: 4,
+    июня: 5,
+    июля: 6,
+    августа: 7,
+    сентября: 8,
+    октября: 9,
+    ноября: 10,
+    декабря: 11,
+  };
+  const monthsEn = {
+    january: 0,
+    february: 1,
+    march: 2,
+    april: 3,
+    may: 4,
+    june: 5,
+    july: 6,
+    august: 7,
+    september: 8,
+    october: 9,
+    november: 10,
+    december: 11,
+  };
+
+  const ru = s.match(/^(\d{1,2})\s+([а-яё]+)\s+(\d{4})$/i);
+  if (ru) {
+    const [, day, month, year] = ru;
+    const monthIndex = monthsRu[month.toLowerCase()];
+    if (monthIndex !== undefined) {
+      return Date.UTC(Number(year), monthIndex, Number(day));
+    }
+  }
+
+  const en = s.match(/^([a-z]+)\s+(\d{1,2}),\s+(\d{4})$/i);
+  if (en) {
+    const [, month, day, year] = en;
+    const monthIndex = monthsEn[month.toLowerCase()];
+    if (monthIndex !== undefined) {
+      return Date.UTC(Number(year), monthIndex, Number(day));
+    }
+  }
+
+  const parsed = Date.parse(s);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 function estimateReadTime(md, lang = "ru") {
   const words = stripMd(md).split(/\s+/).filter(Boolean).length;
   const minutes = Math.max(1, Math.round(words / 200));
@@ -142,7 +197,11 @@ function buildIndexForDir({ dir, slugs, lang }) {
       mtimeMs,
     });
   }
-  items.sort((a, b) => (b.mtimeMs || 0) - (a.mtimeMs || 0));
+  items.sort((a, b) => {
+    const dateDelta = parseDateMs(b.date) - parseDateMs(a.date);
+    if (dateDelta) return dateDelta;
+    return (b.mtimeMs || 0) - (a.mtimeMs || 0);
+  });
   return items;
 }
 
@@ -172,4 +231,3 @@ function main() {
 }
 
 main();
-

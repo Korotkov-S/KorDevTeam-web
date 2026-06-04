@@ -21,9 +21,25 @@ const markdownComponents = {
   p: ({ node, ...props }: any) => (
     <p className="text-muted-foreground mb-4 leading-relaxed" {...props} />
   ),
-  a: ({ node, ...props }: any) => (
-    <a className="text-primary hover:underline" {...props} />
-  ),
+  a: ({ node, ...props }: any) => {
+    const href = typeof props.href === "string" ? props.href : "";
+    const isVideo = /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(href);
+
+    if (isVideo) {
+      return (
+        <video
+          controls
+          preload="metadata"
+          className="w-full rounded-xl border border-border/50 my-6 bg-black"
+        >
+          <source src={href} />
+          <a className="text-primary hover:underline" {...props} />
+        </video>
+      );
+    }
+
+    return <a className="text-primary hover:underline" {...props} />;
+  },
   code: ({ node, inline, ...props }: any) =>
     inline ? (
       <code className="bg-secondary text-foreground px-1.5 py-0.5 rounded text-sm" {...props} />
@@ -86,4 +102,3 @@ export function MarkdownContent({
     </div>
   );
 }
-
