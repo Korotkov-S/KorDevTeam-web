@@ -1,5 +1,7 @@
 # WordPress Site Performance Optimization
 
+![WordPress Site Performance Optimization](/blog/covers/wordpress-optimization.jpg)
+
 ## Introduction
 
 WordPress is one of the most popular CMS in the world, but without proper optimization, sites can run slowly. In this article, we'll look at key methods for improving performance.

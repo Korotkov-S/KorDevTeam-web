@@ -1,5 +1,7 @@
 # Stop Losing Negotiations! Iron-Clad Argumentation That Breaks Resistance Even from Stubborn Clients
 
+![Stop Losing Negotiations! Iron-Clad Argumentation That Breaks Resistance Even from Stubborn Clients](/blog/covers/argumentation-guide.jpg)
+
 This post was written after reading Nikita Nepryakhin's book "Argue This!" — highly recommend it, it covers argumentation in great detail.
 
 Plus some of my own experience.

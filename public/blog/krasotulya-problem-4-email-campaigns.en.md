@@ -1,6 +1,6 @@
 # "Krasotulya": why micro & small businesses need it (card #4 — email campaigns for clients)
 
-!["Krasotulya" CRM](/krasotula4.png)
+!["Krasotulya": why micro & small businesses need it (card #4 — email campaigns for clients)](/blog/covers/krasotulya-problem-4-email-campaigns.jpg)
 
 Gennadiy Korotkov here — head of KorDev Team.
 Today we'll talk about problem #4 — email campaigns for clients.

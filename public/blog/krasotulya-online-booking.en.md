@@ -2,7 +2,7 @@
 
 Hi everyone! Gennady Korotkov, head of KorDev Team.
 
-![Online booking «Krasotulya»](/krasotula7.png)
+![Online Booking in «Krasotulya»: Fewer Calls, More Convenience](/blog/covers/krasotulya-online-booking.jpg)
 
 We've upgraded the feature — **online booking!** 🔥
 

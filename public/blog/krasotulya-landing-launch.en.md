@@ -2,7 +2,7 @@
 
 Gennadiy Korotkov here — head of KorDev Team!
 
-![“Krasotulya” landing page](/krasotula6.png)
+![Launched the “Krasotulya” landing page — krasotula.com](/blog/covers/krasotulya-landing-launch.jpg)
 
 We launched the landing page — [krasotula.com](https://krasotula.com)
 

@@ -1,5 +1,7 @@
 # CRM Implementation: Complete Guide to Sales Automation in 2025
 
+![CRM Implementation: Complete Guide to Sales Automation in 2025](/blog/covers/crm-implementation.jpg)
+
 ## Introduction
 
 CRM (Customer Relationship Management) systems have become an integral part of modern business. A properly implemented CRM system can increase sales by 30-50%, improve customer service quality, and optimize sales team operations. In this guide, we'll explore all aspects of selecting, implementing, and using CRM systems.

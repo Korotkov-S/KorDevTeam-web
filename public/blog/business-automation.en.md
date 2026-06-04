@@ -1,5 +1,7 @@
 # Business Process Automation: How to Increase Company Efficiency in 2025
 
+![Business Process Automation: How to Increase Company Efficiency in 2025](/blog/covers/business-automation.jpg)
+
 ## Introduction
 
 Business process automation has become a key success factor for modern companies. In 2025, technologies allow automating up to 80% of routine operations, significantly increasing efficiency and reducing operational costs. In this article, we'll explore the main approaches to automation, tools, and practical implementation examples.

@@ -1,5 +1,7 @@
 # Telegram Broadcast Automation: Saving 16 Hours of Work for Kusidis PRO
 
+![Telegram Broadcast Automation: Saving 16 Hours of Work for Kusidis PRO](/blog/covers/telegram-broadcast-automation.jpg)
+
 ## Introduction
 
 Mass messaging to customers is one of the most time-consuming tasks in marketing. This is especially true for service businesses, where it's necessary to regularly inform customers about new offers, promotions, and special services. In this article, we'll share a real case study of automating mass messaging through a Telegram bot for Kusidis PRO massage salon in Vladimir, which saved 16 hours of manual work per month.

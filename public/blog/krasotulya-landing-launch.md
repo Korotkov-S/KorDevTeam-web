@@ -2,7 +2,7 @@
 
 На связи Геннадий Коротков, руководитель команды KorDev Team!
 
-![Лендинг «Красотуля»](/krasotula6.png)
+![Запустили лендинг «Красотуля» — krasotula.com](/blog/covers/krasotulya-landing-launch.jpg)
 
 Запустили лендинг — [krasotula.com](https://krasotula.com)
 

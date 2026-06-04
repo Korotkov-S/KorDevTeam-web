@@ -1,9 +1,139 @@
 [
   {
+    "slug": "wordpress-optimization",
+    "lang": "ru",
+    "title": "Оптимизация производительности WordPress сайтов",
+    "coverUrl": "/blog/covers/wordpress-optimization.jpg",
+    "excerpt": "Введение",
+    "date": "10 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "WordPress",
+      "Optimization",
+      "Performance",
+      "PHP"
+    ],
+    "mtimeMs": 1780584409049.4348
+  },
+  {
+    "slug": "telegram-broadcast-automation",
+    "lang": "ru",
+    "title": "Автоматизация массовой рассылки в Telegram: экономия 16 часов работы для Kusidis PRO",
+    "coverUrl": "/blog/covers/telegram-broadcast-automation.jpg",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1780584409048.6301
+  },
+  {
+    "slug": "stone-calculator-automation",
+    "lang": "ru",
+    "title": "Калькулятор изделий из камня: автоматизация сметы и экономия до 80% времени",
+    "coverUrl": "/blog/covers/stone-calculator-automation.jpg",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1780584409047.386
+  },
+  {
+    "slug": "sims-dynasty-tree-platform",
+    "lang": "ru",
+    "title": "SimsDynastyTree: разработка сервиса генеалогических древ на основе графов для фанатов The Sims",
+    "coverUrl": "/blog/covers/sims-dynasty-tree-platform.jpg",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "7 мин",
+    "tags": [],
+    "mtimeMs": 1780584409046.1812
+  },
+  {
+    "slug": "react-native-best-practices",
+    "lang": "ru",
+    "title": "Лучшие практики разработки на React Native в 2025 году",
+    "coverUrl": "/blog/covers/react-native-best-practices.jpg",
+    "excerpt": "Введение",
+    "date": "20 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "React Native",
+      "Mobile Development",
+      "Best Practices"
+    ],
+    "mtimeMs": 1780584409045.067
+  },
+  {
+    "slug": "nodejs-microservices",
+    "lang": "ru",
+    "title": "Микросервисная архитектура на Node.js с NestJS",
+    "coverUrl": "/blog/covers/nodejs-microservices.jpg",
+    "excerpt": "Почему микросервисы?",
+    "date": "15 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "Node.js",
+      "NestJS",
+      "Microservices",
+      "Backend"
+    ],
+    "mtimeMs": 1780584409044.173
+  },
+  {
+    "slug": "laravel-api-development",
+    "lang": "ru",
+    "title": "Разработка RESTful API на Laravel: Полное руководство",
+    "coverUrl": "/blog/covers/laravel-api-development.jpg",
+    "excerpt": "Введение",
+    "date": "5 октября 2025",
+    "readTime": "1 мин",
+    "tags": [
+      "Laravel",
+      "PHP",
+      "API Development",
+      "REST"
+    ],
+    "mtimeMs": 1780584409043.2083
+  },
+  {
+    "slug": "krasotulya-problem-4-email-campaigns",
+    "lang": "ru",
+    "title": "«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №4 — электронные рассылки для клиентов)",
+    "coverUrl": "/blog/covers/krasotulya-problem-4-email-campaigns.jpg",
+    "excerpt": "На связи Геннадий Коротков, руководитель команды KorDev Team. Поговорим сегодня о проблеме №4 — электронные рассылки для клиентов.",
+    "date": "25 января 2026",
+    "readTime": "1 мин",
+    "tags": [
+      "Красотуля",
+      "CRM",
+      "CRM для бизнеса",
+      "Бьюти-бизнес",
+      "Малый бизнес"
+    ],
+    "mtimeMs": 1780584409042.2156
+  },
+  {
+    "slug": "krasotulya-problem-1-data-fragmentation",
+    "lang": "ru",
+    "title": "«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №1 — разрозненные данные)",
+    "coverUrl": "/blog/covers/krasotulya-problem-1-data-fragmentation.jpg",
+    "excerpt": "Всем привет!",
+    "date": "20 января 2026",
+    "readTime": "1 мин",
+    "tags": [
+      "Красотуля",
+      "CRM",
+      "CRM для бизнеса",
+      "Бьюти-бизнес",
+      "Малый бизнес"
+    ],
+    "mtimeMs": 1780584409041.2224
+  },
+  {
     "slug": "krasotulya-online-booking",
     "lang": "ru",
     "title": "Онлайн-запись в «Красотуле»: меньше звонков, больше удобства",
-    "coverUrl": "/krasotula7.png",
+    "coverUrl": "/blog/covers/krasotulya-online-booking.jpg",
     "excerpt": "Всем привет! Геннадий Коротков, руководитель команды KorDev Team.",
     "date": "3 февраля 2026",
     "readTime": "1 мин",
@@ -15,13 +145,13 @@
       "запись клиентов",
       "бьюти-бизнес"
     ],
-    "mtimeMs": 1770114822000
+    "mtimeMs": 1780584409040.593
   },
   {
     "slug": "krasotulya-landing-launch",
     "lang": "ru",
     "title": "Запустили лендинг «Красотуля» — krasotula.com",
-    "coverUrl": "/krasotula6.png",
+    "coverUrl": "/blog/covers/krasotulya-landing-launch.jpg",
     "excerpt": "На связи Геннадий Коротков, руководитель команды KorDev Team!",
     "date": "31 января 2026",
     "readTime": "1 мин",
@@ -31,47 +161,13 @@
       "CRM",
       "Лендинг"
     ],
-    "mtimeMs": 1769852072000
-  },
-  {
-    "slug": "krasotulya-problem-4-email-campaigns",
-    "lang": "ru",
-    "title": "«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №4 — электронные рассылки для клиентов)",
-    "coverUrl": "/krasotula4.png",
-    "excerpt": "На связи Геннадий Коротков, руководитель команды KorDev Team. Поговорим сегодня о проблеме №4 — электронные рассылки для клиентов.",
-    "date": "25 января 2026",
-    "readTime": "1 мин",
-    "tags": [
-      "Красотуля",
-      "CRM",
-      "CRM для бизнеса",
-      "Бьюти-бизнес",
-      "Малый бизнес"
-    ],
-    "mtimeMs": 1769486110000
-  },
-  {
-    "slug": "krasotulya-problem-1-data-fragmentation",
-    "lang": "ru",
-    "title": "«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №1 — разрозненные данные)",
-    "coverUrl": "/blog/krasotula2.jpeg",
-    "excerpt": "Всем привет!",
-    "date": "20 января 2026",
-    "readTime": "1 мин",
-    "tags": [
-      "Красотуля",
-      "CRM",
-      "CRM для бизнеса",
-      "Бьюти-бизнес",
-      "Малый бизнес"
-    ],
-    "mtimeMs": 1769273452000
+    "mtimeMs": 1780584409040.0508
   },
   {
     "slug": "krasotulya-crm-launch",
     "lang": "ru",
     "title": "Запускаем CRM «Красотуля» — здесь будут новости и обновления",
-    "coverUrl": "/blog/krasotula1.jpeg",
+    "coverUrl": "/blog/covers/krasotulya-crm-launch.jpg",
     "excerpt": "Всем привет!",
     "date": "24 января 2026",
     "readTime": "1 мин",
@@ -83,13 +179,13 @@
       "Бьюти-бизнес",
       "Малый бизнес"
     ],
-    "mtimeMs": 1769272800000
+    "mtimeMs": 1780584409039.2305
   },
   {
     "slug": "harmonize-me-story",
     "lang": "ru",
     "title": "\"HarmonizeMe я снова сорвалась…\" — Дарья знает, почему это происходит, и научит, как избежать срывов",
-    "coverUrl": "",
+    "coverUrl": "/blog/covers/harmonize-me-story.jpg",
     "excerpt": "История сервиса",
     "date": "27 января 2025",
     "readTime": "2 мин",
@@ -100,13 +196,24 @@
       "Образование",
       "Next.js"
     ],
-    "mtimeMs": 1766738451000
+    "mtimeMs": 1780584409037.7742
+  },
+  {
+    "slug": "harmonize-me-platform",
+    "lang": "ru",
+    "title": "Платформа Harmonize Me: комплексная разработка онлайн-курсов психологии с геймификацией и ИИ-поддержкой",
+    "coverUrl": "/blog/covers/harmonize-me-platform.jpg",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "8 мин",
+    "tags": [],
+    "mtimeMs": 1780584409035.5957
   },
   {
     "slug": "government-contractors-guide",
     "lang": "ru",
     "title": "Как эффективно взаимодействовать с госзаказчиками в IT-сфере?",
-    "coverUrl": "",
+    "coverUrl": "/blog/covers/government-contractors-guide.jpg",
     "excerpt": "Мой телеграм канал о моей студии, жизни, менеджменте, умных мыслях (надеюсь), личной эффективности, юмор",
     "date": "27 января 2025",
     "readTime": "12 мин",
@@ -117,13 +224,35 @@
       "Бизнес",
       "Менеджмент"
     ],
-    "mtimeMs": 1766738278000
+    "mtimeMs": 1780584409033.5295
+  },
+  {
+    "slug": "crm-implementation",
+    "lang": "ru",
+    "title": "Внедрение CRM систем: полное руководство по автоматизации продаж в 2025 году",
+    "coverUrl": "/blog/covers/crm-implementation.jpg",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1780584409031.8308
+  },
+  {
+    "slug": "business-automation",
+    "lang": "ru",
+    "title": "Автоматизация бизнес-процессов: как повысить эффективность компании в 2025 году",
+    "coverUrl": "/blog/covers/business-automation.jpg",
+    "excerpt": "Введение",
+    "date": "",
+    "readTime": "4 мин",
+    "tags": [],
+    "mtimeMs": 1780584409031.0342
   },
   {
     "slug": "argumentation-guide",
     "lang": "ru",
     "title": "Хватит терять переговоры! Железная аргументация, которая ломает сопротивление даже упрямых клиентов",
-    "coverUrl": "",
+    "coverUrl": "/blog/covers/argumentation-guide.jpg",
     "excerpt": "Пост написан после прочтения книги Никиты Непряхина «Аргументируй это!» — очень советую, там очень подробно расписано про аргументацию.",
     "date": "27 января 2025",
     "readTime": "3 мин",
@@ -133,135 +262,6 @@
       "Коммуникация",
       "Бизнес"
     ],
-    "mtimeMs": 1766737161000
-  },
-  {
-    "slug": "sims-dynasty-tree-platform",
-    "lang": "ru",
-    "title": "SimsDynastyTree: разработка сервиса генеалогических древ на основе графов для фанатов The Sims",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "7 мин",
-    "tags": [],
-    "mtimeMs": 1766498499000
-  },
-  {
-    "slug": "harmonize-me-platform",
-    "lang": "ru",
-    "title": "Платформа Harmonize Me: комплексная разработка онлайн-курсов психологии с геймификацией и ИИ-поддержкой",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "7 мин",
-    "tags": [],
-    "mtimeMs": 1766496436000
-  },
-  {
-    "slug": "business-automation",
-    "lang": "ru",
-    "title": "Автоматизация бизнес-процессов: как повысить эффективность компании в 2025 году",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "4 мин",
-    "tags": [],
-    "mtimeMs": 1766496115000
-  },
-  {
-    "slug": "crm-implementation",
-    "lang": "ru",
-    "title": "Внедрение CRM систем: полное руководство по автоматизации продаж в 2025 году",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "4 мин",
-    "tags": [],
-    "mtimeMs": 1766496115000
-  },
-  {
-    "slug": "laravel-api-development",
-    "lang": "ru",
-    "title": "Разработка RESTful API на Laravel: Полное руководство",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "5 октября 2025",
-    "readTime": "1 мин",
-    "tags": [
-      "Laravel",
-      "PHP",
-      "API Development",
-      "REST"
-    ],
-    "mtimeMs": 1766496115000
-  },
-  {
-    "slug": "nodejs-microservices",
-    "lang": "ru",
-    "title": "Микросервисная архитектура на Node.js с NestJS",
-    "coverUrl": "",
-    "excerpt": "Почему микросервисы?",
-    "date": "15 октября 2025",
-    "readTime": "1 мин",
-    "tags": [
-      "Node.js",
-      "NestJS",
-      "Microservices",
-      "Backend"
-    ],
-    "mtimeMs": 1766496115000
-  },
-  {
-    "slug": "react-native-best-practices",
-    "lang": "ru",
-    "title": "Лучшие практики разработки на React Native в 2025 году",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "20 октября 2025",
-    "readTime": "1 мин",
-    "tags": [
-      "React Native",
-      "Mobile Development",
-      "Best Practices"
-    ],
-    "mtimeMs": 1766496115000
-  },
-  {
-    "slug": "stone-calculator-automation",
-    "lang": "ru",
-    "title": "Калькулятор изделий из камня: автоматизация сметы и экономия до 80% времени",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "4 мин",
-    "tags": [],
-    "mtimeMs": 1766496115000
-  },
-  {
-    "slug": "telegram-broadcast-automation",
-    "lang": "ru",
-    "title": "Автоматизация массовой рассылки в Telegram: экономия 16 часов работы для Kusidis PRO",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "",
-    "readTime": "4 мин",
-    "tags": [],
-    "mtimeMs": 1766496115000
-  },
-  {
-    "slug": "wordpress-optimization",
-    "lang": "ru",
-    "title": "Оптимизация производительности WordPress сайтов",
-    "coverUrl": "",
-    "excerpt": "Введение",
-    "date": "10 октября 2025",
-    "readTime": "1 мин",
-    "tags": [
-      "WordPress",
-      "Optimization",
-      "Performance",
-      "PHP"
-    ],
-    "mtimeMs": 1766496115000
+    "mtimeMs": 1780584409030.1118
   }
 ]

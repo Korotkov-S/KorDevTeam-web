@@ -1,5 +1,7 @@
 # Microservices Architecture on Node.js with NestJS
 
+![Microservices Architecture on Node.js with NestJS](/blog/covers/nodejs-microservices.jpg)
+
 ## Why Microservices?
 
 Microservices architecture allows breaking down a monolithic application into small, independent services that are easy to scale and maintain.

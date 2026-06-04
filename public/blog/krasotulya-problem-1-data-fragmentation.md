@@ -2,7 +2,7 @@
 
 Всем привет!
 
-![CRM «Красотуля»](/blog/krasotula2.jpeg)
+![«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №1 — разрозненные данные)](/blog/covers/krasotulya-problem-1-data-fragmentation.jpg)
 
 На связи Геннадий Коротков, руководитель команды KorDev Team.
 

@@ -1,5 +1,7 @@
 # Laravel RESTful API Development: Complete Guide
 
+![Laravel RESTful API Development: Complete Guide](/blog/covers/laravel-api-development.jpg)
+
 ## Introduction
 
 Laravel is one of the most popular PHP frameworks for creating web applications and APIs. In this guide, we'll create a full-featured RESTful API.

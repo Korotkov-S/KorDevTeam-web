@@ -2,7 +2,7 @@
 
 Hello everyone!
 
-![“Krasotulya” CRM](/blog/krasotula2.jpeg)
+![“Krasotulya”: why micro & small businesses need it (card #1 — scattered data)](/blog/covers/krasotulya-problem-1-data-fragmentation.jpg)
 
 Gennadiy Korotkov here — head of KorDev Team.
 

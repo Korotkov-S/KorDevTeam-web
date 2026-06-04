@@ -1,5 +1,7 @@
 # SimsDynastyTree: Development of Genealogy Tree Service Based on Graphs for The Sims Fans
 
+![SimsDynastyTree: Development of Genealogy Tree Service Based on Graphs for The Sims Fans](/blog/covers/sims-dynasty-tree-platform.jpg)
+
 ## Introduction
 
 Creating genealogy trees is a complex task requiring an efficient data structure to represent relationships between people. This is especially relevant for The Sims fans who want to track complex family stories across many generations. In this article, we'll share the development of the [SimsDynastyTree](https://simsdynastytree.com/ru) web service — a specialized platform for creating and maintaining detailed Sims genealogy trees using graphs, customization, subscription system, and international payments.

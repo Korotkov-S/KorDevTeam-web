@@ -2,7 +2,7 @@
 
 Hello everyone!
 
-![“Krasotulya” CRM](/blog/krasotula1.jpeg)
+![Launching “Krasotulya” CRM — news and updates will be here](/blog/covers/krasotulya-crm-launch.jpg)
 
 Gennadiy Korotkov here — head of KorDev Team.
 

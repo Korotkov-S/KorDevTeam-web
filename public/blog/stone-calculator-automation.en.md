@@ -1,5 +1,7 @@
 # Stone Products Calculator: Automating Estimates and Saving Up to 80% of Time
 
+![Stone Products Calculator: Automating Estimates and Saving Up to 80% of Time](/blog/covers/stone-calculator-automation.jpg)
+
 ## Introduction
 
 Creating estimates and commercial proposals for stone products is a complex and time-consuming process. Designers and managers have to manually calculate material costs, work costs, account for product complexity, and create documents. In this article, we'll share a web service we developed for a Moscow company producing stone products. The solution combines a visual drawing editor (similar to a simplified AutoCAD), automatic estimate calculation, and commercial proposal generation, which reduced time spent on creating estimates by up to 80%.

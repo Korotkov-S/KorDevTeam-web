@@ -1,5 +1,7 @@
 # How to Effectively Work with Government Contractors in IT?
 
+![How to Effectively Work with Government Contractors in IT?](/blog/covers/government-contractors-guide.jpg)
+
 My [Telegram channel](https://t.me/kordevteam) - about my studio, life, management, smart thoughts (hopefully), personal effectiveness, humor
 
 ## Introduction

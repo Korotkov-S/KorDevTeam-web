@@ -1,5 +1,7 @@
 # Harmonize Me Platform: Comprehensive Development of Online Psychology Courses with Gamification and AI Support
 
+![Harmonize Me Platform: Comprehensive Development of Online Psychology Courses with Gamification and AI Support](/blog/covers/harmonize-me-platform.jpg)
+
 ## Introduction
 
 Creating a full-featured educational platform with gamification elements, bonus system, personal accounts, and AI assistant integration is a complex task requiring a comprehensive approach. In this article, we'll share the development of the [Harmonize Me](https://iharmo.com/ru) web platform — online psychology courses for weight management that combines educational content, game mechanics, motivation system, and artificial intelligence for user support.

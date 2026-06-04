@@ -1,5 +1,7 @@
 # "HarmonizeMe I broke down again..." — Daria knows why this happens and will teach you how to avoid breakdowns
 
+!["HarmonizeMe I broke down again..." — Daria knows why this happens and will teach you how to avoid breakdowns](/blog/covers/harmonize-me-story.jpg)
+
 ## Service Story
 
 We helped Daria Kuznetsova, an expert in nutrition psychology, create a platform that breaks patterns in the fight against excess weight.

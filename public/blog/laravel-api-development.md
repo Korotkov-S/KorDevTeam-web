@@ -1,5 +1,7 @@
 # Разработка RESTful API на Laravel: Полное руководство
 
+![Разработка RESTful API на Laravel: Полное руководство](/blog/covers/laravel-api-development.jpg)
+
 ## Введение
 
 Laravel — один из самых популярных PHP фреймворков для создания веб-приложений и API. В этом руководстве мы создадим полноценный RESTful API.

@@ -2,7 +2,7 @@
 
 Всем привет!
 
-![CRM «Красотуля»](/blog/krasotula1.jpeg)
+![Запускаем CRM «Красотуля» — здесь будут новости и обновления](/blog/covers/krasotulya-crm-launch.jpg)
 
 На связи Геннадий Коротков, руководитель команды KorDev Team.
 
