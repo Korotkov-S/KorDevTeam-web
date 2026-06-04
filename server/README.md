@@ -9,10 +9,9 @@ API сервер для управления постами блога на са
 yarn install
 ```
 
-2. Создайте файл `.env` в директории `server/`:
+2. Создайте файл `.env` в корне проекта. Сервер загружает переменные окружения из текущей рабочей директории, поэтому запускать его нужно из корня репозитория:
 ```bash
-cd server
-cp .env.example .env
+cp server/.env.example .env
 ```
 
 3. Настройте переменные окружения в `.env`:
@@ -29,17 +28,19 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Запуск
 
-### Режим разработки (с автоперезагрузкой):
+### Режим разработки:
 ```bash
-yarn server:dev
+node server/index.js
 ```
 
-### Продакшн режим:
+### Продакшен режим:
 ```bash
-yarn server
+NODE_ENV=production PORT=3001 CONTENT_DIST_ROOT=dist node server/index.js
 ```
 
 Сервер будет доступен по адресу: `http://localhost:3001`
+
+> В `package.json` сейчас нет отдельных скриптов `server` или `server:dev`, поэтому сервер запускается напрямую через Node.js.
 
 ## API Endpoints
 
