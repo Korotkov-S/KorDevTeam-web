@@ -12,6 +12,7 @@ function toWebpCandidate(src: string): string | null {
   const s = src.trim();
   // only local static assets
   if (!s || s.startsWith("data:") || /^https?:\/\//i.test(s)) return null;
+  if (s.startsWith("/blog/") && !s.startsWith("/blog/uploads/")) return null;
   // avoid query/hash rewriting ambiguity
   if (s.includes("?") || s.includes("#")) return null;
   if (!s.startsWith("/")) return null;

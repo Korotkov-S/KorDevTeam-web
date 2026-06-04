@@ -51,6 +51,12 @@ function stripFirstMarkdownH1(md: string): string {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
 }
 
+function stripFirstMarkdownImage(md: string): string {
+  return md
+    .replace(/^\s*!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*\n*/m, "")
+    .trim();
+}
+
 function stripMd(md: string): string {
   return md
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
@@ -68,6 +74,18 @@ function isImageOnlyBlock(block: string): boolean {
   return lines.every((l) =>
     /^!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*$/.test(l),
   );
+}
+
+function isMediaOrSourceOnlyBlock(block: string): boolean {
+  if (isImageOnlyBlock(block)) return true;
+
+  const normalized = stripMd(block).toLowerCase();
+  if (!normalized) return true;
+  if (normalized === "видео") return true;
+  if (/^видео\s+смотреть видео(?:\s+\d+)?$/.test(normalized)) return true;
+  if (/^смотреть видео(?:\s+\d+)?$/.test(normalized)) return true;
+  if (normalized.startsWith("источник: telegram-канал")) return true;
+  return false;
 }
 
 function extractLegacyMeta(md: string): Partial<BlogPostMeta> {
@@ -102,7 +120,7 @@ function deriveMetaFromMarkdown(md: string, lang: string): BlogPostMeta {
     .split(/\n\s*\n/)
     .map((b) => b.trim())
     .filter(Boolean);
-  const firstTextBlock = blocks.find((b) => !isImageOnlyBlock(b)) || "";
+  const firstTextBlock = blocks.find((b) => !isMediaOrSourceOnlyBlock(b)) || "";
   const excerpt = stripMd(firstTextBlock || title).slice(0, 180);
   const legacy = extractLegacyMeta(md);
   return {
@@ -348,7 +366,7 @@ export function BlogPostPage() {
             const firstImg = extractFirstImage(md);
             const coverForUi = normalizePublicAssetUrl(cover || firstImg);
             setCoverUrl(coverForUi);
-            setContent(stripFirstMarkdownH1(md));
+            setContent(stripFirstMarkdownImage(stripFirstMarkdownH1(md)));
             setOgImage(toAbsoluteOgImage(coverForUi));
             if (!postMeta) {
               if (data?.post?.title) {
@@ -376,7 +394,7 @@ export function BlogPostPage() {
           const firstImg = extractFirstImage(text);
           const coverForUi = normalizePublicAssetUrl(firstImg);
           setCoverUrl(coverForUi);
-          setContent(stripFirstMarkdownH1(text));
+          setContent(stripFirstMarkdownImage(stripFirstMarkdownH1(text)));
           setOgImage(toAbsoluteOgImage(coverForUi));
           if (!postMeta) {
             setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));

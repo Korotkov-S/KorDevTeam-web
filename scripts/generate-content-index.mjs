@@ -30,6 +30,18 @@ function isImageOnlyBlock(block) {
   );
 }
 
+function isMediaOrSourceOnlyBlock(block) {
+  if (isImageOnlyBlock(block)) return true;
+
+  const normalized = stripMd(block).toLowerCase();
+  if (!normalized) return true;
+  if (normalized === "видео") return true;
+  if (/^видео\s+смотреть видео(?:\s+\d+)?$/.test(normalized)) return true;
+  if (/^смотреть видео(?:\s+\d+)?$/.test(normalized)) return true;
+  if (normalized.startsWith("источник: telegram-канал")) return true;
+  return false;
+}
+
 function extractTitleAndExcerpt(md) {
   const titleMatch = md.match(/^\s*#\s+(.+)\s*$/m);
   const title = (titleMatch?.[1] || "Page").trim();
@@ -38,7 +50,7 @@ function extractTitleAndExcerpt(md) {
     .split(/\n\s*\n/)
     .map((b) => b.trim())
     .filter(Boolean);
-  const firstTextBlock = blocks.find((b) => !isImageOnlyBlock(b)) || "";
+  const firstTextBlock = blocks.find((b) => !isMediaOrSourceOnlyBlock(b)) || "";
   const excerpt = stripMd(firstTextBlock || title).slice(0, 180);
   return { title, excerpt };
 }
