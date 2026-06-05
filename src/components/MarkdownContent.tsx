@@ -1,9 +1,35 @@
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 import { cn } from "./ui/utils";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 const DEFAULT_FALLBACK_IMAGE_SRC = "/opengraphlogo.jpeg";
+
+function MarkdownVideo({ href }: { href: string }) {
+  const [isVertical, setIsVertical] = useState(false);
+
+  return (
+    <video
+      controls
+      preload="metadata"
+      className={cn(
+        "rounded-xl border border-border/50 my-6 bg-black object-contain",
+        "max-h-[min(78dvh,720px)]",
+        isVertical ? "w-auto max-w-full mx-auto" : "w-full",
+      )}
+      onLoadedMetadata={(event) => {
+        const video = event.currentTarget;
+        setIsVertical(video.videoHeight > video.videoWidth);
+      }}
+    >
+      <source src={href} />
+      <a className="text-primary hover:underline" href={href}>
+        Смотреть видео
+      </a>
+    </video>
+  );
+}
 
 const markdownComponents = {
   h1: ({ node, ...props }: any) => (
@@ -26,16 +52,7 @@ const markdownComponents = {
     const isVideo = /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(href);
 
     if (isVideo) {
-      return (
-        <video
-          controls
-          preload="metadata"
-          className="w-full rounded-xl border border-border/50 my-6 bg-black"
-        >
-          <source src={href} />
-          <a className="text-primary hover:underline" {...props} />
-        </video>
-      );
+      return <MarkdownVideo href={href} />;
     }
 
     return <a className="text-primary hover:underline" {...props} />;
