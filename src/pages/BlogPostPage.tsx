@@ -251,33 +251,37 @@ function PostImageCarousel({
           ))}
         </CarouselContent>
       </Carousel>
-      <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-3 sm:px-5">
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-black/45 to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-black/45 to-transparent" />
+      <div className="absolute inset-y-0 left-0 right-0 z-20 flex items-center justify-between px-3 sm:px-5">
         <Button
           type="button"
           size="icon"
-          variant="secondary"
+          variant="ghost"
           aria-label="Предыдущее изображение"
-          className="size-9 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
+          className="size-11 rounded-full border border-white/70 bg-black/70 text-white shadow-xl backdrop-blur-md hover:bg-black/85 hover:text-white focus-visible:ring-white/70 sm:size-12"
           onClick={() => api?.scrollPrev()}
+          onMouseDown={(event) => event.preventDefault()}
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-6" />
         </Button>
         <Button
           type="button"
           size="icon"
-          variant="secondary"
+          variant="ghost"
           aria-label="Следующее изображение"
-          className="size-9 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
+          className="size-11 rounded-full border border-white/70 bg-black/70 text-white shadow-xl backdrop-blur-md hover:bg-black/85 hover:text-white focus-visible:ring-white/70 sm:size-12"
           onClick={() => api?.scrollNext()}
+          onMouseDown={(event) => event.preventDefault()}
         >
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-6" />
         </Button>
       </div>
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+      <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/45 px-3 py-2 backdrop-blur-md">
         {safeImages.map((src, index) => (
           <span
             key={`${src}-dot-${index}`}
-            className="size-2 rounded-full bg-background/85 shadow-sm"
+            className="size-2 rounded-full bg-white shadow-sm"
           />
         ))}
       </div>
