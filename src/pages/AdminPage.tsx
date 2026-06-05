@@ -63,6 +63,14 @@ async function fetchText(url: string, init?: RequestInit): Promise<string> {
   return await res.text();
 }
 
+function postApiPath(slug: string) {
+  return `/api/posts/${encodeURIComponent(slug)}`;
+}
+
+function postDeleteApiPath(slug: string, lang: Lang) {
+  return `/api/posts?slug=${encodeURIComponent(slug)}&lang=${encodeURIComponent(lang)}`;
+}
+
 async function checkAuth(
   header: string
 ): Promise<{ ok: boolean; status: number | null }> {
@@ -190,6 +198,7 @@ export function AdminPage() {
 
   // Blog editor
   const [blogSelectedSlug, setBlogSelectedSlug] = useState<string>("");
+  const [blogHasSelection, setBlogHasSelection] = useState(false);
   const [blogTitle, setBlogTitle] = useState<string>("");
   const [blogCoverUrl, setBlogCoverUrl] = useState<string>("");
   const [blogDate, setBlogDate] = useState<string>("");
@@ -534,12 +543,13 @@ export function AdminPage() {
   const onSelectBlog = useCallback(
     async (slug: string) => {
       setBlogSelectedSlug(slug);
+      setBlogHasSelection(true);
       const meta = blogIndex.find((x) => x.slug === slug) || null;
       setBlogTitle(meta?.title || slug);
       try {
         const data = await fetchJson<{
           post: { content: string; coverUrl?: string; title?: string; tags?: string[]; date?: string };
-        }>(`/api/posts/${slug}?lang=${lang}`);
+        }>(`${postApiPath(slug)}?lang=${encodeURIComponent(lang)}`);
         const loadedCover = String(data.post.coverUrl || "").trim();
         setBlogContent(prepareBlogEditorContent(data.post.content || "", loadedCover));
         setBlogCoverUrl(loadedCover);
@@ -575,9 +585,9 @@ export function AdminPage() {
         toast.error("Нужны title и content");
         return;
       }
-      const isUpdate = Boolean(blogSelectedSlug);
+      const isUpdate = blogHasSelection;
       if (isUpdate) {
-        await fetchJson(`/api/posts/${blogSelectedSlug}`, {
+        await fetchJson(postApiPath(blogSelectedSlug), {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -613,6 +623,7 @@ export function AdminPage() {
         if (coverToSave) lastUploadedCoverUrlRef.current = coverToSave;
         toast.success(`Создано: ${resp.post.slug}`);
         setBlogSelectedSlug(resp.post.slug);
+        setBlogHasSelection(true);
       }
       await loadIndexes();
     } catch (e: any) {
@@ -625,6 +636,7 @@ export function AdminPage() {
     blogDate,
     blogTags,
     blogContent,
+    blogHasSelection,
     blogSelectedSlug,
     blogTitle,
     lang,
@@ -633,18 +645,19 @@ export function AdminPage() {
   ]);
 
   const deleteBlog = useCallback(async () => {
-    if (!blogSelectedSlug) return;
+    if (!blogHasSelection) return;
     try {
       if (!(await verifyAuth())) {
         toast.error("Нужна авторизация");
         return;
       }
-      await fetchJson(`/api/posts/${blogSelectedSlug}?lang=${lang}`, {
+      await fetchJson(postDeleteApiPath(blogSelectedSlug, lang), {
         method: "DELETE",
         headers: { ...authHeaders(authHeaderValue) },
       });
       toast.success("Удалено");
       setBlogSelectedSlug("");
+      setBlogHasSelection(false);
       setBlogTitle("");
       setBlogCoverUrl("");
       setBlogDate("");
@@ -658,7 +671,7 @@ export function AdminPage() {
       console.warn(e);
       toast.error(`Ошибка удаления: ${e?.message || "unknown"}`);
     }
-  }, [authHeaderValue, blogSelectedSlug, lang, loadIndexes, verifyAuth]);
+  }, [authHeaderValue, blogHasSelection, blogSelectedSlug, lang, loadIndexes, verifyAuth]);
 
   const saveProjects = useCallback(async () => {
     try {
@@ -1039,6 +1052,7 @@ export function AdminPage() {
                       variant="secondary"
                       onClick={() => {
                         setBlogSelectedSlug("");
+                        setBlogHasSelection(false);
                         setBlogTitle("");
                         setBlogCoverUrl("");
                         setBlogDate("");
@@ -1095,6 +1109,10 @@ export function AdminPage() {
                       {blogSelectedSlug ? (
                         <div className="text-xs text-muted-foreground">
                           <span className="font-mono">/blog/{blogSelectedSlug}</span>
+                        </div>
+                      ) : blogHasSelection ? (
+                        <div className="text-xs text-destructive">
+                          У этого старого поста пустой slug. Его можно удалить и создать заново.
                         </div>
                       ) : null}
                     </div>
@@ -1201,7 +1219,7 @@ export function AdminPage() {
                       <Button
                         variant="destructive"
                         onClick={deleteBlog}
-                        disabled={!blogSelectedSlug}
+                        disabled={!blogHasSelection}
                       >
                         Удалить
                       </Button>
@@ -1243,17 +1261,17 @@ export function AdminPage() {
                             : `Загрузки локально. ${uploadConfig.reason ?? "S3 не настроен."}`}
                         </span>
                       )}
-                      {blogSelectedSlug && (
+                      {blogHasSelection && blogSelectedSlug ? (
                         <Button asChild variant="outline">
                           <a
-                            href={`/blog/${blogSelectedSlug}`}
+                            href={`/blog/${encodeURIComponent(blogSelectedSlug)}`}
                             target="_blank"
                             rel="noreferrer"
                           >
                             Открыть
                           </a>
                         </Button>
-                      )}
+                      ) : null}
                     </div>
 
                     {blogCoverUrl ? (

@@ -16,6 +16,16 @@ const {
 } = require("../utils/fileHandler");
 const { extractMetaFromMarkdown } = require("../utils/contentMeta");
 
+async function deletePostBySlug({ slug, lang }) {
+  const l = safeLang(lang?.toString?.() || "ru");
+  const legacyPost = await getFilePost(slug, l);
+  const deleted = await deleteDbPost({ slug, lang: l });
+  // Legacy cleanup (ignore errors)
+  await deleteMarkdownFile(slug, l);
+
+  return deleted || Boolean(legacyPost);
+}
+
 /**
  * POST /api/posts
  * Создание нового поста
@@ -89,6 +99,32 @@ router.get('/', async (req, res, next) => {
     const en = await listPostMetas({ lang: "en" });
     const posts = { ru, en };
     res.json({ posts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/posts?slug=:slug
+ * Удаление поста, включая старые записи с пустым/кривым slug
+ */
+router.delete('/', authenticate, async (req, res, next) => {
+  try {
+    const hasSlugQuery = Object.prototype.hasOwnProperty.call(req.query, "slug");
+    const rawSlug = hasSlugQuery ? req.query.slug : req.body?.slug;
+    if (Array.isArray(rawSlug) || rawSlug === undefined || rawSlug === null) {
+      return res.status(400).json({ error: "slug is required" });
+    }
+
+    const { lang = 'ru' } = req.query;
+    const deleted = await deletePostBySlug({
+      slug: String(rawSlug),
+      lang,
+    });
+
+    if (!deleted) return res.status(404).json({ error: "Post not found" });
+
+    res.json({ message: 'Post deleted successfully' });
   } catch (error) {
     next(error);
   }
@@ -201,13 +237,9 @@ router.delete('/:slug', authenticate, async (req, res, next) => {
     const { slug } = req.params;
     const { lang = 'ru' } = req.query;
 
-    const l = safeLang(lang?.toString?.() || "ru");
-    const legacyPost = await getFilePost(slug, l);
-    const deleted = await deleteDbPost({ slug, lang: l });
-    // Legacy cleanup (ignore errors)
-    await deleteMarkdownFile(slug, l);
+    const deleted = await deletePostBySlug({ slug, lang });
 
-    if (!deleted && !legacyPost) return res.status(404).json({ error: "Post not found" });
+    if (!deleted) return res.status(404).json({ error: "Post not found" });
 
     res.json({ message: 'Post deleted successfully' });
   } catch (error) {
