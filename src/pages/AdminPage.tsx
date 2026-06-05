@@ -98,6 +98,10 @@ function deriveBlogUploadsKeyFromUrl(url: string, publicBaseUrl?: string | null)
   const u = String(url || "").trim();
   if (!u) return "";
 
+  if (u.startsWith("/api/media/blog/uploads/")) {
+    return u.replace(/^\/api\/media\/+/, "");
+  }
+
   if (u.startsWith("/blog/uploads/")) {
     return u.replace(/^\/+/, ""); // blog/uploads/...
   }
@@ -415,8 +419,10 @@ export function AdminPage() {
             : uploadedUrl.startsWith("/")
               ? uploadedUrl
               : `/${uploadedUrl.replace(/^\.\//, "")}`;
-        // Store the real S3/CDN URL. The media proxy is only a fallback for private buckets.
-        const coverUrlToUse = resolvedUploadedUrl || proxyUrl;
+        // For S3, store the same-origin proxy URL so images render even when
+        // the bucket is private or the public base URL is not browser-readable.
+        const coverUrlToUse =
+          resp.storage === "s3" && proxyUrl ? proxyUrl : resolvedUploadedUrl || proxyUrl;
 
         // Use uploaded image as the article cover. The public article renders it above the body.
         lastUploadedCoverUrlRef.current = coverUrlToUse;
@@ -811,7 +817,11 @@ export function AdminPage() {
           reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
           reader.readAsDataURL(file);
         });
-        const resp = await fetchJson<{ url: string }>(
+        const resp = await fetchJson<{
+          url?: string;
+          proxyUrl?: string;
+          storage?: "s3" | "local";
+        }>(
           `/api/admin/upload-project-image`,
           {
             method: "POST",
@@ -822,7 +832,25 @@ export function AdminPage() {
             body: JSON.stringify({ dataUrl, filename: file.name }),
           }
         );
-        setProjectDraft((prev) => ({ ...prev, image: resp.url }));
+        const uploadedUrl = String(resp.url || "").trim();
+        const proxyUrl = String(resp.proxyUrl || "").trim();
+        const resolvedUploadedUrl =
+          /^https?:\/\//i.test(uploadedUrl)
+            ? uploadedUrl
+            : uploadedUrl.startsWith("/")
+              ? uploadedUrl
+              : uploadedUrl
+                ? `/${uploadedUrl.replace(/^\.\//, "")}`
+                : "";
+        const imageUrlToUse =
+          resp.storage === "s3" && proxyUrl ? proxyUrl : resolvedUploadedUrl || proxyUrl;
+
+        if (!imageUrlToUse) {
+          toast.error("Сервер не вернул URL изображения");
+          return;
+        }
+
+        setProjectDraft((prev) => ({ ...prev, image: imageUrlToUse }));
         toast.success("Фото загружено");
       } catch (e: any) {
         console.warn(e);

@@ -77,7 +77,9 @@ router.post("/delete-blog-image", authenticate, async (req, res, next) => {
 
     // Derive key from URL if not provided
     if (!key && urlStr) {
-      if (urlStr.startsWith("/blog/uploads/")) {
+      if (urlStr.startsWith("/api/media/blog/uploads/")) {
+        key = normalizePosixKey(urlStr.replace(/^\/api\/media\/+/, "")); // blog/uploads/...
+      } else if (urlStr.startsWith("/blog/uploads/")) {
         key = normalizePosixKey(urlStr.replace(/^\/+/, "")); // blog/uploads/...
       } else if (config.publicBaseUrl && /^https?:\/\//i.test(urlStr)) {
         // If URL points to our configured public base, extract path as key.
@@ -326,4 +328,3 @@ router.post("/generate-index", authenticate, async (req, res) => {
 });
 
 module.exports = router;
-
