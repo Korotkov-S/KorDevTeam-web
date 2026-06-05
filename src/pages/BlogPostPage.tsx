@@ -88,17 +88,24 @@ function stripFirstMarkdownH1(md: string): string {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
 }
 
-function stripMarkdownImages(md: string): string {
-  return md
-    .replace(/^\s*!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*\n*/gm, "")
-    .trim();
-}
-
 function stripMd(md: string): string {
   return md
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/[`*_>#-]/g, "")
     .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripMarkdownImageByUrl(md: string, imageUrl: string): string {
+  const target = normalizePublicAssetUrl(imageUrl);
+  if (!target) return md.trim();
+
+  return md
+    .replace(
+      /^\s*!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*\n*/gm,
+      (match, src) =>
+        normalizePublicAssetUrl(String(src || "")) === target ? "" : match,
+    )
     .trim();
 }
 
@@ -450,7 +457,7 @@ export function BlogPostPage() {
             setImageUrls(prerenderImages);
             setCoverUrl(prerenderCover);
             setOgImage(toAbsoluteOgImage(prerenderCover));
-            setContent(stripMarkdownImages(stripFirstMarkdownH1(data.md)));
+            setContent(stripMarkdownImageByUrl(stripFirstMarkdownH1(data.md), prerenderCover));
             setLoading(false);
             hasPrerender = true;
           }
@@ -493,7 +500,7 @@ export function BlogPostPage() {
             const coverForUi = mediaForUi[0] || "";
             setImageUrls(mediaForUi);
             setCoverUrl(coverForUi);
-            setContent(stripMarkdownImages(stripFirstMarkdownH1(md)));
+            setContent(stripMarkdownImageByUrl(stripFirstMarkdownH1(md), coverForUi));
             setOgImage(toAbsoluteOgImage(coverForUi));
             if (!postMeta) {
               if (data?.post?.title) {
@@ -522,7 +529,7 @@ export function BlogPostPage() {
           const coverForUi = mediaForUi[0] || "";
           setImageUrls(mediaForUi);
           setCoverUrl(coverForUi);
-          setContent(stripMarkdownImages(stripFirstMarkdownH1(text)));
+          setContent(stripMarkdownImageByUrl(stripFirstMarkdownH1(text), coverForUi));
           setOgImage(toAbsoluteOgImage(coverForUi));
           if (!postMeta) {
             setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
@@ -548,7 +555,7 @@ export function BlogPostPage() {
     loadMarkdown();
   }, [slug, navigate, i18n.language, i18n.resolvedLanguage, blogPostsData, navigateGoBack]);
 
-  const heroImageUrls = imageUrls.length ? imageUrls : coverUrl ? [coverUrl] : [];
+  const heroImageUrls = coverUrl ? [coverUrl] : imageUrls.slice(0, 1);
 
   return (
     <>

@@ -131,6 +131,38 @@ function removeMarkdownImagesByUrl(markdown: string, url: string) {
   return markdown.replace(re, "").replace(/\n{3,}/g, "\n\n").trimStart();
 }
 
+function stripFirstMarkdownH1(markdown: string) {
+  return String(markdown || "").replace(/^\s*#\s+.+\s*$/m, "").trim();
+}
+
+function prepareBlogEditorContent(markdown: string, coverUrl?: string) {
+  const withoutTitle = stripFirstMarkdownH1(markdown);
+  return coverUrl
+    ? removeMarkdownImagesByUrl(withoutTitle, coverUrl).trim()
+    : withoutTitle;
+}
+
+function buildBlogStorageContent({
+  title,
+  coverUrl,
+  content,
+}: {
+  title: string;
+  coverUrl?: string;
+  content: string;
+}) {
+  const parts = [`# ${title.trim()}`];
+  const cover = String(coverUrl || "").trim();
+  const body = cover
+    ? removeMarkdownImagesByUrl(content, cover).trim()
+    : String(content || "").trim();
+
+  if (cover) parts.push(`![](${cover})`);
+  if (body) parts.push(body);
+
+  return `${parts.join("\n\n")}\n`;
+}
+
 export function AdminPage() {
   const [username, setUsername] = useState<string>(
     () => localStorage.getItem("ADMIN_USERNAME") || ""
@@ -386,24 +418,10 @@ export function AdminPage() {
         // For S3 uploads, prefer same-origin proxy URL (works for private buckets too).
         const coverUrlToUse = proxyUrl || resolvedUploadedUrl;
 
-        // Use uploaded image as cover and also insert into markdown (for "same cover inside article")
+        // Use uploaded image as the article cover. The public article renders it above the body.
         lastUploadedCoverUrlRef.current = coverUrlToUse;
         lastUploadedCoverKeyRef.current = String(resp.key || "").trim();
         setBlogCoverUrl(coverUrlToUse);
-        const alreadyHasUrl = blogContent.includes(coverUrlToUse) || blogContent.includes(uploadedUrl);
-        if (!alreadyHasUrl) {
-          // Insert right after the first H1 if present, otherwise at the top.
-          const md = blogContent || "";
-          const h1Match = md.match(/^\s*#\s+.+\s*$/m);
-          if (h1Match?.index != null) {
-            const idx = h1Match.index + h1Match[0].length;
-            const next =
-              md.slice(0, idx) + `\n\n![](${coverUrlToUse})\n\n` + md.slice(idx);
-            setBlogContent(next);
-          } else {
-            setBlogContent(`![](${coverUrlToUse})\n\n` + md);
-          }
-        }
         const storageLabel = resp.storage === "s3" ? " (S3)" : " (локально)";
         toast.success(`Фото загружено${storageLabel}`, {
           description: uploadedUrl.length <= 80 ? uploadedUrl : `${uploadedUrl.slice(0, 77)}…`,
@@ -416,7 +434,7 @@ export function AdminPage() {
         if (blogImageInputRef.current) blogImageInputRef.current.value = "";
       }
     },
-    [authHeaderValue, blogContent, verifyAuth]
+    [authHeaderValue, verifyAuth]
   );
 
   const deleteBlogCoverImage = useCallback(async () => {
@@ -519,7 +537,7 @@ export function AdminPage() {
           post: { content: string; coverUrl?: string; title?: string; tags?: string[]; date?: string };
         }>(`/api/posts/${slug}?lang=${lang}`);
         const loadedCover = String(data.post.coverUrl || "").trim();
-        setBlogContent(data.post.content || "");
+        setBlogContent(prepareBlogEditorContent(data.post.content || "", loadedCover));
         setBlogCoverUrl(loadedCover);
         lastUploadedCoverUrlRef.current = loadedCover;
         lastUploadedCoverKeyRef.current = "";
@@ -541,14 +559,20 @@ export function AdminPage() {
         toast.error("Нужна авторизация");
         return;
       }
+      const coverToSave =
+        (blogCoverUrl && blogCoverUrl.trim()) || lastUploadedCoverUrlRef.current || undefined;
+      const contentToSave = buildBlogStorageContent({
+        title: blogTitle,
+        coverUrl: coverToSave,
+        content: blogContent,
+      });
+
       if (!blogTitle.trim() || !blogContent.trim()) {
         toast.error("Нужны title и content");
         return;
       }
       const isUpdate = Boolean(blogSelectedSlug);
       if (isUpdate) {
-        const coverToSave =
-          (blogCoverUrl && blogCoverUrl.trim()) || lastUploadedCoverUrlRef.current || undefined;
         await fetchJson(`/api/posts/${blogSelectedSlug}`, {
           method: "PUT",
           headers: {
@@ -560,15 +584,13 @@ export function AdminPage() {
             coverUrl: coverToSave,
             date: blogDate.trim() || undefined,
             tags: blogTags,
-            content: blogContent,
+            content: contentToSave,
             lang,
           }),
         });
         if (coverToSave) lastUploadedCoverUrlRef.current = coverToSave;
         toast.success("Сохранено");
       } else {
-        const coverToSave =
-          (blogCoverUrl && blogCoverUrl.trim()) || lastUploadedCoverUrlRef.current || undefined;
         const resp = await fetchJson<{ post: { slug: string } }>(`/api/posts`, {
           method: "POST",
           headers: {
@@ -581,7 +603,7 @@ export function AdminPage() {
             coverUrl: coverToSave,
             date: blogDate.trim() || undefined,
             tags: blogTags,
-            content: blogContent,
+            content: contentToSave,
             lang,
           }),
         });
@@ -997,6 +1019,7 @@ export function AdminPage() {
                         setBlogTitle("");
                         setBlogSlugOverride("");
                         setBlogCoverUrl("");
+                        setBlogDate("");
                         setBlogTags([]);
                         setBlogTagDraft("");
                         setBlogContent("");
@@ -1156,7 +1179,6 @@ export function AdminPage() {
                       onChange={setBlogContent}
                       onInsertImage={() => blogImageInputRef.current?.click()}
                       minHeight="min-h-[420px]"
-                      showPreview={true}
                     />
 
                     <div className="flex gap-2">
@@ -1184,7 +1206,7 @@ export function AdminPage() {
                         disabled={uploadingBlogImage}
                         onClick={() => blogImageInputRef.current?.click()}
                       >
-                        {uploadingBlogImage ? "Загрузка..." : "Загрузить фото"}
+                        {uploadingBlogImage ? "Загрузка..." : "Загрузить обложку"}
                       </Button>
                       {blogCoverUrl ? (
                         <Button
