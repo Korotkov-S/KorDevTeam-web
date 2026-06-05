@@ -57,12 +57,6 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-async function fetchText(url: string, init?: RequestInit): Promise<string> {
-  const res = await fetch(url, init);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return await res.text();
-}
-
 function postApiPath(slug: string) {
   return `/api/posts/${encodeURIComponent(slug)}`;
 }
@@ -244,8 +238,7 @@ export function AdminPage() {
     setBlogTags((prev) => prev.filter((t) => t !== tag));
   }, []);
 
-  // Projects editor (raw JSON)
-  const [projectsJson, setProjectsJson] = useState<string>("[]\n");
+  // Projects editor
   const [projectsList, setProjectsList] = useState<Project[]>([]);
   const [projectSelectedId, setProjectSelectedId] = useState<string>("");
   const [projectDraft, setProjectDraft] = useState<Project>({
@@ -281,8 +274,9 @@ export function AdminPage() {
 
   const loadProjects = useCallback(async () => {
     try {
-      const raw = await fetchText(`/content/projects.${lang}.json`);
-      setProjectsJson(raw.endsWith("\n") ? raw : raw + "\n");
+      const res = await fetch(`/content/projects.${lang}.json`);
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const raw = await res.text();
       try {
         const parsed = JSON.parse(raw);
         setProjectsList(
@@ -315,7 +309,6 @@ export function AdminPage() {
       const data = await fetchJson<{ projects: unknown }>(
         `/api/projects?lang=${lang}`
       );
-      setProjectsJson(JSON.stringify(data.projects ?? [], null, 2) + "\n");
       const parsed = data.projects;
       setProjectsList(
         Array.isArray(parsed)
@@ -338,7 +331,6 @@ export function AdminPage() {
       );
     } catch (e) {
       console.warn(e);
-      setProjectsJson("[]\n");
       setProjectsList([]);
       toast.error(
         "Не удалось загрузить projects. Создай новый список и сохрани."
@@ -673,32 +665,6 @@ export function AdminPage() {
     }
   }, [authHeaderValue, blogHasSelection, blogSelectedSlug, lang, loadIndexes, verifyAuth]);
 
-  const saveProjects = useCallback(async () => {
-    try {
-      if (!(await verifyAuth())) {
-        toast.error("Нужна авторизация");
-        return;
-      }
-      const parsed = JSON.parse(projectsJson);
-      if (!Array.isArray(parsed)) {
-        toast.error("projects должен быть массивом");
-        return;
-      }
-      await fetchJson(`/api/projects?lang=${lang}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(authHeaderValue),
-        },
-        body: JSON.stringify({ projects: parsed }),
-      });
-      toast.success("Projects сохранены");
-    } catch (e: any) {
-      console.warn(e);
-      toast.error(`Ошибка projects: ${e?.message || "unknown"}`);
-    }
-  }, [authHeaderValue, lang, projectsJson, verifyAuth]);
-
   const persistProjectsList = useCallback(
     async (next: Project[]) => {
       if (!(await verifyAuth())) {
@@ -714,7 +680,6 @@ export function AdminPage() {
         body: JSON.stringify({ projects: next }),
       });
       setProjectsList(next);
-      setProjectsJson(JSON.stringify(next, null, 2) + "\n");
       toast.success("Projects сохранены");
     },
     [authHeaderValue, lang, verifyAuth]
@@ -871,6 +836,12 @@ export function AdminPage() {
     },
     [authHeaderValue, verifyAuth]
   );
+
+  const deleteProjectImage = useCallback(() => {
+    if (!projectDraft.image) return;
+    setProjectDraft((prev) => ({ ...prev, image: "" }));
+    toast.success("Фото проекта удалено из карточки");
+  }, [projectDraft.image]);
 
   const generateStatic = useCallback(async () => {
     try {
@@ -1380,18 +1351,8 @@ export function AdminPage() {
                       className="min-h-[90px]"
                     />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Input
-                        placeholder="Image URL (например /projects/my.png)"
-                        value={projectDraft.image}
-                        onChange={(e) =>
-                          setProjectDraft((p) => ({
-                            ...p,
-                            image: e.target.value,
-                          }))
-                        }
-                      />
-                      <div className="flex gap-2">
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                         <input
                           ref={projectImageInputRef}
                           type="file"
@@ -1405,26 +1366,40 @@ export function AdminPage() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="w-full"
                           disabled={uploadingProjectImage}
                           onClick={() => projectImageInputRef.current?.click()}
                         >
                           {uploadingProjectImage
                             ? "Загрузка..."
-                            : "Загрузить фото"}
+                            : projectDraft.image
+                              ? "Заменить фото"
+                              : "Загрузить фото"}
                         </Button>
+                        {projectDraft.image ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={deleteProjectImage}
+                          >
+                            Удалить фото
+                          </Button>
+                        ) : null}
+                        <div className="text-xs text-muted-foreground">
+                          Фото используется в карточке и на странице проекта.
+                        </div>
                       </div>
-                    </div>
 
-                    {projectDraft.image ? (
-                      <div className="rounded-md border border-border overflow-hidden">
-                        <img
-                          src={projectDraft.image}
-                          alt={projectDraft.title || projectDraft.id}
-                          className="w-full h-auto"
-                        />
-                      </div>
-                    ) : null}
+                      {projectDraft.image ? (
+                        <div className="rounded-md border border-border overflow-hidden">
+                          <ImageWithFallback
+                            src={projectDraft.image}
+                            alt={projectDraft.title || projectDraft.id}
+                            fallbackSrc="/opengraphlogo.jpeg"
+                            className="w-full h-auto"
+                          />
+                        </div>
+                      ) : null}
+                    </div>
 
                     <Textarea
                       value={projectDraft.fullDescription}
@@ -1512,23 +1487,6 @@ export function AdminPage() {
                           </a>
                         </Button>
                       )}
-                    </div>
-
-                    <div className="pt-4 border-t border-border space-y-3">
-                      <div className="text-sm font-medium">
-                        Raw JSON (опционально)
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={loadProjects}>
-                          Обновить JSON
-                        </Button>
-                        <Button onClick={saveProjects}>Сохранить JSON</Button>
-                      </div>
-                      <Textarea
-                        value={projectsJson}
-                        onChange={(e) => setProjectsJson(e.target.value)}
-                        className="min-h-[240px] font-mono"
-                      />
                     </div>
 
                     <div className="pt-4 border-t border-border">
