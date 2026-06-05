@@ -191,7 +191,6 @@ export function AdminPage() {
   // Blog editor
   const [blogSelectedSlug, setBlogSelectedSlug] = useState<string>("");
   const [blogTitle, setBlogTitle] = useState<string>("");
-  const [blogSlugOverride, setBlogSlugOverride] = useState<string>("");
   const [blogCoverUrl, setBlogCoverUrl] = useState<string>("");
   const [blogDate, setBlogDate] = useState<string>("");
   const [blogTags, setBlogTags] = useState<string[]>([]);
@@ -535,7 +534,6 @@ export function AdminPage() {
   const onSelectBlog = useCallback(
     async (slug: string) => {
       setBlogSelectedSlug(slug);
-      setBlogSlugOverride(slug);
       const meta = blogIndex.find((x) => x.slug === slug) || null;
       setBlogTitle(meta?.title || slug);
       try {
@@ -605,7 +603,6 @@ export function AdminPage() {
           },
           body: JSON.stringify({
             title: blogTitle,
-            slug: blogSlugOverride || undefined,
             coverUrl: coverToSave,
             date: blogDate.trim() || undefined,
             tags: blogTags,
@@ -629,7 +626,6 @@ export function AdminPage() {
     blogTags,
     blogContent,
     blogSelectedSlug,
-    blogSlugOverride,
     blogTitle,
     lang,
     loadIndexes,
@@ -650,7 +646,6 @@ export function AdminPage() {
       toast.success("Удалено");
       setBlogSelectedSlug("");
       setBlogTitle("");
-      setBlogSlugOverride("");
       setBlogCoverUrl("");
       setBlogDate("");
       lastUploadedCoverUrlRef.current = "";
@@ -1045,7 +1040,6 @@ export function AdminPage() {
                       onClick={() => {
                         setBlogSelectedSlug("");
                         setBlogTitle("");
-                        setBlogSlugOverride("");
                         setBlogCoverUrl("");
                         setBlogDate("");
                         setBlogTags([]);
@@ -1092,24 +1086,17 @@ export function AdminPage() {
                     <CardTitle>Редактор</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
                       <Input
                         placeholder="Заголовок"
                         value={blogTitle}
                         onChange={(e) => setBlogTitle(e.target.value)}
                       />
-                      <div className="space-y-1">
-                        <Input
-                          placeholder="Slug (опционально)"
-                          value={blogSlugOverride}
-                          onChange={(e) => setBlogSlugOverride(e.target.value)}
-                          disabled={Boolean(blogSelectedSlug)}
-                        />
+                      {blogSelectedSlug ? (
                         <div className="text-xs text-muted-foreground">
-                          Slug — это часть ссылки (URL). Например:{" "}
-                          <span className="font-mono">/blog/my-post</span>.
+                          <span className="font-mono">/blog/{blogSelectedSlug}</span>
                         </div>
-                      </div>
+                      ) : null}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -9,12 +9,57 @@ const SRC_BLOG_DIR = path.join(__dirname, '../../src/blog');
  * Генерация slug из заголовка
  */
 function generateSlug(title) {
-  return title
+  const cyrillicMap = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "y",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "h",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "sch",
+    ъ: "",
+    ы: "y",
+    ь: "",
+    э: "e",
+    ю: "yu",
+    я: "ya",
+  };
+
+  const transliterated = String(title || "").replace(/[а-яё]/gi, (char) => {
+    const lower = char.toLowerCase();
+    return cyrillicMap[lower] || lower;
+  });
+
+  const slug = transliterated
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '') // Удаляем спецсимволы
-    .replace(/[\s_-]+/g, '-') // Заменяем пробелы и подчеркивания на дефисы
-    .replace(/^-+|-+$/g, ''); // Удаляем дефисы в начале и конце
+    .replace(/[^a-z0-9\s-]/g, "") // Удаляем спецсимволы
+    .replace(/[\s_-]+/g, "-") // Заменяем пробелы и подчеркивания на дефисы
+    .replace(/^-+|-+$/g, ""); // Удаляем дефисы в начале и конце
+
+  return slug || `post-${Date.now()}`;
 }
 
 /**

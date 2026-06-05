@@ -31,12 +31,19 @@ router.post('/', authenticate, async (req, res, next) => {
       });
     }
 
-    // Генерация slug из заголовка
-    const slug = (slugOverride && typeof slugOverride === "string" && slugOverride.trim())
-      ? generateSlug(slugOverride)
-      : generateSlug(title);
-
     const l = safeLang(lang);
+    const hasManualSlug = typeof slugOverride === "string" && slugOverride.trim();
+    const baseSlug = generateSlug(hasManualSlug ? slugOverride : title);
+    let slug = baseSlug;
+
+    if (!hasManualSlug) {
+      let suffix = 2;
+      while ((await getDbPost({ slug, lang: l })) || (await getFilePost(slug, l))) {
+        slug = `${baseSlug}-${suffix}`;
+        suffix += 1;
+      }
+    }
+
     const meta = await extractMetaFromMarkdown({
       slug,
       md: String(content || ""),
