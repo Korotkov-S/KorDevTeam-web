@@ -85,9 +85,21 @@ function buildPublicUrl({ bucket, region, endpoint, forcePathStyle, publicBaseUr
 
   // Fallbacks (best effort). Prefer setting S3_PUBLIC_BASE_URL explicitly.
   if (endpoint) {
-    const base = endpoint.replace(/\/+$/, "");
-    if (forcePathStyle) return `${base}/${bucket}/${encodedKey}`;
-    return `${base}/${encodedKey}`;
+    const endpointUrl = new URL(endpoint);
+    endpointUrl.pathname = endpointUrl.pathname.replace(/\/+$/, "");
+
+    if (forcePathStyle) {
+      endpointUrl.pathname = `${endpointUrl.pathname}/${encodeURIComponent(bucket)}/${encodedKey}`;
+      return endpointUrl.toString();
+    }
+
+    // Virtual-hosted style, e.g. https://<bucket>.s3.twcstorage.ru/<key>.
+    // If endpoint already includes the bucket host, don't duplicate it.
+    if (!endpointUrl.hostname.toLowerCase().startsWith(`${String(bucket).toLowerCase()}.`)) {
+      endpointUrl.hostname = `${bucket}.${endpointUrl.hostname}`;
+    }
+    endpointUrl.pathname = `${endpointUrl.pathname}/${encodedKey}`;
+    return endpointUrl.toString();
   }
   // AWS virtual-hosted style
   return `https://${bucket}.s3.${region}.amazonaws.com/${encodedKey}`;
@@ -182,4 +194,3 @@ module.exports = {
   getObjectFromS3,
   buildPublicUrl,
 };
-

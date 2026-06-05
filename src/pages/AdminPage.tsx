@@ -415,8 +415,8 @@ export function AdminPage() {
             : uploadedUrl.startsWith("/")
               ? uploadedUrl
               : `/${uploadedUrl.replace(/^\.\//, "")}`;
-        // For S3 uploads, prefer same-origin proxy URL (works for private buckets too).
-        const coverUrlToUse = proxyUrl || resolvedUploadedUrl;
+        // Store the real S3/CDN URL. The media proxy is only a fallback for private buckets.
+        const coverUrlToUse = resolvedUploadedUrl || proxyUrl;
 
         // Use uploaded image as the article cover. The public article renders it above the body.
         lastUploadedCoverUrlRef.current = coverUrlToUse;
