@@ -202,11 +202,12 @@ router.delete('/:slug', authenticate, async (req, res, next) => {
     const { lang = 'ru' } = req.query;
 
     const l = safeLang(lang?.toString?.() || "ru");
+    const legacyPost = await getFilePost(slug, l);
     const deleted = await deleteDbPost({ slug, lang: l });
     // Legacy cleanup (ignore errors)
     await deleteMarkdownFile(slug, l);
 
-    if (!deleted) return res.status(404).json({ error: "Post not found" });
+    if (!deleted && !legacyPost) return res.status(404).json({ error: "Post not found" });
 
     res.json({ message: 'Post deleted successfully' });
   } catch (error) {
