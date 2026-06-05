@@ -60,6 +60,10 @@ function extractImages(md: string): string[] {
   ];
 }
 
+function hasMarkdownVideo(md: string): boolean {
+  return /\]\([^)]*\.(?:mp4|webm|mov)(?:[?#][^)]*)?\)/i.test(md);
+}
+
 function normalizePublicAssetUrl(url: string): string {
   const s = String(url || "").trim();
   if (!s) return "";
@@ -299,6 +303,7 @@ export function BlogPostPage() {
   const [ogImage, setOgImage] = useState<string | undefined>(undefined);
   const [coverUrl, setCoverUrl] = useState<string>("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [hasVideoMedia, setHasVideoMedia] = useState(false);
 
   // Получаем метаданные из переводов
 
@@ -453,6 +458,7 @@ export function BlogPostPage() {
             const prerenderCover = prerenderImages[0] || "";
             setImageUrls(prerenderImages);
             setCoverUrl(prerenderCover);
+            setHasVideoMedia(hasMarkdownVideo(data.md));
             setOgImage(toAbsoluteOgImage(prerenderCover));
             setContent(stripMarkdownImages(stripFirstMarkdownH1(data.md)));
             setLoading(false);
@@ -497,6 +503,7 @@ export function BlogPostPage() {
             const coverForUi = mediaForUi[0] || "";
             setImageUrls(mediaForUi);
             setCoverUrl(coverForUi);
+            setHasVideoMedia(hasMarkdownVideo(md));
             setContent(stripMarkdownImages(stripFirstMarkdownH1(md)));
             setOgImage(toAbsoluteOgImage(coverForUi));
             if (!postMeta) {
@@ -526,6 +533,7 @@ export function BlogPostPage() {
           const coverForUi = mediaForUi[0] || "";
           setImageUrls(mediaForUi);
           setCoverUrl(coverForUi);
+          setHasVideoMedia(hasMarkdownVideo(text));
           setContent(stripMarkdownImages(stripFirstMarkdownH1(text)));
           setOgImage(toAbsoluteOgImage(coverForUi));
           if (!postMeta) {
@@ -535,6 +543,7 @@ export function BlogPostPage() {
       } catch (error) {
         console.error("Error loading markdown:", error);
         setContent("# Error Loading\n\nFailed to load article content.");
+        setHasVideoMedia(false);
         if (!postMeta) {
           setMeta({
             title: "Error Loading",
@@ -552,7 +561,13 @@ export function BlogPostPage() {
     loadMarkdown();
   }, [slug, navigate, i18n.language, i18n.resolvedLanguage, blogPostsData, navigateGoBack]);
 
-  const heroImageUrls = imageUrls.length ? imageUrls : coverUrl ? [coverUrl] : [];
+  const heroImageUrls = hasVideoMedia
+    ? []
+    : imageUrls.length
+      ? imageUrls
+      : coverUrl
+        ? [coverUrl]
+        : [];
 
   return (
     <>
