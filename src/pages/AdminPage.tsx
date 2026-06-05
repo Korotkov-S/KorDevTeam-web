@@ -274,6 +274,34 @@ export function AdminPage() {
 
   const loadProjects = useCallback(async () => {
     try {
+      const data = await fetchJson<{ projects: unknown }>(
+        `/api/projects?lang=${lang}`
+      );
+      const parsed = data.projects;
+      if (!Array.isArray(parsed) || !parsed.length) throw new Error("empty api projects");
+      setProjectsList(
+        (parsed as any[]).map((p: any) => ({
+          id: String(p?.id || ""),
+          title: String(p?.title || p?.id || ""),
+          description: String(p?.description || ""),
+          fullDescription: String(p?.fullDescription || ""),
+          image: String(p?.image || ""),
+          technologies: Array.isArray(p?.technologies)
+            ? p.technologies.map((x: any) => String(x))
+            : [],
+          features: Array.isArray(p?.features)
+            ? p.features.map((x: any) => String(x))
+            : [],
+          demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
+          githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
+        }))
+      );
+      return;
+    } catch {
+      // ignore, fallback to static json
+    }
+
+    try {
       const res = await fetch(`/content/projects.${lang}.json`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const raw = await res.text();
@@ -302,33 +330,6 @@ export function AdminPage() {
         setProjectsList([]);
       }
       return;
-    } catch {
-      // ignore, fallback to api
-    }
-    try {
-      const data = await fetchJson<{ projects: unknown }>(
-        `/api/projects?lang=${lang}`
-      );
-      const parsed = data.projects;
-      setProjectsList(
-        Array.isArray(parsed)
-          ? (parsed as any[]).map((p: any) => ({
-              id: String(p?.id || ""),
-              title: String(p?.title || p?.id || ""),
-              description: String(p?.description || ""),
-              fullDescription: String(p?.fullDescription || ""),
-              image: String(p?.image || ""),
-              technologies: Array.isArray(p?.technologies)
-                ? p.technologies.map((x: any) => String(x))
-                : [],
-              features: Array.isArray(p?.features)
-                ? p.features.map((x: any) => String(x))
-                : [],
-              demoUrl: p?.demoUrl ? String(p.demoUrl) : "",
-              githubUrl: p?.githubUrl ? String(p.githubUrl) : "",
-            }))
-          : []
-      );
     } catch (e) {
       console.warn(e);
       setProjectsList([]);

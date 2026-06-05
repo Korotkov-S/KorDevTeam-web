@@ -160,9 +160,17 @@ export function ProjectPage() {
     const load = async () => {
       setLoadingProjects(true);
       try {
-        const res = await fetch(`/content/projects.${lang}.json`);
-        if (!res.ok) throw new Error("no json");
-        const data = (await res.json()) as any[];
+        let data: any[] = [];
+        const apiRes = await fetch(`/api/projects?lang=${lang}`);
+        if (apiRes.ok) {
+          const payload = (await apiRes.json()) as { projects?: unknown };
+          data = Array.isArray(payload.projects) ? payload.projects : [];
+        }
+        if (!data.length) {
+          const res = await fetch(`/content/projects.${lang}.json`);
+          if (!res.ok) throw new Error("no json");
+          data = (await res.json()) as any[];
+        }
         if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
         const mapped: Project[] = data.map((p) => ({
           id: String(p.id),

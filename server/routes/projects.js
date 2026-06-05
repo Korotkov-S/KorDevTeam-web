@@ -9,9 +9,7 @@ const router = express.Router();
 function getRoots() {
   const repoRoot = process.cwd();
   const distRoot = process.env.CONTENT_DIST_ROOT;
-  const readRoots = [distRoot, repoRoot].filter(Boolean);
-  const writeRoots = [distRoot, repoRoot].filter(Boolean);
-  return { readRoots, writeRoots };
+  return { repoRoot, distRoot };
 }
 
 function getFilename(lang) {
@@ -19,9 +17,27 @@ function getFilename(lang) {
   return `projects.${l}.json`;
 }
 
-async function readFirstExisting(readRoots, relPath) {
-  for (const root of readRoots) {
-    const p = path.join(root, relPath);
+function getProjectJsonReadPaths(lang) {
+  const { repoRoot, distRoot } = getRoots();
+  const filename = getFilename(lang);
+  return [
+    distRoot ? path.join(distRoot, "content", filename) : null,
+    distRoot ? path.join(distRoot, "public", "content", filename) : null,
+    path.join(repoRoot, "public", "content", filename),
+  ].filter(Boolean);
+}
+
+function getProjectJsonWritePaths(lang) {
+  const { repoRoot, distRoot } = getRoots();
+  const filename = getFilename(lang);
+  return [
+    distRoot ? path.join(distRoot, "content", filename) : null,
+    path.join(repoRoot, "public", "content", filename),
+  ].filter(Boolean);
+}
+
+async function readFirstExistingPath(paths) {
+  for (const p of paths) {
     try {
       const raw = await fs.readFile(p, "utf-8");
       return { raw, path: p };
@@ -32,10 +48,9 @@ async function readFirstExisting(readRoots, relPath) {
   return { raw: null, path: null };
 }
 
-async function writeAll(writeRoots, relPath, raw) {
+async function writeAllPaths(paths, raw) {
   const results = [];
-  for (const root of writeRoots) {
-    const p = path.join(root, relPath);
+  for (const p of paths) {
     await fs.mkdir(path.dirname(p), { recursive: true });
     await fs.writeFile(p, raw, "utf-8");
     results.push(p);
@@ -50,9 +65,7 @@ router.get("/", async (req, res, next) => {
     if (projects.length) return res.json({ lang, projects });
 
     // Legacy fallback: read JSON from disk and import into DB.
-    const { readRoots } = getRoots();
-    const rel = path.join("public", "content", getFilename(lang));
-    const { raw } = await readFirstExisting(readRoots, rel);
+    const { raw } = await readFirstExistingPath(getProjectJsonReadPaths(lang));
     if (!raw) return res.status(404).json({ error: "Projects not found" });
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return res.status(500).json({ error: "Invalid legacy projects format" });
@@ -72,9 +85,7 @@ router.put("/", authenticate, async (req, res, next) => {
     const next = await replaceProjects({ lang, projects });
 
     const raw = JSON.stringify(next, null, 2) + "\n";
-    const { writeRoots } = getRoots();
-    const rel = path.join("public", "content", getFilename(lang));
-    const paths = await writeAll(writeRoots, rel, raw);
+    const paths = await writeAllPaths(getProjectJsonWritePaths(lang), raw);
 
     res.json({ message: "Saved", lang, paths, count: next.length });
   } catch (e) {
@@ -83,4 +94,3 @@ router.put("/", authenticate, async (req, res, next) => {
 });
 
 module.exports = router;
-
