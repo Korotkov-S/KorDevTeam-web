@@ -815,8 +815,7 @@ export function AdminPage() {
               : uploadedUrl
                 ? `/${uploadedUrl.replace(/^\.\//, "")}`
                 : "";
-        const imageUrlToUse =
-          resp.storage === "s3" && proxyUrl ? proxyUrl : resolvedUploadedUrl || proxyUrl;
+        const imageUrlToUse = proxyUrl || resolvedUploadedUrl;
 
         if (!imageUrlToUse) {
           toast.error("Сервер не вернул URL изображения");

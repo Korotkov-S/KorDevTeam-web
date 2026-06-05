@@ -276,6 +276,7 @@ router.post("/upload-project-image", authenticate, async (req, res, next) => {
         key: uploaded.key,
         bytes: buf.length,
         mime,
+        storage: "s3",
       });
     } else {
       // Write to repo `public/` for dev (vite serves from it)
@@ -293,6 +294,7 @@ router.post("/upload-project-image", authenticate, async (req, res, next) => {
       filename: outName,
       bytes: buf.length,
       mime,
+      storage: "local",
     });
   } catch (e) {
     next(e);
