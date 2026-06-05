@@ -60,9 +60,21 @@ function extractFirstMarkdownImage(md) {
   return (match?.[1] || "").trim();
 }
 
+function extractMarkdownImages(md) {
+  return [...md.matchAll(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/gm)]
+    .map((m) => (m?.[1] || "").trim())
+    .filter(Boolean);
+}
+
 function extractFirstHtmlImage(md) {
   const match = md.match(/<img[^>]+src=["']([^"']+)["']/im);
   return (match?.[1] || "").trim();
+}
+
+function extractHtmlImages(md) {
+  return [...md.matchAll(/<img[^>]+src=["']([^"']+)["']/gim)]
+    .map((m) => (m?.[1] || "").trim())
+    .filter(Boolean);
 }
 
 function normalizePublicAssetUrl(url) {
@@ -92,6 +104,18 @@ function extractCoverUrl(md) {
     }
   }
   return normalizePublicAssetUrl(extractFirstMarkdownImage(md) || extractFirstHtmlImage(md));
+}
+
+function extractImageUrls(md) {
+  const coverUrl = extractCoverUrl(md);
+  const urls = [
+    coverUrl,
+    ...extractMarkdownImages(md),
+    ...extractHtmlImages(md),
+  ]
+    .map(normalizePublicAssetUrl)
+    .filter(Boolean);
+  return [...new Set(urls)];
 }
 
 function parseLegacyMeta(md) {
@@ -194,6 +218,7 @@ function buildIndexForDir({ dir, slugs, lang }) {
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
     const coverUrl = extractCoverUrl(md);
+    const imageUrls = extractImageUrls(md);
     const legacy = parseLegacyMeta(md);
     const readTime = estimateReadTime(md, lang);
     const mtimeMs = fs.statSync(mdPath).mtimeMs;
@@ -202,6 +227,7 @@ function buildIndexForDir({ dir, slugs, lang }) {
       lang,
       title,
       coverUrl,
+      imageUrls,
       excerpt,
       date: legacy.date || "",
       readTime,

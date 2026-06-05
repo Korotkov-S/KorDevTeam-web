@@ -43,6 +43,32 @@ function fromJson(raw, fallback) {
   }
 }
 
+function normalizePublicAssetUrl(url) {
+  const s = String(url || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  return `/${s.replace(/^\.\//, "")}`;
+}
+
+function extractPostImageUrls(content, coverUrl) {
+  const md = String(content || "");
+  const markdownImages = [
+    ...md.matchAll(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/gm),
+  ].map((m) => (m?.[1] || "").trim());
+  const htmlImages = [...md.matchAll(/<img[^>]+src=["']([^"']+)["']/gim)].map(
+    (m) => (m?.[1] || "").trim(),
+  );
+  return [
+    ...new Set(
+      [coverUrl, ...markdownImages, ...htmlImages]
+        .map(normalizePublicAssetUrl)
+        .filter(Boolean),
+    ),
+  ];
+}
+
 let _sqlPromise = null;
 async function getSqlJs() {
   if (_sqlPromise) return _sqlPromise;
@@ -233,7 +259,7 @@ async function deletePost({ slug, lang }) {
 async function listPostMetas({ lang }) {
   const l = safeLang(lang);
   const rows = await queryAll(
-    `SELECT slug, lang, title, cover_url, excerpt, tags_json, date_text, read_time_text, updated_at_ms
+    `SELECT slug, lang, title, cover_url, content_md, excerpt, tags_json, date_text, read_time_text, updated_at_ms
      FROM posts
      WHERE lang = ?
      ORDER BY updated_at_ms DESC`,
@@ -244,6 +270,7 @@ async function listPostMetas({ lang }) {
     lang: r.lang,
     title: r.title,
     coverUrl: r.cover_url || "",
+    imageUrls: extractPostImageUrls(r.content_md, r.cover_url || ""),
     excerpt: r.excerpt,
     date: r.date_text,
     readTime: r.read_time_text,
@@ -328,4 +355,3 @@ module.exports = {
   getProjects,
   replaceProjects,
 };
-

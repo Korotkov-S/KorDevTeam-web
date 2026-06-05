@@ -4,6 +4,9 @@
     "lang": "ru",
     "title": "Фоллоу-ап сообщения в семинарах",
     "coverUrl": "/blog/media/krasatulaCRM/122-video-1-thumb.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/122-video-1-thumb.jpg"
+    ],
     "excerpt": "Новая фича фоллуап сообщения в Семинарах",
     "date": "4 июня 2026",
     "readTime": "1 мин",
@@ -20,6 +23,9 @@
     "lang": "ru",
     "title": "Чек-лист: эффективные воронки на CRM-доске",
     "coverUrl": "/blog/media/krasatulaCRM/121-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/121-photo-1.jpg"
+    ],
     "excerpt": "Хитроумности",
     "date": "2 июня 2026",
     "readTime": "1 мин",
@@ -36,6 +42,9 @@
     "lang": "ru",
     "title": "Почему я сам пользуюсь «Красотуля-CRM»",
     "coverUrl": "/blog/media/krasatulaCRM/120-cover.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/120-cover.jpg"
+    ],
     "excerpt": "Говорит Красотуля почему я сам пользуюсь CRM",
     "date": "31 мая 2026",
     "readTime": "1 мин",
@@ -52,6 +61,9 @@
     "lang": "ru",
     "title": "Массовое создание задач и приоритеты дня",
     "coverUrl": "/blog/media/krasatulaCRM/119-video-1-thumb.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/119-video-1-thumb.jpg"
+    ],
     "excerpt": "Новая фича",
     "date": "28 мая 2026",
     "readTime": "1 мин",
@@ -68,6 +80,9 @@
     "lang": "ru",
     "title": "Автопостинг и рассылки ко Дню предпринимателя",
     "coverUrl": "/blog/media/krasatulaCRM/118-video-1-thumb.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/118-video-1-thumb.jpg"
+    ],
     "excerpt": "Лайфхаки 26 мая был День предпринимателя — отличный повод напомнить о себе клиентам и аудитории.",
     "date": "27 мая 2026",
     "readTime": "1 мин",
@@ -84,6 +99,9 @@
     "lang": "ru",
     "title": "С Днем предпринимателя",
     "coverUrl": "/blog/media/krasatulaCRM/117-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/117-photo-1.jpg"
+    ],
     "excerpt": "С праздничком народ :)",
     "date": "26 мая 2026",
     "readTime": "1 мин",
@@ -98,6 +116,9 @@
     "lang": "ru",
     "title": "Конструктор сценариев для бота в «Красотуля-CRM»",
     "coverUrl": "/blog/media/krasatulaCRM/116-video-1-thumb.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/116-video-1-thumb.jpg"
+    ],
     "excerpt": "Новая фишка в КрасотуляCRM: конструктор сценариев для бота Частая проблема: клиент перешел по ссылке из рекламы, поста или рассылки, а дальше администратор вручную объясняет одно и",
     "date": "23 мая 2026",
     "readTime": "1 мин",
@@ -114,6 +135,9 @@
     "lang": "ru",
     "title": "Согласия на персональные данные и рекламные коммуникации",
     "coverUrl": "/blog/media/krasatulaCRM/115-cover.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/115-cover.jpg"
+    ],
     "excerpt": "Всем добрый день!",
     "date": "22 мая 2026",
     "readTime": "1 мин",
@@ -131,6 +155,10 @@
     "lang": "ru",
     "title": "«Клиенты на всю жизнь»: выступление и выводы для CRM",
     "coverUrl": "/blog/media/krasatulaCRM/112-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/112-photo-1.jpg",
+      "/blog/media/krasatulaCRM/112-photo-2.jpg"
+    ],
     "excerpt": "Всем привет!",
     "date": "20 мая 2026",
     "readTime": "1 мин",
@@ -147,6 +175,9 @@
     "lang": "ru",
     "title": "Бесплатный семинар для мастеров маникюра и педикюра 20 мая",
     "coverUrl": "/blog/media/krasatulaCRM/111-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/111-photo-1.jpg"
+    ],
     "excerpt": "20 МАЯ В 12:00",
     "date": "16 мая 2026",
     "readTime": "2 мин",
@@ -162,6 +193,9 @@
     "lang": "ru",
     "title": "Создание задач голосом и задачи внутри сделки",
     "coverUrl": "/blog/media/krasatulaCRM/110-video-1-thumb.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/110-video-1-thumb.jpg"
+    ],
     "excerpt": "Всем привет!",
     "date": "13 мая 2026",
     "readTime": "1 мин",
@@ -178,6 +212,9 @@
     "lang": "ru",
     "title": "CRM: если есть сделка, то в ней должно быть дело",
     "coverUrl": "/blog/media/krasatulaCRM/109-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/109-photo-1.jpg"
+    ],
     "excerpt": "CRM: если есть сделка, то в ней должно быть дело",
     "date": "11 мая 2026",
     "readTime": "1 мин",
@@ -194,6 +231,9 @@
     "lang": "ru",
     "title": "MAX и Telegram: обновления переписок в «Красотуле»",
     "coverUrl": "/blog/media/krasatulaCRM/108-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/108-photo-1.jpg"
+    ],
     "excerpt": "MAX и телеграм",
     "date": "5 мая 2026",
     "readTime": "1 мин",
@@ -210,6 +250,9 @@
     "lang": "ru",
     "title": "Рабочие выходные: список срочных функций для «Красотули»",
     "coverUrl": "/blog/media/krasatulaCRM/107-video-1-thumb.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/107-video-1-thumb.jpg"
+    ],
     "excerpt": "Как у вас идут выходные? А я фигачу с огоньком, на видео перечень функций, которые нужно срочно сделать.",
     "date": "2 мая 2026",
     "readTime": "1 мин",
@@ -225,6 +268,10 @@
     "lang": "ru",
     "title": "Мир, труд, май: новые функции CRM- и канбан-досок",
     "coverUrl": "/blog/media/krasatulaCRM/105-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/105-photo-1.jpg",
+      "/blog/media/krasatulaCRM/105-photo-2.jpg"
+    ],
     "excerpt": "Мир, труд, май всем!",
     "date": "1 мая 2026",
     "readTime": "1 мин",
@@ -241,6 +288,9 @@
     "lang": "ru",
     "title": "Онлайн-запись в «Красотуле»: меньше звонков, больше удобства",
     "coverUrl": "/blog/covers/krasotulya-online-booking.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-online-booking.jpg"
+    ],
     "excerpt": "Всем привет! Геннадий Коротков, руководитель команды KorDev Team.",
     "date": "3 февраля 2026",
     "readTime": "1 мин",
@@ -259,6 +309,9 @@
     "lang": "ru",
     "title": "Запустили лендинг «Красотуля» — krasotula.com",
     "coverUrl": "/blog/covers/krasotulya-landing-launch.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-landing-launch.jpg"
+    ],
     "excerpt": "На связи Геннадий Коротков, руководитель команды KorDev Team!",
     "date": "31 января 2026",
     "readTime": "1 мин",
@@ -275,6 +328,9 @@
     "lang": "ru",
     "title": "«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №4 — электронные рассылки для клиентов)",
     "coverUrl": "/blog/covers/krasotulya-problem-4-email-campaigns.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-problem-4-email-campaigns.jpg"
+    ],
     "excerpt": "На связи Геннадий Коротков, руководитель команды KorDev Team. Поговорим сегодня о проблеме №4 — электронные рассылки для клиентов.",
     "date": "25 января 2026",
     "readTime": "1 мин",
@@ -292,6 +348,9 @@
     "lang": "ru",
     "title": "Запускаем CRM «Красотуля» — здесь будут новости и обновления",
     "coverUrl": "/blog/covers/krasotulya-crm-launch.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-crm-launch.jpg"
+    ],
     "excerpt": "Всем привет!",
     "date": "24 января 2026",
     "readTime": "1 мин",
@@ -310,6 +369,9 @@
     "lang": "ru",
     "title": "«Красотуля»: зачем нужна микро- и малому бизнесу (карточка №1 — разрозненные данные)",
     "coverUrl": "/blog/covers/krasotulya-problem-1-data-fragmentation.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-problem-1-data-fragmentation.jpg"
+    ],
     "excerpt": "Всем привет!",
     "date": "20 января 2026",
     "readTime": "1 мин",
@@ -327,6 +389,9 @@
     "lang": "ru",
     "title": "Лучшие практики разработки на React Native в 2025 году",
     "coverUrl": "/blog/covers/react-native-best-practices.jpg",
+    "imageUrls": [
+      "/blog/covers/react-native-best-practices.jpg"
+    ],
     "excerpt": "Введение",
     "date": "20 октября 2025",
     "readTime": "1 мин",
@@ -342,6 +407,9 @@
     "lang": "ru",
     "title": "Микросервисная архитектура на Node.js с NestJS",
     "coverUrl": "/blog/covers/nodejs-microservices.jpg",
+    "imageUrls": [
+      "/blog/covers/nodejs-microservices.jpg"
+    ],
     "excerpt": "Почему микросервисы?",
     "date": "15 октября 2025",
     "readTime": "1 мин",
@@ -358,6 +426,9 @@
     "lang": "ru",
     "title": "Оптимизация производительности WordPress сайтов",
     "coverUrl": "/blog/covers/wordpress-optimization.jpg",
+    "imageUrls": [
+      "/blog/covers/wordpress-optimization.jpg"
+    ],
     "excerpt": "Введение",
     "date": "10 октября 2025",
     "readTime": "1 мин",
@@ -374,6 +445,9 @@
     "lang": "ru",
     "title": "Разработка RESTful API на Laravel: Полное руководство",
     "coverUrl": "/blog/covers/laravel-api-development.jpg",
+    "imageUrls": [
+      "/blog/covers/laravel-api-development.jpg"
+    ],
     "excerpt": "Введение",
     "date": "5 октября 2025",
     "readTime": "1 мин",
@@ -390,6 +464,9 @@
     "lang": "ru",
     "title": "\"HarmonizeMe я снова сорвалась…\" — Дарья знает, почему это происходит, и научит, как избежать срывов",
     "coverUrl": "/blog/covers/harmonize-me-story.jpg",
+    "imageUrls": [
+      "/blog/covers/harmonize-me-story.jpg"
+    ],
     "excerpt": "История сервиса",
     "date": "27 января 2025",
     "readTime": "2 мин",
@@ -407,6 +484,9 @@
     "lang": "ru",
     "title": "Как эффективно взаимодействовать с госзаказчиками в IT-сфере?",
     "coverUrl": "/blog/covers/government-contractors-guide.jpg",
+    "imageUrls": [
+      "/blog/covers/government-contractors-guide.jpg"
+    ],
     "excerpt": "Мой телеграм канал о моей студии, жизни, менеджменте, умных мыслях (надеюсь), личной эффективности, юмор",
     "date": "27 января 2025",
     "readTime": "12 мин",
@@ -424,6 +504,9 @@
     "lang": "ru",
     "title": "Хватит терять переговоры! Железная аргументация, которая ломает сопротивление даже упрямых клиентов",
     "coverUrl": "/blog/covers/argumentation-guide.jpg",
+    "imageUrls": [
+      "/blog/covers/argumentation-guide.jpg"
+    ],
     "excerpt": "Пост написан после прочтения книги Никиты Непряхина «Аргументируй это!» — очень советую, там очень подробно расписано про аргументацию.",
     "date": "27 января 2025",
     "readTime": "3 мин",
@@ -440,6 +523,9 @@
     "lang": "ru",
     "title": "Автоматизация массовой рассылки в Telegram: экономия 16 часов работы для Kusidis PRO",
     "coverUrl": "/blog/covers/telegram-broadcast-automation.jpg",
+    "imageUrls": [
+      "/blog/covers/telegram-broadcast-automation.jpg"
+    ],
     "excerpt": "Введение",
     "date": "",
     "readTime": "4 мин",
@@ -451,6 +537,9 @@
     "lang": "ru",
     "title": "Калькулятор изделий из камня: автоматизация сметы и экономия до 80% времени",
     "coverUrl": "/blog/covers/stone-calculator-automation.jpg",
+    "imageUrls": [
+      "/blog/covers/stone-calculator-automation.jpg"
+    ],
     "excerpt": "Введение",
     "date": "",
     "readTime": "4 мин",
@@ -462,6 +551,9 @@
     "lang": "ru",
     "title": "SimsDynastyTree: разработка сервиса генеалогических древ на основе графов для фанатов The Sims",
     "coverUrl": "/blog/covers/sims-dynasty-tree-platform.jpg",
+    "imageUrls": [
+      "/blog/covers/sims-dynasty-tree-platform.jpg"
+    ],
     "excerpt": "Введение",
     "date": "",
     "readTime": "7 мин",
@@ -473,6 +565,9 @@
     "lang": "ru",
     "title": "Платформа Harmonize Me: комплексная разработка онлайн-курсов психологии с геймификацией и ИИ-поддержкой",
     "coverUrl": "/blog/covers/harmonize-me-platform.jpg",
+    "imageUrls": [
+      "/blog/covers/harmonize-me-platform.jpg"
+    ],
     "excerpt": "Введение",
     "date": "",
     "readTime": "8 мин",
@@ -484,6 +579,9 @@
     "lang": "ru",
     "title": "Внедрение CRM систем: полное руководство по автоматизации продаж в 2025 году",
     "coverUrl": "/blog/covers/crm-implementation.jpg",
+    "imageUrls": [
+      "/blog/covers/crm-implementation.jpg"
+    ],
     "excerpt": "Введение",
     "date": "",
     "readTime": "4 мин",
@@ -495,6 +593,9 @@
     "lang": "ru",
     "title": "Автоматизация бизнес-процессов: как повысить эффективность компании в 2025 году",
     "coverUrl": "/blog/covers/business-automation.jpg",
+    "imageUrls": [
+      "/blog/covers/business-automation.jpg"
+    ],
     "excerpt": "Введение",
     "date": "",
     "readTime": "4 мин",

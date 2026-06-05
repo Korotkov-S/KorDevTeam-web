@@ -9,11 +9,23 @@ import {
 } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Calendar, Clock, ArrowUpRight } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SEO } from "./SEO";
 import { motion } from "motion/react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "./ui/carousel";
 import {
   Pagination,
   PaginationContent,
@@ -32,6 +44,7 @@ interface BlogPost {
   tags: string[];
   slug: string;
   coverUrl?: string;
+  imageUrls?: string[];
 }
 
 function normalizePublicAssetUrl(url: string | undefined): string {
@@ -41,6 +54,130 @@ function normalizePublicAssetUrl(url: string | undefined): string {
   if (/^https?:\/\//i.test(s)) return s;
   if (s.startsWith("/")) return s;
   return `/${s.replace(/^\.\//, "")}`;
+}
+
+function normalizePublicAssetUrls(urls: Array<string | undefined>): string[] {
+  return [
+    ...new Set(
+      urls.map((url) => normalizePublicAssetUrl(url)).filter(Boolean),
+    ),
+  ];
+}
+
+function mapPostImageUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return normalizePublicAssetUrls(value.map((url) => String(url || "")));
+}
+
+function getPostMediaImages(post: BlogPost, fallbackSrc: string): string[] {
+  const images = normalizePublicAssetUrls([
+    post.coverUrl,
+    ...(post.imageUrls || []),
+  ]);
+  return images.length ? images : [fallbackSrc];
+}
+
+function BlogCardMedia({
+  images,
+  title,
+  gradientClassName,
+}: {
+  images: string[];
+  title: string;
+  gradientClassName: string;
+}) {
+  const [api, setApi] = useState<CarouselApi>();
+  const safeImages = images.length ? images : ["/opengraphlogo.jpeg"];
+
+  if (safeImages.length === 1) {
+    return (
+      <>
+        <ImageWithFallback
+          src={safeImages[0]}
+          alt={title}
+          fallbackSrc="/opengraphlogo.jpeg"
+          fallbackClassName="block w-full h-full object-contain box-border p-4"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+        />
+        <div
+          className={`absolute inset-0 bg-gradient-to-br ${gradientClassName} opacity-30 group-hover:opacity-50 transition-opacity`}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Carousel
+        setApi={setApi}
+        opts={{ loop: true }}
+        className="h-full [&_[data-slot=carousel-content]]:h-full"
+      >
+        <CarouselContent className="h-full -ml-0">
+          {safeImages.map((src, imageIndex) => (
+            <CarouselItem key={`${src}-${imageIndex}`} className="h-full pl-0">
+              <ImageWithFallback
+                src={src}
+                alt={`${title} - ${imageIndex + 1}`}
+                fallbackSrc="/opengraphlogo.jpeg"
+                fallbackClassName="block w-full h-full object-contain box-border p-4"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
+      <div
+        className={`absolute inset-0 pointer-events-none bg-gradient-to-br ${gradientClassName} opacity-30 group-hover:opacity-50 transition-opacity`}
+      />
+      <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-3 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          aria-label="Предыдущее изображение"
+          className="size-8 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            api?.scrollPrev();
+          }}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          aria-label="Следующее изображение"
+          className="size-8 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            api?.scrollNext();
+          }}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+        {safeImages.map((src, imageIndex) => (
+          <span
+            key={`${src}-dot-${imageIndex}`}
+            className="size-1.5 rounded-full bg-background/80 shadow-sm"
+          />
+        ))}
+      </div>
+    </>
+  );
 }
 
 export function Blog({ withId = true }: { withId?: boolean } = {}) {
@@ -221,6 +358,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
           readTime: String(x.readTime || ""),
           tags: Array.isArray(x.tags) ? x.tags.map((t: any) => String(t)) : [],
           coverUrl: normalizePublicAssetUrl(x.coverUrl ? String(x.coverUrl) : ""),
+          imageUrls: mapPostImageUrls(x.imageUrls),
         }));
         if (mapped.length) {
           setBlogPosts(mapped);
@@ -247,6 +385,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
                 ? x.tags.map((t: any) => String(t))
                 : [],
               coverUrl: normalizePublicAssetUrl(x.coverUrl ? String(x.coverUrl) : ""),
+              imageUrls: mapPostImageUrls(x.imageUrls),
             }),
           );
           if (mapped.length) {
@@ -381,21 +520,14 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
                 className="block relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300"
               >
                 <div className="relative aspect-video overflow-hidden">
-                  <ImageWithFallback
-                    src={
-                      post.coverUrl ||
-                      (postCardImageBySlug[post.slug] ??
-                        cardImages[index % cardImages.length])
-                    }
-                    alt={post.title}
-                    fallbackSrc="/opengraphlogo.jpeg"
-                    fallbackClassName="block w-full h-full object-contain box-border p-4"
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-br ${
-                      gradients[index % gradients.length]
-                    } opacity-30 group-hover:opacity-50 transition-opacity`}
+                  <BlogCardMedia
+                    images={getPostMediaImages(
+                      post,
+                      postCardImageBySlug[post.slug] ??
+                        cardImages[index % cardImages.length],
+                    )}
+                    title={post.title}
+                    gradientClassName={gradients[index % gradients.length]}
                   />
 
                   <div className="absolute top-4 left-4">

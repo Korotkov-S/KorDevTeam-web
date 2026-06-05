@@ -2,11 +2,17 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Button } from "../components/ui/button";
-import { ArrowLeft, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { useTranslation } from "react-i18next";
 import { SEO } from "../components/SEO";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "../components/ui/carousel";
 
 interface BlogPostMeta {
   title: string;
@@ -22,13 +28,36 @@ function extractFirstMarkdownImage(md: string): string {
   return (match?.[1] || "").trim();
 }
 
+function extractMarkdownImages(md: string): string[] {
+  return [...md.matchAll(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/gm)]
+    .map((m) => (m?.[1] || "").trim())
+    .filter(Boolean);
+}
+
 function extractFirstHtmlImage(md: string): string {
   const match = md.match(/<img[^>]+src=["']([^"']+)["']/im);
   return (match?.[1] || "").trim();
 }
 
+function extractHtmlImages(md: string): string[] {
+  return [...md.matchAll(/<img[^>]+src=["']([^"']+)["']/gim)]
+    .map((m) => (m?.[1] || "").trim())
+    .filter(Boolean);
+}
+
 function extractFirstImage(md: string): string {
   return extractFirstMarkdownImage(md) || extractFirstHtmlImage(md);
+}
+
+function extractImages(md: string): string[] {
+  const first = extractFirstImage(md);
+  return [
+    ...new Set([
+      first,
+      ...extractMarkdownImages(md),
+      ...extractHtmlImages(md),
+    ].filter(Boolean)),
+  ];
 }
 
 function normalizePublicAssetUrl(url: string): string {
@@ -38,6 +67,14 @@ function normalizePublicAssetUrl(url: string): string {
   if (/^https?:\/\//i.test(s)) return s;
   if (s.startsWith("/")) return s;
   return `/${s.replace(/^\.\//, "")}`;
+}
+
+function normalizePublicAssetUrls(urls: Array<string | undefined>): string[] {
+  return [
+    ...new Set(
+      urls.map((url) => normalizePublicAssetUrl(String(url || ""))).filter(Boolean),
+    ),
+  ];
 }
 
 function toAbsoluteOgImage(src: string): string | undefined {
@@ -51,9 +88,9 @@ function stripFirstMarkdownH1(md: string): string {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
 }
 
-function stripFirstMarkdownImage(md: string): string {
+function stripMarkdownImages(md: string): string {
   return md
-    .replace(/^\s*!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*\n*/m, "")
+    .replace(/^\s*!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*\n*/gm, "")
     .trim();
 }
 
@@ -173,6 +210,81 @@ function parseDateToISO(dateStr: string): string {
   return new Date().toISOString().split("T")[0];
 }
 
+function PostImageCarousel({
+  images,
+  title,
+}: {
+  images: string[];
+  title: string;
+}) {
+  const [api, setApi] = useState<CarouselApi>();
+  const safeImages = images.filter(Boolean);
+
+  if (safeImages.length <= 1) {
+    return (
+      <ImageWithFallback
+        src={safeImages[0] || ""}
+        alt={title}
+        fallbackSrc="/opengraphlogo.jpeg"
+        className="w-full h-full object-cover"
+      />
+    );
+  }
+
+  return (
+    <>
+      <Carousel
+        setApi={setApi}
+        opts={{ loop: true }}
+        className="h-full [&_[data-slot=carousel-content]]:h-full"
+      >
+        <CarouselContent className="h-full -ml-0">
+          {safeImages.map((src, index) => (
+            <CarouselItem key={`${src}-${index}`} className="h-full pl-0">
+              <ImageWithFallback
+                src={src}
+                alt={`${title} - ${index + 1}`}
+                fallbackSrc="/opengraphlogo.jpeg"
+                className="w-full h-full object-cover"
+              />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
+      <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-3 sm:px-5">
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          aria-label="Предыдущее изображение"
+          className="size-9 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
+          onClick={() => api?.scrollPrev()}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          aria-label="Следующее изображение"
+          className="size-9 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
+          onClick={() => api?.scrollNext()}
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+        {safeImages.map((src, index) => (
+          <span
+            key={`${src}-dot-${index}`}
+            className="size-2 rounded-full bg-background/85 shadow-sm"
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -182,6 +294,7 @@ export function BlogPostPage() {
   const [meta, setMeta] = useState<BlogPostMeta | null>(null);
   const [ogImage, setOgImage] = useState<string | undefined>(undefined);
   const [coverUrl, setCoverUrl] = useState<string>("");
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   // Получаем метаданные из переводов
 
@@ -332,7 +445,12 @@ export function BlogPostPage() {
         try {
           const data = JSON.parse(el.textContent) as { slug?: string; lang?: string; md?: string };
           if (data?.slug === slug && data?.lang === "ru" && typeof data?.md === "string" && data.md.trim()) {
-            setContent(data.md);
+            const prerenderImages = normalizePublicAssetUrls(extractImages(data.md));
+            const prerenderCover = prerenderImages[0] || "";
+            setImageUrls(prerenderImages);
+            setCoverUrl(prerenderCover);
+            setOgImage(toAbsoluteOgImage(prerenderCover));
+            setContent(stripMarkdownImages(stripFirstMarkdownH1(data.md)));
             setLoading(false);
             hasPrerender = true;
           }
@@ -359,14 +477,23 @@ export function BlogPostPage() {
                 readTime?: string;
                 tags?: string[];
                 coverUrl?: string;
+                imageUrls?: string[];
               };
             };
             const md = String(data?.post?.content || "");
             const cover = String(data?.post?.coverUrl || "");
-            const firstImg = extractFirstImage(md);
-            const coverForUi = normalizePublicAssetUrl(cover || firstImg);
+            const apiImages = Array.isArray(data?.post?.imageUrls)
+              ? data.post.imageUrls.map((url) => String(url || ""))
+              : [];
+            const mediaForUi = normalizePublicAssetUrls([
+              cover,
+              ...apiImages,
+              ...extractImages(md),
+            ]);
+            const coverForUi = mediaForUi[0] || "";
+            setImageUrls(mediaForUi);
             setCoverUrl(coverForUi);
-            setContent(stripFirstMarkdownImage(stripFirstMarkdownH1(md)));
+            setContent(stripMarkdownImages(stripFirstMarkdownH1(md)));
             setOgImage(toAbsoluteOgImage(coverForUi));
             if (!postMeta) {
               if (data?.post?.title) {
@@ -391,10 +518,11 @@ export function BlogPostPage() {
           const response = await fetch(`/blog/${slug}${langSuffix}.md`);
           if (!response.ok) throw new Error("Failed to load");
           const text = await response.text();
-          const firstImg = extractFirstImage(text);
-          const coverForUi = normalizePublicAssetUrl(firstImg);
+          const mediaForUi = normalizePublicAssetUrls(extractImages(text));
+          const coverForUi = mediaForUi[0] || "";
+          setImageUrls(mediaForUi);
           setCoverUrl(coverForUi);
-          setContent(stripFirstMarkdownImage(stripFirstMarkdownH1(text)));
+          setContent(stripMarkdownImages(stripFirstMarkdownH1(text)));
           setOgImage(toAbsoluteOgImage(coverForUi));
           if (!postMeta) {
             setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
@@ -419,6 +547,8 @@ export function BlogPostPage() {
 
     loadMarkdown();
   }, [slug, navigate, i18n.language, i18n.resolvedLanguage, blogPostsData, navigateGoBack]);
+
+  const heroImageUrls = imageUrls.length ? imageUrls : coverUrl ? [coverUrl] : [];
 
   return (
     <>
@@ -500,14 +630,12 @@ export function BlogPostPage() {
             )}
 
             {/* Cover image */}
-            {coverUrl ? (
+            {heroImageUrls.length ? (
               <div className="mb-10">
-                <div className="w-full aspect-video rounded-lg overflow-hidden">
-                  <ImageWithFallback
-                    src={coverUrl}
-                    alt={meta?.title || slug || "cover"}
-                    fallbackSrc="/opengraphlogo.jpeg"
-                    className="w-full h-full object-cover"
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden">
+                  <PostImageCarousel
+                    images={heroImageUrls}
+                    title={meta?.title || slug || "cover"}
                   />
                 </div>
               </div>

@@ -17,13 +17,37 @@ function stripFirstMarkdownH1(md) {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
 }
 
+function isImageOnlyBlock(block) {
+  const lines = block
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return false;
+  return lines.every((l) =>
+    /^!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*$/.test(l),
+  );
+}
+
+function isMediaOrSourceOnlyBlock(block) {
+  if (isImageOnlyBlock(block)) return true;
+
+  const normalized = stripMd(block).toLowerCase();
+  if (!normalized) return true;
+  if (normalized === "видео") return true;
+  if (/^видео\s+смотреть видео(?:\s+\d+)?$/.test(normalized)) return true;
+  if (/^смотреть видео(?:\s+\d+)?$/.test(normalized)) return true;
+  if (normalized.startsWith("источник: telegram-канал")) return true;
+  return false;
+}
+
 function extractFirstParagraph(md) {
   const body = stripFirstMarkdownH1(md);
   const blocks = body
     .split(/\n\s*\n/)
     .map((b) => b.trim())
     .filter(Boolean);
-  return stripMd(blocks[0] || "");
+  const firstTextBlock = blocks.find((b) => !isMediaOrSourceOnlyBlock(b)) || "";
+  return stripMd(firstTextBlock || "");
 }
 
 function parseFrontmatter(md) {
@@ -71,9 +95,21 @@ function extractFirstMarkdownImage(md) {
   return (match?.[1] || "").trim();
 }
 
+function extractMarkdownImages(md) {
+  return [...md.matchAll(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/gm)]
+    .map((m) => (m?.[1] || "").trim())
+    .filter(Boolean);
+}
+
 function extractFirstHtmlImage(md) {
   const match = md.match(/<img[^>]+src=["']([^"']+)["']/im);
   return (match?.[1] || "").trim();
+}
+
+function extractHtmlImages(md) {
+  return [...md.matchAll(/<img[^>]+src=["']([^"']+)["']/gim)]
+    .map((m) => (m?.[1] || "").trim())
+    .filter(Boolean);
 }
 
 function normalizePublicAssetUrl(url) {
@@ -143,6 +179,14 @@ async function extractMetaFromMarkdown({ slug, md, lang, filePathForStat }) {
     extractFirstHtmlImage(content)
   ).toString().trim();
   const coverUrlNorm = normalizePublicAssetUrl(coverUrl);
+  const imageUrls = [
+    coverUrlNorm,
+    ...extractMarkdownImages(content),
+    ...extractHtmlImages(content),
+  ]
+    .map(normalizePublicAssetUrl)
+    .filter(Boolean);
+  const imageUrlsNorm = [...new Set(imageUrls)];
 
   const legacy = parseLegacyMeta(content);
   const tags = Array.isArray(frontmatter?.tags)
@@ -159,6 +203,7 @@ async function extractMetaFromMarkdown({ slug, md, lang, filePathForStat }) {
     lang,
     title,
     coverUrl: coverUrlNorm,
+    imageUrls: imageUrlsNorm,
     excerpt,
     date,
     readTime,
@@ -175,4 +220,3 @@ module.exports = {
   estimateReadTime,
   extractMetaFromMarkdown,
 };
-

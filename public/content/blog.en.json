@@ -4,6 +4,9 @@
     "lang": "en",
     "title": "Online Booking in «Krasotulya»: Fewer Calls, More Convenience",
     "coverUrl": "/blog/covers/krasotulya-online-booking.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-online-booking.jpg"
+    ],
     "excerpt": "Hi everyone! Gennady Korotkov, head of KorDev Team.",
     "date": "February 3, 2026",
     "readTime": "1 min",
@@ -22,6 +25,9 @@
     "lang": "en",
     "title": "Launched the “Krasotulya” landing page — krasotula.com",
     "coverUrl": "/blog/covers/krasotulya-landing-launch.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-landing-launch.jpg"
+    ],
     "excerpt": "Gennadiy Korotkov here — head of KorDev Team!",
     "date": "January 31, 2026",
     "readTime": "1 min",
@@ -38,6 +44,9 @@
     "lang": "en",
     "title": "\"Krasotulya\": why micro & small businesses need it (card #4 — email campaigns for clients)",
     "coverUrl": "/blog/covers/krasotulya-problem-4-email-campaigns.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-problem-4-email-campaigns.jpg"
+    ],
     "excerpt": "Gennadiy Korotkov here — head of KorDev Team. Today we'll talk about problem 4 — email campaigns for clients.",
     "date": "January 25, 2026",
     "readTime": "1 min",
@@ -55,6 +64,9 @@
     "lang": "en",
     "title": "Launching “Krasotulya” CRM — news and updates will be here",
     "coverUrl": "/blog/covers/krasotulya-crm-launch.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-crm-launch.jpg"
+    ],
     "excerpt": "Hello everyone!",
     "date": "January 24, 2026",
     "readTime": "1 min",
@@ -72,6 +84,9 @@
     "lang": "en",
     "title": "“Krasotulya”: why micro & small businesses need it (card #1 — scattered data)",
     "coverUrl": "/blog/covers/krasotulya-problem-1-data-fragmentation.jpg",
+    "imageUrls": [
+      "/blog/covers/krasotulya-problem-1-data-fragmentation.jpg"
+    ],
     "excerpt": "Hello everyone!",
     "date": "January 20, 2026",
     "readTime": "1 min",
@@ -82,13 +97,16 @@
       "Beauty business",
       "Small business"
     ],
-    "mtimeMs": 1780584409040.9563
+    "mtimeMs": 1780633481714.1963
   },
   {
     "slug": "react-native-best-practices",
     "lang": "en",
     "title": "Best Practices for React Native Development in 2025",
     "coverUrl": "/blog/covers/react-native-best-practices.jpg",
+    "imageUrls": [
+      "/blog/covers/react-native-best-practices.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "October 20, 2025",
     "readTime": "1 min",
@@ -104,6 +122,9 @@
     "lang": "en",
     "title": "Microservices Architecture on Node.js with NestJS",
     "coverUrl": "/blog/covers/nodejs-microservices.jpg",
+    "imageUrls": [
+      "/blog/covers/nodejs-microservices.jpg"
+    ],
     "excerpt": "Why Microservices?",
     "date": "October 15, 2025",
     "readTime": "1 min",
@@ -113,13 +134,16 @@
       "Microservices",
       "Backend"
     ],
-    "mtimeMs": 1780584409043.7896
+    "mtimeMs": 1780633457108.8174
   },
   {
     "slug": "wordpress-optimization",
     "lang": "en",
     "title": "WordPress Site Performance Optimization",
     "coverUrl": "/blog/covers/wordpress-optimization.jpg",
+    "imageUrls": [
+      "/blog/covers/wordpress-optimization.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "October 10, 2025",
     "readTime": "1 min",
@@ -136,6 +160,9 @@
     "lang": "en",
     "title": "Laravel RESTful API Development: Complete Guide",
     "coverUrl": "/blog/covers/laravel-api-development.jpg",
+    "imageUrls": [
+      "/blog/covers/laravel-api-development.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "October 5, 2025",
     "readTime": "1 min",
@@ -152,6 +179,9 @@
     "lang": "en",
     "title": "\"HarmonizeMe I broke down again...\" — Daria knows why this happens and will teach you how to avoid breakdowns",
     "coverUrl": "/blog/covers/harmonize-me-story.jpg",
+    "imageUrls": [
+      "/blog/covers/harmonize-me-story.jpg"
+    ],
     "excerpt": "Service Story",
     "date": "January 27, 2025",
     "readTime": "2 min",
@@ -169,6 +199,9 @@
     "lang": "en",
     "title": "How to Effectively Work with Government Contractors in IT?",
     "coverUrl": "/blog/covers/government-contractors-guide.jpg",
+    "imageUrls": [
+      "/blog/covers/government-contractors-guide.jpg"
+    ],
     "excerpt": "My Telegram channel about my studio, life, management, smart thoughts (hopefully), personal effectiveness, humor",
     "date": "January 27, 2025",
     "readTime": "11 min",
@@ -186,6 +219,9 @@
     "lang": "en",
     "title": "Stop Losing Negotiations! Iron-Clad Argumentation That Breaks Resistance Even from Stubborn Clients",
     "coverUrl": "/blog/covers/argumentation-guide.jpg",
+    "imageUrls": [
+      "/blog/covers/argumentation-guide.jpg"
+    ],
     "excerpt": "This post was written after reading Nikita Nepryakhin's book \"Argue This!\" — highly recommend it, it covers argumentation in great detail.",
     "date": "January 27, 2025",
     "readTime": "4 min",
@@ -202,6 +238,9 @@
     "lang": "en",
     "title": "Telegram Broadcast Automation: Saving 16 Hours of Work for Kusidis PRO",
     "coverUrl": "/blog/covers/telegram-broadcast-automation.jpg",
+    "imageUrls": [
+      "/blog/covers/telegram-broadcast-automation.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "",
     "readTime": "4 min",
@@ -213,6 +252,9 @@
     "lang": "en",
     "title": "Stone Products Calculator: Automating Estimates and Saving Up to 80% of Time",
     "coverUrl": "/blog/covers/stone-calculator-automation.jpg",
+    "imageUrls": [
+      "/blog/covers/stone-calculator-automation.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "",
     "readTime": "4 min",
@@ -224,6 +266,9 @@
     "lang": "en",
     "title": "SimsDynastyTree: Development of Genealogy Tree Service Based on Graphs for The Sims Fans",
     "coverUrl": "/blog/covers/sims-dynasty-tree-platform.jpg",
+    "imageUrls": [
+      "/blog/covers/sims-dynasty-tree-platform.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "",
     "readTime": "7 min",
@@ -235,6 +280,9 @@
     "lang": "en",
     "title": "Harmonize Me Platform: Comprehensive Development of Online Psychology Courses with Gamification and AI Support",
     "coverUrl": "/blog/covers/harmonize-me-platform.jpg",
+    "imageUrls": [
+      "/blog/covers/harmonize-me-platform.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "",
     "readTime": "8 min",
@@ -246,6 +294,9 @@
     "lang": "en",
     "title": "CRM Implementation: Complete Guide to Sales Automation in 2025",
     "coverUrl": "/blog/covers/crm-implementation.jpg",
+    "imageUrls": [
+      "/blog/covers/crm-implementation.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "",
     "readTime": "4 min",
@@ -257,6 +308,9 @@
     "lang": "en",
     "title": "Business Process Automation: How to Increase Company Efficiency in 2025",
     "coverUrl": "/blog/covers/business-automation.jpg",
+    "imageUrls": [
+      "/blog/covers/business-automation.jpg"
+    ],
     "excerpt": "Introduction",
     "date": "",
     "readTime": "4 min",
