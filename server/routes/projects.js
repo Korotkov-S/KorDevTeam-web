@@ -58,10 +58,29 @@ async function writeAllPaths(paths, raw) {
   return results;
 }
 
+function mergeProjectImagesFromFallback(projects, fallbackProjects) {
+  const fallbackById = new Map(
+    (fallbackProjects || []).map((project) => [String(project.id || ""), project]),
+  );
+
+  return (projects || []).map((project) => {
+    const fallback = fallbackById.get(String(project.id || ""));
+    if (!fallback || project.image) return project;
+    return {
+      ...project,
+      image: fallback.image || "",
+    };
+  });
+}
+
 router.get("/", async (req, res, next) => {
   try {
     const lang = safeLang((req.query.lang || "ru").toString());
-    const projects = await getProjects({ lang });
+    let projects = await getProjects({ lang });
+    if (lang !== "ru" && projects.length) {
+      const ruProjects = await getProjects({ lang: "ru" });
+      projects = mergeProjectImagesFromFallback(projects, ruProjects);
+    }
     if (projects.length) return res.json({ lang, projects });
 
     // Legacy fallback: read JSON from disk and import into DB.
@@ -69,7 +88,11 @@ router.get("/", async (req, res, next) => {
     if (!raw) return res.status(404).json({ error: "Projects not found" });
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return res.status(500).json({ error: "Invalid legacy projects format" });
-    const imported = await replaceProjects({ lang, projects: parsed });
+    let imported = await replaceProjects({ lang, projects: parsed });
+    if (lang !== "ru") {
+      const ruProjects = await getProjects({ lang: "ru" });
+      imported = mergeProjectImagesFromFallback(imported, ruProjects);
+    }
     return res.json({ lang, projects: imported, source: "legacy_file_imported" });
   } catch (e) {
     next(e);

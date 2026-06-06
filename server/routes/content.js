@@ -6,6 +6,28 @@ const { listPostMetas, safeLang } = require("../db");
 
 const router = express.Router();
 
+function mergeBlogImagesFromFallback(items, fallbackItems) {
+  const fallbackBySlug = new Map(
+    (fallbackItems || []).map((item) => [String(item.slug || ""), item]),
+  );
+
+  return (items || []).map((item) => {
+    const fallback = fallbackBySlug.get(String(item.slug || ""));
+    if (!fallback) return item;
+
+    const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls.filter(Boolean) : [];
+    const fallbackImageUrls = Array.isArray(fallback.imageUrls)
+      ? fallback.imageUrls.filter(Boolean)
+      : [];
+
+    return {
+      ...item,
+      coverUrl: item.coverUrl || fallback.coverUrl || "",
+      imageUrls: imageUrls.length ? imageUrls : fallbackImageUrls,
+    };
+  });
+}
+
 function getRoots() {
   // Repo-root-like directories. In development, process.cwd() is project root.
   // In production (nginx image), you can point CONTENT_DIST_ROOT to the directory that contains blog/ and krasotulya-crm/.
@@ -51,7 +73,11 @@ router.get("/:section", async (req, res, next) => {
 
     // Blog index is now sourced from SQLite (markdown files are optional/legacy).
     if (section === "blog") {
-      const items = await listPostMetas({ lang });
+      let items = await listPostMetas({ lang });
+      if (lang !== "ru") {
+        const ruItems = await listPostMetas({ lang: "ru" });
+        items = mergeBlogImagesFromFallback(items, ruItems);
+      }
       return res.json({ section, lang, items });
     }
 
@@ -76,4 +102,3 @@ router.get("/:section", async (req, res, next) => {
 });
 
 module.exports = router;
-

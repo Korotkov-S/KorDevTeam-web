@@ -16,6 +16,32 @@ const {
 } = require("../utils/fileHandler");
 const { extractMetaFromMarkdown } = require("../utils/contentMeta");
 
+function normalizePublicAssetUrl(url) {
+  const s = String(url || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return s;
+  return `/${s.replace(/^\.\//, "")}`;
+}
+
+function extractPostImageUrls(content, coverUrl) {
+  const md = String(content || "");
+  const markdownImages = [
+    ...md.matchAll(/!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)/gm),
+  ].map((m) => (m?.[1] || "").trim());
+  const htmlImages = [...md.matchAll(/<img[^>]+src=["']([^"']+)["']/gim)].map(
+    (m) => (m?.[1] || "").trim(),
+  );
+  return [
+    ...new Set(
+      [coverUrl, ...markdownImages, ...htmlImages]
+        .map(normalizePublicAssetUrl)
+        .filter(Boolean),
+    ),
+  ];
+}
+
 async function deletePostBySlug({ slug, lang }) {
   const l = safeLang(lang?.toString?.() || "ru");
   const legacyPost = await getFilePost(slug, l);
@@ -167,6 +193,17 @@ router.get('/:slug', async (req, res, next) => {
         createdAtMs: meta.mtimeMs,
         updatedAtMs: meta.mtimeMs,
       });
+    }
+
+    post.imageUrls = extractPostImageUrls(post.content, post.coverUrl || "");
+
+    if (l !== "ru") {
+      const ruPost = await getDbPost({ slug, lang: "ru" });
+      if (ruPost) {
+        const ruImageUrls = extractPostImageUrls(ruPost.content, ruPost.coverUrl || "");
+        if (!post.coverUrl && ruPost.coverUrl) post.coverUrl = ruPost.coverUrl;
+        if (!post.imageUrls.length && ruImageUrls.length) post.imageUrls = ruImageUrls;
+      }
     }
 
     res.json({ post });
