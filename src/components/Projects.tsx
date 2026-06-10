@@ -101,7 +101,6 @@ export function Projects({ withId = true }: { withId?: boolean } = {}) {
   // Примечание: без типовых деклараций React TS может некорректно вывести сигнатуру useState из JS.
   // Поэтому инициализируем состояние без аргументов и задаём значение эффектом.
   const [projects, setProjects] = useState();
-  const [loadedFromJson, setLoadedFromJson] = useState();
 
   useEffect(() => {
     // Обновляем фоллбек при смене языка/переводов
@@ -133,11 +132,9 @@ export function Projects({ withId = true }: { withId?: boolean } = {}) {
           technologies: Array.isArray(p.technologies) ? p.technologies.map((x: any) => String(x)) : [],
         }));
         setProjects(mapped);
-        setLoadedFromJson(true);
         setCurrentPage(1);
       } catch {
         setProjects(fallbackProjects as any);
-        setLoadedFromJson(false);
       }
     };
     load();
@@ -189,11 +186,6 @@ export function Projects({ withId = true }: { withId?: boolean } = {}) {
           >
             {t("projects.subtitle")}
           </motion.p>
-          {loadedFromJson && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Список проектов загружен динамически (из `public/content/projects.*.json`).
-            </p>
-          )}
         </div>
 
         <div className="space-y-8 mb-8">

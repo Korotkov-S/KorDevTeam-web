@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Hero } from "../components/Hero";
 import { SEO } from "../components/SEO";
+import { ProductSpotlight } from "../components/ProductSpotlight";
 
 const Services = lazy(() => import("../components/Services").then((m) => ({ default: m.Services })));
 const Technologies = lazy(() =>
@@ -56,13 +57,14 @@ export function HomePage() {
   return (
     <>
       <SEO
-        title="Цифровая трансформация вашего бизнеса"
-        description="Профессиональная команда разработчиков. Веб-сервисы, мобильные приложения, цифровизация и автоматизация бизнеса."
+        title="Автоматизация продаж и операционных процессов"
+        description="KorDevTeam разрабатывает CRM, веб-сервисы, мобильные приложения и интеграции под ключ. У нас есть собственный продукт Красотуля-CRM для малого бизнеса."
         canonical="https://kordev.team/"
         ogType="website"
         ogImage="https://kordev.team/opengraphlogo.jpeg"
       />
       <Hero />
+      <ProductSpotlight />
       <DeferredSection id="services">
         <Suspense fallback={null}>
           <Services withId={false} />

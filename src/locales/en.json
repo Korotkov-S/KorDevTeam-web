@@ -32,44 +32,62 @@
     }
   },
   "hero": {
-    "badge": "Team of Professional Developers",
-    "title": "Digital Transformation of Your Business",
-    "subtitle": "We specialize in developing web services and mobile applications. From concept to launch and support.",
+    "badge": "Product automation studio",
+    "title": "We automate sales and business operations",
+    "subtitle": "We build CRM systems, web services, mobile apps and integrations end to end. We also run our own product, Krasotulya-CRM, so we understand automation beyond contractor delivery.",
     "discussProject": "Discuss Project",
     "ourServices": "Our Services",
     "scroll": "Scroll",
     "stats": {
       "clients": "clients were satisfied",
-      "cheaper": "Cheaper than competitors",
+      "mvp": "weeks to launch an MVP",
       "onTime": "On time deadline"
     }
   },
+  "productSpotlight": {
+    "badge": "Our own product",
+    "title": "Krasotulya-CRM for small business",
+    "subtitle": "We develop a CRM platform for customers, sales, tasks, online booking, campaigns, inventory and AI automation. We bring this product experience into custom development.",
+    "features": [
+      "Customers and deals",
+      "Tasks and pipelines",
+      "Online booking",
+      "Chats and campaigns",
+      "Telegram bots",
+      "AI automation"
+    ],
+    "openProduct": "View product",
+    "requestDemo": "Request demo",
+    "imageAlt": "Krasotulya-CRM",
+    "proofTitle": "More than contractors",
+    "proofText": "We build our own SaaS product and understand how automation works after launch."
+  },
   "services": {
     "title": "Our Services",
-    "subtitle": "We provide a full range of services for development, implementation and support of web solutions",
+    "subtitle": "We solve practical business problems: sales, operations, integrations, mobile workflows and system support",
     "webDevelopment": {
-      "title": "Web Services Development",
-      "description": "Creating modern, responsive and performant web services using the latest technologies."
+      "title": "CRM and sales automation",
+      "description": "We design pipelines, customer cards, tasks, reminders, campaigns and analytics around real company workflows."
     },
     "mobileApps": {
-      "title": "React Native Apps",
-      "description": "Cross-platform mobile application development for iOS and Android."
+      "title": "Offline-first mobile apps",
+      "description": "We build React Native apps for field teams, inspections, records and data sync without stable internet."
     },
     "backend": {
-      "title": "Backend Development",
-      "description": "Creating reliable server solutions on Node.js (NestJS, AdonisJS, Fastify), PHP Laravel and Python."
+      "title": "Backend and integrations",
+      "description": "We create reliable APIs and connect Telegram, payments, inventory, analytics, external services and internal dashboards."
     },
     "interviews": {
-      "title": "Technical Interviews",
-      "description": "We conduct technical interviews, provide detailed reports and save your money on hiring."
+      "title": "Audits and technical interviews",
+      "description": "We evaluate candidates, code and architecture, then provide a clear report for hiring, team growth or vendor transition."
     },
     "cmsSupport": {
-      "title": "WordPress, Drupal Support",
-      "description": "Full cycle of CMS work: from installation and configuration to custom development and optimization."
+      "title": "Websites, CMS and portals",
+      "description": "We develop WordPress, Drupal and custom web services: forms, catalogs, portals, SEO and performance."
     },
     "technicalSupport": {
-      "title": "Technical Support",
-      "description": "Support and maintenance of existing projects, bug fixes, updates and improvements."
+      "title": "System support and growth",
+      "description": "We take over existing projects: fix bugs, update stacks, add features and bring order to development processes."
     }
   },
   "technologies": {
@@ -297,12 +315,16 @@
     "telegram": "Telegram",
     "max": "Max",
     "sendMessage": "Send Message",
-    "sendDescription": "Fill out the form below and we will respond as soon as possible",
+    "sendDescription": "Describe the task, budget and timeline. The request will reach us in Telegram.",
     "yourName": "Your Name",
-    "yourEmail": "Your Email",
-    "messagePlaceholder": "Tell us about your project...",
+    "yourContact": "Email, Telegram or phone",
+    "budget": "Budget range",
+    "timeline": "Desired timeline",
+    "messagePlaceholder": "Which sales, operations or workflows should we automate?",
     "send": "Send",
-    "thanks": "Thank you! We will contact you soon."
+    "sending": "Sending...",
+    "thanks": "Thank you! Your request has been sent, and we will contact you soon.",
+    "error": "Could not send the request. Please write to us in Telegram or email."
   },
   "footer": {
     "description": "A team of professional developers specializing in creating web services and mobile solutions.",

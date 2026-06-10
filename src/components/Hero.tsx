@@ -80,7 +80,7 @@ export function Hero() {
   const stats = useMemo(
     () => [
       { value: 95, suffix: "%", label: t("hero.stats.clients"), icon: TrendingUp },
-      { value: 30, suffix: "%", label: t("hero.stats.cheaper"), icon: Zap },
+      { value: 8, suffix: "", label: t("hero.stats.mvp"), icon: Zap },
       { value: 83, suffix: "%", label: t("hero.stats.onTime"), icon: Users },
     ],
     [t]
