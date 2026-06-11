@@ -86,6 +86,7 @@ export function ProductSpotlight() {
                   src="/blog/covers/krasotulya-crm-launch.jpg"
                   alt={t("productSpotlight.imageAlt")}
                   className="h-full w-full object-cover"
+                  loading="eager"
                 />
               </div>
               <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/20 bg-background/80 p-4 backdrop-blur-xl">

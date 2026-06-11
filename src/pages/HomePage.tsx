@@ -75,12 +75,12 @@ export function HomePage() {
           <Technologies withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="projects">
+      <DeferredSection id="projects" rootMargin="2400px">
         <Suspense fallback={null}>
           <Projects withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="blog">
+      <DeferredSection id="blog" rootMargin="2200px">
         <Suspense fallback={null}>
           <Blog withId={false} />
         </Suspense>
