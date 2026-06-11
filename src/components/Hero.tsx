@@ -89,11 +89,20 @@ export function Hero() {
   const titleParts = useMemo(() => {
     const title = String(t("hero.title") ?? "");
     const words = title.split(/\s+/).filter(Boolean);
-    if (words.length <= 2) return { a: title, b: "", c: "" };
+    const divider = words.findIndex((word) => /^(и|and)$/i.test(word));
+    if (divider > 0) {
+      return {
+        a: words.slice(0, divider).join(" "),
+        b: words.slice(divider).join(" "),
+        c: "",
+      };
+    }
+    if (words.length <= 4) return { a: title, b: "", c: "" };
+    const midpoint = Math.ceil(words.length / 2);
     return {
-      a: words[0],
-      b: words[1],
-      c: words.slice(2).join(" "),
+      a: words.slice(0, midpoint).join(" "),
+      b: words.slice(midpoint).join(" "),
+      c: "",
     };
   }, [t]);
 
@@ -610,61 +619,51 @@ function AnimatedTitle({ a, b, c }: { a: string; b: string; c: string }) {
     { text: c, className: "text-foreground", isGradient: false },
   ].filter((x) => x.text);
 
+  const renderWords = (text: string) =>
+    text.split(/\s+/).map((word, index) => (
+      <span key={`${word}-${index}`} className="inline-block">
+        {word}
+      </span>
+    ));
+
   return (
-    <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight">
-      {parts.map((word, wordIndex) => (
+    <h1 className="mx-auto max-w-6xl text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] text-balance">
+      {parts.map((part, partIndex) => (
         <motion.div
-          key={`${word.text}-${wordIndex}`}
-          initial={{ opacity: 0, y: 50 }}
+          key={`${part.text}-${partIndex}`}
+          initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 + wordIndex * 0.2 }}
-          className={wordIndex === 2 ? "mt-2" : ""}
+          transition={{ duration: 0.6, delay: 0.2 + partIndex * 0.18 }}
+          className={[
+            "flex flex-wrap justify-center gap-x-3 gap-y-1 sm:gap-x-4",
+            partIndex > 0 ? "mt-2" : "",
+          ].join(" ")}
         >
-          {word.isGradient ? (
-            <span className="relative inline-block">
+          {part.isGradient ? (
+            <span className="relative inline-flex flex-wrap justify-center gap-x-3 gap-y-1 sm:gap-x-4">
               <motion.span
-                className={word.className}
+                className={[
+                  part.className,
+                  "inline-flex flex-wrap justify-center gap-x-3 gap-y-1 sm:gap-x-4",
+                ].join(" ")}
                 initial={{ backgroundPosition: "0% 50%" }}
                 animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
                 transition={{ duration: 5, repeat: Infinity }}
                 style={{ backgroundSize: "200% 200%" }}
               >
-                {word.text.split("").map((char, i) => (
-                  <motion.span
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.4 + i * 0.05 }}
-                    className="inline-block"
-                  >
-                    {char}
-                  </motion.span>
-                ))}
+                {renderWords(part.text)}
               </motion.span>
               <motion.div
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ duration: 0.8, delay: 1.2 }}
-                className="absolute bottom-1 sm:bottom-2 left-0 right-0 h-2 sm:h-3 bg-gradient-to-r from-blue-500/30 to-purple-500/30 blur-sm"
+                className="absolute bottom-0 sm:bottom-1 left-0 right-0 h-2 sm:h-3 bg-gradient-to-r from-blue-500/30 to-purple-500/30 blur-sm"
                 style={{ originX: 0 }}
               />
             </span>
           ) : (
-            <span className={word.className}>
-              {word.text.split("").map((char, i) => (
-                <motion.span
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.3,
-                    delay: 0.2 + wordIndex * 0.2 + i * 0.03,
-                  }}
-                  className="inline-block"
-                >
-                  {char === " " ? "\u00A0" : char}
-                </motion.span>
-              ))}
+            <span className={["inline-flex flex-wrap justify-center gap-x-3 gap-y-1 sm:gap-x-4", part.className].join(" ")}>
+              {renderWords(part.text)}
             </span>
           )}
         </motion.div>
