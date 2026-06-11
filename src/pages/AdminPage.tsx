@@ -51,6 +51,149 @@ function authHeaders(authHeaderValue: string) {
   return authHeaderValue ? { Authorization: authHeaderValue } : {};
 }
 
+type PreparedUploadImage = {
+  dataUrl: string;
+  filename: string;
+  originalBytes: number;
+  bytes: number;
+  compressed: boolean;
+};
+
+type UploadImageCompressionOptions = {
+  maxWidth: number;
+  quality: number;
+};
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 КБ";
+  const units = ["Б", "КБ", "МБ"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+}
+
+function replaceFileExtension(filename: string, ext: string) {
+  const cleanName = String(filename || "image").trim() || "image";
+  return `${cleanName.replace(/\.[a-z0-9]+$/i, "")}.${ext}`;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Не удалось подготовить файл"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number
+): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Браузер не смог сжать изображение"));
+      },
+      type,
+      quality
+    );
+  });
+}
+
+async function loadImageElement(file: File): Promise<HTMLImageElement> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    const loaded = new Promise<HTMLImageElement>((resolve, reject) => {
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Не удалось открыть изображение"));
+    });
+    image.src = objectUrl;
+    return await loaded;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function prepareImageForUpload(
+  file: File,
+  options: UploadImageCompressionOptions
+): Promise<PreparedUploadImage> {
+  const fallback = async (): Promise<PreparedUploadImage> => {
+    const dataUrl = await fileToDataUrl(file);
+    return {
+      dataUrl,
+      filename: file.name,
+      originalBytes: file.size,
+      bytes: file.size,
+      compressed: false,
+    };
+  };
+
+  // GIF can be animated, so keep it untouched instead of flattening to one frame.
+  if (file.type === "image/gif") return fallback();
+
+  try {
+    const source =
+      "createImageBitmap" in window
+        ? await createImageBitmap(file)
+        : await loadImageElement(file);
+    const sourceWidth =
+      source instanceof HTMLImageElement ? source.naturalWidth : source.width;
+    const sourceHeight =
+      source instanceof HTMLImageElement ? source.naturalHeight : source.height;
+
+    if (!sourceWidth || !sourceHeight) {
+      throw new Error("У изображения нет размеров");
+    }
+
+    const scale = Math.min(1, options.maxWidth / sourceWidth);
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Браузер не смог подготовить canvas");
+    ctx.drawImage(source, 0, 0, width, height);
+
+    if ("close" in source && typeof source.close === "function") {
+      source.close();
+    }
+
+    const blob = await canvasToBlob(canvas, "image/webp", options.quality);
+    if (blob.size >= file.size) return fallback();
+
+    return {
+      dataUrl: await blobToDataUrl(blob),
+      filename: replaceFileExtension(file.name, "webp"),
+      originalBytes: file.size,
+      bytes: blob.size,
+      compressed: true,
+    };
+  } catch (e) {
+    console.warn("Image compression failed, uploading original file", e);
+    return fallback();
+  }
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -385,11 +528,9 @@ export function AdminPage() {
         }
 
         setUploadingBlogImage(true);
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ""));
-          reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
-          reader.readAsDataURL(file);
+        const prepared = await prepareImageForUpload(file, {
+          maxWidth: 960,
+          quality: 0.78,
         });
 
         const resp = await fetchJson<{
@@ -404,7 +545,10 @@ export function AdminPage() {
             "Content-Type": "application/json",
             ...authHeaders(authHeaderValue),
           },
-          body: JSON.stringify({ dataUrl, filename: file.name }),
+          body: JSON.stringify({
+            dataUrl: prepared.dataUrl,
+            filename: prepared.filename,
+          }),
         });
 
         const uploadedUrl = (resp.url ?? (resp as { imageUrl?: string }).imageUrl ?? "").trim();
@@ -430,8 +574,12 @@ export function AdminPage() {
         lastUploadedCoverKeyRef.current = String(resp.key || "").trim();
         setBlogCoverUrl(coverUrlToUse);
         const storageLabel = resp.storage === "s3" ? " (S3)" : " (локально)";
+        const compressionLabel = prepared.compressed
+          ? `, сжато: ${formatBytes(prepared.originalBytes)} -> ${formatBytes(prepared.bytes)}`
+          : "";
         toast.success(`Фото загружено${storageLabel}`, {
-          description: uploadedUrl.length <= 80 ? uploadedUrl : `${uploadedUrl.slice(0, 77)}…`,
+          description:
+            `${uploadedUrl.length <= 80 ? uploadedUrl : `${uploadedUrl.slice(0, 77)}…`}${compressionLabel}`,
         });
       } catch (e: any) {
         console.warn(e);
@@ -785,11 +933,9 @@ export function AdminPage() {
           return;
         }
         setUploadingProjectImage(true);
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ""));
-          reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
-          reader.readAsDataURL(file);
+        const prepared = await prepareImageForUpload(file, {
+          maxWidth: 1200,
+          quality: 0.78,
         });
         const resp = await fetchJson<{
           url?: string;
@@ -803,7 +949,10 @@ export function AdminPage() {
               "Content-Type": "application/json",
               ...authHeaders(authHeaderValue),
             },
-            body: JSON.stringify({ dataUrl, filename: file.name }),
+            body: JSON.stringify({
+              dataUrl: prepared.dataUrl,
+              filename: prepared.filename,
+            }),
           }
         );
         const uploadedUrl = String(resp.url || "").trim();
@@ -824,7 +973,11 @@ export function AdminPage() {
         }
 
         setProjectDraft((prev) => ({ ...prev, image: imageUrlToUse }));
-        toast.success("Фото загружено");
+        toast.success("Фото загружено", {
+          description: prepared.compressed
+            ? `Сжато: ${formatBytes(prepared.originalBytes)} -> ${formatBytes(prepared.bytes)}`
+            : "Файл загружен без сжатия",
+        });
       } catch (e: any) {
         console.warn(e);
         toast.error(`Ошибка загрузки: ${e?.message || "unknown"}`);
