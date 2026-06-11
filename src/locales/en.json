@@ -57,7 +57,7 @@
       "AI automation"
     ],
     "openProduct": "View product",
-    "requestDemo": "Request demo",
+    "requestDemo": "Message us on Telegram",
     "imageAlt": "Krasotulya-CRM",
     "proofTitle": "More than contractors",
     "proofText": "We build our own SaaS product and understand how automation works after launch."
@@ -313,18 +313,7 @@
     "subtitle": "Ready to discuss your project? Write to us and we will contact you soon",
     "email": "Email",
     "telegram": "Telegram",
-    "max": "Max",
-    "sendMessage": "Send Message",
-    "sendDescription": "Describe the task, budget and timeline. The request will reach us in Telegram.",
-    "yourName": "Your Name",
-    "yourContact": "Email, Telegram or phone",
-    "budget": "Budget range",
-    "timeline": "Desired timeline",
-    "messagePlaceholder": "Which sales, operations or workflows should we automate?",
-    "send": "Send",
-    "sending": "Sending...",
-    "thanks": "Thank you! Your request has been sent, and we will contact you soon.",
-    "error": "Could not send the request. Please write to us in Telegram or email."
+    "max": "Max"
   },
   "footer": {
     "description": "A team of professional developers specializing in creating web services and mobile solutions.",

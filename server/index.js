@@ -7,7 +7,6 @@ const contentRouter = require("./routes/content");
 const projectsRouter = require("./routes/projects");
 const adminRouter = require("./routes/admin");
 const mediaRouter = require("./routes/media");
-const contactRouter = require("./routes/contact");
 const path = require('path');
 const fs = require("node:fs");
 const { bootstrapFromLegacyContentIfEmpty } = require("./db/bootstrap");
@@ -40,7 +39,6 @@ app.use("/api/content", contentRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/media", mediaRouter);
-app.use("/api/contact", contactRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

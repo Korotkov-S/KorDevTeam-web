@@ -66,7 +66,9 @@ export function ProductSpotlight() {
                 </a>
               </Button>
               <Button asChild variant="outline">
-                <a href="#contact">{t("productSpotlight.requestDemo")}</a>
+                <a href="https://t.me/ideamen51" target="_blank" rel="noopener noreferrer">
+                  {t("productSpotlight.requestDemo")}
+                </a>
               </Button>
             </div>
           </motion.div>
