@@ -683,7 +683,7 @@ function HeroWalkBehindTitle({ reduceEffects }: { reduceEffects: boolean }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 top-24 bottom-20 z-[6] hidden lg:block overflow-hidden"
+      className="pointer-events-none absolute inset-x-0 top-20 bottom-16 z-[6] hidden lg:block overflow-hidden"
       style={{
         WebkitMaskImage:
           "linear-gradient(to bottom, transparent 0%, black 18%, black 78%, transparent 100%)",
@@ -691,40 +691,163 @@ function HeroWalkBehindTitle({ reduceEffects }: { reduceEffects: boolean }) {
           "linear-gradient(to bottom, transparent 0%, black 18%, black 78%, transparent 100%)",
       }}
     >
-      <motion.img
-        src="/people/gennady-hero-walk.webp"
-        alt=""
-        loading="eager"
-        decoding="async"
-        className="absolute bottom-0 left-1/2 h-[58vh] min-h-[430px] max-h-[620px] w-auto select-none object-contain opacity-45 mix-blend-multiply dark:opacity-35 dark:mix-blend-screen"
-        initial={{ x: "-58vw", y: 18, scale: 0.92, rotate: -1 }}
-        animate={{
-          x: ["-58vw", "-18vw", "18vw", "58vw"],
-          y: [18, 0, 10, 18],
-          rotate: [-1, 1.2, -0.8, 1],
-          scale: [0.92, 0.98, 0.94, 0.92],
-        }}
-        transition={{
-          duration: 16,
-          ease: "easeInOut",
-          repeat: Infinity,
-          repeatDelay: 1.5,
-        }}
-      />
       <motion.div
-        className="absolute bottom-12 left-1/2 h-16 w-44 rounded-full bg-blue-500/20 blur-3xl dark:bg-blue-300/15"
-        initial={{ x: "-58vw", opacity: 0.35 }}
+        className="absolute bottom-0 left-1/2 w-[260px] origin-bottom opacity-80 drop-shadow-[0_30px_35px_rgba(37,99,235,0.22)] dark:opacity-70"
+        initial={{ x: "-62vw", scale: 0.82 }}
         animate={{
-          x: ["-58vw", "-18vw", "18vw", "58vw"],
-          opacity: [0.25, 0.45, 0.35, 0.25],
+          x: ["-62vw", "-22vw", "20vw", "62vw"],
+          scale: [0.82, 0.9, 0.86, 0.82],
         }}
         transition={{
-          duration: 16,
+          duration: 14,
           ease: "easeInOut",
           repeat: Infinity,
-          repeatDelay: 1.5,
+          repeatDelay: 1.2,
         }}
-      />
+      >
+        <motion.div
+          animate={{ y: [0, -10, 0, -7, 0], rotate: [-1, 1.4, -0.8, 1, -1] }}
+          transition={{ duration: 1.1, ease: "easeInOut", repeat: Infinity }}
+        >
+          <svg
+            viewBox="0 0 260 520"
+            role="presentation"
+            className="h-auto w-full"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="heroWalkerSkin" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stopColor="#ffd8bf" />
+                <stop offset="100%" stopColor="#e9a47f" />
+              </linearGradient>
+              <linearGradient id="heroWalkerHoodie" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stopColor="#08234f" />
+                <stop offset="100%" stopColor="#020817" />
+              </linearGradient>
+              <linearGradient id="heroWalkerPants" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stopColor="#6b7280" />
+                <stop offset="100%" stopColor="#2f3744" />
+              </linearGradient>
+              <radialGradient id="heroWalkerFaceShade" cx="35%" cy="20%" r="75%">
+                <stop offset="0%" stopColor="#fff1e7" stopOpacity="0.75" />
+                <stop offset="100%" stopColor="#c9785d" stopOpacity="0.18" />
+              </radialGradient>
+            </defs>
+
+            <ellipse cx="132" cy="496" rx="72" ry="16" fill="rgba(37,99,235,0.18)" />
+
+            <motion.g
+              style={{ transformBox: "fill-box", transformOrigin: "86px 210px" }}
+              animate={{ rotate: [18, -20, 18] }}
+              transition={{ duration: 1.1, ease: "easeInOut", repeat: Infinity }}
+            >
+              <path
+                d="M92 174 C62 201 48 236 45 282"
+                fill="none"
+                stroke="#061833"
+                strokeWidth="31"
+                strokeLinecap="round"
+              />
+              <circle cx="45" cy="287" r="14" fill="url(#heroWalkerSkin)" />
+            </motion.g>
+
+            <motion.g
+              style={{ transformBox: "fill-box", transformOrigin: "176px 208px" }}
+              animate={{ rotate: [-18, 19, -18] }}
+              transition={{ duration: 1.1, ease: "easeInOut", repeat: Infinity }}
+            >
+              <path
+                d="M166 174 C194 201 210 235 214 280"
+                fill="none"
+                stroke="#04142d"
+                strokeWidth="31"
+                strokeLinecap="round"
+              />
+              <circle cx="214" cy="286" r="14" fill="url(#heroWalkerSkin)" />
+            </motion.g>
+
+            <path
+              d="M74 170 C83 125 105 104 131 104 C160 104 181 128 188 172 L202 298 C177 314 99 316 60 298 Z"
+              fill="url(#heroWalkerHoodie)"
+            />
+            <path
+              d="M88 159 C97 122 112 107 132 107 C153 107 169 124 176 159 C151 147 113 147 88 159 Z"
+              fill="#020817"
+              opacity="0.82"
+            />
+            <path
+              d="M91 190 C112 210 150 211 174 190"
+              fill="none"
+              stroke="#1d4ed8"
+              strokeWidth="4"
+              strokeLinecap="round"
+              opacity="0.55"
+            />
+
+            <motion.g
+              style={{ transformBox: "fill-box", transformOrigin: "105px 302px" }}
+              animate={{ rotate: [-16, 19, -16] }}
+              transition={{ duration: 1.1, ease: "easeInOut", repeat: Infinity }}
+            >
+              <path
+                d="M93 292 C84 338 78 387 76 452"
+                fill="none"
+                stroke="url(#heroWalkerPants)"
+                strokeWidth="34"
+                strokeLinecap="round"
+              />
+              <path
+                d="M60 463 C77 452 95 454 112 470 C100 482 75 482 52 476 C48 472 52 467 60 463 Z"
+                fill="#4b2f22"
+              />
+            </motion.g>
+
+            <motion.g
+              style={{ transformBox: "fill-box", transformOrigin: "154px 302px" }}
+              animate={{ rotate: [18, -17, 18] }}
+              transition={{ duration: 1.1, ease: "easeInOut", repeat: Infinity }}
+            >
+              <path
+                d="M160 292 C169 340 178 389 181 453"
+                fill="none"
+                stroke="url(#heroWalkerPants)"
+                strokeWidth="34"
+                strokeLinecap="round"
+              />
+              <path
+                d="M165 465 C184 453 202 455 219 471 C205 484 178 483 157 477 C153 472 157 468 165 465 Z"
+                fill="#4b2f22"
+              />
+            </motion.g>
+
+            <path
+              d="M80 290 C105 304 156 305 198 290 L184 333 C151 346 98 342 67 330 Z"
+              fill="#111827"
+              opacity="0.28"
+            />
+
+            <path
+              d="M95 72 C95 37 112 20 134 20 C158 20 176 39 176 72 C176 91 166 108 151 116 L117 116 C103 106 95 90 95 72 Z"
+              fill="#111827"
+            />
+            <ellipse cx="133" cy="77" rx="39" ry="45" fill="url(#heroWalkerSkin)" />
+            <ellipse cx="122" cy="69" rx="4" ry="3" fill="#172033" />
+            <ellipse cx="150" cy="69" rx="4" ry="3" fill="#172033" />
+            <path
+              d="M123 90 C133 98 147 97 155 89"
+              fill="none"
+              stroke="#7f3b2b"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            <path
+              d="M95 65 C102 36 117 23 138 23 C156 24 170 39 176 65 C151 53 122 53 95 65 Z"
+              fill="#2b1b16"
+            />
+            <ellipse cx="132" cy="78" rx="40" ry="46" fill="url(#heroWalkerFaceShade)" />
+          </svg>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
