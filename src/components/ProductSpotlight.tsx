@@ -81,21 +81,13 @@ export function ProductSpotlight() {
             className="relative"
           >
             <div className="relative overflow-hidden rounded-3xl border border-border bg-card/60 dark:bg-white/5 p-3 shadow-2xl shadow-blue-500/10">
-              <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
+              <div className="aspect-[10/7] overflow-hidden rounded-2xl bg-muted">
                 <ImageWithFallback
-                  src="/blog/covers/krasotulya-crm-launch.jpg"
+                  src="/products/krasotulya-crm-capabilities-hero.png"
                   alt={t("productSpotlight.imageAlt")}
                   className="h-full w-full object-cover"
                   loading="eager"
                 />
-              </div>
-              <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/20 bg-background/80 p-4 backdrop-blur-xl">
-                <p className="text-sm font-medium text-foreground">
-                  {t("productSpotlight.proofTitle")}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("productSpotlight.proofText")}
-                </p>
               </div>
             </div>
           </motion.div>
