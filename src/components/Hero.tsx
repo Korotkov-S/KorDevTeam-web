@@ -109,7 +109,7 @@ export function Hero() {
   return (
     <section
       ref={containerRef}
-      className="relative min-h-screen flex items-center justify-center pt-32 pb-20 px-4 sm:px-6 overflow-hidden"
+      className="relative isolate min-h-screen flex items-center justify-center pt-32 pb-20 px-4 sm:px-6 overflow-hidden"
     >
       {/* Background effects: disable heavy animation on mobile / reduced motion */}
       {reduceEffects ? (
@@ -411,6 +411,8 @@ export function Hero() {
         <CodeTerminal />
       </div>
 
+      <HeroWalkBehindTitle reduceEffects={reduceEffects} />
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto w-full relative z-10">
         <div className="text-center mb-16">
@@ -672,6 +674,58 @@ function AnimatedTitle({ a, b, c }: { a: string; b: string; c: string }) {
         </motion.div>
       ))}
     </h1>
+  );
+}
+
+function HeroWalkBehindTitle({ reduceEffects }: { reduceEffects: boolean }) {
+  if (reduceEffects) return null;
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 top-24 bottom-20 z-[6] hidden lg:block overflow-hidden"
+      style={{
+        WebkitMaskImage:
+          "linear-gradient(to bottom, transparent 0%, black 18%, black 78%, transparent 100%)",
+        maskImage:
+          "linear-gradient(to bottom, transparent 0%, black 18%, black 78%, transparent 100%)",
+      }}
+    >
+      <motion.img
+        src="/people/gennady-hero-walk.webp"
+        alt=""
+        loading="eager"
+        decoding="async"
+        className="absolute bottom-0 left-1/2 h-[58vh] min-h-[430px] max-h-[620px] w-auto select-none object-contain opacity-45 mix-blend-multiply dark:opacity-35 dark:mix-blend-screen"
+        initial={{ x: "-58vw", y: 18, scale: 0.92, rotate: -1 }}
+        animate={{
+          x: ["-58vw", "-18vw", "18vw", "58vw"],
+          y: [18, 0, 10, 18],
+          rotate: [-1, 1.2, -0.8, 1],
+          scale: [0.92, 0.98, 0.94, 0.92],
+        }}
+        transition={{
+          duration: 16,
+          ease: "easeInOut",
+          repeat: Infinity,
+          repeatDelay: 1.5,
+        }}
+      />
+      <motion.div
+        className="absolute bottom-12 left-1/2 h-16 w-44 rounded-full bg-blue-500/20 blur-3xl dark:bg-blue-300/15"
+        initial={{ x: "-58vw", opacity: 0.35 }}
+        animate={{
+          x: ["-58vw", "-18vw", "18vw", "58vw"],
+          opacity: [0.25, 0.45, 0.35, 0.25],
+        }}
+        transition={{
+          duration: 16,
+          ease: "easeInOut",
+          repeat: Infinity,
+          repeatDelay: 1.5,
+        }}
+      />
+    </div>
   );
 }
 
