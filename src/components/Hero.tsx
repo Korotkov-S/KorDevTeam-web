@@ -403,89 +403,90 @@ export function Hero() {
       </>
       )}
 
+      {/* Animated code/terminal effect */}
+      <div
+        aria-hidden="true"
+        className="absolute top-32 right-10 hidden min-[1920px]:block pointer-events-none"
+      >
+        <CodeTerminal />
+      </div>
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto w-full relative z-10">
-        <div className="mb-16 grid items-center gap-10 xl:grid-cols-[minmax(0,1fr)_18rem] 2xl:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="inline-flex items-center gap-2 rounded-full bg-card/60 dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 mb-8 backdrop-blur-sm"
-            >
-              <Code2 className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-foreground/90">{t("hero.badge")}</span>
-            </motion.div>
+        <div className="text-center mb-16">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="inline-flex items-center gap-2 rounded-full bg-card/60 dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 mb-8 backdrop-blur-sm"
+          >
+            <Code2 className="w-4 h-4 text-blue-400" />
+            <span className="text-sm text-foreground/90">{t("hero.badge")}</span>
+          </motion.div>
 
-            <div className="mb-6">
-              <AnimatedTitle a={titleParts.a} b={titleParts.b} c={titleParts.c} />
-            </div>
-
-            <motion.p
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.9 }}
-              className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-10"
-            >
-              {t("hero.subtitle")}
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 1.1 }}
-              className="flex flex-col sm:flex-row items-center justify-center gap-4"
-            >
-              <MagneticButton mousePosition={mousePosition}>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => scrollToSection("contact")}
-                  className="group relative px-8 py-4 rounded-xl overflow-hidden"
-                >
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-500"
-                    whileHover={{ scale: 1.05 }}
-                  />
-                  <motion.div
-                    className="absolute inset-0 -translate-x-full"
-                    style={{
-                      background:
-                        "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-                    }}
-                    animate={{ translateX: ["-100%", "200%"] }}
-                    transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-                  />
-                  <span className="relative flex items-center gap-2 text-white font-medium">
-                    {t("hero.discussProject")}
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </span>
-                </motion.button>
-              </MagneticButton>
-
-              <MagneticButton mousePosition={mousePosition}>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => scrollToSection("services")}
-                  className="px-8 py-4 rounded-xl border border-border dark:border-white/20 bg-card/60 dark:bg-white/5 backdrop-blur-sm text-foreground dark:text-white hover:bg-accent/60 dark:hover:bg-white/10 transition-colors relative overflow-hidden group"
-                >
-                  <span className="relative z-10">{t("hero.ourServices")}</span>
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-blue-600/20 to-blue-600/0"
-                    initial={{ x: "-100%" }}
-                    whileHover={{ x: "100%" }}
-                    transition={{ duration: 0.6 }}
-                  />
-                </motion.button>
-              </MagneticButton>
-            </motion.div>
+          <div className="mb-6">
+            <AnimatedTitle a={titleParts.a} b={titleParts.b} c={titleParts.c} />
           </div>
 
-          {/* Keep the terminal in layout on wide screens so it never overlaps the title. */}
-          <div className="hidden xl:flex justify-end pointer-events-none">
-            <CodeTerminal />
-          </div>
+          <motion.p
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.9 }}
+            className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-10"
+          >
+            {t("hero.subtitle")}
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.1 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
+            <MagneticButton mousePosition={mousePosition}>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => scrollToSection("contact")}
+                className="group relative px-8 py-4 rounded-xl overflow-hidden"
+              >
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-500"
+                  whileHover={{ scale: 1.05 }}
+                />
+                <motion.div
+                  className="absolute inset-0 -translate-x-full"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+                  }}
+                  animate={{ translateX: ["-100%", "200%"] }}
+                  transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                />
+                <span className="relative flex items-center gap-2 text-white font-medium">
+                  {t("hero.discussProject")}
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </motion.button>
+            </MagneticButton>
+
+            <MagneticButton mousePosition={mousePosition}>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => scrollToSection("services")}
+                className="px-8 py-4 rounded-xl border border-border dark:border-white/20 bg-card/60 dark:bg-white/5 backdrop-blur-sm text-foreground dark:text-white hover:bg-accent/60 dark:hover:bg-white/10 transition-colors relative overflow-hidden group"
+              >
+                <span className="relative z-10">{t("hero.ourServices")}</span>
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-blue-600/20 to-blue-600/0"
+                  initial={{ x: "-100%" }}
+                  whileHover={{ x: "100%" }}
+                  transition={{ duration: 0.6 }}
+                />
+              </motion.button>
+            </MagneticButton>
+          </motion.div>
         </div>
 
         <motion.div
