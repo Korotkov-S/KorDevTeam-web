@@ -1,5 +1,86 @@
 [
   {
+    "slug": "krasotulya-telegram-140",
+    "lang": "ru",
+    "title": "Что такое «Красотуля»: CRM для бизнеса и сервисных команд",
+    "coverUrl": "/products/krasotulya-crm-capabilities-hero.png",
+    "imageUrls": [
+      "/products/krasotulya-crm-capabilities-hero.png"
+    ],
+    "excerpt": "«Красотуля» — это CRM для бизнеса и сервисных команд.",
+    "date": "19 июня 2026",
+    "readTime": "2 мин",
+    "tags": [
+      "Красотуля",
+      "CRM",
+      "Автоматизация",
+      "Малый бизнес",
+      "Сервисные команды"
+    ],
+    "mtimeMs": 1781936619987.0608
+  },
+  {
+    "slug": "krasotulya-telegram-139",
+    "lang": "ru",
+    "title": "Что происходит внутри «Красотули»: мобильное приложение, инфраструктура и маркетплейс решений",
+    "coverUrl": "/blog/media/krasatulaCRM/139-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/139-photo-1.jpg"
+    ],
+    "excerpt": "Давно не рассказывали, что происходит внутри проекта. Исправляемся.",
+    "date": "18 июня 2026",
+    "readTime": "2 мин",
+    "tags": [
+      "Красотуля",
+      "CRM",
+      "Мобильное приложение",
+      "Selectel",
+      "Маркетплейс"
+    ],
+    "mtimeMs": 1781936619831.8054
+  },
+  {
+    "slug": "krasotulya-telegram-138",
+    "lang": "ru",
+    "title": "Почему сайт открывается не у всех: дело может быть не в сайте",
+    "coverUrl": "/blog/covers/network-routes-availability.jpg",
+    "imageUrls": [
+      "/blog/covers/network-routes-availability.jpg"
+    ],
+    "excerpt": "Иногда ситуация выглядит странно: у одного человека сайт открывается, у другого не открывается вообще. У когото все работает через домашний WiFi, но не работает через мобильный инт",
+    "date": "15 июня 2026",
+    "readTime": "2 мин",
+    "tags": [
+      "Интернет",
+      "Доступность сайта",
+      "Хостинг",
+      "ТСПУ",
+      "Инфраструктура"
+    ],
+    "mtimeMs": 1781936673612.5264
+  },
+  {
+    "slug": "krasotulya-telegram-130",
+    "lang": "ru",
+    "title": "Домены в опасности: что проверить владельцам .ru, .рф и .su",
+    "coverUrl": "/blog/media/krasatulaCRM/130-photo-1.jpg",
+    "imageUrls": [
+      "/blog/media/krasatulaCRM/130-photo-1.jpg"
+    ],
+    "excerpt": "Если у компании есть сайт, лендинг, почта на своем домене или несколько доменов под проекты, доменное имя уже давно не просто \"адрес в интернете\". Это актив, от которого зависят за",
+    "date": "10 июня 2026",
+    "readTime": "2 мин",
+    "tags": [
+      "Домены",
+      ".ru",
+      ".рф",
+      ".su",
+      "Безопасность",
+      "Бизнес"
+    ],
+    "mtimeMs": 1781936619549.7542
+  },
+  {
     "slug": "krasotulya-telegram-122",
     "lang": "ru",
     "title": "Фоллоу-ап сообщения в семинарах",
