@@ -7,7 +7,10 @@
     "blog": "Blog",
     "underMetup": "Under Metup",
     "contact": "Contact",
-    "getInTouch": "Get in Touch"
+    "getInTouch": "Free consultation"
+  },
+  "common": {
+    "freeConsultation": "Free consultation"
   },
   "krasotulyaCrm": {
     "title": "Krasotulya-CRM",
@@ -35,7 +38,7 @@
     "badge": "Product automation studio",
     "title": "We build digital products and automate routine processes",
     "subtitle": "We create web services, mobile apps, CRM systems, integrations and internal tools. We help remove manual work, connect systems and launch products without unnecessary complexity.",
-    "discussProject": "Discuss Project",
+    "discussProject": "Free consultation",
     "ourServices": "Our Services",
     "scroll": "Scroll",
     "stats": {
@@ -61,6 +64,21 @@
     "imageAlt": "Krasotulya-CRM",
     "proofTitle": "More than contractors",
     "proofText": "We build our own SaaS product and understand how automation works after launch."
+  },
+  "presentationMaterials": {
+    "badge": "Video and presentations",
+    "title": "See how we can help in a few minutes",
+    "subtitle": "Watch a short KorDevTeam video and choose the PDF that fits your context: for a business that wants to automate operations, or for an agency looking for a reliable technical partner.",
+    "videoLabel": "KorDevTeam video presentation",
+    "openBusiness": "Business PDF",
+    "business": {
+      "title": "Presentation for business",
+      "description": "How we help launch products, automate sales, connect services and support internal systems."
+    },
+    "agency": {
+      "title": "Presentation for agencies",
+      "description": "Partnership format for digital teams that need development, backend, mobile apps and technical reinforcement."
+    }
   },
   "services": {
     "title": "Our Services",
@@ -310,7 +328,7 @@
   },
   "contact": {
     "title": "Contact Us",
-    "subtitle": "Ready to discuss your project? Write to us and we will contact you soon",
+    "subtitle": "Book a free consultation: we will unpack the task, suggest the first step and offer a clear working format",
     "email": "Email",
     "telegram": "Telegram",
     "max": "Max"

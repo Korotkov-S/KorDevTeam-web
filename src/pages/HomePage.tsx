@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Hero } from "../components/Hero";
 import { SEO } from "../components/SEO";
 import { ProductSpotlight } from "../components/ProductSpotlight";
+import { PresentationMaterials } from "../components/PresentationMaterials";
 
 const Services = lazy(() => import("../components/Services").then((m) => ({ default: m.Services })));
 const Technologies = lazy(() =>
@@ -65,6 +66,7 @@ export function HomePage() {
       />
       <Hero />
       <ProductSpotlight />
+      <PresentationMaterials />
       <DeferredSection id="services">
         <Suspense fallback={null}>
           <Services withId={false} />
