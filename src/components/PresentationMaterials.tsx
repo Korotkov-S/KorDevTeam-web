@@ -4,7 +4,6 @@ import {
   ArrowDownToLine,
   ArrowRight,
   Building2,
-  FileText,
   Handshake,
   PlayCircle,
 } from "lucide-react";
@@ -61,6 +60,39 @@ export function PresentationMaterials() {
                 </video>
               </div>
             </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {materials.map((material) => {
+                const Icon = material.icon;
+
+                return (
+                  <a
+                    key={material.href}
+                    href={material.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-border bg-card/60 dark:bg-white/5 px-4 py-3 transition-all duration-300 hover:border-border/70 dark:hover:border-white/20 hover:bg-accent/50 dark:hover:bg-white/10"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-foreground">
+                            {material.title}
+                          </span>
+                          <ArrowDownToLine className="h-4 w-4 shrink-0 text-blue-500 transition-transform group-hover:translate-y-0.5" />
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                          {material.description}
+                        </span>
+                      </span>
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
           </motion.div>
 
           <motion.div
@@ -82,39 +114,6 @@ export function PresentationMaterials() {
               {t("presentationMaterials.subtitle")}
             </p>
 
-            <div className="mt-8 grid grid-cols-1 gap-4">
-              {materials.map((material) => {
-                const Icon = material.icon;
-
-                return (
-                  <a
-                    key={material.href}
-                    href={material.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group rounded-2xl border border-border bg-card/60 dark:bg-white/5 px-5 py-4 transition-all duration-300 hover:border-border/70 dark:hover:border-white/20 hover:bg-accent/50 dark:hover:bg-white/10"
-                  >
-                    <span className="flex items-start gap-4">
-                      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-3">
-                          <span className="font-semibold text-foreground">
-                            {material.title}
-                          </span>
-                          <ArrowDownToLine className="h-5 w-5 shrink-0 text-blue-500 transition-transform group-hover:translate-y-0.5" />
-                        </span>
-                        <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">
-                          {material.description}
-                        </span>
-                      </span>
-                    </span>
-                  </a>
-                );
-              })}
-            </div>
-
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Button
                 type="button"
@@ -123,12 +122,6 @@ export function PresentationMaterials() {
               >
                 {t("common.freeConsultation")}
                 <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-              <Button asChild variant="outline">
-                <a href={BUSINESS_PDF_URL} target="_blank" rel="noopener noreferrer">
-                  <FileText className="w-4 h-4 mr-2" />
-                  {t("presentationMaterials.openBusiness")}
-                </a>
               </Button>
             </div>
           </motion.div>
