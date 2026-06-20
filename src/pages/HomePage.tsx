@@ -3,6 +3,7 @@ import { Hero } from "../components/Hero";
 import { SEO } from "../components/SEO";
 import { ProductSpotlight } from "../components/ProductSpotlight";
 import { PresentationMaterials } from "../components/PresentationMaterials";
+import { Contact } from "../components/Contact";
 
 const Services = lazy(() => import("../components/Services").then((m) => ({ default: m.Services })));
 const Technologies = lazy(() =>
@@ -13,7 +14,6 @@ const Blog = lazy(() => import("../components/Blog").then((m) => ({ default: m.B
 const UnderMetup = lazy(() =>
   import("../components/UnderMetup").then((m) => ({ default: m.UnderMetup })),
 );
-const Contact = lazy(() => import("../components/Contact").then((m) => ({ default: m.Contact })));
 
 function DeferredSection({
   id,
@@ -92,11 +92,7 @@ export function HomePage() {
           <UnderMetup withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="contact" rootMargin="1200px">
-        <Suspense fallback={null}>
-          <Contact withId={false} />
-        </Suspense>
-      </DeferredSection>
+      <Contact />
     </>
   );
 }
