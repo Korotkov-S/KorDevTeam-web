@@ -16,8 +16,10 @@ import {
 
 interface BlogPostMeta {
   title: string;
+  seoTitle?: string;
   excerpt: string;
   date: string;
+  updatedDate?: string;
   readTime: string;
   tags: string[];
 }
@@ -138,13 +140,17 @@ function extractLegacyMeta(md: string): Partial<BlogPostMeta> {
     md.match(/\*\*(?:Дата публикации|Publication Date)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
     md.match(/^(?:Дата публикации|Publication Date)\s*:\s*(.+)\s*$/im)?.[1] ||
     "";
+  const updatedDateLine =
+    md.match(/\*\*(?:Дата обновления|Updated Date|Last Updated)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Дата обновления|Updated Date|Last Updated)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
   const tags = tagsLine
     ? tagsLine
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean)
     : [];
-  return { tags, date: dateLine.trim() };
+  return { tags, date: dateLine.trim(), updatedDate: updatedDateLine.trim() };
 }
 
 function estimateReadTime(md: string, lang: string): string {
@@ -168,6 +174,7 @@ function deriveMetaFromMarkdown(md: string, lang: string): BlogPostMeta {
     title,
     excerpt,
     date: legacy.date || "",
+    updatedDate: legacy.updatedDate || legacy.date || "",
     readTime: estimateReadTime(md, lang),
     tags: legacy.tags || [],
   };
@@ -452,7 +459,13 @@ export function BlogPostPage() {
       const el = document.getElementById("__BLOG_PRERENDER_DATA__");
       if (el?.textContent) {
         try {
-          const data = JSON.parse(el.textContent) as { slug?: string; lang?: string; md?: string };
+          const data = JSON.parse(el.textContent) as {
+            slug?: string;
+            lang?: string;
+            md?: string;
+            seoTitle?: string;
+            description?: string;
+          };
           if (data?.slug === slug && data?.lang === "ru" && typeof data?.md === "string" && data.md.trim()) {
             const prerenderImages = normalizePublicAssetUrls(extractImages(data.md));
             const prerenderCover = prerenderImages[0] || "";
@@ -461,6 +474,12 @@ export function BlogPostPage() {
             setHasVideoMedia(hasMarkdownVideo(data.md));
             setOgImage(toAbsoluteOgImage(prerenderCover));
             setContent(stripMarkdownImages(stripFirstMarkdownH1(data.md)));
+            const prerenderMeta = deriveMetaFromMarkdown(data.md, "ru");
+            setMeta({
+              ...prerenderMeta,
+              seoTitle: data.seoTitle || prerenderMeta.seoTitle,
+              excerpt: data.description || prerenderMeta.excerpt,
+            });
             setLoading(false);
             hasPrerender = true;
           }
@@ -476,14 +495,19 @@ export function BlogPostPage() {
         // Prefer API (runtime edits), fallback to static markdown.
         let loaded = false;
         try {
+          if (hasPrerender) {
+            loaded = true;
+          } else {
           const apiRes = await fetch(`/api/posts/${slug}?lang=${isRu ? "ru" : "en"}`);
           if (apiRes.ok) {
             const data = (await apiRes.json()) as {
               post?: {
                 content?: string;
                 title?: string;
+                seoTitle?: string;
                 excerpt?: string;
                 date?: string;
+                updatedDate?: string;
                 readTime?: string;
                 tags?: string[];
                 coverUrl?: string;
@@ -506,20 +530,21 @@ export function BlogPostPage() {
             setHasVideoMedia(hasMarkdownVideo(md));
             setContent(stripMarkdownImages(stripFirstMarkdownH1(md)));
             setOgImage(toAbsoluteOgImage(coverForUi));
-            if (!postMeta) {
-              if (data?.post?.title) {
-                setMeta({
-                  title: String(data.post.title),
-                  excerpt: String(data.post.excerpt || ""),
-                  date: String(data.post.date || ""),
-                  readTime: String(data.post.readTime || ""),
-                  tags: Array.isArray(data.post.tags) ? data.post.tags : [],
-                });
-              } else {
-                setMeta(deriveMetaFromMarkdown(md, isRu ? "ru" : "en"));
-              }
+            if (data?.post?.title) {
+              setMeta({
+                title: String(data.post.title),
+                seoTitle: data.post.seoTitle ? String(data.post.seoTitle) : undefined,
+                excerpt: String(data.post.excerpt || ""),
+                date: String(data.post.date || ""),
+                updatedDate: String(data.post.updatedDate || data.post.date || ""),
+                readTime: String(data.post.readTime || ""),
+                tags: Array.isArray(data.post.tags) ? data.post.tags : [],
+              });
+            } else {
+              setMeta(deriveMetaFromMarkdown(md, isRu ? "ru" : "en"));
             }
             loaded = true;
+          }
           }
         } catch {
           // ignore API errors, try static
@@ -536,9 +561,7 @@ export function BlogPostPage() {
           setHasVideoMedia(hasMarkdownVideo(text));
           setContent(stripMarkdownImages(stripFirstMarkdownH1(text)));
           setOgImage(toAbsoluteOgImage(coverForUi));
-          if (!postMeta) {
-            setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
-          }
+          setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
         }
       } catch (error) {
         console.error("Error loading markdown:", error);
@@ -573,13 +596,14 @@ export function BlogPostPage() {
     <>
       {meta && (
         <SEO
-          title={meta.title}
+          title={meta.seoTitle || meta.title}
           description={meta.excerpt}
           canonical={`https://kordev.team/blog/${slug}`}
           ogImage={ogImage}
           ogType="article"
           article={{
             publishedTime: parseDateToISO(meta.date),
+            modifiedTime: parseDateToISO(meta.updatedDate || meta.date),
             tags: meta.tags,
             authors: ["KorDevTeam"],
           }}
@@ -622,6 +646,14 @@ export function BlogPostPage() {
                     <Calendar className="w-4 h-4" />
                     <time dateTime={parseDateToISO(meta.date)} itemProp="datePublished">{meta.date}</time>
                   </div>
+                  {meta.updatedDate && meta.updatedDate !== meta.date && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <time dateTime={parseDateToISO(meta.updatedDate)} itemProp="dateModified">
+                        Обновлено: {meta.updatedDate}
+                      </time>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     <span>{meta.readTime}</span>

@@ -114,6 +114,22 @@ export const SEO_DESCRIPTION_OVERRIDES_EN = {
     "How to speed up and optimize a WordPress site: performance, SEO, images, caching, security, technical maintenance, and support.",
 };
 
+export const SEO_TITLE_OVERRIDES = {
+  "business-automation": "Автоматизация бизнес-процессов для малого бизнеса",
+  "crm-implementation": "Внедрение CRM для малого бизнеса",
+  "telegram-broadcast-automation": "Автоматизация рассылок в Telegram",
+  "stone-calculator-automation": "Калькулятор стоимости на сайте",
+  "wordpress-optimization": "Оптимизация WordPress-сайта",
+};
+
+export const SEO_TITLE_OVERRIDES_EN = {
+  "business-automation": "Business Process Automation for Small Business",
+  "crm-implementation": "CRM Implementation for Small Business",
+  "telegram-broadcast-automation": "Telegram Broadcast Automation",
+  "stone-calculator-automation": "Website Cost Calculator",
+  "wordpress-optimization": "WordPress Website Optimization",
+};
+
 export function normalizeWhitespace(str) {
   return String(str || "").replace(/\s+/g, " ").trim();
 }
@@ -129,4 +145,9 @@ export function trimDescription(str, max = 160) {
 export function getSeoDescription(slug, fallback, lang = "ru") {
   const overrides = lang === "en" ? SEO_DESCRIPTION_OVERRIDES_EN : SEO_DESCRIPTION_OVERRIDES;
   return trimDescription(overrides[slug] || fallback, 160);
+}
+
+export function getSeoTitle(slug, fallback, lang = "ru") {
+  const overrides = lang === "en" ? SEO_TITLE_OVERRIDES_EN : SEO_TITLE_OVERRIDES;
+  return normalizeWhitespace(overrides[slug] || fallback);
 }

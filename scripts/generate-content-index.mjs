@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getSeoDescription } from "./seo-descriptions.mjs";
+import { getSeoDescription, getSeoTitle } from "./seo-descriptions.mjs";
 
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -128,13 +128,17 @@ function parseLegacyMeta(md) {
     md.match(/\*\*(?:Дата публикации|Publication Date)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
     md.match(/^(?:Дата публикации|Publication Date)\s*:\s*(.+)\s*$/im)?.[1] ||
     "";
+  const updatedDate =
+    md.match(/\*\*(?:Дата обновления|Updated Date|Last Updated)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Дата обновления|Updated Date|Last Updated)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
   const tagsArr = tags
     ? tags
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean)
     : [];
-  return { tags: tagsArr, date: date.trim() };
+  return { tags: tagsArr, date: date.trim(), updatedDate: updatedDate.trim() };
 }
 
 function parseDateMs(dateStr) {
@@ -227,10 +231,12 @@ function buildIndexForDir({ dir, slugs, lang }) {
       slug,
       lang,
       title,
+      seoTitle: getSeoTitle(slug, title, lang),
       coverUrl,
       imageUrls,
       excerpt: getSeoDescription(slug, excerpt, lang),
       date: legacy.date || "",
+      updatedDate: legacy.updatedDate || legacy.date || "",
       readTime,
       tags: legacy.tags || [],
       mtimeMs,

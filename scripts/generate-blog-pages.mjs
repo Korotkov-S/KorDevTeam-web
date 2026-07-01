@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   getSeoDescription,
+  getSeoTitle,
   normalizeWhitespace,
   trimDescription,
 } from "./seo-descriptions.mjs";
@@ -255,6 +256,107 @@ function stripFirstMarkdownH1(md) {
 
 function stripFirstMarkdownHeading(md) {
   return md.replace(/^\s*#{1,6}\s+.+\s*$/m, "").trim();
+}
+
+function extractLegacyMeta(md) {
+  const date =
+    md.match(/\*\*(?:Дата публикации|Publication Date)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Дата публикации|Publication Date)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
+  const updatedDate =
+    md.match(/\*\*(?:Дата обновления|Updated Date|Last Updated)\*\*\s*:\s*(.+)\s*$/im)?.[1] ||
+    md.match(/^(?:Дата обновления|Updated Date|Last Updated)\s*:\s*(.+)\s*$/im)?.[1] ||
+    "";
+  return {
+    date: date.trim(),
+    updatedDate: updatedDate.trim() || date.trim(),
+  };
+}
+
+function parseDateToIso(dateStr) {
+  const s = String(dateStr || "").trim();
+  if (!s) return "";
+
+  const monthsRu = {
+    января: "01",
+    февраля: "02",
+    марта: "03",
+    апреля: "04",
+    мая: "05",
+    июня: "06",
+    июля: "07",
+    августа: "08",
+    сентября: "09",
+    октября: "10",
+    ноября: "11",
+    декабря: "12",
+  };
+  const monthsEn = {
+    january: "01",
+    february: "02",
+    march: "03",
+    april: "04",
+    may: "05",
+    june: "06",
+    july: "07",
+    august: "08",
+    september: "09",
+    october: "10",
+    november: "11",
+    december: "12",
+  };
+
+  const ru = s.match(/^(\d{1,2})\s+([а-яё]+)\s+(\d{4})$/i);
+  if (ru) {
+    const [, day, month, year] = ru;
+    const monthNum = monthsRu[month.toLowerCase()];
+    if (monthNum) return `${year}-${monthNum}-${day.padStart(2, "0")}`;
+  }
+
+  const en = s.match(/^([a-z]+)\s+(\d{1,2}),\s+(\d{4})$/i);
+  if (en) {
+    const [, month, day, year] = en;
+    const monthNum = monthsEn[month.toLowerCase()];
+    if (monthNum) return `${year}-${monthNum}-${day.padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(s);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
+function extractFaqItems(md) {
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const faqStart = lines.findIndex((line) =>
+    /^##\s+(FAQ|Частые вопросы)\s*$/i.test(line.trim()),
+  );
+  if (faqStart === -1) return [];
+
+  const items = [];
+  let current = null;
+  const flush = () => {
+    if (!current) return;
+    const answer = stripMd(current.answer.join(" ")).trim();
+    if (current.question && answer) {
+      items.push({ question: current.question, answer });
+    }
+  };
+
+  for (let i = faqStart + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (/^##\s+/.test(line)) break;
+    const questionMatch = line.match(/^###\s+(.+?)\s*$/);
+    if (questionMatch) {
+      flush();
+      current = { question: stripMd(questionMatch[1]), answer: [] };
+      continue;
+    }
+    if (current && line && !/^\*\*(?:Теги|Tags|Дата публикации|Дата обновления)/i.test(line)) {
+      current.answer.push(line);
+    }
+  }
+  flush();
+
+  return items.slice(0, 6);
 }
 
 // Minimal markdown -> HTML. Good enough for indexing (headings, paragraphs, links, lists, code).
@@ -965,7 +1067,12 @@ function main() {
     const mdPath = path.join(PUBLIC_BLOG_DIR, `${slug}.md`);
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
+    const seoTitle = getSeoTitle(slug, title, "ru");
     const description = getSeoDescription(slug, excerpt);
+    const legacy = extractLegacyMeta(md);
+    const datePublished = parseDateToIso(legacy.date);
+    const dateModified = parseDateToIso(legacy.updatedDate || legacy.date);
+    const faqItems = extractFaqItems(md);
     const { content } = parseFrontmatter(md);
     const mdBody = stripFirstMarkdownH1(content);
     const coverUrl = extractCoverUrl(md);
@@ -989,31 +1096,50 @@ function main() {
     ].join("\n");
 
     const canonicalUrl = `${SITE_URL}/blog/${slug}`;
+    const jsonLd = [
+      breadcrumbJsonLd([
+        { name: "Главная", url: `${SITE_URL}/` },
+        { name: "Блог", url: `${SITE_URL}/blog` },
+        { name: title, url: canonicalUrl },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        headline: title,
+        description,
+        image: ogImage || `${SITE_URL}/opengraphlogo.jpeg`,
+        author: { "@id": `${SITE_URL}/#organization` },
+        publisher: { "@id": `${SITE_URL}/#organization` },
+        mainEntityOfPage: canonicalUrl,
+        url: canonicalUrl,
+        inLanguage: "ru-RU",
+        ...(datePublished ? { datePublished } : {}),
+        ...(dateModified ? { dateModified } : {}),
+      },
+    ];
+    if (faqItems.length) {
+      jsonLd.push({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: faqItems.map((item) => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: item.answer,
+          },
+        })),
+      });
+    }
+
     const pageHtml = injectSeoAndBody({
       indexHtml,
-      title,
+      title: `${seoTitle} | ${SITE_NAME}`,
       description,
       canonicalUrl,
       ogImage,
       ogType: "article",
-      jsonLd: [
-        breadcrumbJsonLd([
-          { name: "Главная", url: `${SITE_URL}/` },
-          { name: "Блог", url: `${SITE_URL}/blog` },
-          { name: title, url: canonicalUrl },
-        ]),
-        {
-          "@context": "https://schema.org",
-          "@type": "BlogPosting",
-          headline: title,
-          description,
-          image: ogImage || `${SITE_URL}/opengraphlogo.jpeg`,
-          author: { "@id": `${SITE_URL}/#organization` },
-          publisher: { "@id": `${SITE_URL}/#organization` },
-          mainEntityOfPage: canonicalUrl,
-          inLanguage: "ru-RU",
-        },
-      ],
+      jsonLd,
       bodyHtml,
     });
 
@@ -1022,6 +1148,8 @@ function main() {
       slug,
       lang: "ru",
       md: mdBody,
+      seoTitle,
+      description,
     }).replaceAll("</script", "<\\/script");
     const pageHtmlWithPrerender = pageHtml.replace(
       /<\/body>/i,
