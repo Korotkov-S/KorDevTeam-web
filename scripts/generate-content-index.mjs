@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { getSeoDescription } from "./seo-descriptions.mjs";
 
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -228,7 +229,7 @@ function buildIndexForDir({ dir, slugs, lang }) {
       title,
       coverUrl,
       imageUrls,
-      excerpt,
+      excerpt: getSeoDescription(slug, excerpt, lang),
       date: legacy.date || "",
       readTime,
       tags: legacy.tags || [],

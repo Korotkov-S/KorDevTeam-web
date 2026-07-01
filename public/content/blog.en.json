@@ -7,7 +7,7 @@
     "imageUrls": [
       "/blog/covers/krasotulya-online-booking.jpg"
     ],
-    "excerpt": "Hi everyone! Gennady Korotkov, head of KorDev Team.",
+    "excerpt": "Online booking in Krasotulya CRM: available slots, schedule setup, Telegram reminders, analytics, reviews, and branded booking pages.",
     "date": "February 3, 2026",
     "readTime": "1 min",
     "tags": [
@@ -28,7 +28,7 @@
     "imageUrls": [
       "/blog/covers/krasotulya-landing-launch.jpg"
     ],
-    "excerpt": "Gennadiy Korotkov here — head of KorDev Team!",
+    "excerpt": "Krasotulya landing page launch: where to see the CRM demo, sign up, pay for a subscription, start using the product, and send feedback.",
     "date": "January 31, 2026",
     "readTime": "1 min",
     "tags": [
@@ -47,7 +47,7 @@
     "imageUrls": [
       "/blog/covers/krasotulya-problem-4-email-campaigns.jpg"
     ],
-    "excerpt": "Gennadiy Korotkov here — head of KorDev Team. Today we'll talk about problem 4 — email campaigns for clients.",
+    "excerpt": "How email campaigns in Krasotulya CRM help bring clients back with segments, personalized offers, and regular communication.",
     "date": "January 25, 2026",
     "readTime": "1 min",
     "tags": [
@@ -67,7 +67,7 @@
     "imageUrls": [
       "/blog/covers/krasotulya-crm-launch.jpg"
     ],
-    "excerpt": "Hello everyone!",
+    "excerpt": "Launching Krasotulya CRM for small businesses: product news, tutorials, feedback, workflow automation, and lower operating costs.",
     "date": "January 24, 2026",
     "readTime": "1 min",
     "tags": [
@@ -87,7 +87,7 @@
     "imageUrls": [
       "/blog/covers/krasotulya-problem-1-data-fragmentation.jpg"
     ],
-    "excerpt": "Hello everyone!",
+    "excerpt": "Why scattered data hurts small businesses and how Krasotulya CRM keeps clients, bookings, requests, and communications in one place.",
     "date": "January 20, 2026",
     "readTime": "1 min",
     "tags": [
@@ -107,7 +107,7 @@
     "imageUrls": [
       "/blog/covers/react-native-best-practices.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "React Native development best practices: app architecture, performance, navigation, state management, testing, and long-term support.",
     "date": "October 20, 2025",
     "readTime": "1 min",
     "tags": [
@@ -125,7 +125,7 @@
     "imageUrls": [
       "/blog/covers/nodejs-microservices.jpg"
     ],
-    "excerpt": "Why Microservices?",
+    "excerpt": "How to design Node.js microservices: responsibility boundaries, APIs, queues, scaling, monitoring, and reliability for production.",
     "date": "October 15, 2025",
     "readTime": "1 min",
     "tags": [
@@ -144,7 +144,7 @@
     "imageUrls": [
       "/blog/covers/wordpress-optimization.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "How to speed up and optimize a WordPress site: performance, SEO, images, caching, security, technical maintenance, and support.",
     "date": "October 10, 2025",
     "readTime": "1 min",
     "tags": [
@@ -163,7 +163,7 @@
     "imageUrls": [
       "/blog/covers/laravel-api-development.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "How to build APIs with Laravel: architecture, routes, validation, security, integrations, and practical approaches for web services.",
     "date": "October 5, 2025",
     "readTime": "1 min",
     "tags": [
@@ -182,7 +182,7 @@
     "imageUrls": [
       "/blog/covers/harmonize-me-story.jpg"
     ],
-    "excerpt": "Service Story",
+    "excerpt": "The HarmonizeMe service story: how an online platform helps users work with eating behavior through psychology, courses, and support.",
     "date": "January 27, 2025",
     "readTime": "2 min",
     "tags": [
@@ -202,7 +202,7 @@
     "imageUrls": [
       "/blog/covers/government-contractors-guide.jpg"
     ],
-    "excerpt": "My Telegram channel about my studio, life, management, smart thoughts (hopefully), personal effectiveness, humor",
+    "excerpt": "How IT teams can work with government contractors: procurement rules, communication, deadline risks, and practical vendor guidelines.",
     "date": "January 27, 2025",
     "readTime": "11 min",
     "tags": [
@@ -222,7 +222,7 @@
     "imageUrls": [
       "/blog/covers/argumentation-guide.jpg"
     ],
-    "excerpt": "This post was written after reading Nikita Nepryakhin's book \"Argue This!\" — highly recommend it, it covers argumentation in great detail.",
+    "excerpt": "How to build stronger arguments in client negotiations: IT project examples, objection handling, and choosing proof that moves decisions.",
     "date": "January 27, 2025",
     "readTime": "4 min",
     "tags": [
@@ -241,7 +241,7 @@
     "imageUrls": [
       "/blog/covers/telegram-broadcast-automation.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "How to automate Telegram broadcasts with segments, scenarios, notifications, CRM integrations, and safer client communication.",
     "date": "",
     "readTime": "4 min",
     "tags": [],
@@ -255,7 +255,7 @@
     "imageUrls": [
       "/blog/covers/stone-calculator-automation.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "Stone product calculation automation case study: cost calculator, leads, CRM, less manual work, and faster order processing.",
     "date": "",
     "readTime": "4 min",
     "tags": [],
@@ -269,7 +269,7 @@
     "imageUrls": [
       "/blog/covers/sims-dynasty-tree-platform.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "Sims Dynasty Tree case study: an online service for The Sims family trees, public links, customization, media, and premium features.",
     "date": "",
     "readTime": "7 min",
     "tags": [],
@@ -283,7 +283,7 @@
     "imageUrls": [
       "/blog/covers/harmonize-me-platform.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "Harmonize Me platform case study: online courses, personal accounts, gamification, bonuses, AI assistant, payments, and analytics.",
     "date": "",
     "readTime": "8 min",
     "tags": [],
@@ -297,7 +297,7 @@
     "imageUrls": [
       "/blog/covers/crm-implementation.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "How to choose and implement a CRM for sales: project stages, pipeline automation, analytics, integrations, and common business mistakes.",
     "date": "",
     "readTime": "4 min",
     "tags": [],
@@ -311,7 +311,7 @@
     "imageUrls": [
       "/blog/covers/business-automation.jpg"
     ],
-    "excerpt": "Introduction",
+    "excerpt": "How business process automation cuts manual work, errors, and lost leads with CRM, integrations, email campaigns, and implementation examples.",
     "date": "",
     "readTime": "4 min",
     "tags": [],
