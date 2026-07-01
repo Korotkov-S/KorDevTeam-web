@@ -10,6 +10,140 @@ const SITE_URL = (process.env.SITE_URL || "https://kordev.team").replace(
   /\/+$/,
   "",
 );
+const SITE_NAME = "KorDevTeam";
+
+const PROJECT_ALIASES = new Map([["Media & Entertainment", "media-entertainment"]]);
+
+function toProjectSlug(id) {
+  const raw = String(id || "").trim();
+  if (PROJECT_ALIASES.has(raw)) return PROJECT_ALIASES.get(raw);
+  return raw
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+const SEO_DESCRIPTION_OVERRIDES = {
+  "argumentation-guide":
+    "Как выстраивать аргументацию в переговорах с клиентами: примеры из IT-проектов, работа с возражениями и выбор доводов для решений.",
+  "business-automation":
+    "Как автоматизация бизнес-процессов снижает ручную работу, ошибки и потери заявок: CRM, интеграции, рассылки и примеры внедрения.",
+  "crm-implementation":
+    "Как выбрать и внедрить CRM для продаж: этапы проекта, автоматизация воронки, аналитика, интеграции и типовые ошибки бизнеса.",
+  "government-contractors-guide":
+    "Как IT-команде работать с госзаказчиками: 44-ФЗ, закупки, коммуникация, риски сроков и практические правила для подрядчика.",
+  "harmonize-me-platform":
+    "Кейс разработки платформы Harmonize Me: онлайн-курсы, личный кабинет, геймификация, бонусы, ИИ-помощник, платежи и аналитика.",
+  "harmonize-me-story":
+    "История сервиса HarmonizeMe: как онлайн-платформа помогает работать с пищевым поведением через психологию, курсы и поддержку.",
+  "krasotulya-crm-launch":
+    "Запуск CRM «Красотуля» для малого бизнеса: новости продукта, обучение, обратная связь, автоматизация операций и снижение затрат.",
+  "krasotulya-landing-launch":
+    "Запуск лендинга krasotula.com: где посмотреть демо CRM «Красотуля», зарегистрироваться, оплатить подписку и оставить обратную связь.",
+  "krasotulya-online-booking":
+    "Онлайн-запись в CRM «Красотуля»: свободные слоты, расписание, напоминания в Telegram, аналитика, отзывы и брендированная страница.",
+  "krasotulya-problem-1-data-fragmentation":
+    "Почему разрозненные данные мешают малому бизнесу: как CRM «Красотуля» собирает клиентов, записи, заявки и коммуникации в одном месте.",
+  "krasotulya-problem-4-email-campaigns":
+    "Как email-рассылки в CRM «Красотуля» помогают возвращать клиентов: сегменты, персональные предложения и регулярные касания.",
+  "krasotulya-telegram-105":
+    "Как CRM «Красотуля» помогает салонам и сервисным командам вести клиентов, задачи, записи и коммуникации без хаоса в таблицах.",
+  "krasotulya-telegram-107":
+    "Обновления CRM «Красотуля»: практические функции для клиентской базы, задач, записей и ежедневной работы малого бизнеса.",
+  "krasotulya-telegram-108":
+    "Разбор возможностей CRM «Красотуля» для малого бизнеса: учет клиентов, контроль заявок, автоматизация рутины и развитие продукта.",
+  "krasotulya-telegram-109":
+    "Новости разработки CRM «Красотуля»: улучшения продукта, сценарии использования, автоматизация процессов и польза для сервисных команд.",
+  "krasotulya-telegram-110":
+    "Как «Красотуля» закрывает ежедневные задачи бизнеса: клиентская база, записи, напоминания, коммуникации и контроль процессов.",
+  "krasotulya-telegram-111":
+    "Бесплатный семинар для мастеров: как использовать CRM, клиентскую базу и автоматизацию, чтобы удерживать клиентов и снижать ручную работу.",
+  "krasotulya-telegram-112":
+    "Выводы выступления «Клиенты на всю жизнь»: как CRM помогает удерживать клиентов, собирать историю общения и повышать повторные продажи.",
+  "krasotulya-telegram-115":
+    "Как оформить согласия на персональные данные и рекламные коммуникации: что важно учесть бизнесу при работе с клиентской базой.",
+  "krasotulya-telegram-116":
+    "Конструктор сценариев для бота в CRM «Красотуля»: автоматизация ответов, обработка заявок и снижение нагрузки на администратора.",
+  "krasotulya-telegram-117":
+    "День предпринимателя и CRM для малого бизнеса: почему учет клиентов, задач и коммуникаций помогает владельцу держать процессы под контролем.",
+  "krasotulya-telegram-118":
+    "Автопостинг и рассылки ко Дню предпринимателя: как CRM помогает заранее готовить касания, напоминать о себе и возвращать клиентов.",
+  "krasotulya-telegram-119":
+    "Массовое создание задач в CRM «Красотуля»: как быстро расставлять приоритеты дня, распределять работу и не терять важные дела.",
+  "krasotulya-telegram-120":
+    "Почему мы сами пользуемся CRM «Красотуля»: канбан, продажи, задачи, клиентская база и контроль процессов в одном рабочем пространстве.",
+  "krasotulya-telegram-121":
+    "Чек-лист эффективной CRM-воронки: как настроить этапы, не терять заявки, контролировать сделки и видеть узкие места продаж.",
+  "krasotulya-telegram-122":
+    "Фоллоу-ап сообщения в семинарах: как CRM «Красотуля» помогает автоматически продолжать общение с участниками после мероприятия.",
+  "krasotulya-telegram-130":
+    "Что проверить владельцам доменов .ru, .рф и .su: доступы, почта, регистратор, продление и риски для сайта, рекламы и бизнеса.",
+  "krasotulya-telegram-138":
+    "Почему сайт может открываться не у всех: маршруты провайдеров, DNS, хостинг, доступность сервера и диагностика проблем с подключением.",
+  "krasotulya-telegram-139":
+    "Что внутри проекта «Красотуля»: мобильное приложение, инфраструктура Selectel, маркетплейс решений и развитие CRM для бизнеса.",
+  "krasotulya-telegram-140":
+    "Что такое CRM «Красотуля» для бизнеса и сервисных команд: клиенты, задачи, записи, коммуникации и автоматизация ежедневной рутины.",
+  "laravel-api-development":
+    "Как разрабатывать API на Laravel: архитектура, маршруты, валидация, безопасность, интеграции и практические подходы для веб-сервисов.",
+  "nodejs-microservices":
+    "Как проектировать микросервисы на Node.js: разделение ответственности, API, очереди, масштабирование, мониторинг и надежность.",
+  "react-native-best-practices":
+    "Лучшие практики React Native разработки: архитектура приложения, производительность, навигация, состояние, тестирование и поддержка.",
+  "sims-dynasty-tree-platform":
+    "Кейс Sims Dynasty Tree: онлайн-сервис для генеалогических древ The Sims, публичных ссылок, кастомизации, медиа и премиум-функций.",
+  "stone-calculator-automation":
+    "Кейс автоматизации расчета изделий из камня: калькулятор стоимости, заявки, CRM, снижение ручной работы и ускорение обработки заказов.",
+  "telegram-broadcast-automation":
+    "Как автоматизировать Telegram-рассылки: сегменты, сценарии, уведомления, CRM-интеграции и безопасная коммуникация с клиентами.",
+  "wordpress-optimization":
+    "Как ускорить и оптимизировать WordPress-сайт: производительность, SEO, изображения, кэширование, безопасность и техническая поддержка.",
+};
+
+const UNDER_METUP_VIDEOS = [
+  {
+    slug: "video-1",
+    title: "Under Metup №1",
+    description:
+      "Запись первого Under Metup: Android, безопасность Web3, платформа .NET, доклады спикеров и полезные материалы для IT-сообщества.",
+    date: "2025",
+    duration: "Видео",
+    tags: ["Under Metup", "Android", "Web3", ".NET"],
+    program: [
+      "Каждый юнит на счету",
+      "Основы безопасности в Web3. Как не стать жертвой взлома",
+      "Платформа .NET",
+    ],
+  },
+  {
+    slug: "video-2",
+    title: "Under Metup №2",
+    description:
+      "Запись второго Under Metup: data driven development, WebRTC, нетворкинг в IT и практические доклады для разработчиков.",
+    date: "2025",
+    duration: "Видео",
+    tags: ["Under Metup", "Data", "WebRTC", "Нетворкинг"],
+    program: [
+      "Data Driven Development: сначала данные, потом код",
+      "Позвони мне, позвони при помощи WebRTC",
+      "Нетворкинг в IT для начинающих",
+    ],
+  },
+  {
+    slug: "video-3",
+    title: "Under Metup №3",
+    description:
+      "Запись третьего Under Metup: автоматизация коммитов и PR, стандарты CI/CD и постановка целей на 2026 год.",
+    date: "2026",
+    duration: "Видео",
+    tags: ["Under Metup", "CI/CD", "Автоматизация", "Цели"],
+    program: [
+      "Автоматизация коммитов и PR: стандарты и CI/CD на практике",
+      "Учимся ставить цели на 2026 так, чтобы не забросить их 1 февраля",
+    ],
+  },
+];
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -30,6 +164,97 @@ function stripMd(md) {
     .replace(/[`*_>#-]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeWhitespace(str) {
+  return String(str || "").replace(/\s+/g, " ").trim();
+}
+
+function trimDescription(str, max = 160) {
+  const value = normalizeWhitespace(str);
+  if (value.length <= max) return value;
+  const sliced = value.slice(0, max + 1);
+  const lastSpace = sliced.lastIndexOf(" ");
+  return `${sliced.slice(0, lastSpace > 120 ? lastSpace : max).replace(/[,:;.!?]+$/, "")}.`;
+}
+
+function getSeoDescription(slug, fallback) {
+  return trimDescription(SEO_DESCRIPTION_OVERRIDES[slug] || fallback, 160);
+}
+
+function readJsonArray(filePath) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function getRuProjects() {
+  const projects = readJsonArray(path.join(ROOT, "public", "content", "projects.ru.json"));
+  return projects
+    .filter((p) => p && p.id)
+    .map((p) => {
+      const title = String(p.title || p.id);
+      const rawDescription = normalizeWhitespace(p.description || title);
+      const description =
+        rawDescription.length < 120
+          ? trimDescription(`${title}: ${rawDescription}`, 160)
+          : trimDescription(rawDescription, 160);
+      return {
+        id: String(p.id),
+        slug: toProjectSlug(p.id),
+        title,
+        description,
+        fullDescription: String(p.fullDescription || ""),
+        image: normalizePublicAssetUrl(p.image || ""),
+        technologies: Array.isArray(p.technologies) ? p.technologies.map(String) : [],
+        features: Array.isArray(p.features) ? p.features.map(String) : [],
+        demoUrl: p.demoUrl ? String(p.demoUrl) : "",
+      };
+    });
+}
+
+function baseJsonLd() {
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      url: `${SITE_URL}/`,
+      logo: `${SITE_URL}/opengraphlogo.jpeg`,
+      sameAs: ["https://t.me/kordevteam"],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: SITE_NAME,
+      url: `${SITE_URL}/`,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      inLanguage: "ru-RU",
+    },
+  ];
+}
+
+function breadcrumbJsonLd(items) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  };
+}
+
+function jsonLdScript(data) {
+  return `<script type="application/ld+json">${JSON.stringify(data).replaceAll("</script", "<\\/script")}</script>`;
 }
 
 function parseFrontmatter(md) {
@@ -114,6 +339,10 @@ function extractTitleAndExcerpt(md) {
 
 function stripFirstMarkdownH1(md) {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();
+}
+
+function stripFirstMarkdownHeading(md) {
+  return md.replace(/^\s*#{1,6}\s+.+\s*$/m, "").trim();
 }
 
 // Minimal markdown -> HTML. Good enough for indexing (headings, paragraphs, links, lists, code).
@@ -220,9 +449,12 @@ function injectSeoAndBody({
   description,
   canonicalUrl,
   ogImage,
+  ogType = "website",
+  jsonLd = [],
   bodyHtml,
 }) {
   let html = indexHtml;
+  const safeDescription = trimDescription(description, 160);
 
   // Title
   if (/<title>.*<\/title>/i.test(html)) {
@@ -241,12 +473,12 @@ function injectSeoAndBody({
   if (/<meta\s+name=["']description["'][^>]*>/i.test(html)) {
     html = html.replace(
       /<meta\s+name=["']description["'][^>]*>/i,
-      `<meta name="description" content="${escapeHtml(description)}">`,
+      `<meta name="description" content="${escapeHtml(safeDescription)}">`,
     );
   } else {
     html = html.replace(
       /<head>/i,
-      `<head>\n<meta name="description" content="${escapeHtml(description)}">`,
+      `<head>\n<meta name="description" content="${escapeHtml(safeDescription)}">`,
     );
   }
 
@@ -271,9 +503,9 @@ function injectSeoAndBody({
     else html = html.replace(/<\/head>/i, `${tag}\n</head>`);
   };
 
-  replaceOrAddMeta("og:type", "article");
+  replaceOrAddMeta("og:type", ogType);
   replaceOrAddMeta("og:title", title);
-  replaceOrAddMeta("og:description", description);
+  replaceOrAddMeta("og:description", safeDescription);
   replaceOrAddMeta("og:url", canonicalUrl);
   if (ogImage) replaceOrAddMeta("og:image", ogImage);
 
@@ -285,8 +517,13 @@ function injectSeoAndBody({
     else html = html.replace(/<\/head>/i, `${tag}\n</head>`);
   };
   replaceOrAddTwitter("twitter:title", title);
-  replaceOrAddTwitter("twitter:description", description);
+  replaceOrAddTwitter("twitter:description", safeDescription);
   if (ogImage) replaceOrAddTwitter("twitter:image", ogImage);
+
+  const schemas = [...baseJsonLd(), ...jsonLd].filter(Boolean);
+  if (schemas.length) {
+    html = html.replace(/<\/head>/i, `${jsonLdScript(schemas)}\n</head>`);
+  }
 
   // Inject pre-rendered content for crawlers (React will overwrite on load; that's OK)
   html = html.replace(
@@ -350,10 +587,225 @@ function getSlugsFromPublic() {
   return [...slugs].sort();
 }
 
+function writeRouteHtml(routePath, html) {
+  if (routePath === "/") {
+    fs.writeFileSync(DIST_INDEX_HTML, html, "utf-8");
+    return;
+  }
+
+  const clean = routePath.replace(/^\/+/, "").replace(/\/+$/, "");
+  const htmlPath = path.join(DIST_DIR, `${clean}.html`);
+  ensureDir(path.dirname(htmlPath));
+  fs.writeFileSync(htmlPath, html, "utf-8");
+  const dir = path.join(DIST_DIR, clean);
+  ensureDir(dir);
+  fs.writeFileSync(path.join(dir, "index.html"), html, "utf-8");
+}
+
+function generateHomePage({ indexHtml, blogItems, projects }) {
+  const title = "Автоматизация продаж и операционных процессов";
+  const description =
+    "KorDevTeam разрабатывает CRM, веб-сервисы, мобильные приложения и интеграции под ключ для автоматизации продаж и операций бизнеса.";
+  const canonicalUrl = `${SITE_URL}/`;
+  const ogImage = `${SITE_URL}/opengraphlogo.jpeg`;
+
+  const projectLinks = projects.map((project) => {
+    return `          <li><a href="/project/${escapeHtml(project.slug)}">${escapeHtml(project.title)}</a> — ${escapeHtml(project.description)}</li>`;
+  });
+  const blogLinks = blogItems.slice(0, 10).map((post) => {
+    return `          <li><a href="/blog/${escapeHtml(post.slug)}">${escapeHtml(post.title)}</a> — ${escapeHtml(post.excerpt)}</li>`;
+  });
+
+  const bodyHtml = [
+    `<main class="min-h-screen pt-20">`,
+    `  <section class="container mx-auto px-4 py-12">`,
+    `    <h1>Автоматизация продаж и операционных процессов</h1>`,
+    `    <p>${escapeHtml(description)}</p>`,
+    `    <nav aria-label="Основные разделы">`,
+    `      <a href="/#services">Услуги</a>`,
+    `      <a href="/#projects">Проекты</a>`,
+    `      <a href="/blog">Блог</a>`,
+    `      <a href="/video">Видео</a>`,
+    `      <a href="/#contact">Контакты</a>`,
+    `    </nav>`,
+    `  </section>`,
+    `  <section id="services" class="container mx-auto px-4 py-8">`,
+    `    <h2>Услуги</h2>`,
+    `    <p>Проектируем и разрабатываем CRM, веб-сервисы, мобильные приложения, личные кабинеты, интеграции с API, Telegram-боты и внутренние инструменты для команд.</p>`,
+    `    <ul>`,
+    `      <li>Автоматизация продаж, заявок, задач и клиентской базы.</li>`,
+    `      <li>Разработка веб-сервисов и мобильных приложений под бизнес-процессы.</li>`,
+    `      <li>Интеграции с CRM, платежами, рассылками, аналитикой и внешними API.</li>`,
+    `    </ul>`,
+    `  </section>`,
+    `  <section class="container mx-auto px-4 py-8">`,
+    `    <h2>Красотуля-CRM</h2>`,
+    `    <p>Собственный продукт KorDevTeam для малого бизнеса: клиенты, записи, задачи, онлайн-запись, рассылки и автоматизация рутины.</p>`,
+    `    <p><a href="https://krasotula.com">Перейти на сайт Красотуля-CRM</a></p>`,
+    `  </section>`,
+    `  <section id="projects" class="container mx-auto px-4 py-8">`,
+    `    <h2>Кейсы и проекты</h2>`,
+    `    <ul>`,
+    ...projectLinks,
+    `    </ul>`,
+    `  </section>`,
+    `  <section id="blog" class="container mx-auto px-4 py-8">`,
+    `    <h2>Статьи</h2>`,
+    `    <ul>`,
+    ...blogLinks,
+    `    </ul>`,
+    `  </section>`,
+    `  <section class="container mx-auto px-4 py-8">`,
+    `    <h2>Видео</h2>`,
+    `    <p><a href="/video">Посмотреть видео-презентацию KorDevTeam</a> и записи Under Metup.</p>`,
+    `  </section>`,
+    `</main>`,
+  ].join("\n");
+
+  const html = injectSeoAndBody({
+    indexHtml,
+    title,
+    description,
+    canonicalUrl,
+    ogImage,
+    ogType: "website",
+    jsonLd: [breadcrumbJsonLd([{ name: "Главная", url: canonicalUrl }])],
+    bodyHtml,
+  });
+  writeRouteHtml("/", html);
+}
+
+function generateVideoPage({ indexHtml }) {
+  const title = "Видео KorDevTeam";
+  const description =
+    "Видео-презентация KorDevTeam: подход к разработке, примеры работ, автоматизация бизнеса, веб-сервисы, CRM и мобильные приложения.";
+  const canonicalUrl = `${SITE_URL}/video`;
+  const bodyHtml = [
+    `<main class="min-h-screen pt-20">`,
+    `  <section class="container mx-auto px-4 py-12">`,
+    `    <h1>Видео KorDevTeam</h1>`,
+    `    <p>${escapeHtml(description)}</p>`,
+    `    <p><a href="/">Вернуться на главную</a></p>`,
+    `    <video controls preload="metadata" poster="/opengraphlogo.jpeg">`,
+    `      <source src="/default.mp4" type="video/mp4">`,
+    `    </video>`,
+    `  </section>`,
+    `</main>`,
+  ].join("\n");
+
+  const html = injectSeoAndBody({
+    indexHtml,
+    title,
+    description,
+    canonicalUrl,
+    ogImage: `${SITE_URL}/opengraphlogo.jpeg`,
+    ogType: "video.other",
+    jsonLd: [
+      breadcrumbJsonLd([
+        { name: "Главная", url: `${SITE_URL}/` },
+        { name: "Видео", url: canonicalUrl },
+      ]),
+    ],
+    bodyHtml,
+  });
+  writeRouteHtml("/video", html);
+}
+
+function generateUnderMetupPages({ indexHtml }) {
+  for (const video of UNDER_METUP_VIDEOS) {
+    const canonicalUrl = `${SITE_URL}/under-metup/${video.slug}`;
+    const bodyHtml = [
+      `<main class="min-h-screen pt-20">`,
+      `  <article class="container mx-auto px-4 py-12">`,
+      `    <h1>${escapeHtml(video.title)}</h1>`,
+      `    <p>${escapeHtml(video.description)}</p>`,
+      `    <p>${escapeHtml(video.date)} · ${escapeHtml(video.duration)}</p>`,
+      `    <ul>`,
+      ...video.program.map((item) => `      <li>${escapeHtml(item)}</li>`),
+      `    </ul>`,
+      `    <p><a href="/">Вернуться на главную</a></p>`,
+      `  </article>`,
+      `</main>`,
+    ].join("\n");
+
+    const html = injectSeoAndBody({
+      indexHtml,
+      title: video.title,
+      description: video.description,
+      canonicalUrl,
+      ogImage: `${SITE_URL}/opengraphlogo.jpeg`,
+      ogType: "video.other",
+      jsonLd: [
+        breadcrumbJsonLd([
+          { name: "Главная", url: `${SITE_URL}/` },
+          { name: "Under Metup", url: `${SITE_URL}/#under-metup` },
+          { name: video.title, url: canonicalUrl },
+        ]),
+      ],
+      bodyHtml,
+    });
+    writeRouteHtml(`/under-metup/${video.slug}`, html);
+  }
+}
+
+function generateProjectPages({ indexHtml, projects }) {
+  for (const project of projects) {
+    const canonicalUrl = `${SITE_URL}/project/${project.slug}`;
+    const bodyHtml = [
+      `<main class="min-h-screen pt-20">`,
+      `  <article class="container mx-auto px-4 py-12">`,
+      `    <h1>${escapeHtml(project.title)}</h1>`,
+      `    <p>${escapeHtml(project.description)}</p>`,
+      `    <p><img src="${escapeHtml(project.image)}" alt="${escapeHtml(project.title)}"></p>`,
+      `    <h2>Технологии</h2>`,
+      `    <ul>`,
+      ...project.technologies.map((item) => `      <li>${escapeHtml(item)}</li>`),
+      `    </ul>`,
+      `    <h2>Что сделали</h2>`,
+      markdownToHtml(stripFirstMarkdownHeading(project.fullDescription)),
+      `    <h2>Возможности</h2>`,
+      `    <ul>`,
+      ...project.features.map((item) => `      <li>${escapeHtml(item)}</li>`),
+      `    </ul>`,
+      project.demoUrl ? `    <p><a href="${escapeHtml(project.demoUrl)}">Открыть проект</a></p>` : "",
+      `    <p><a href="/#projects">Все проекты</a></p>`,
+      `  </article>`,
+      `</main>`,
+    ].join("\n");
+
+    const html = injectSeoAndBody({
+      indexHtml,
+      title: project.title,
+      description: project.description,
+      canonicalUrl,
+      ogImage: toAbsoluteOgImage(project.image) || `${SITE_URL}/opengraphlogo.jpeg`,
+      ogType: "article",
+      jsonLd: [
+        breadcrumbJsonLd([
+          { name: "Главная", url: `${SITE_URL}/` },
+          { name: "Проекты", url: `${SITE_URL}/#projects` },
+          { name: project.title, url: canonicalUrl },
+        ]),
+        {
+          "@context": "https://schema.org",
+          "@type": "CreativeWork",
+          name: project.title,
+          description: project.description,
+          url: canonicalUrl,
+          image: toAbsoluteOgImage(project.image) || `${SITE_URL}/opengraphlogo.jpeg`,
+          creator: { "@id": `${SITE_URL}/#organization` },
+        },
+      ],
+      bodyHtml,
+    });
+    writeRouteHtml(`/project/${project.slug}`, html);
+  }
+}
+
 function generateBlogIndexPage({ indexHtml, slugs }) {
   const title = "Блог KorDevTeam";
   const description =
-    "Статьи KorDevTeam про разработку, автоматизацию и кейсы.";
+    "Статьи KorDevTeam про разработку веб-сервисов, CRM, мобильных приложений, автоматизацию бизнеса, интеграции и кейсы команды.";
   const canonicalUrl = `${SITE_URL}/blog`;
   const ogImage = `${SITE_URL}/opengraphlogo.jpeg`;
 
@@ -363,7 +815,7 @@ function generateBlogIndexPage({ indexHtml, slugs }) {
       const mdPath = path.join(PUBLIC_BLOG_DIR, `${slug}.md`);
       const md = fs.readFileSync(mdPath, "utf-8");
       const meta = extractTitleAndExcerpt(md);
-      items.push({ slug, title: meta.title, excerpt: meta.excerpt });
+      items.push({ slug, title: meta.title, excerpt: getSeoDescription(slug, meta.excerpt) });
     } catch {
       items.push({ slug, title: slug, excerpt: "" });
     }
@@ -396,6 +848,13 @@ function generateBlogIndexPage({ indexHtml, slugs }) {
     description,
     canonicalUrl,
     ogImage,
+    ogType: "website",
+    jsonLd: [
+      breadcrumbJsonLd([
+        { name: "Главная", url: `${SITE_URL}/` },
+        { name: "Блог", url: canonicalUrl },
+      ]),
+    ],
     bodyHtml,
   });
 
@@ -406,22 +865,17 @@ function generateBlogIndexPage({ indexHtml, slugs }) {
   fs.writeFileSync(path.join(DIST_DIR, "blog.html"), pageHtml, "utf-8");
 }
 
-function buildRedirects(slugs) {
-  const projects = [
-    "Media%20%26%20Entertainment",
-    "web-site",
-    "web-service",
-    "harmonize-me",
-    "stroyrem",
-    "wowbanner",
-    "serviceplus",
-    "amch",
-    "notion-analog",
-  ];
-  const underMetupVideos = ["video-1", "video-2", "video-3"];
+function buildRedirects(slugs, projects) {
+  const underMetupVideos = UNDER_METUP_VIDEOS.map((video) => video.slug);
 
   const lines = [];
   lines.push("# Auto-generated. Do not edit by hand.");
+  lines.push("");
+  lines.push("# Canonical URL redirects");
+  lines.push("/blog/    /blog    301!");
+  lines.push("/video/    /video    301!");
+  lines.push("/project/Media%20%26%20Entertainment    /project/media-entertainment    301!");
+  lines.push("/project/Media%20&%20Entertainment    /project/media-entertainment    301!");
   lines.push("");
   lines.push("# Cache headers");
   lines.push("/assets/*  Cache-Control: public, max-age=31536000, immutable");
@@ -432,14 +886,14 @@ function buildRedirects(slugs) {
     lines.push(`/blog/${slug}    /blog/${slug}.html    200`);
   }
   lines.push("");
-  lines.push("# Known SPA routes");
-  lines.push("/video    /index.html    200");
+  lines.push("# Static app pages (preferred for SEO)");
+  lines.push("/video    /video.html    200");
   lines.push("/admin    /index.html    200");
   for (const video of underMetupVideos) {
-    lines.push(`/under-metup/${video}    /index.html    200`);
+    lines.push(`/under-metup/${video}    /under-metup/${video}.html    200`);
   }
   for (const project of projects) {
-    lines.push(`/project/${project}    /index.html    200`);
+    lines.push(`/project/${project.slug}    /project/${project.slug}.html    200`);
   }
   lines.push("");
   lines.push("# Unknown URLs must stay real 404s, not soft-404 SPA pages");
@@ -473,7 +927,7 @@ function buildSitemapBlogXml(slugs) {
   ].join("\n");
 }
 
-function buildFullSitemapXml(blogSlugs) {
+function buildFullSitemapXml(blogSlugs, projects) {
   const today = new Date().toISOString().slice(0, 10);
 
   // Static pages
@@ -483,21 +937,8 @@ function buildFullSitemapXml(blogSlugs) {
     { loc: "/video", priority: "0.8", changefreq: "monthly" },
   ];
 
-  // Projects
-  const projects = [
-    "Media%20%26%20Entertainment",
-    "web-site",
-    "web-service",
-    "harmonize-me",
-    "stroyrem",
-    "wowbanner",
-    "serviceplus",
-    "amch",
-    "notion-analog",
-  ];
-
   // Under Metup videos
-  const underMetupVideos = ["video-1", "video-2", "video-3"];
+  const underMetupVideos = UNDER_METUP_VIDEOS.map((video) => video.slug);
 
   const urls = [];
 
@@ -548,7 +989,7 @@ function buildFullSitemapXml(blogSlugs) {
     urls.push(
       [
         "  <url>",
-        `    <loc>${SITE_URL}/project/${project}</loc>`,
+        `    <loc>${SITE_URL}/project/${project.slug}</loc>`,
         `    <lastmod>${today}</lastmod>`,
         "    <changefreq>monthly</changefreq>",
         "    <priority>0.8</priority>",
@@ -583,14 +1024,36 @@ function main() {
 
   const indexHtml = fs.readFileSync(DIST_INDEX_HTML, "utf-8");
   ensureDir(DIST_BLOG_DIR);
+  const projects = getRuProjects();
 
   // Blog index page (/blog)
   generateBlogIndexPage({ indexHtml, slugs });
+
+  const blogItems = [];
+  for (const slug of slugs) {
+    try {
+      const md = fs.readFileSync(path.join(PUBLIC_BLOG_DIR, `${slug}.md`), "utf-8");
+      const meta = extractTitleAndExcerpt(md);
+      blogItems.push({
+        slug,
+        title: meta.title,
+        excerpt: getSeoDescription(slug, meta.excerpt),
+      });
+    } catch {
+      blogItems.push({ slug, title: slug, excerpt: "" });
+    }
+  }
+
+  generateHomePage({ indexHtml, blogItems, projects });
+  generateVideoPage({ indexHtml });
+  generateUnderMetupPages({ indexHtml });
+  generateProjectPages({ indexHtml, projects });
 
   for (const slug of slugs) {
     const mdPath = path.join(PUBLIC_BLOG_DIR, `${slug}.md`);
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
+    const description = getSeoDescription(slug, excerpt);
     const { content } = parseFrontmatter(md);
     const mdBody = stripFirstMarkdownH1(content);
     const coverUrl = extractCoverUrl(md);
@@ -617,9 +1080,28 @@ function main() {
     const pageHtml = injectSeoAndBody({
       indexHtml,
       title,
-      description: excerpt,
+      description,
       canonicalUrl,
       ogImage,
+      ogType: "article",
+      jsonLd: [
+        breadcrumbJsonLd([
+          { name: "Главная", url: `${SITE_URL}/` },
+          { name: "Блог", url: `${SITE_URL}/blog` },
+          { name: title, url: canonicalUrl },
+        ]),
+        {
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          headline: title,
+          description,
+          image: ogImage || `${SITE_URL}/opengraphlogo.jpeg`,
+          author: { "@id": `${SITE_URL}/#organization` },
+          publisher: { "@id": `${SITE_URL}/#organization` },
+          mainEntityOfPage: canonicalUrl,
+          inLanguage: "ru-RU",
+        },
+      ],
       bodyHtml,
     });
 
@@ -652,7 +1134,7 @@ function main() {
   }
 
   // Netlify-style redirects (also useful as documentation/source-of-truth)
-  const redirects = buildRedirects(slugs);
+  const redirects = buildRedirects(slugs, projects);
   fs.writeFileSync(path.join(DIST_DIR, "_redirects"), redirects, "utf-8");
   fs.writeFileSync(path.join(ROOT, "public", "_redirects"), redirects, "utf-8");
 
@@ -670,7 +1152,7 @@ function main() {
   );
 
   // Full sitemap with all pages (auto-generated, includes new blogs)
-  const sitemapFull = buildFullSitemapXml(slugs);
+  const sitemapFull = buildFullSitemapXml(slugs, projects);
   fs.writeFileSync(path.join(DIST_DIR, "sitemap.xml"), sitemapFull, "utf-8");
   fs.writeFileSync(
     path.join(ROOT, "public", "sitemap.xml"),

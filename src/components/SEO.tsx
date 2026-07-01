@@ -27,8 +27,30 @@ export function SEO({
     ? canonical 
     : `https://kordev.team${canonical || ""}`;
 
-  // JSON-LD для статьи
-  const jsonLd = article
+  const baseJsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": "https://kordev.team/#organization",
+      name: "KorDevTeam",
+      url: "https://kordev.team/",
+      logo: "https://kordev.team/opengraphlogo.jpeg",
+      sameAs: ["https://t.me/kordevteam"],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://kordev.team/#website",
+      name: "KorDevTeam",
+      url: "https://kordev.team/",
+      publisher: {
+        "@id": "https://kordev.team/#organization",
+      },
+      inLanguage: "ru-RU",
+    },
+  ];
+
+  const articleJsonLd = article
     ? {
         "@context": "https://schema.org",
         "@type": "BlogPosting",
@@ -59,6 +81,7 @@ export function SEO({
         keywords: article.tags?.join(", "),
       }
     : null;
+  const jsonLd = articleJsonLd ? [...baseJsonLd, articleJsonLd] : baseJsonLd;
 
   return (
     <Helmet>
@@ -94,10 +117,7 @@ export function SEO({
       <meta name="twitter:image" content={ogImage} />
 
       {/* JSON-LD */}
-      {jsonLd && (
-        <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
-      )}
+      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
     </Helmet>
   );
 }
-

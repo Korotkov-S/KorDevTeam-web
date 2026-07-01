@@ -15,6 +15,15 @@ import {
   PaginationPrevious,
 } from "./ui/pagination";
 
+function toProjectSlug(id: string): string {
+  if (id === "Media & Entertainment") return "media-entertainment";
+  return id
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function Projects({ withId = true }: { withId?: boolean } = {}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -204,12 +213,12 @@ export function Projects({ withId = true }: { withId?: boolean } = {}) {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  navigate(`/project/${project.id}`);
+                  navigate(`/project/${toProjectSlug(project.id)}`);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    navigate(`/project/${project.id}`);
+                    navigate(`/project/${toProjectSlug(project.id)}`);
                   }
                 }}
                 className="relative rounded-3xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-500 cursor-pointer"

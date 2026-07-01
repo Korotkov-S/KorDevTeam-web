@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, Play } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { useTranslation } from "react-i18next";
+import { SEO } from "../components/SEO";
 
 interface UnderMetupVideoMeta {
   title: string;
@@ -102,7 +103,17 @@ export function UnderMetupPage() {
   }, [meta]);
 
   return (
-    <div className="min-h-screen pt-20 under-metup-page">
+    <>
+      {meta && slug && (
+        <SEO
+          title={meta.title}
+          description={`Запись Under Metup: ${meta.title}, доклады, программа встречи и материалы для IT-сообщества.`}
+          canonical={`https://kordev.team/under-metup/${slug}`}
+          ogType="video.other"
+          ogImage="https://kordev.team/opengraphlogo.jpeg"
+        />
+      )}
+      <div className="min-h-screen pt-20 under-metup-page">
       <div className="container mx-auto px-2 md:px-4 py-2 md:py-8">
         {/* Back Button */}
         <div className="mb-2 md:mb-8 relative" style={{ zIndex: 9999 }}>
@@ -312,7 +323,7 @@ export function UnderMetupPage() {
           </article>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
-

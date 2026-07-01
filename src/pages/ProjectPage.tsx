@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { ArrowLeft, ExternalLink, Github } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { SEO } from "../components/SEO";
 
 type Project = {
   id: string;
@@ -19,6 +20,29 @@ type Project = {
   demoUrl?: string;
   githubUrl?: string;
 };
+
+function toProjectSlug(id: string): string {
+  if (id === "Media & Entertainment") return "media-entertainment";
+  return id
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function getProjectSeoDescription(project: Project): string {
+  const description = project.description.replace(/\s+/g, " ").trim();
+  if (description.length >= 120) return description.slice(0, 160);
+  return `${project.title}: ${description}`.slice(0, 160);
+}
 
 export function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -193,7 +217,11 @@ export function ProjectPage() {
     load();
   }, [fallbackProjects, i18n.language, i18n.resolvedLanguage]);
 
-  const project = projects.find((p) => p.id === projectId);
+  const decodedProjectId = safeDecodeURIComponent(projectId || "");
+  const project = projects.find(
+    (p) => toProjectSlug(p.id) === projectId || p.id === decodedProjectId,
+  );
+  const canonicalProjectSlug = project ? toProjectSlug(project.id) : "";
 
   const navigateGoBack = () => {
     if (window.history.state?.idx > 0) {
@@ -211,6 +239,11 @@ export function ProjectPage() {
       behavior: "smooth",
     });
   }, [projectId]);
+
+  useEffect(() => {
+    if (!project || !projectId || projectId === canonicalProjectSlug) return;
+    navigate(`/project/${canonicalProjectSlug}`, { replace: true });
+  }, [canonicalProjectSlug, navigate, project, projectId]);
 
   if (loadingProjects && !project) {
     return (
@@ -237,7 +270,19 @@ export function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen pt-20">
+    <>
+      <SEO
+        title={project.title}
+        description={getProjectSeoDescription(project)}
+        canonical={`https://kordev.team/project/${canonicalProjectSlug}`}
+        ogType="article"
+        ogImage={
+          project.image.startsWith("http")
+            ? project.image
+            : `https://kordev.team${project.image}`
+        }
+      />
+      <div className="min-h-screen pt-20">
       <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
         <div className="mb-8">
@@ -342,6 +387,7 @@ export function ProjectPage() {
           </div>
         </article>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

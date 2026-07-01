@@ -1,5 +1,11 @@
 # Auto-generated. Do not edit by hand.
 
+# Canonical URL redirects
+/blog/    /blog    301!
+/video/    /video    301!
+/project/Media%20%26%20Entertainment    /project/media-entertainment    301!
+/project/Media%20&%20Entertainment    /project/media-entertainment    301!
+
 # Cache headers
 /assets/*  Cache-Control: public, max-age=31536000, immutable
 
@@ -43,21 +49,21 @@
 /blog/telegram-broadcast-automation    /blog/telegram-broadcast-automation.html    200
 /blog/wordpress-optimization    /blog/wordpress-optimization.html    200
 
-# Known SPA routes
-/video    /index.html    200
+# Static app pages (preferred for SEO)
+/video    /video.html    200
 /admin    /index.html    200
-/under-metup/video-1    /index.html    200
-/under-metup/video-2    /index.html    200
-/under-metup/video-3    /index.html    200
-/project/Media%20%26%20Entertainment    /index.html    200
-/project/web-site    /index.html    200
-/project/web-service    /index.html    200
-/project/harmonize-me    /index.html    200
-/project/stroyrem    /index.html    200
-/project/wowbanner    /index.html    200
-/project/serviceplus    /index.html    200
-/project/amch    /index.html    200
-/project/notion-analog    /index.html    200
+/under-metup/video-1    /under-metup/video-1.html    200
+/under-metup/video-2    /under-metup/video-2.html    200
+/under-metup/video-3    /under-metup/video-3.html    200
+/project/media-entertainment    /project/media-entertainment.html    200
+/project/web-site    /project/web-site.html    200
+/project/web-service    /project/web-service.html    200
+/project/harmonize-me    /project/harmonize-me.html    200
+/project/stroyrem    /project/stroyrem.html    200
+/project/wowbanner    /project/wowbanner.html    200
+/project/serviceplus    /project/serviceplus.html    200
+/project/amch    /project/amch.html    200
+/project/notion-analog    /project/notion-analog.html    200
 
 # Unknown URLs must stay real 404s, not soft-404 SPA pages
 /*    /404.html    404

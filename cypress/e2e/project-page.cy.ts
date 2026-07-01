@@ -8,7 +8,7 @@ describe('Media & Entertainment project page', () => {
 
   it('opens successfully and displays project title', () => {
     // Visit the project page with encoded URL
-    cy.visit('https://kordev.team/project/Media%20&%20Entertainment');
+    cy.visit('https://kordev.team/project/media-entertainment');
     // Ensure the page loads (wait for heading)
     cy.get('h1').should('be.visible');
     // Check that the project identifier is present in the page

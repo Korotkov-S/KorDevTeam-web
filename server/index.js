@@ -39,6 +39,15 @@ const STATIC_PROJECT_IDS = new Set([
 const UNDER_METUP_SLUGS = new Set(["video-1", "video-2", "video-3"]);
 const STATIC_APP_PATHS = new Set(["/", "/blog", "/video", "/admin"]);
 
+function toProjectSlug(id) {
+  if (id === "Media & Entertainment") return "media-entertainment";
+  return String(id || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function fileExists(filePath) {
   try {
     return fs.statSync(filePath).isFile();
@@ -88,13 +97,16 @@ async function projectExists(projectId) {
   if (!projectId || projectId.includes("/")) return false;
   const decodedId = safeDecodeURIComponent(projectId);
   if (STATIC_PROJECT_IDS.has(decodedId)) return true;
+  if ([...STATIC_PROJECT_IDS].some((id) => toProjectSlug(id) === decodedId)) return true;
 
   try {
     const [ruProjects, enProjects] = await Promise.all([
       getDbProjects({ lang: "ru" }),
       getDbProjects({ lang: "en" }),
     ]);
-    return [...ruProjects, ...enProjects].some((project) => project.id === decodedId);
+    return [...ruProjects, ...enProjects].some(
+      (project) => project.id === decodedId || toProjectSlug(project.id) === decodedId,
+    );
   } catch (e) {
     console.warn("[spa-fallback] project lookup failed:", e?.message || e);
     return false;
@@ -140,6 +152,10 @@ app.use("/api/media", mediaRouter);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get(/^\/project\/Media(?:%20|\s)(?:%26|&)(?:%20|\s)Entertainment\/?$/i, (req, res) => {
+  res.redirect(301, "/project/media-entertainment");
 });
 
 // Serve built static site (dist) in production-like setups.
