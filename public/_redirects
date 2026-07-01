@@ -1,5 +1,8 @@
 # Auto-generated. Do not edit by hand.
 
+# Cache headers
+/assets/*  Cache-Control: public, max-age=31536000, immutable
+
 # Static blog pages (preferred for SEO)
 /blog    /blog/index.html    200
 /blog/argumentation-guide    /blog/argumentation-guide.html    200
@@ -28,6 +31,10 @@
 /blog/krasotulya-telegram-120    /blog/krasotulya-telegram-120.html    200
 /blog/krasotulya-telegram-121    /blog/krasotulya-telegram-121.html    200
 /blog/krasotulya-telegram-122    /blog/krasotulya-telegram-122.html    200
+/blog/krasotulya-telegram-130    /blog/krasotulya-telegram-130.html    200
+/blog/krasotulya-telegram-138    /blog/krasotulya-telegram-138.html    200
+/blog/krasotulya-telegram-139    /blog/krasotulya-telegram-139.html    200
+/blog/krasotulya-telegram-140    /blog/krasotulya-telegram-140.html    200
 /blog/laravel-api-development    /blog/laravel-api-development.html    200
 /blog/nodejs-microservices    /blog/nodejs-microservices.html    200
 /blog/react-native-best-practices    /blog/react-native-best-practices.html    200
@@ -36,8 +43,21 @@
 /blog/telegram-broadcast-automation    /blog/telegram-broadcast-automation.html    200
 /blog/wordpress-optimization    /blog/wordpress-optimization.html    200
 
-# SPA fallback
-/*    /index.html   200
+# Known SPA routes
+/video    /index.html    200
+/admin    /index.html    200
+/under-metup/video-1    /index.html    200
+/under-metup/video-2    /index.html    200
+/under-metup/video-3    /index.html    200
+/project/Media%20%26%20Entertainment    /index.html    200
+/project/web-site    /index.html    200
+/project/web-service    /index.html    200
+/project/harmonize-me    /index.html    200
+/project/stroyrem    /index.html    200
+/project/wowbanner    /index.html    200
+/project/serviceplus    /index.html    200
+/project/amch    /index.html    200
+/project/notion-analog    /index.html    200
 
-# Cache headers
-/assets/*  Cache-Control: public, max-age=31536000, immutable
+# Unknown URLs must stay real 404s, not soft-404 SPA pages
+/*    /404.html    404

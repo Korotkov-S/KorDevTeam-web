@@ -7,6 +7,10 @@ const contentRouter = require("./routes/content");
 const projectsRouter = require("./routes/projects");
 const adminRouter = require("./routes/admin");
 const mediaRouter = require("./routes/media");
+const {
+  getPost: getDbPost,
+  getProjects: getDbProjects,
+} = require("./db");
 const path = require('path');
 const fs = require("node:fs");
 const { bootstrapFromLegacyContentIfEmpty } = require("./db/bootstrap");
@@ -19,6 +23,99 @@ const PORT = process.env.PORT || 3001;
 const DIST_ROOT =
   process.env.CONTENT_DIST_ROOT ||
   path.join(__dirname, "..", "dist");
+const PUBLIC_ROOT = path.join(process.cwd(), "public");
+
+const STATIC_PROJECT_IDS = new Set([
+  "Media & Entertainment",
+  "web-site",
+  "web-service",
+  "harmonize-me",
+  "stroyrem",
+  "wowbanner",
+  "serviceplus",
+  "amch",
+  "notion-analog",
+]);
+const UNDER_METUP_SLUGS = new Set(["video-1", "video-2", "video-3"]);
+const STATIC_APP_PATHS = new Set(["/", "/blog", "/video", "/admin"]);
+
+function fileExists(filePath) {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function normalizeAppPath(rawPath) {
+  if (!rawPath || rawPath === "/") return "/";
+  return rawPath.replace(/\/+$/, "");
+}
+
+function safeDecodeURIComponent(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+async function blogPostExists(slug) {
+  if (!slug || slug.includes("/")) return false;
+
+  const staticCandidates = [
+    path.join(DIST_ROOT, "blog", `${slug}.html`),
+    path.join(DIST_ROOT, "blog", slug, "index.html"),
+    path.join(DIST_ROOT, "blog", `${slug}.md`),
+    path.join(DIST_ROOT, "blog", `${slug}.en.md`),
+    path.join(PUBLIC_ROOT, "blog", `${slug}.md`),
+    path.join(PUBLIC_ROOT, "blog", `${slug}.en.md`),
+  ];
+  if (staticCandidates.some(fileExists)) return true;
+
+  try {
+    return Boolean(
+      (await getDbPost({ slug, lang: "ru" })) ||
+        (await getDbPost({ slug, lang: "en" })),
+    );
+  } catch (e) {
+    console.warn("[spa-fallback] blog lookup failed:", e?.message || e);
+    return false;
+  }
+}
+
+async function projectExists(projectId) {
+  if (!projectId || projectId.includes("/")) return false;
+  const decodedId = safeDecodeURIComponent(projectId);
+  if (STATIC_PROJECT_IDS.has(decodedId)) return true;
+
+  try {
+    const [ruProjects, enProjects] = await Promise.all([
+      getDbProjects({ lang: "ru" }),
+      getDbProjects({ lang: "en" }),
+    ]);
+    return [...ruProjects, ...enProjects].some((project) => project.id === decodedId);
+  } catch (e) {
+    console.warn("[spa-fallback] project lookup failed:", e?.message || e);
+    return false;
+  }
+}
+
+async function isKnownAppRoute(reqPath) {
+  const pathname = normalizeAppPath(reqPath);
+  if (STATIC_APP_PATHS.has(pathname)) return true;
+
+  const blogMatch = pathname.match(/^\/blog\/([^/]+)$/);
+  if (blogMatch) return blogPostExists(safeDecodeURIComponent(blogMatch[1]));
+
+  const projectMatch = pathname.match(/^\/project\/([^/]+)$/);
+  if (projectMatch) return projectExists(projectMatch[1]);
+
+  const underMetupMatch = pathname.match(/^\/under-metup\/([^/]+)$/);
+  if (underMetupMatch) return UNDER_METUP_SLUGS.has(underMetupMatch[1]);
+
+  return false;
+}
 
 // Middleware
 app.use(cors());
@@ -53,14 +150,14 @@ if (fs.existsSync(DIST_ROOT)) {
   // Also serve /public as a fallback for runtime-edited content (uploads, markdown),
   // especially when CONTENT_DIST_ROOT isn't set or isn't writable.
   // Dist stays higher priority because it's mounted first.
-  const PUBLIC_ROOT = path.join(process.cwd(), "public");
   if (fs.existsSync(PUBLIC_ROOT)) {
     app.use(express.static(PUBLIC_ROOT));
   }
 
-  // SPA + pre-rendered HTML fallback (similar to nginx `try_files $uri $uri/ $uri.html /index.html;`)
+  // SPA + pre-rendered HTML fallback. Only known app routes receive index.html;
+  // unknown URLs must return 404 so search engines do not index soft-404 pages.
   // Note: Express 5 (router/path-to-regexp) doesn't accept "*" string patterns.
-  app.get(/.*/, (req, res, next) => {
+  app.get(/.*/, async (req, res, next) => {
     if (req.path.startsWith("/api/")) return next();
 
     const tryFiles = [
@@ -78,7 +175,16 @@ if (fs.existsSync(DIST_ROOT)) {
       }
     }
 
-    return res.sendFile(path.join(DIST_ROOT, "index.html"));
+    if (await isKnownAppRoute(req.path)) {
+      return res.sendFile(path.join(DIST_ROOT, "index.html"));
+    }
+
+    const notFoundHtml = path.join(DIST_ROOT, "404.html");
+    if (fileExists(notFoundHtml)) {
+      return res.status(404).sendFile(notFoundHtml);
+    }
+
+    return res.status(404).type("text/plain").send("Not Found");
   });
 }
 

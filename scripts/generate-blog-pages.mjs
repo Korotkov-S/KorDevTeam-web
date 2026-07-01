@@ -407,8 +407,24 @@ function generateBlogIndexPage({ indexHtml, slugs }) {
 }
 
 function buildRedirects(slugs) {
+  const projects = [
+    "Media%20%26%20Entertainment",
+    "web-site",
+    "web-service",
+    "harmonize-me",
+    "stroyrem",
+    "wowbanner",
+    "serviceplus",
+    "amch",
+    "notion-analog",
+  ];
+  const underMetupVideos = ["video-1", "video-2", "video-3"];
+
   const lines = [];
   lines.push("# Auto-generated. Do not edit by hand.");
+  lines.push("");
+  lines.push("# Cache headers");
+  lines.push("/assets/*  Cache-Control: public, max-age=31536000, immutable");
   lines.push("");
   lines.push("# Static blog pages (preferred for SEO)");
   lines.push(`/blog    /blog/index.html    200`);
@@ -416,11 +432,18 @@ function buildRedirects(slugs) {
     lines.push(`/blog/${slug}    /blog/${slug}.html    200`);
   }
   lines.push("");
-  lines.push("# SPA fallback");
-  lines.push("/*    /index.html   200");
+  lines.push("# Known SPA routes");
+  lines.push("/video    /index.html    200");
+  lines.push("/admin    /index.html    200");
+  for (const video of underMetupVideos) {
+    lines.push(`/under-metup/${video}    /index.html    200`);
+  }
+  for (const project of projects) {
+    lines.push(`/project/${project}    /index.html    200`);
+  }
   lines.push("");
-  lines.push("# Cache headers");
-  lines.push("/assets/*  Cache-Control: public, max-age=31536000, immutable");
+  lines.push("# Unknown URLs must stay real 404s, not soft-404 SPA pages");
+  lines.push("/*    /404.html    404");
   lines.push("");
   return lines.join("\n");
 }
