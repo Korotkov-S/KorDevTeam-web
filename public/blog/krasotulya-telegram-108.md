@@ -18,6 +18,6 @@
 
 ---
 
-Источник: [Telegram-канал «Красотуля»](https://t.me/krasatulaCRM/108)
+Источник: [Telegram-канал «Красотуля»](https://telegram.me/krasatulaCRM/108)
 **Теги**: Красотуля, MAX, Telegram, Переписки
 **Дата публикации**: 5 мая 2026

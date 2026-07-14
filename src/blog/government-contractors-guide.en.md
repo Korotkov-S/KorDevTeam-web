@@ -1,6 +1,6 @@
 # How to Effectively Work with Government Contractors in IT?
 
-My [Telegram channel](https://t.me/kordevteam) - about my studio, life, management, smart thoughts (hopefully), personal effectiveness, humor
+My [Telegram channel](https://telegram.me/kordevteam) - about my studio, life, management, smart thoughts (hopefully), personal effectiveness, humor
 
 ## Introduction
 
@@ -259,7 +259,7 @@ If you suspect a conflict situation, enter it and resolve it - if successful, th
 - "Argue This" - Nikita Nepryakhin
 - "Influence: The Psychology of Persuasion" - Robert Cialdini
 
-My [Telegram channel](https://t.me/kordevteam) - about my studio, life, management, smart thoughts (hopefully), personal effectiveness, humor
+My [Telegram channel](https://telegram.me/kordevteam) - about my studio, life, management, smart thoughts (hopefully), personal effectiveness, humor
 
 ---
 

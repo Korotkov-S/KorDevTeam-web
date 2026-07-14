@@ -79,7 +79,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://t.me/ideamen51"
+                  href="https://telegram.me/ideamen51"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-blue-300 transition-colors"

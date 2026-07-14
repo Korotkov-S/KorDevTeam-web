@@ -22,7 +22,7 @@ export function FloatingButtons() {
         className="shadow-lg hover:shadow-xl transition-shadow text-sm md:text-base"
       >
         <a
-          href="https://t.me/korotkovsStudio/634"
+          href="https://telegram.me/korotkovsStudio/634"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 whitespace-nowrap"

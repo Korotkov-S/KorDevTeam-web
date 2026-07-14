@@ -66,7 +66,7 @@ export function ProductSpotlight() {
                 </a>
               </Button>
               <Button asChild variant="outline">
-                <a href="https://t.me/ideamen51" target="_blank" rel="noopener noreferrer">
+                <a href="https://telegram.me/ideamen51" target="_blank" rel="noopener noreferrer">
                   {t("productSpotlight.requestDemo")}
                 </a>
               </Button>

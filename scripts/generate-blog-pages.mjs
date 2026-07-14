@@ -139,7 +139,7 @@ function baseJsonLd() {
       name: SITE_NAME,
       url: `${SITE_URL}/`,
       logo: `${SITE_URL}/opengraphlogo.jpeg`,
-      sameAs: ["https://t.me/kordevteam"],
+      sameAs: ["https://telegram.me/kordevteam"],
     },
     {
       "@context": "https://schema.org",

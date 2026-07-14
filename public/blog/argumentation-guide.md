@@ -114,9 +114,9 @@
 
 C меня все подготовить, с вас желание по участвовать.
 
-Пишите мне в [Telegram](https://t.me/kordevteam).
+Пишите мне в [Telegram](https://telegram.me/kordevteam).
 
-Мой [канал в Telegram](https://t.me/kordevteam).
+Мой [канал в Telegram](https://telegram.me/kordevteam).
 
 ---
 

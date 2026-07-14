@@ -112,9 +112,9 @@ I have experience participating in and conducting management duels, so if anyone
 
 I'll prepare everything, you just need the desire to participate.
 
-Write to me on [Telegram](https://t.me/kordevteam).
+Write to me on [Telegram](https://telegram.me/kordevteam).
 
-My [Telegram channel](https://t.me/kordevteam).
+My [Telegram channel](https://telegram.me/kordevteam).
 
 ---
 

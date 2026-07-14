@@ -1,5 +1,128 @@
 [
   {
+    "slug": "max-comments-business-process",
+    "lang": "ru",
+    "title": "Комментарии в MAX: почему новая функция не равна рабочему процессу",
+    "seoTitle": "Комментарии в MAX: почему новая функция не равна рабочему процессу",
+    "coverUrl": "/blog/media/korotkovsStudio/1136-01.jpg",
+    "imageUrls": [
+      "/blog/media/korotkovsStudio/1136-01.jpg"
+    ],
+    "excerpt": "Когда в сервисе появляются комментарии, реакции, формы, кнопки или новые интеграции, это легко воспринимается как готовое улучшение. Функция есть — значит.",
+    "date": "10 июля 2026",
+    "updatedDate": "10 июля 2026",
+    "readTime": "2 мин",
+    "tags": [
+      "MAX",
+      "Комментарии",
+      "Бизнес-процессы",
+      "Коммуникации",
+      "CRM"
+    ],
+    "mtimeMs": 1784034957273.8223
+  },
+  {
+    "slug": "business-processes-before-automation",
+    "lang": "ru",
+    "title": "Почему автоматизацию стоит начинать с описания бизнес-процессов",
+    "seoTitle": "Почему автоматизацию стоит начинать с описания бизнес-процессов",
+    "coverUrl": "/blog/media/korotkovsStudio/1130-01.jpg",
+    "imageUrls": [
+      "/blog/media/korotkovsStudio/1130-01.jpg",
+      "/blog/media/korotkovsStudio/1130-02.jpg",
+      "/blog/media/korotkovsStudio/1130-03.jpg",
+      "/blog/media/korotkovsStudio/1130-04.jpg",
+      "/blog/media/korotkovsStudio/1130-05.jpg",
+      "/blog/media/korotkovsStudio/1130-06.jpg"
+    ],
+    "excerpt": "Автоматизация часто начинается с фразы: \"Нам нужно приложение\", \"Нам нужна CRM\" или \"Нужно срочно сделать личный кабинет\". Но в сильных проектах первый шаг.",
+    "date": "9 июля 2026",
+    "updatedDate": "9 июля 2026",
+    "readTime": "3 мин",
+    "tags": [
+      "Бизнес-процессы",
+      "Автоматизация",
+      "Внедрение",
+      "CRM",
+      "IT-консалтинг"
+    ],
+    "mtimeMs": 1784034967962.8635
+  },
+  {
+    "slug": "business-automation-without-custom-development",
+    "lang": "ru",
+    "title": "Не каждой задаче нужна разработка с нуля",
+    "seoTitle": "Не каждой задаче нужна разработка с нуля",
+    "coverUrl": "/blog/media/korotkovsStudio/1122-01.jpg",
+    "imageUrls": [
+      "/blog/media/korotkovsStudio/1122-01.jpg",
+      "/blog/media/korotkovsStudio/1122-02.jpg",
+      "/blog/media/korotkovsStudio/1122-03.jpg",
+      "/blog/media/korotkovsStudio/1122-04.jpg",
+      "/blog/media/korotkovsStudio/1122-05.jpg",
+      "/blog/media/korotkovsStudio/1122-06.jpg",
+      "/blog/media/korotkovsStudio/1122-07.jpg"
+    ],
+    "excerpt": "Бизнес часто приходит к автоматизации с ощущением, что ему обязательно нужен уникальный сервис, личный кабинет, CRM или приложение. Иногда это правда. Но далеко.",
+    "date": "7 июля 2026",
+    "updatedDate": "7 июля 2026",
+    "readTime": "3 мин",
+    "tags": [
+      "Автоматизация",
+      "Разработка",
+      "CRM",
+      "Бизнес-процессы",
+      "KorDevTeam"
+    ],
+    "mtimeMs": 1784034957022.0793
+  },
+  {
+    "slug": "offline-packaging-for-it-studio",
+    "lang": "ru",
+    "title": "Зачем IT-студии визитки в 2026 году",
+    "seoTitle": "Зачем IT-студии визитки в 2026 году",
+    "coverUrl": "/blog/media/korotkovsStudio/1112-01.jpg",
+    "imageUrls": [
+      "/blog/media/korotkovsStudio/1112-01.jpg",
+      "/blog/media/korotkovsStudio/1112-02.jpg",
+      "/blog/media/korotkovsStudio/1112-03.jpg"
+    ],
+    "excerpt": "Кажется, что в 2026 году визитки уже должны были окончательно исчезнуть. Есть сайт, QRкоды, Telegram, презентации, соцсети, карты, мессенджеры и десятки.",
+    "date": "1 июля 2026",
+    "updatedDate": "1 июля 2026",
+    "readTime": "2 мин",
+    "tags": [
+      "IT-студия",
+      "Упаковка",
+      "Маркетинг",
+      "Визитки",
+      "SEO"
+    ],
+    "mtimeMs": 1784034957393.1223
+  },
+  {
+    "slug": "ai-business-strategy-without-hype",
+    "lang": "ru",
+    "title": "ИИ в бизнесе: рабочий инструмент без магической кнопки",
+    "seoTitle": "ИИ в бизнесе: рабочий инструмент без магической кнопки",
+    "coverUrl": "/blog/media/korotkovsStudio/1090-01.jpg",
+    "imageUrls": [
+      "/blog/media/korotkovsStudio/1090-01.jpg"
+    ],
+    "excerpt": "ИИ уже стал обычным рабочим инструментом: помогает с текстами, идеями, изображениями, анализом, черновиками документов и даже стратегическими размышлениями. Но.",
+    "date": "19 июня 2026",
+    "updatedDate": "19 июня 2026",
+    "readTime": "2 мин",
+    "tags": [
+      "ИИ",
+      "ChatGPT",
+      "Стратегия",
+      "Автоматизация",
+      "Бизнес"
+    ],
+    "mtimeMs": 1784034957762.5957
+  },
+  {
     "slug": "krasotulya-telegram-140",
     "lang": "ru",
     "title": "Что такое «Красотуля»: CRM для бизнеса и сервисных команд",
@@ -19,7 +142,7 @@
       "Малый бизнес",
       "Сервисные команды"
     ],
-    "mtimeMs": 1781936619987.0608
+    "mtimeMs": 1784032296931.8008
   },
   {
     "slug": "krasotulya-telegram-139",
@@ -41,7 +164,7 @@
       "Selectel",
       "Маркетплейс"
     ],
-    "mtimeMs": 1781936619831.8054
+    "mtimeMs": 1784032296934.0002
   },
   {
     "slug": "krasotulya-telegram-138",
@@ -63,7 +186,7 @@
       "ТСПУ",
       "Инфраструктура"
     ],
-    "mtimeMs": 1781936673612.5264
+    "mtimeMs": 1784032296934.657
   },
   {
     "slug": "krasotulya-telegram-130",
@@ -86,7 +209,7 @@
       "Безопасность",
       "Бизнес"
     ],
-    "mtimeMs": 1781936619549.7542
+    "mtimeMs": 1784032296935.9712
   },
   {
     "slug": "krasotulya-telegram-122",
@@ -107,7 +230,7 @@
       "Семинары",
       "Follow-up"
     ],
-    "mtimeMs": 1780588939388.8257
+    "mtimeMs": 1784032296928.9243
   },
   {
     "slug": "krasotulya-telegram-121",
@@ -128,7 +251,7 @@
       "Воронки",
       "Хитроумности"
     ],
-    "mtimeMs": 1780588939388.6904
+    "mtimeMs": 1784032296931.4856
   },
   {
     "slug": "krasotulya-telegram-120",
@@ -149,7 +272,7 @@
       "Канбан",
       "Продажи"
     ],
-    "mtimeMs": 1780588939388.5466
+    "mtimeMs": 1784032296929.3533
   },
   {
     "slug": "krasotulya-telegram-119",
@@ -170,7 +293,7 @@
       "Задачи",
       "Приоритеты"
     ],
-    "mtimeMs": 1780588939388.298
+    "mtimeMs": 1784032296929.9336
   },
   {
     "slug": "krasotulya-telegram-118",
@@ -191,7 +314,7 @@
       "Автопостинг",
       "Рассылки"
     ],
-    "mtimeMs": 1780588939388.026
+    "mtimeMs": 1784032296929.646
   },
   {
     "slug": "krasotulya-telegram-117",
@@ -210,7 +333,7 @@
       "Красотуля",
       "День предпринимателя"
     ],
-    "mtimeMs": 1780588939387.3555
+    "mtimeMs": 1784032296934.3284
   },
   {
     "slug": "krasotulya-telegram-116",
@@ -231,7 +354,7 @@
       "Боты",
       "Сценарии"
     ],
-    "mtimeMs": 1780588939386.8525
+    "mtimeMs": 1784032296935.6118
   },
   {
     "slug": "krasotulya-telegram-115",
@@ -253,7 +376,7 @@
       "38-ФЗ",
       "Согласия"
     ],
-    "mtimeMs": 1780588939386.5408
+    "mtimeMs": 1784032242820.121
   },
   {
     "slug": "krasotulya-telegram-112",
@@ -275,7 +398,7 @@
       "Клиенты",
       "Семинары"
     ],
-    "mtimeMs": 1780588939386.2634
+    "mtimeMs": 1784032242818.479
   },
   {
     "slug": "krasotulya-telegram-111",
@@ -295,7 +418,7 @@
       "Семинары",
       "Бьюти-бизнес"
     ],
-    "mtimeMs": 1780588939386.0273
+    "mtimeMs": 1784032239878.5366
   },
   {
     "slug": "krasotulya-telegram-110",
@@ -316,7 +439,7 @@
       "Задачи",
       "Голосовой ввод"
     ],
-    "mtimeMs": 1780588939385.5723
+    "mtimeMs": 1784032239877.643
   },
   {
     "slug": "krasotulya-telegram-109",
@@ -337,7 +460,7 @@
       "Сделки",
       "Продажи"
     ],
-    "mtimeMs": 1780588939385.3552
+    "mtimeMs": 1784032239877.149
   },
   {
     "slug": "krasotulya-telegram-108",
@@ -358,7 +481,7 @@
       "Telegram",
       "Переписки"
     ],
-    "mtimeMs": 1780588939384.8142
+    "mtimeMs": 1784032239875.271
   },
   {
     "slug": "krasotulya-telegram-107",
@@ -378,7 +501,7 @@
       "CRM",
       "Roadmap"
     ],
-    "mtimeMs": 1780588939384.314
+    "mtimeMs": 1784032239873.7727
   },
   {
     "slug": "krasotulya-telegram-105",
@@ -400,7 +523,7 @@
       "Канбан",
       "Таймтрекинг"
     ],
-    "mtimeMs": 1780588939384.1
+    "mtimeMs": 1784032239869.7666
   },
   {
     "slug": "krasotulya-online-booking",
@@ -554,7 +677,7 @@
       "Telegram",
       "личный кабинет"
     ],
-    "mtimeMs": 1782919429281.9937
+    "mtimeMs": 1784032227582.9248
   },
   {
     "slug": "nodejs-microservices",
@@ -597,7 +720,7 @@
       "интеграции",
       "клиентская база"
     ],
-    "mtimeMs": 1782919446990.0361
+    "mtimeMs": 1784032227585.3113
   },
   {
     "slug": "wordpress-optimization",
@@ -619,7 +742,7 @@
       "Core Web Vitals",
       "SEO"
     ],
-    "mtimeMs": 1782919499889.9214
+    "mtimeMs": 1784032296935.3083
   },
   {
     "slug": "laravel-api-development",
@@ -662,7 +785,7 @@
       "смета",
       "веб-сервис"
     ],
-    "mtimeMs": 1782919481698.2942
+    "mtimeMs": 1784032296933.6238
   },
   {
     "slug": "telegram-broadcast-automation",
@@ -684,7 +807,50 @@
       "рассылки",
       "сегменты клиентов"
     ],
-    "mtimeMs": 1782919466514.4026
+    "mtimeMs": 1784032296932.4617
+  },
+  {
+    "slug": "government-contractors-guide",
+    "lang": "ru",
+    "title": "Как эффективно взаимодействовать с госзаказчиками в IT-сфере?",
+    "seoTitle": "Как эффективно взаимодействовать с госзаказчиками в IT-сфере?",
+    "coverUrl": "/blog/covers/government-contractors-guide.jpg",
+    "imageUrls": [
+      "/blog/covers/government-contractors-guide.jpg"
+    ],
+    "excerpt": "Как IT-команде работать с госзаказчиками: 44-ФЗ, закупки, коммуникация, риски сроков и практические правила для подрядчика.",
+    "date": "27 января 2025",
+    "updatedDate": "27 января 2025",
+    "readTime": "12 мин",
+    "tags": [
+      "Госзакупки",
+      "Переговоры",
+      "44-ФЗ",
+      "Бизнес",
+      "Менеджмент"
+    ],
+    "mtimeMs": 1784032232172.5261
+  },
+  {
+    "slug": "argumentation-guide",
+    "lang": "ru",
+    "title": "Хватит терять переговоры! Железная аргументация, которая ломает сопротивление даже упрямых клиентов",
+    "seoTitle": "Хватит терять переговоры! Железная аргументация, которая ломает сопротивление даже упрямых клиентов",
+    "coverUrl": "/blog/covers/argumentation-guide.jpg",
+    "imageUrls": [
+      "/blog/covers/argumentation-guide.jpg"
+    ],
+    "excerpt": "Как выстраивать аргументацию в переговорах с клиентами: примеры из IT-проектов, работа с возражениями и выбор доводов для решений.",
+    "date": "27 января 2025",
+    "updatedDate": "27 января 2025",
+    "readTime": "3 мин",
+    "tags": [
+      "Переговоры",
+      "Аргументация",
+      "Коммуникация",
+      "Бизнес"
+    ],
+    "mtimeMs": 1784032227580.671
   },
   {
     "slug": "harmonize-me-story",
@@ -707,49 +873,6 @@
       "Next.js"
     ],
     "mtimeMs": 1780584409037.7744
-  },
-  {
-    "slug": "government-contractors-guide",
-    "lang": "ru",
-    "title": "Как эффективно взаимодействовать с госзаказчиками в IT-сфере?",
-    "seoTitle": "Как эффективно взаимодействовать с госзаказчиками в IT-сфере?",
-    "coverUrl": "/blog/covers/government-contractors-guide.jpg",
-    "imageUrls": [
-      "/blog/covers/government-contractors-guide.jpg"
-    ],
-    "excerpt": "Как IT-команде работать с госзаказчиками: 44-ФЗ, закупки, коммуникация, риски сроков и практические правила для подрядчика.",
-    "date": "27 января 2025",
-    "updatedDate": "27 января 2025",
-    "readTime": "12 мин",
-    "tags": [
-      "Госзакупки",
-      "Переговоры",
-      "44-ФЗ",
-      "Бизнес",
-      "Менеджмент"
-    ],
-    "mtimeMs": 1780584409033.5295
-  },
-  {
-    "slug": "argumentation-guide",
-    "lang": "ru",
-    "title": "Хватит терять переговоры! Железная аргументация, которая ломает сопротивление даже упрямых клиентов",
-    "seoTitle": "Хватит терять переговоры! Железная аргументация, которая ломает сопротивление даже упрямых клиентов",
-    "coverUrl": "/blog/covers/argumentation-guide.jpg",
-    "imageUrls": [
-      "/blog/covers/argumentation-guide.jpg"
-    ],
-    "excerpt": "Как выстраивать аргументацию в переговорах с клиентами: примеры из IT-проектов, работа с возражениями и выбор доводов для решений.",
-    "date": "27 января 2025",
-    "updatedDate": "27 января 2025",
-    "readTime": "3 мин",
-    "tags": [
-      "Переговоры",
-      "Аргументация",
-      "Коммуникация",
-      "Бизнес"
-    ],
-    "mtimeMs": 1780584409030.1118
   },
   {
     "slug": "sims-dynasty-tree-platform",

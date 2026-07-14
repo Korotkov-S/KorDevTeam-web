@@ -8,12 +8,12 @@
 
 Делюсь чек-листом как создавать более эффективные воронки на CRM доске.
 
-1.[Телеграм](https://t.me/testKrasotula2_bot)
+1.[Телеграм](https://telegram.me/testKrasotula2_bot)
 2.[МAX](https://max.ru/id519098647630_bot)
 3.[Сообщество в VK](https://vk.com/im/convo/-236532402?entrypoint=list_all)
 
 ---
 
-Источник: [Telegram-канал «Красотуля»](https://t.me/krasatulaCRM/121)
+Источник: [Telegram-канал «Красотуля»](https://telegram.me/krasatulaCRM/121)
 **Теги**: Красотуля, CRM, Воронки, Хитроумности
 **Дата публикации**: 2 июня 2026

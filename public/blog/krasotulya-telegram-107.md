@@ -15,6 +15,6 @@
 
 ---
 
-Источник: [Telegram-канал «Красотуля»](https://t.me/krasatulaCRM/107)
+Источник: [Telegram-канал «Красотуля»](https://telegram.me/krasatulaCRM/107)
 **Теги**: Красотуля, CRM, Roadmap
 **Дата публикации**: 2 мая 2026

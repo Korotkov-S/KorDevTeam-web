@@ -35,7 +35,7 @@ export function SEO({
       name: "KorDevTeam",
       url: "https://kordev.team/",
       logo: "https://kordev.team/opengraphlogo.jpeg",
-      sameAs: ["https://t.me/kordevteam"],
+      sameAs: ["https://telegram.me/kordevteam"],
     },
     {
       "@context": "https://schema.org",

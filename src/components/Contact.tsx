@@ -22,7 +22,7 @@ export function Contact({ withId = true }: { withId?: boolean } = {}) {
     {
       icon: MessageSquare,
       title: t("contact.telegram"),
-      href: "https://t.me/ideamen51",
+      href: "https://telegram.me/ideamen51",
       label: "@ideamen51",
     },
     {

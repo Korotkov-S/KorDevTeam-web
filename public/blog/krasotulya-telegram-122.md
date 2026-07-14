@@ -18,6 +18,6 @@
 
 ---
 
-Источник: [Telegram-канал «Красотуля»](https://t.me/krasatulaCRM/122)
+Источник: [Telegram-канал «Красотуля»](https://telegram.me/krasatulaCRM/122)
 **Теги**: Красотуля, CRM, Семинары, Follow-up
 **Дата публикации**: 4 июня 2026
