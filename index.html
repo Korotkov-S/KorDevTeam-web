@@ -10,6 +10,16 @@
     content="аутсорсинг разработчиков, веб-сервисы, мобильные приложения, React, Node.js, React Native" />
   <meta name="author" content="KorDevTeam" />
 
+  <script>
+    try {
+      if (localStorage.getItem("theme") !== "light") {
+        document.documentElement.classList.add("dark");
+      }
+    } catch {
+      document.documentElement.classList.add("dark");
+    }
+  </script>
+
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Разрабатываем цифровые продукты и автоматизируем рутинные процессы" />
   <meta property="og:description" content="Веб-сервисы, мобильные приложения, CRM, интеграции и внутренние инструменты для бизнеса." />

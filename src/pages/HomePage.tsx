@@ -10,12 +10,19 @@ const Services = lazy(() => import("../components/Services").then((m) => ({ defa
 const Technologies = lazy(() =>
   import("../components/Technologies").then((m) => ({ default: m.Technologies })),
 );
-const Projects = lazy(() => import("../components/Projects").then((m) => ({ default: m.Projects })));
+const loadProjects = () => import("../components/Projects");
+const Projects = lazy(() => loadProjects().then((m) => ({ default: m.Projects })));
 const Blog = lazy(() => import("../components/Blog").then((m) => ({ default: m.Blog })));
 const UnderMetup = lazy(() =>
   import("../components/UnderMetup").then((m) => ({ default: m.UnderMetup })),
 );
 const Contact = lazy(() => import("../components/Contact").then((m) => ({ default: m.Contact })));
+
+const PROJECT_PRELOAD_IMAGES = [
+  "/projects/noodome.webp",
+  "/projects/asg.webp",
+  "/projects/sims.webp",
+];
 
 function DeferredSection({
   id,
@@ -66,6 +73,25 @@ function DeferredSection({
 }
 
 export function HomePage() {
+  useEffect(() => {
+    const warmProjects = () => {
+      void loadProjects();
+      PROJECT_PRELOAD_IMAGES.forEach((src) => {
+        const image = new Image();
+        image.decoding = "async";
+        image.src = src;
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(warmProjects, { timeout: 1_500 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = window.setTimeout(warmProjects, 800);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
   return (
     <>
       <SEO
@@ -92,7 +118,7 @@ export function HomePage() {
           <Technologies withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="projects" estimatedHeight={980}>
+      <DeferredSection id="projects" estimatedHeight={980} rootMargin="1800px">
         <Suspense fallback={null}>
           <Projects withId={false} />
         </Suspense>

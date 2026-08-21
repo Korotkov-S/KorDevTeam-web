@@ -16,9 +16,11 @@ const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default:
 
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
-      Загрузка…
-    </div>
+    <div
+      className="min-h-screen bg-background"
+      role="status"
+      aria-label="Загрузка страницы"
+    />
   );
 }
 

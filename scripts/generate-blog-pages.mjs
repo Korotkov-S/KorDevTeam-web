@@ -539,10 +539,17 @@ function injectSeoAndBody({
     html = html.replace(/<\/head>/i, `${jsonLdScript(schemas)}\n</head>`);
   }
 
+  // Keep crawler-friendly HTML in the document without flashing it to users
+  // while the locale and React route chunks are still loading.
+  html = html.replace(
+    /<\/head>/i,
+    `<style id="prerender-guard">#root[data-prerendered]{visibility:hidden}</style>\n<noscript><style>#root[data-prerendered]{visibility:visible}</style></noscript>\n</head>`,
+  );
+
   // Inject pre-rendered content for crawlers (React will overwrite on load; that's OK)
   html = html.replace(
     /<div\s+id=["']root["']\s*><\/div>/i,
-    `<div id="root">${bodyHtml}</div>`,
+    `<div id="root" data-prerendered>${bodyHtml}</div>`,
   );
 
   return html;

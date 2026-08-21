@@ -333,11 +333,12 @@ export function Hero() {
         />
 
         {[...Array(2)].map((_, i) => (
-          <motion.path
+          <motion.line
             key={i}
-            d={`M ${i % 2 === 0 ? 0 : "100%"} ${20 + i * 15}% Q 50% ${
-              30 + i * 10
-            }% ${i % 2 === 0 ? "100%" : 0} ${40 + i * 15}%`}
+            x1={i % 2 === 0 ? "0%" : "100%"}
+            y1={`${20 + i * 15}%`}
+            x2={i % 2 === 0 ? "100%" : "0%"}
+            y2={`${40 + i * 15}%`}
             stroke="url(#gradient)"
             strokeWidth="2"
             fill="none"

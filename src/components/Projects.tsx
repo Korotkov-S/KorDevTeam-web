@@ -233,6 +233,8 @@ export function Projects({ withId = true }: { withId?: boolean } = {}) {
                       src={project.image}
                       alt={project.title}
                       className="w-full h-full object-cover"
+                      loading="eager"
+                      fetchPriority={index === 0 ? "high" : "auto"}
                     />
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-500 opacity-20 group-hover:opacity-40 transition-opacity" />
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
