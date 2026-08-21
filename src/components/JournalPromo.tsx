@@ -24,7 +24,7 @@ export function JournalPromo() {
               className="relative mx-auto w-full max-w-sm"
             >
               <Link
-                to={`/journal/${issue.slug}`}
+                to={`/journal/${issue.slug}/`}
                 state={{ journalPlacement: "homepage_cover" }}
                 className="group block"
                 aria-label={t("journal.readIssue")}
@@ -70,7 +70,7 @@ export function JournalPromo() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="border-0 bg-blue-600 text-white hover:bg-blue-700">
                   <Link
-                    to={`/journal/${issue.slug}`}
+                    to={`/journal/${issue.slug}/`}
                     state={{ journalPlacement: "homepage_button" }}
                   >
                     <BookOpen className="h-4 w-4" />

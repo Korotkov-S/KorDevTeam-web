@@ -14,7 +14,7 @@ export function JournalIndexPage() {
       <SEO
         title={t("journal.archiveTitle")}
         description={t("journal.archiveDescription")}
-        canonical="https://kordev.team/journal"
+        canonical="https://kordev.team/journal/"
         ogType="website"
         ogImage="https://kordev.team/journal/issue-0-cover.webp"
         ogImageType="image/webp"
@@ -43,7 +43,7 @@ export function JournalIndexPage() {
                 className="overflow-hidden rounded-3xl border border-border bg-card/70 shadow-xl shadow-blue-500/5"
               >
                 <Link
-                  to={`/journal/${issue.slug}`}
+                  to={`/journal/${issue.slug}/`}
                   state={{ journalPlacement: "journal_archive_cover" }}
                   className="group block overflow-hidden bg-muted"
                 >
@@ -70,7 +70,7 @@ export function JournalIndexPage() {
                   <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                     <Button asChild className="border-0 bg-blue-600 text-white hover:bg-blue-700">
                       <Link
-                        to={`/journal/${issue.slug}`}
+                        to={`/journal/${issue.slug}/`}
                         state={{ journalPlacement: "journal_archive_button" }}
                       >
                         {t("journal.readIssue")}

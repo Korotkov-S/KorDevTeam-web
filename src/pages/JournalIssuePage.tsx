@@ -54,7 +54,7 @@ export function JournalIssuePage() {
       <SEO
         title={t("journal.seoIssueTitle")}
         description={t("journal.issueDescription")}
-        canonical={`https://kordev.team/journal/${issue.slug}`}
+        canonical={`https://kordev.team/journal/${issue.slug}/`}
         ogType="article"
         ogImage={`https://kordev.team${issue.coverUrl}`}
         ogImageType="image/webp"
@@ -64,7 +64,7 @@ export function JournalIssuePage() {
       <article className="min-h-screen px-4 pb-24 pt-28 sm:px-6">
         <div className="mx-auto max-w-7xl">
           <Link
-            to="/journal"
+            to="/journal/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />

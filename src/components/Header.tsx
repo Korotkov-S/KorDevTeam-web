@@ -102,7 +102,7 @@ export function Header() {
               {t("header.blog")}
             </Link>
             <Link
-              to="/journal"
+              to="/journal/"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {t("header.journal")}
@@ -181,7 +181,7 @@ export function Header() {
               {t("header.blog")}
             </Link>
             <Link
-              to="/journal"
+              to="/journal/"
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
               onClick={() => setIsMenuOpen(false)}
             >

@@ -666,7 +666,7 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
     `      <a href="/#services">Услуги</a>`,
     `      <a href="/#projects">Проекты</a>`,
     `      <a href="/blog">Блог</a>`,
-    `      <a href="/journal">Журнал</a>`,
+    `      <a href="/journal/">Журнал</a>`,
     `      <a href="/video">Видео</a>`,
     `      <a href="/#contact">Контакты</a>`,
     `    </nav>`,
@@ -699,7 +699,7 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
     `  </section>`,
     `  <section class="container mx-auto px-4 py-8">`,
     `    <h2>Журнал KorDevTeam</h2>`,
-    `    <p><a href="/journal/${JOURNAL_ISSUE.slug}">Выпуск №${JOURNAL_ISSUE.issue}: ${escapeHtml(JOURNAL_ISSUE.title)}</a> — ${escapeHtml(JOURNAL_ISSUE.subtitle)}</p>`,
+    `    <p><a href="/journal/${JOURNAL_ISSUE.slug}/">Выпуск №${JOURNAL_ISSUE.issue}: ${escapeHtml(JOURNAL_ISSUE.title)}</a> — ${escapeHtml(JOURNAL_ISSUE.subtitle)}</p>`,
     `  </section>`,
     `  <section class="container mx-auto px-4 py-8">`,
     `    <h2>Видео</h2>`,
@@ -722,8 +722,8 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
 }
 
 function generateJournalPages({ indexHtml }) {
-  const archiveUrl = `${SITE_URL}/journal`;
-  const issueUrl = `${archiveUrl}/${JOURNAL_ISSUE.slug}`;
+  const archiveUrl = `${SITE_URL}/journal/`;
+  const issueUrl = `${archiveUrl}${JOURNAL_ISSUE.slug}/`;
   const absoluteCover = `${SITE_URL}${JOURNAL_ISSUE.coverUrl}`;
   const absolutePdf = `${SITE_URL}${JOURNAL_ISSUE.pdfUrl}`;
 
@@ -733,8 +733,8 @@ function generateJournalPages({ indexHtml }) {
     `    <h1>Журнал KorDevTeam</h1>`,
     `    <p>Разбираем технологии без шума: показываем, где они уже приносят бизнесу результат, и говорим с теми, кто внедряет их на практике.</p>`,
     `    <article>`,
-    `      <a href="/journal/${JOURNAL_ISSUE.slug}"><img src="${JOURNAL_ISSUE.coverUrl}" alt="Обложка журнала KorDevTeam, выпуск №${JOURNAL_ISSUE.issue}"></a>`,
-    `      <h2><a href="/journal/${JOURNAL_ISSUE.slug}">Выпуск №${JOURNAL_ISSUE.issue}: ${escapeHtml(JOURNAL_ISSUE.title)}</a></h2>`,
+    `      <a href="/journal/${JOURNAL_ISSUE.slug}/"><img src="${JOURNAL_ISSUE.coverUrl}" alt="Обложка журнала KorDevTeam, выпуск №${JOURNAL_ISSUE.issue}"></a>`,
+    `      <h2><a href="/journal/${JOURNAL_ISSUE.slug}/">Выпуск №${JOURNAL_ISSUE.issue}: ${escapeHtml(JOURNAL_ISSUE.title)}</a></h2>`,
     `      <p>${escapeHtml(JOURNAL_ISSUE.subtitle)}</p>`,
     `      <p><a href="${JOURNAL_ISSUE.pdfUrl}" download>Скачать PDF</a></p>`,
     `    </article>`,
@@ -776,7 +776,7 @@ function generateJournalPages({ indexHtml }) {
   const issueBody = [
     `<main class="min-h-screen pt-20">`,
     `  <article class="container mx-auto px-4 py-12">`,
-    `    <p><a href="/journal">Все выпуски</a></p>`,
+    `    <p><a href="/journal/">Все выпуски</a></p>`,
     `    <p><img src="${JOURNAL_ISSUE.coverUrl}" alt="Обложка журнала KorDevTeam, выпуск №${JOURNAL_ISSUE.issue}"></p>`,
     `    <p>Выпуск №${JOURNAL_ISSUE.issue} · август 2026 · ${JOURNAL_ISSUE.pages} страниц</p>`,
     `    <h1>${escapeHtml(JOURNAL_ISSUE.title)}</h1>`,
@@ -1029,8 +1029,8 @@ function buildRedirects(slugs, projects) {
   lines.push("# Canonical URL redirects");
   lines.push("/blog/    /blog    301!");
   lines.push("/video/    /video    301!");
-  lines.push("/journal/    /journal    301!");
-  lines.push(`/journal/${JOURNAL_ISSUE.slug}/    /journal/${JOURNAL_ISSUE.slug}    301!`);
+  lines.push("/journal    /journal/    301!");
+  lines.push(`/journal/${JOURNAL_ISSUE.slug}    /journal/${JOURNAL_ISSUE.slug}/    301!`);
   lines.push("/project/Media%20%26%20Entertainment    /project/media-entertainment    301!");
   lines.push("/project/Media%20&%20Entertainment    /project/media-entertainment    301!");
   lines.push("");
@@ -1093,8 +1093,8 @@ function buildFullSitemapXml(blogSlugs, projects) {
   const staticPages = [
     { loc: "/", priority: "1.0", changefreq: "weekly" },
     { loc: "/blog", priority: "0.9", changefreq: "weekly" },
-    { loc: "/journal", priority: "0.9", changefreq: "monthly" },
-    { loc: `/journal/${JOURNAL_ISSUE.slug}`, priority: "0.9", changefreq: "monthly" },
+    { loc: "/journal/", priority: "0.9", changefreq: "monthly" },
+    { loc: `/journal/${JOURNAL_ISSUE.slug}/`, priority: "0.9", changefreq: "monthly" },
     { loc: "/video", priority: "0.8", changefreq: "monthly" },
   ];
 
