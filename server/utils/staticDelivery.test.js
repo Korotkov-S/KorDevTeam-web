@@ -21,6 +21,9 @@ function createResponseMock() {
     setHeader(name, value) {
       headers.set(name.toLowerCase(), value);
     },
+    type(value) {
+      headers.set("content-type-extension", value);
+    },
   };
 }
 
@@ -49,7 +52,15 @@ test("resolvePrecompressedAsset prefers Brotli and blocks traversal", () => {
 
 test("static delivery emits immutable and safe HTML cache headers", () => {
   const compressedResponse = createResponseMock();
-  setPrecompressedAssetHeaders(compressedResponse, "br");
+  setPrecompressedAssetHeaders(
+    compressedResponse,
+    "br",
+    "/app/dist/assets/index-ABC12345.js",
+  );
+  assert.equal(
+    compressedResponse.getHeader("content-type-extension"),
+    ".js",
+  );
   assert.equal(compressedResponse.getHeader("content-encoding"), "br");
   assert.equal(compressedResponse.getHeader("vary"), "Accept-Encoding");
   assert.equal(

@@ -178,8 +178,7 @@ if (fs.existsSync(DIST_ROOT)) {
       );
       if (!asset) return next();
 
-      res.type(asset.originalPath);
-      setPrecompressedAssetHeaders(res, asset.encoding);
+      setPrecompressedAssetHeaders(res, asset.encoding, asset.originalPath);
       return res.sendFile(asset.compressedPath);
     });
 

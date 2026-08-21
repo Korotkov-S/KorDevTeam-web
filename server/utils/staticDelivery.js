@@ -76,7 +76,12 @@ function setImmutableAssetHeaders(res) {
   );
 }
 
-function setPrecompressedAssetHeaders(res, encoding) {
+function setPrecompressedAssetHeaders(res, encoding, originalPath) {
+  if (originalPath && typeof res.type === "function") {
+    // Express expects a MIME type or extension here. Passing the full path
+    // makes it use that path verbatim as Content-Type for .br/.gz responses.
+    res.type(path.extname(originalPath));
+  }
   setImmutableAssetHeaders(res);
   res.setHeader("Content-Encoding", encoding);
   appendVary(res, "Accept-Encoding");
