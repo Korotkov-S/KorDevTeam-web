@@ -14,6 +14,12 @@ const {
 const path = require('path');
 const fs = require("node:fs");
 const { bootstrapFromLegacyContentIfEmpty } = require("./db/bootstrap");
+const {
+  resolvePrecompressedAsset,
+  setGeneralStaticHeaders,
+  setImmutableAssetHeaders,
+  setPrecompressedAssetHeaders,
+} = require("./utils/staticDelivery");
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -24,6 +30,7 @@ const DIST_ROOT =
   process.env.CONTENT_DIST_ROOT ||
   path.join(__dirname, "..", "dist");
 const PUBLIC_ROOT = path.join(process.cwd(), "public");
+const ASSET_ROOT = path.join(DIST_ROOT, "assets");
 
 const STATIC_PROJECT_IDS = new Set([
   "Media & Entertainment",
@@ -161,13 +168,46 @@ app.get(/^\/project\/Media(?:%20|\s)(?:%26|&)(?:%20|\s)Entertainment\/?$/i, (req
 // Serve built static site (dist) in production-like setups.
 // This avoids nginx returning 405 for POST/PUT to /api/* when the site is served as pure static.
 if (fs.existsSync(DIST_ROOT)) {
-  app.use(express.static(DIST_ROOT));
+  if (fs.existsSync(ASSET_ROOT)) {
+    app.get(/^\/assets\/.+/, (req, res, next) => {
+      const relativePath = req.path.replace(/^\/assets\//, "");
+      const asset = resolvePrecompressedAsset(
+        ASSET_ROOT,
+        relativePath,
+        req.headers["accept-encoding"],
+      );
+      if (!asset) return next();
+
+      res.type(asset.originalPath);
+      setPrecompressedAssetHeaders(res, asset.encoding);
+      return res.sendFile(asset.compressedPath);
+    });
+
+    app.use(
+      "/assets",
+      express.static(ASSET_ROOT, {
+        immutable: true,
+        maxAge: "1y",
+        setHeaders: setImmutableAssetHeaders,
+      }),
+    );
+  }
+
+  app.use(
+    express.static(DIST_ROOT, {
+      setHeaders: setGeneralStaticHeaders,
+    }),
+  );
 
   // Also serve /public as a fallback for runtime-edited content (uploads, markdown),
   // especially when CONTENT_DIST_ROOT isn't set or isn't writable.
   // Dist stays higher priority because it's mounted first.
   if (fs.existsSync(PUBLIC_ROOT)) {
-    app.use(express.static(PUBLIC_ROOT));
+    app.use(
+      express.static(PUBLIC_ROOT, {
+        setHeaders: setGeneralStaticHeaders,
+      }),
+    );
   }
 
   // SPA + pre-rendered HTML fallback. Only known app routes receive index.html;

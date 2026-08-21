@@ -3,6 +3,7 @@ const fs = require("fs").promises;
 const path = require("path");
 const { authenticate } = require("../middleware/auth");
 const { getProjects, replaceProjects, safeLang } = require("../db");
+const { setPublicContentCache } = require("../utils/httpCache");
 
 const router = express.Router();
 
@@ -75,6 +76,7 @@ function mergeProjectImagesFromFallback(projects, fallbackProjects) {
 
 router.get("/", async (req, res, next) => {
   try {
+    setPublicContentCache(res);
     const lang = safeLang((req.query.lang || "ru").toString());
     let projects = await getProjects({ lang });
     if (lang !== "ru" && projects.length) {

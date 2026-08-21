@@ -3,6 +3,7 @@ const path = require("path");
 const { createSectionHandler } = require("../utils/sectionFileHandler");
 const { extractMetaFromMarkdown } = require("../utils/contentMeta");
 const { listPostMetas, safeLang } = require("../db");
+const { setPublicContentCache } = require("../utils/httpCache");
 
 const router = express.Router();
 
@@ -68,6 +69,7 @@ function buildHandlerFor(section) {
 
 router.get("/:section", async (req, res, next) => {
   try {
+    setPublicContentCache(res);
     const section = req.params.section;
     const lang = safeLang((req.query.lang || "ru").toString());
 

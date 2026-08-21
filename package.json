@@ -59,7 +59,6 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
-    "@squoosh/lib": "^0.5.3",
     "@tailwindcss/vite": "^4.1.3",
     "@types/node": "^20.10.0",
     "@types/react": "^19.2.10",
@@ -74,13 +73,14 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/generate-blog-pages.mjs && node scripts/generate-content-index.mjs",
+    "build": "vite build && node scripts/generate-blog-pages.mjs && node scripts/generate-content-index.mjs && node scripts/precompress-assets.mjs",
     "preview": "vite preview",
-    "build:static": "vite build --mode production",
+    "build:static": "vite build --mode production && node scripts/precompress-assets.mjs",
     "serve": "vite preview --port 4173",
-    "build:blog": "vite build && node scripts/generate-blog-pages.mjs",
+    "build:blog": "vite build && node scripts/generate-blog-pages.mjs && node scripts/precompress-assets.mjs",
     "generate:blog": "node scripts/generate-blog-pages.mjs",
-    "generate:content-index": "node scripts/generate-content-index.mjs"
+    "generate:content-index": "node scripts/generate-content-index.mjs",
+    "test:server": "node --test server/utils/*.test.js"
   },
   "packageManager": "yarn@3.8.7"
 }
