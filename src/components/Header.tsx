@@ -15,10 +15,20 @@ export function Header() {
   const { t } = useTranslation();
 
   React.useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    let animationFrame = 0;
+    const update = () => {
+      setScrolled(window.scrollY > 24);
+      animationFrame = 0;
+    };
+    const onScroll = () => {
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(update);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
   }, []);
 
   const scrollToSection = (id: string) => {

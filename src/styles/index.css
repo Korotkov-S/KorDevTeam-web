@@ -1,7 +1,18 @@
 @import 'tailwindcss' source(none);
 @source '../App.tsx';
 @source '../main.tsx';
-@source '../components';
+@source '../components/*.tsx';
+@source '../components/figma/*.tsx';
+@source '../components/ui/badge.tsx';
+@source '../components/ui/button.tsx';
+@source '../components/ui/card.tsx';
+@source '../components/ui/carousel.tsx';
+@source '../components/ui/input.tsx';
+@source '../components/ui/pagination.tsx';
+@source '../components/ui/sonner.tsx';
+@source '../components/ui/tabs.tsx';
+@source '../components/ui/textarea.tsx';
+@source '../components/ui/tooltip.tsx';
 @source '../contexts';
 @source '../pages';
 

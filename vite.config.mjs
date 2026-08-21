@@ -12,7 +12,7 @@ export default defineConfig({
   // Базовый путь для деплоя (можно изменить в зависимости от хостинга)
   base: "/",
 
-  plugins: [react(), tailwindcss({ optimize: false })],
+  plugins: [react(), tailwindcss()],
 
   resolve: {
     extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
@@ -65,23 +65,20 @@ export default defineConfig({
     outDir: "dist",
 
     // Целевая платформа для сборки
-    target: "es2015",
+    target: "es2020",
 
     // Минификация
-    minify: "terser",
+    minify: "esbuild",
 
     // Настройки для статичного сайта
     rollupOptions: {
+      // Keep builds stable on environments with a 1024 file-descriptor limit.
+      maxParallelFileOps: 512,
       output: {
         // Разделение кода на чанки для лучшего кэширования
         manualChunks: {
           vendor: ["react", "react-dom"],
           router: ["react-router-dom"],
-          ui: [
-            "@radix-ui/react-accordion",
-            "@radix-ui/react-alert-dialog",
-            "@radix-ui/react-aspect-ratio",
-          ],
         },
         // Настройка имен файлов для лучшего кэширования
         chunkFileNames: "assets/js/[name]-[hash].js",

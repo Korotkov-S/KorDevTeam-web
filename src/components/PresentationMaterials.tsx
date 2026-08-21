@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "motion/react";
 import {
   ArrowDownToLine,
@@ -16,6 +16,7 @@ const AGENCY_PDF_URL = "/presentations/kordev-team-agency-presentation.pdf";
 
 export function PresentationMaterials() {
   const { t } = useTranslation();
+  const [videoRequested, setVideoRequested] = useState(false);
 
   const scrollToContact = () => {
     document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
@@ -49,15 +50,41 @@ export function PresentationMaterials() {
           >
             <div className="relative overflow-hidden rounded-3xl border border-border bg-card/60 dark:bg-white/5 p-3 shadow-2xl shadow-cyan-500/10">
               <div className="relative aspect-video overflow-hidden rounded-2xl bg-muted">
-                <video
-                  className="h-full w-full object-cover"
-                  controls
-                  preload="metadata"
-                  playsInline
-                  aria-label={t("presentationMaterials.videoLabel")}
-                >
-                  <source src={VIDEO_URL} type="video/mp4" />
-                </video>
+                {videoRequested ? (
+                  <video
+                    className="h-full w-full object-cover"
+                    controls
+                    autoPlay
+                    preload="metadata"
+                    playsInline
+                    aria-label={t("presentationMaterials.videoLabel")}
+                  >
+                    <source src={VIDEO_URL} type="video/mp4" />
+                  </video>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setVideoRequested(true)}
+                    className="group relative h-full w-full overflow-hidden"
+                    aria-label={t("presentationMaterials.videoLabel")}
+                  >
+                    <img
+                      src="/opengraphlogo.jpeg"
+                      alt=""
+                      width="1200"
+                      height="630"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <span className="absolute inset-0 bg-black/35" />
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/30 bg-black/45 text-white backdrop-blur-sm transition-transform group-hover:scale-110">
+                        <PlayCircle className="h-8 w-8" />
+                      </span>
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
 

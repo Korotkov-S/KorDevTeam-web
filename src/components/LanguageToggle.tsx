@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
+import { changeAppLanguage } from '../i18n';
 
 export function LanguageToggle() {
   const { i18n } = useTranslation();
@@ -9,7 +10,7 @@ export function LanguageToggle() {
     const current = (i18n.resolvedLanguage || i18n.language || "en").toLowerCase();
     const isRu = current === "ru" || current.startsWith("ru-");
     const newLang = isRu ? "en" : "ru";
-    i18n.changeLanguage(newLang);
+    void changeAppLanguage(newLang);
   };
 
   return (

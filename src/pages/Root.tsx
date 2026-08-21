@@ -1,9 +1,13 @@
 import { Outlet, ScrollRestoration, useLocation } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
+import { lazy, Suspense } from "react";
 import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
-import { Toaster } from "../components/ui/sonner";
 import { FloatingButtons } from "../components/FloatingButtons";
+
+const Toaster = lazy(() =>
+  import("../components/ui/sonner").then((module) => ({ default: module.Toaster })),
+);
 
 export function Root() {
   const { pathname } = useLocation();
@@ -30,7 +34,11 @@ export function Root() {
           </main>
           {!isAdmin && <Footer />}
           {!isAdmin && <FloatingButtons />}
-          <Toaster />
+          {isAdmin ? (
+            <Suspense fallback={null}>
+              <Toaster />
+            </Suspense>
+          ) : null}
           <ScrollRestoration />
         </div>
       </div>

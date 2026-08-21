@@ -4,7 +4,6 @@ import {
 } from "react-router-dom";
 import React, { Suspense, lazy } from "react";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import "./i18n";
 
 const Root = lazy(() => import("./pages/Root").then((m) => ({ default: m.Root })));
 const HomePage = lazy(() => import("./pages/HomePage").then((m) => ({ default: m.HomePage })));

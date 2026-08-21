@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring } from "motion/react";
+import { motion, useInView, useMotionValue, useSpring } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -16,9 +16,10 @@ import { useTranslation } from "react-i18next";
 
 export function Hero() {
   const { t } = useTranslation();
-  const containerRef = useRef();
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLElement | null>(null);
   const [reduceEffects, setReduceEffects] = useState(false);
+  const isHeroInView = useInView(containerRef, { amount: 0.05 });
+  const effectsEnabled = !reduceEffects && isHeroInView;
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -61,16 +62,23 @@ export function Hero() {
   }, []);
 
   useEffect(() => {
-    if (reduceEffects) return;
+    if (!effectsEnabled) return;
+    let animationFrame = 0;
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-      mouseX.set(e.clientX);
-      mouseY.set(e.clientY);
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(() => {
+        mouseX.set((e.clientX - window.innerWidth / 2) * 0.02);
+        mouseY.set((e.clientY - window.innerHeight / 2) * 0.02);
+        animationFrame = 0;
+      });
     };
 
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY, reduceEffects]);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, [effectsEnabled, mouseX, mouseY]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -112,7 +120,7 @@ export function Hero() {
       className="relative min-h-screen flex items-center justify-center pt-32 pb-20 px-4 sm:px-6 overflow-hidden"
     >
       {/* Background effects: disable heavy animation on mobile / reduced motion */}
-      {reduceEffects ? (
+      {!effectsEnabled ? (
         <>
           <div
             className="absolute inset-0 opacity-10"
@@ -199,11 +207,11 @@ export function Hero() {
         </>
       )}
 
-      {!reduceEffects && (
+      {effectsEnabled && (
       <>
       {/* Floating particles with glow */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(30)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-blue-400 rounded-full"
@@ -324,7 +332,7 @@ export function Hero() {
           transition={{ duration: 4, delay: 0.5, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        {[...Array(6)].map((_, i) => (
+        {[...Array(2)].map((_, i) => (
           <motion.path
             key={i}
             d={`M ${i % 2 === 0 ? 0 : "100%"} ${20 + i * 15}% Q 50% ${
@@ -443,7 +451,7 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 1.1 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <MagneticButton mousePosition={mousePosition}>
+            <MagneticButton>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -470,7 +478,7 @@ export function Hero() {
               </motion.button>
             </MagneticButton>
 
-            <MagneticButton mousePosition={mousePosition}>
+            <MagneticButton>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -675,37 +683,11 @@ function AnimatedTitle({ a, b, c }: { a: string; b: string; c: string }) {
   );
 }
 
-function MagneticButton(props: any) {
-  const { children, mousePosition } = props || {};
-  const ref = useRef();
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const el = (ref as any).current;
-    if (!el) return;
-
-    const rect = el.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const distanceX = (mousePosition?.x ?? 0) - centerX;
-    const distanceY = (mousePosition?.y ?? 0) - centerY;
-    const distance = Math.sqrt(distanceX ** 2 + distanceY ** 2);
-
-    if (distance < 120) {
-      setOffset({
-        x: distanceX * 0.25,
-        y: distanceY * 0.25,
-      });
-    } else {
-      setOffset({ x: 0, y: 0 });
-    }
-  }, [mousePosition]);
-
+function MagneticButton({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      ref={ref}
-      animate={{ x: offset.x, y: offset.y }}
-      transition={{ type: "spring", stiffness: 150, damping: 15 }}
+      whileHover={{ y: -2 }}
+      transition={{ type: "spring", stiffness: 220, damping: 20 }}
     >
       {children}
     </motion.div>
@@ -716,10 +698,11 @@ function CountUpNumber({ value, delay }: { value: number; delay: number }) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
     const timeout = setTimeout(() => {
       let current = 0;
       const increment = value / 50;
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         current += increment;
         if (current >= value) {
           setCount(value);
@@ -728,10 +711,12 @@ function CountUpNumber({ value, delay }: { value: number; delay: number }) {
           setCount(Math.floor(current));
         }
       }, 30);
-      return () => clearInterval(interval);
     }, delay * 1000);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, [value, delay]);
 
   return (

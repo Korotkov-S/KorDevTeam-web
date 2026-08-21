@@ -83,10 +83,15 @@ export function ProductSpotlight() {
             <div className="relative overflow-hidden rounded-3xl border border-border bg-card/60 dark:bg-white/5 p-3 shadow-2xl shadow-blue-500/10">
               <div className="aspect-[10/7] overflow-hidden rounded-2xl bg-muted">
                 <ImageWithFallback
-                  src="/products/krasotulya-crm-capabilities-hero.png"
+                  src="/products/krasotulya-crm-capabilities-hero.webp"
                   alt={t("productSpotlight.imageAlt")}
                   className="h-full w-full object-cover"
-                  loading="eager"
+                  width="1600"
+                  height="1120"
+                  srcSet="/products/krasotulya-crm-capabilities-hero-640.webp 640w, /products/krasotulya-crm-capabilities-hero-960.webp 960w, /products/krasotulya-crm-capabilities-hero.webp 1600w"
+                  sizes="(min-width: 1024px) 45vw, 100vw"
+                  loading="lazy"
+                  fetchPriority="low"
                 />
               </div>
             </div>

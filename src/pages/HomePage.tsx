@@ -2,9 +2,10 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Hero } from "../components/Hero";
 import { SEO } from "../components/SEO";
 import { ProductSpotlight } from "../components/ProductSpotlight";
-import { PresentationMaterials } from "../components/PresentationMaterials";
-import { Contact } from "../components/Contact";
 
+const PresentationMaterials = lazy(() =>
+  import("../components/PresentationMaterials").then((m) => ({ default: m.PresentationMaterials })),
+);
 const Services = lazy(() => import("../components/Services").then((m) => ({ default: m.Services })));
 const Technologies = lazy(() =>
   import("../components/Technologies").then((m) => ({ default: m.Technologies })),
@@ -14,14 +15,17 @@ const Blog = lazy(() => import("../components/Blog").then((m) => ({ default: m.B
 const UnderMetup = lazy(() =>
   import("../components/UnderMetup").then((m) => ({ default: m.UnderMetup })),
 );
+const Contact = lazy(() => import("../components/Contact").then((m) => ({ default: m.Contact })));
 
 function DeferredSection({
   id,
   children,
-  rootMargin = "900px",
+  estimatedHeight,
+  rootMargin = "500px",
 }: {
   id: string;
   children: React.ReactNode;
+  estimatedHeight: number;
   rootMargin?: string;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -46,11 +50,18 @@ function DeferredSection({
   }, [rootMargin, show]);
 
   return (
-    <>
-      {/* Якорь всегда в DOM, чтобы меню/скролл работали даже до загрузки секции */}
-      <div id={id} ref={ref} />
+    <div
+      id={id}
+      ref={ref}
+      aria-busy={!show}
+      style={{
+        minHeight: `${estimatedHeight}px`,
+        contentVisibility: "auto",
+        containIntrinsicSize: `auto ${estimatedHeight}px`,
+      }}
+    >
       {show ? children : null}
-    </>
+    </div>
   );
 }
 
@@ -66,33 +77,41 @@ export function HomePage() {
       />
       <Hero />
       <ProductSpotlight />
-      <PresentationMaterials />
-      <DeferredSection id="services">
+      <DeferredSection id="presentation" estimatedHeight={720} rootMargin="350px">
+        <Suspense fallback={null}>
+          <PresentationMaterials />
+        </Suspense>
+      </DeferredSection>
+      <DeferredSection id="services" estimatedHeight={760}>
         <Suspense fallback={null}>
           <Services withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="technologies">
+      <DeferredSection id="technologies" estimatedHeight={680}>
         <Suspense fallback={null}>
           <Technologies withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="projects" rootMargin="2400px">
+      <DeferredSection id="projects" estimatedHeight={980}>
         <Suspense fallback={null}>
           <Projects withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="blog" rootMargin="2200px">
+      <DeferredSection id="blog" estimatedHeight={980}>
         <Suspense fallback={null}>
           <Blog withId={false} />
         </Suspense>
       </DeferredSection>
-      <DeferredSection id="under-metup">
+      <DeferredSection id="under-metup" estimatedHeight={860}>
         <Suspense fallback={null}>
           <UnderMetup withId={false} />
         </Suspense>
       </DeferredSection>
-      <Contact />
+      <DeferredSection id="contact" estimatedHeight={680}>
+        <Suspense fallback={null}>
+          <Contact withId={false} />
+        </Suspense>
+      </DeferredSection>
     </>
   );
 }
