@@ -170,7 +170,7 @@ export function JournalIssuePage() {
                   src={`${issue.pdfUrl}#view=FitH&toolbar=1`}
                   title={t("journal.viewerTitle")}
                   loading="lazy"
-                  className="h-[72vh] min-h-[560px] w-full rounded-2xl bg-white"
+                  className="h-[85dvh] min-h-[680px] w-full rounded-2xl bg-white md:h-[calc(100dvh-6rem)] md:min-h-[900px]"
                 />
               </div>
             ) : (
