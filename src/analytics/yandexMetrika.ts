@@ -1,5 +1,13 @@
 const COUNTER_ID = 105288175;
 
+export type YandexGoalName =
+  | "journal_issue_open"
+  | "journal_read_start"
+  | "journal_download"
+  | "journal_contact";
+
+export type YandexGoalParams = Record<string, string | number | boolean>;
+
 type YandexMetrika = ((...args: unknown[]) => void) & {
   a?: unknown[][];
   l?: number;
@@ -55,4 +63,13 @@ export function scheduleYandexMetrika() {
 
   if (document.readyState === "complete") schedule();
   else window.addEventListener("load", schedule, { once: true });
+}
+
+export function trackYandexGoal(goal: YandexGoalName, params?: YandexGoalParams) {
+  if (typeof window === "undefined" || window.location.hostname !== "kordev.team") return;
+
+  // Create the queue immediately so a goal is not lost if the deferred tag has
+  // not loaded yet. The script itself remains async and does not block the page.
+  loadYandexMetrika();
+  window.ym?.(COUNTER_ID, "reachGoal", goal, params);
 }

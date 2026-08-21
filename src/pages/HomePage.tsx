@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Hero } from "../components/Hero";
 import { SEO } from "../components/SEO";
 import { ProductSpotlight } from "../components/ProductSpotlight";
+import { JournalPromo } from "../components/JournalPromo";
 
 const PresentationMaterials = lazy(() =>
   import("../components/PresentationMaterials").then((m) => ({ default: m.PresentationMaterials })),
@@ -103,6 +104,7 @@ export function HomePage() {
       />
       <Hero />
       <ProductSpotlight />
+      <JournalPromo />
       <DeferredSection id="presentation" estimatedHeight={720} rootMargin="350px">
         <Suspense fallback={null}>
           <PresentationMaterials />

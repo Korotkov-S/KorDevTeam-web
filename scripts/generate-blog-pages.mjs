@@ -17,6 +17,18 @@ const SITE_URL = (process.env.SITE_URL || "https://kordev.team").replace(
   "",
 );
 const SITE_NAME = "KorDevTeam";
+const JOURNAL_ISSUE = {
+  issue: "0",
+  slug: "issue-0",
+  title: "Разработка стала доступнее",
+  subtitle: "Что ИИ дал малому бизнесу?",
+  description:
+    "Первый выпуск журнала KorDevTeam о том, где ИИ уже экономит время и приносит малому бизнесу реальные деньги — без магии, хайпа и абстрактных обещаний.",
+  publishedAt: "2026-08-01",
+  pages: 39,
+  coverUrl: "/journal/issue-0-cover.webp",
+  pdfUrl: "/journal/kordevteam-issue-0-ai-small-business.pdf",
+};
 
 const PROJECT_ALIASES = new Map([["Media & Entertainment", "media-entertainment"]]);
 
@@ -463,6 +475,9 @@ function injectSeoAndBody({
   description,
   canonicalUrl,
   ogImage,
+  ogImageType,
+  ogImageWidth,
+  ogImageHeight,
   ogType = "website",
   jsonLd = [],
   bodyHtml,
@@ -521,7 +536,12 @@ function injectSeoAndBody({
   replaceOrAddMeta("og:title", title);
   replaceOrAddMeta("og:description", safeDescription);
   replaceOrAddMeta("og:url", canonicalUrl);
-  if (ogImage) replaceOrAddMeta("og:image", ogImage);
+  if (ogImage) {
+    replaceOrAddMeta("og:image", ogImage);
+    if (ogImageType) replaceOrAddMeta("og:image:type", ogImageType);
+    if (ogImageWidth) replaceOrAddMeta("og:image:width", ogImageWidth);
+    if (ogImageHeight) replaceOrAddMeta("og:image:height", ogImageHeight);
+  }
 
   // Twitter tags (nice-to-have)
   const replaceOrAddTwitter = (name, content) => {
@@ -646,6 +666,7 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
     `      <a href="/#services">Услуги</a>`,
     `      <a href="/#projects">Проекты</a>`,
     `      <a href="/blog">Блог</a>`,
+    `      <a href="/journal">Журнал</a>`,
     `      <a href="/video">Видео</a>`,
     `      <a href="/#contact">Контакты</a>`,
     `    </nav>`,
@@ -677,6 +698,10 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
     `    </ul>`,
     `  </section>`,
     `  <section class="container mx-auto px-4 py-8">`,
+    `    <h2>Журнал KorDevTeam</h2>`,
+    `    <p><a href="/journal/${JOURNAL_ISSUE.slug}">Выпуск №${JOURNAL_ISSUE.issue}: ${escapeHtml(JOURNAL_ISSUE.title)}</a> — ${escapeHtml(JOURNAL_ISSUE.subtitle)}</p>`,
+    `  </section>`,
+    `  <section class="container mx-auto px-4 py-8">`,
     `    <h2>Видео</h2>`,
     `    <p><a href="/video">Посмотреть видео-презентацию KorDevTeam</a> и записи Under Metup.</p>`,
     `  </section>`,
@@ -694,6 +719,115 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
     bodyHtml,
   });
   writeRouteHtml("/", html);
+}
+
+function generateJournalPages({ indexHtml }) {
+  const archiveUrl = `${SITE_URL}/journal`;
+  const issueUrl = `${archiveUrl}/${JOURNAL_ISSUE.slug}`;
+  const absoluteCover = `${SITE_URL}${JOURNAL_ISSUE.coverUrl}`;
+  const absolutePdf = `${SITE_URL}${JOURNAL_ISSUE.pdfUrl}`;
+
+  const archiveBody = [
+    `<main class="min-h-screen pt-20">`,
+    `  <section class="container mx-auto px-4 py-12">`,
+    `    <h1>Журнал KorDevTeam</h1>`,
+    `    <p>Разбираем технологии без шума: показываем, где они уже приносят бизнесу результат, и говорим с теми, кто внедряет их на практике.</p>`,
+    `    <article>`,
+    `      <a href="/journal/${JOURNAL_ISSUE.slug}"><img src="${JOURNAL_ISSUE.coverUrl}" alt="Обложка журнала KorDevTeam, выпуск №${JOURNAL_ISSUE.issue}"></a>`,
+    `      <h2><a href="/journal/${JOURNAL_ISSUE.slug}">Выпуск №${JOURNAL_ISSUE.issue}: ${escapeHtml(JOURNAL_ISSUE.title)}</a></h2>`,
+    `      <p>${escapeHtml(JOURNAL_ISSUE.subtitle)}</p>`,
+    `      <p><a href="${JOURNAL_ISSUE.pdfUrl}" download>Скачать PDF</a></p>`,
+    `    </article>`,
+    `  </section>`,
+    `</main>`,
+  ].join("\n");
+
+  writeRouteHtml(
+    "/journal",
+    injectSeoAndBody({
+      indexHtml,
+      title: `Журнал KorDevTeam | ${SITE_NAME}`,
+      description:
+        "Журнал KorDevTeam о бизнесе, технологиях, автоматизации и практическом применении искусственного интеллекта.",
+      canonicalUrl: archiveUrl,
+      ogImage: absoluteCover,
+      ogImageType: "image/webp",
+      ogImageWidth: "960",
+      ogImageHeight: "1358",
+      ogType: "website",
+      jsonLd: [
+        breadcrumbJsonLd([
+          { name: "Главная", url: `${SITE_URL}/` },
+          { name: "Журнал", url: archiveUrl },
+        ]),
+        {
+          "@context": "https://schema.org",
+          "@type": "Periodical",
+          name: "Журнал KorDevTeam",
+          url: archiveUrl,
+          publisher: { "@id": `${SITE_URL}/#organization` },
+          inLanguage: "ru-RU",
+        },
+      ],
+      bodyHtml: archiveBody,
+    }),
+  );
+
+  const issueBody = [
+    `<main class="min-h-screen pt-20">`,
+    `  <article class="container mx-auto px-4 py-12">`,
+    `    <p><a href="/journal">Все выпуски</a></p>`,
+    `    <p><img src="${JOURNAL_ISSUE.coverUrl}" alt="Обложка журнала KorDevTeam, выпуск №${JOURNAL_ISSUE.issue}"></p>`,
+    `    <p>Выпуск №${JOURNAL_ISSUE.issue} · август 2026 · ${JOURNAL_ISSUE.pages} страниц</p>`,
+    `    <h1>${escapeHtml(JOURNAL_ISSUE.title)}</h1>`,
+    `    <h2>${escapeHtml(JOURNAL_ISSUE.subtitle)}</h2>`,
+    `    <p>${escapeHtml(JOURNAL_ISSUE.description)}</p>`,
+    `    <ul>`,
+    `      <li>Где ИИ даёт прирост производительности</li>`,
+    `      <li>Почему клиенты не возвращаются</li>`,
+    `      <li>Когда бизнесу нужна автоматизация</li>`,
+    `      <li>Семь честных монологов о бизнесе</li>`,
+    `    </ul>`,
+    `    <p><a href="${JOURNAL_ISSUE.pdfUrl}" download>Скачать журнал в PDF</a></p>`,
+    `  </article>`,
+    `</main>`,
+  ].join("\n");
+
+  writeRouteHtml(
+    `/journal/${JOURNAL_ISSUE.slug}`,
+    injectSeoAndBody({
+      indexHtml,
+      title: `Журнал №${JOURNAL_ISSUE.issue}: ИИ для малого бизнеса | ${SITE_NAME}`,
+      description: JOURNAL_ISSUE.description,
+      canonicalUrl: issueUrl,
+      ogImage: absoluteCover,
+      ogImageType: "image/webp",
+      ogImageWidth: "960",
+      ogImageHeight: "1358",
+      ogType: "article",
+      jsonLd: [
+        breadcrumbJsonLd([
+          { name: "Главная", url: `${SITE_URL}/` },
+          { name: "Журнал", url: archiveUrl },
+          { name: `Выпуск №${JOURNAL_ISSUE.issue}`, url: issueUrl },
+        ]),
+        {
+          "@context": "https://schema.org",
+          "@type": "DigitalDocument",
+          name: `${JOURNAL_ISSUE.title}. ${JOURNAL_ISSUE.subtitle}`,
+          description: JOURNAL_ISSUE.description,
+          url: issueUrl,
+          contentUrl: absolutePdf,
+          image: absoluteCover,
+          datePublished: JOURNAL_ISSUE.publishedAt,
+          numberOfPages: JOURNAL_ISSUE.pages,
+          inLanguage: "ru-RU",
+          publisher: { "@id": `${SITE_URL}/#organization` },
+        },
+      ],
+      bodyHtml: issueBody,
+    }),
+  );
 }
 
 function generateVideoPage({ indexHtml }) {
@@ -895,6 +1029,8 @@ function buildRedirects(slugs, projects) {
   lines.push("# Canonical URL redirects");
   lines.push("/blog/    /blog    301!");
   lines.push("/video/    /video    301!");
+  lines.push("/journal/    /journal    301!");
+  lines.push(`/journal/${JOURNAL_ISSUE.slug}/    /journal/${JOURNAL_ISSUE.slug}    301!`);
   lines.push("/project/Media%20%26%20Entertainment    /project/media-entertainment    301!");
   lines.push("/project/Media%20&%20Entertainment    /project/media-entertainment    301!");
   lines.push("");
@@ -909,6 +1045,8 @@ function buildRedirects(slugs, projects) {
   lines.push("");
   lines.push("# Static app pages (preferred for SEO)");
   lines.push("/video    /video.html    200");
+  lines.push("/journal    /journal.html    200");
+  lines.push(`/journal/${JOURNAL_ISSUE.slug}    /journal/${JOURNAL_ISSUE.slug}.html    200`);
   lines.push("/admin    /index.html    200");
   for (const video of underMetupVideos) {
     lines.push(`/under-metup/${video}    /under-metup/${video}.html    200`);
@@ -955,6 +1093,8 @@ function buildFullSitemapXml(blogSlugs, projects) {
   const staticPages = [
     { loc: "/", priority: "1.0", changefreq: "weekly" },
     { loc: "/blog", priority: "0.9", changefreq: "weekly" },
+    { loc: "/journal", priority: "0.9", changefreq: "monthly" },
+    { loc: `/journal/${JOURNAL_ISSUE.slug}`, priority: "0.9", changefreq: "monthly" },
     { loc: "/video", priority: "0.8", changefreq: "monthly" },
   ];
 
@@ -1066,6 +1206,7 @@ function main() {
   }
 
   generateHomePage({ indexHtml, blogItems, projects });
+  generateJournalPages({ indexHtml });
   generateVideoPage({ indexHtml });
   generateUnderMetupPages({ indexHtml });
   generateProjectPages({ indexHtml, projects });

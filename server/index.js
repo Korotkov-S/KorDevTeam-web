@@ -44,7 +44,14 @@ const STATIC_PROJECT_IDS = new Set([
   "notion-analog",
 ]);
 const UNDER_METUP_SLUGS = new Set(["video-1", "video-2", "video-3"]);
-const STATIC_APP_PATHS = new Set(["/", "/blog", "/video", "/admin"]);
+const STATIC_APP_PATHS = new Set([
+  "/",
+  "/blog",
+  "/video",
+  "/journal",
+  "/journal/issue-0",
+  "/admin",
+]);
 
 function toProjectSlug(id) {
   if (id === "Media & Entertainment") return "media-entertainment";

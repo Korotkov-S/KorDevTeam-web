@@ -68,7 +68,7 @@ export function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden xl:flex items-center gap-6">
             <button
               onClick={() => scrollToSection("services")}
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -101,6 +101,12 @@ export function Header() {
             >
               {t("header.blog")}
             </Link>
+            <Link
+              to="/journal"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {t("header.journal")}
+            </Link>
             <button
               onClick={() => scrollToSection("under-metup")}
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -115,7 +121,7 @@ export function Header() {
             </button>
           </nav>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden xl:flex items-center gap-4">
             <LanguageToggle />
             <ThemeToggle />
             <Button
@@ -127,7 +133,7 @@ export function Header() {
           </div>
 
           {/* Mobile: VideoStory и кнопка меню */}
-          <div className="md:hidden flex items-center" style={{ gap: '10px' }}>
+          <div className="xl:hidden flex items-center" style={{ gap: '10px' }}>
             <button
               className="text-foreground"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -139,7 +145,7 @@ export function Header() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="md:hidden mt-4 flex flex-col gap-4 pb-4 rounded-xl border border-border bg-background/70 backdrop-blur-xl p-4">
+          <nav className="xl:hidden mt-4 flex flex-col gap-4 pb-4 rounded-xl border border-border bg-background/70 backdrop-blur-xl p-4">
             <button
               onClick={() => scrollToSection("services")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
@@ -173,6 +179,13 @@ export function Header() {
               onClick={() => setIsMenuOpen(false)}
             >
               {t("header.blog")}
+            </Link>
+            <Link
+              to="/journal"
+              className="text-muted-foreground hover:text-foreground transition-colors text-left"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              {t("header.journal")}
             </Link>
             <button
               onClick={() => scrollToSection("under-metup")}

@@ -12,6 +12,12 @@ const BlogPostPage = lazy(() => import("./pages/BlogPostPage").then((m) => ({ de
 const ProjectPage = lazy(() => import("./pages/ProjectPage").then((m) => ({ default: m.ProjectPage })));
 const VideoPage = lazy(() => import("./pages/VideoPage").then((m) => ({ default: m.VideoPage })));
 const UnderMetupPage = lazy(() => import("./pages/UnderMetupPage").then((m) => ({ default: m.UnderMetupPage })));
+const JournalIndexPage = lazy(() =>
+  import("./pages/JournalIndexPage").then((m) => ({ default: m.JournalIndexPage })),
+);
+const JournalIssuePage = lazy(() =>
+  import("./pages/JournalIssuePage").then((m) => ({ default: m.JournalIssuePage })),
+);
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 
 function PageLoader() {
@@ -48,6 +54,14 @@ const router = createBrowserRouter([
       {
         path: "/video",
         element: <VideoPage />,
+      },
+      {
+        path: "/journal",
+        element: <JournalIndexPage />,
+      },
+      {
+        path: "/journal/issue-0",
+        element: <JournalIssuePage />,
       },
       {
         path: "/under-metup/:slug",

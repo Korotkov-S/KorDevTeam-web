@@ -5,6 +5,9 @@ interface SEOProps {
   description: string;
   canonical?: string;
   ogImage?: string;
+  ogImageType?: string;
+  ogImageWidth?: string;
+  ogImageHeight?: string;
   ogType?: string;
   article?: {
     publishedTime?: string;
@@ -19,6 +22,9 @@ export function SEO({
   description,
   canonical,
   ogImage = "https://kordev.team/opengraphlogo.jpeg",
+  ogImageType = "image/jpeg",
+  ogImageWidth = "1200",
+  ogImageHeight = "630",
   ogType = "article",
   article,
 }: SEOProps) {
@@ -96,9 +102,9 @@ export function SEO({
       <meta property="og:description" content={description} />
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:image" content={ogImage} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
-      <meta property="og:image:type" content="image/jpeg" />
+      <meta property="og:image:width" content={ogImageWidth} />
+      <meta property="og:image:height" content={ogImageHeight} />
+      <meta property="og:image:type" content={ogImageType} />
       <meta property="og:site_name" content="KorDevTeam" />
       {article?.publishedTime && (
         <meta property="article:published_time" content={article.publishedTime} />

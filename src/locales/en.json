@@ -5,12 +5,45 @@
     "projects": "Projects",
     "krasotulyaCrm": "Krasotulya-CRM",
     "blog": "Blog",
+    "journal": "Magazine",
     "underMetup": "Under Metup",
     "contact": "Contact",
     "getInTouch": "Free consultation"
   },
   "common": {
     "freeConsultation": "Free consultation"
+  },
+  "journal": {
+    "promoBadge": "A new KorDevTeam format",
+    "archiveBadge": "Practice, people and technology",
+    "archiveTitle": "KorDevTeam Magazine",
+    "archiveDescription": "We discuss technology without the noise: where it already delivers business results and what practitioners learn while implementing it.",
+    "issueLabel": "Issue No. {{issue}} · August 2026",
+    "issueTitle": "Development became more accessible",
+    "issueSubtitle": "What has AI brought to small business?",
+    "seoIssueTitle": "Magazine No. 0: AI for small business",
+    "issueDescription": "The first KorDevTeam magazine issue explores where AI already saves time and generates real value for small businesses — without magic, hype or vague promises. The magazine is in Russian.",
+    "readIssue": "Open issue",
+    "readOnline": "Read online",
+    "goToViewer": "Go to magazine",
+    "downloadPdf": "Download PDF",
+    "allIssues": "All issues",
+    "formatMeta": "PDF · {{pages}} pages · 2.9 MB · in Russian",
+    "coverAlt": "Cover of KorDevTeam Magazine issue No. 0 about AI for small business",
+    "viewerTitle": "KorDevTeam Magazine No. 0",
+    "viewerHint": "If the embedded viewer is unavailable, open the PDF in a new tab.",
+    "openNewTab": "Open in a new tab",
+    "viewerPromptTitle": "Open the magazine in your browser",
+    "viewerPromptText": "The PDF loads only after you click, keeping the page fast and avoiding unnecessary traffic.",
+    "contactTitle": "Want to apply AI in your business?",
+    "contactText": "Tell us about a process that takes too much time. We will see whether it can be automated without unnecessary complexity.",
+    "contactButton": "Discuss it on Telegram",
+    "topics": [
+      "Where AI improves productivity",
+      "Why customers do not come back",
+      "When a business needs automation",
+      "Seven candid business monologues"
+    ]
   },
   "krasotulyaCrm": {
     "title": "Krasotulya-CRM",
