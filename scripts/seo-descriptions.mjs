@@ -115,10 +115,17 @@ export const SEO_DESCRIPTION_OVERRIDES_EN = {
 };
 
 export const SEO_TITLE_OVERRIDES = {
+  "ai-ops-business-automation-audit":
+    "AI-автоматизация: аудит и AI-ops без хаоса",
   "business-automation": "Автоматизация бизнес-процессов для малого бизнеса",
   "crm-implementation": "Внедрение CRM для малого бизнеса",
-  "telegram-broadcast-automation": "Автоматизация рассылок в Telegram",
+  "long-b2b-sales-cycle-crm": "CRM для длинного цикла B2B-продаж",
+  "software-development-to-it-consulting":
+    "Заказная разработка как IT-консалтинг",
   "stone-calculator-automation": "Калькулятор стоимости на сайте",
+  "technical-support-debt-time-tracking":
+    "Дебиторка на техподдержке: акты и учет часов",
+  "telegram-broadcast-automation": "Автоматизация рассылок в Telegram",
   "wordpress-optimization": "Оптимизация WordPress-сайта",
 };
 

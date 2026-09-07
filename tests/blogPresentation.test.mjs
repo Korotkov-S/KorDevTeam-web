@@ -9,6 +9,7 @@ import {
   resolvePrerenderMeta,
   sortBlogPostsByDate,
 } from "../src/lib/blogPresentation.mjs";
+import { getSeoTitle } from "../scripts/seo-descriptions.mjs";
 
 test("sortBlogPostsByDate shows the newest localized publication first", () => {
   const posts = [
@@ -102,4 +103,15 @@ test("resolvePrerenderMeta never replaces a known article title with Blog", () =
     ).title,
     "Корректный заголовок",
   );
+});
+
+test("new Telegram articles use compact SEO titles", () => {
+  const titles = [
+    ["ai-ops-business-automation-audit", "AI automation article"],
+    ["long-b2b-sales-cycle-crm", "Long B2B sales article"],
+    ["software-development-to-it-consulting", "IT consulting article"],
+    ["technical-support-debt-time-tracking", "Support debt article"],
+  ].map(([slug, fallback]) => getSeoTitle(slug, fallback));
+
+  assert.ok(titles.every((title) => title.length + " | KorDevTeam".length <= 60));
 });

@@ -3,6 +3,7 @@
 # Canonical URL redirects
 /blog    /blog/    301!
 /blog/ai-business-strategy-without-hype    /blog/ai-business-strategy-without-hype/    301!
+/blog/ai-ops-business-automation-audit    /blog/ai-ops-business-automation-audit/    301!
 /blog/argumentation-guide    /blog/argumentation-guide/    301!
 /blog/business-automation    /blog/business-automation/    301!
 /blog/business-automation-without-custom-development    /blog/business-automation-without-custom-development/    301!
@@ -36,12 +37,15 @@
 /blog/krasotulya-telegram-139    /blog/krasotulya-telegram-139/    301!
 /blog/krasotulya-telegram-140    /blog/krasotulya-telegram-140/    301!
 /blog/laravel-api-development    /blog/laravel-api-development/    301!
+/blog/long-b2b-sales-cycle-crm    /blog/long-b2b-sales-cycle-crm/    301!
 /blog/max-comments-business-process    /blog/max-comments-business-process/    301!
 /blog/nodejs-microservices    /blog/nodejs-microservices/    301!
 /blog/offline-packaging-for-it-studio    /blog/offline-packaging-for-it-studio/    301!
 /blog/react-native-best-practices    /blog/react-native-best-practices/    301!
 /blog/sims-dynasty-tree-platform    /blog/sims-dynasty-tree-platform/    301!
+/blog/software-development-to-it-consulting    /blog/software-development-to-it-consulting/    301!
 /blog/stone-calculator-automation    /blog/stone-calculator-automation/    301!
+/blog/technical-support-debt-time-tracking    /blog/technical-support-debt-time-tracking/    301!
 /blog/telegram-broadcast-automation    /blog/telegram-broadcast-automation/    301!
 /blog/wordpress-optimization    /blog/wordpress-optimization/    301!
 /video/    /video    301!
@@ -56,6 +60,7 @@
 # Static blog pages (preferred for SEO)
 /blog/    /blog/index.html    200
 /blog/ai-business-strategy-without-hype/    /blog/ai-business-strategy-without-hype/index.html    200
+/blog/ai-ops-business-automation-audit/    /blog/ai-ops-business-automation-audit/index.html    200
 /blog/argumentation-guide/    /blog/argumentation-guide/index.html    200
 /blog/business-automation/    /blog/business-automation/index.html    200
 /blog/business-automation-without-custom-development/    /blog/business-automation-without-custom-development/index.html    200
@@ -89,12 +94,15 @@
 /blog/krasotulya-telegram-139/    /blog/krasotulya-telegram-139/index.html    200
 /blog/krasotulya-telegram-140/    /blog/krasotulya-telegram-140/index.html    200
 /blog/laravel-api-development/    /blog/laravel-api-development/index.html    200
+/blog/long-b2b-sales-cycle-crm/    /blog/long-b2b-sales-cycle-crm/index.html    200
 /blog/max-comments-business-process/    /blog/max-comments-business-process/index.html    200
 /blog/nodejs-microservices/    /blog/nodejs-microservices/index.html    200
 /blog/offline-packaging-for-it-studio/    /blog/offline-packaging-for-it-studio/index.html    200
 /blog/react-native-best-practices/    /blog/react-native-best-practices/index.html    200
 /blog/sims-dynasty-tree-platform/    /blog/sims-dynasty-tree-platform/index.html    200
+/blog/software-development-to-it-consulting/    /blog/software-development-to-it-consulting/index.html    200
 /blog/stone-calculator-automation/    /blog/stone-calculator-automation/index.html    200
+/blog/technical-support-debt-time-tracking/    /blog/technical-support-debt-time-tracking/index.html    200
 /blog/telegram-broadcast-automation/    /blog/telegram-broadcast-automation/index.html    200
 /blog/wordpress-optimization/    /blog/wordpress-optimization/index.html    200
 
