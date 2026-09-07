@@ -6,6 +6,7 @@ import {
   normalizeWhitespace,
   trimDescription,
 } from "./seo-descriptions.mjs";
+import { sortBlogPostsByDate } from "../src/lib/blogPresentation.mjs";
 
 const ROOT = process.cwd();
 const PUBLIC_BLOG_DIR = path.join(ROOT, "public", "blog");
@@ -628,6 +629,43 @@ function getSlugsFromPublic() {
   return [...slugs].sort();
 }
 
+function getBlogItems(slugs) {
+  const indexedBySlug = new Map(
+    readJsonArray(path.join(ROOT, "public", "content", "blog.ru.json")).map(
+      (post) => [String(post?.slug || ""), post],
+    ),
+  );
+
+  const items = slugs.map((slug) => {
+    const indexed = indexedBySlug.get(slug) || {};
+
+    try {
+      const mdPath = path.join(PUBLIC_BLOG_DIR, `${slug}.md`);
+      const md = fs.readFileSync(mdPath, "utf-8");
+      const meta = extractTitleAndExcerpt(md);
+      const legacy = extractLegacyMeta(md);
+      const title = String(indexed.title || meta.title || slug);
+      const excerpt = String(indexed.excerpt || meta.excerpt || "");
+
+      return {
+        slug,
+        title,
+        excerpt: getSeoDescription(slug, excerpt),
+        date: String(indexed.date || legacy.date || ""),
+      };
+    } catch {
+      return {
+        slug,
+        title: String(indexed.title || slug),
+        excerpt: String(indexed.excerpt || ""),
+        date: String(indexed.date || ""),
+      };
+    }
+  });
+
+  return sortBlogPostsByDate(items);
+}
+
 function writeRouteHtml(routePath, html) {
   if (routePath === "/") {
     fs.writeFileSync(DIST_INDEX_HTML, html, "utf-8");
@@ -653,8 +691,8 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
   const projectLinks = projects.map((project) => {
     return `          <li><a href="/project/${escapeHtml(project.slug)}">${escapeHtml(project.title)}</a> — ${escapeHtml(project.description)}</li>`;
   });
-  const blogLinks = blogItems.slice(0, 10).map((post) => {
-    return `          <li><a href="/blog/${escapeHtml(post.slug)}">${escapeHtml(post.title)}</a> — ${escapeHtml(post.excerpt)}</li>`;
+  const blogLinks = blogItems.slice(0, 3).map((post) => {
+    return `          <li><a href="/blog/${escapeHtml(post.slug)}/">${escapeHtml(post.title)}</a> — ${escapeHtml(post.excerpt)}</li>`;
   });
 
   const bodyHtml = [
@@ -665,7 +703,7 @@ function generateHomePage({ indexHtml, blogItems, projects }) {
     `    <nav aria-label="Основные разделы">`,
     `      <a href="/#services">Услуги</a>`,
     `      <a href="/#projects">Проекты</a>`,
-    `      <a href="/blog">Блог</a>`,
+    `      <a href="/blog/">Блог</a>`,
     `      <a href="/journal/">Журнал</a>`,
     `      <a href="/video">Видео</a>`,
     `      <a href="/#contact">Контакты</a>`,
@@ -957,24 +995,14 @@ function generateProjectPages({ indexHtml, projects }) {
   }
 }
 
-function generateBlogIndexPage({ indexHtml, slugs }) {
+function generateBlogIndexPage({ indexHtml, blogItems }) {
   const title = "Блог KorDevTeam";
   const description =
     "Статьи KorDevTeam про разработку веб-сервисов, CRM, мобильных приложений, автоматизацию бизнеса, интеграции и кейсы команды.";
-  const canonicalUrl = `${SITE_URL}/blog`;
+  const canonicalUrl = `${SITE_URL}/blog/`;
   const ogImage = `${SITE_URL}/opengraphlogo.jpeg`;
 
-  const items = [];
-  for (const slug of slugs) {
-    try {
-      const mdPath = path.join(PUBLIC_BLOG_DIR, `${slug}.md`);
-      const md = fs.readFileSync(mdPath, "utf-8");
-      const meta = extractTitleAndExcerpt(md);
-      items.push({ slug, title: meta.title, excerpt: getSeoDescription(slug, meta.excerpt) });
-    } catch {
-      items.push({ slug, title: slug, excerpt: "" });
-    }
-  }
+  const items = blogItems.slice(0, 6);
 
   const bodyHtml = [
     `<div class="min-h-screen pt-20">`,
@@ -988,7 +1016,7 @@ function generateBlogIndexPage({ indexHtml, slugs }) {
     `        <ul>`,
     ...items.map((x) => {
       const suffix = x.excerpt ? ` — ${escapeHtml(x.excerpt)}` : "";
-      return `          <li><a href="/blog/${escapeHtml(x.slug)}">${escapeHtml(x.title)}</a>${suffix}</li>`;
+      return `          <li><a href="/blog/${escapeHtml(x.slug)}/">${escapeHtml(x.title)}</a>${suffix}</li>`;
     }),
     `        </ul>`,
     `      </div>`,
@@ -1013,7 +1041,7 @@ function generateBlogIndexPage({ indexHtml, slugs }) {
     bodyHtml,
   });
 
-  // /blog (folder-style)
+  // /blog/ (folder-style)
   ensureDir(DIST_BLOG_DIR);
   fs.writeFileSync(path.join(DIST_BLOG_DIR, "index.html"), pageHtml, "utf-8");
   // /blog.html (works with nginx try_files $uri.html)
@@ -1027,7 +1055,10 @@ function buildRedirects(slugs, projects) {
   lines.push("# Auto-generated. Do not edit by hand.");
   lines.push("");
   lines.push("# Canonical URL redirects");
-  lines.push("/blog/    /blog    301!");
+  lines.push("/blog    /blog/    301!");
+  for (const slug of slugs) {
+    lines.push(`/blog/${slug}    /blog/${slug}/    301!`);
+  }
   lines.push("/video/    /video    301!");
   lines.push("/journal    /journal/    301!");
   lines.push(`/journal/${JOURNAL_ISSUE.slug}    /journal/${JOURNAL_ISSUE.slug}/    301!`);
@@ -1038,9 +1069,9 @@ function buildRedirects(slugs, projects) {
   lines.push("/assets/*  Cache-Control: public, max-age=31536000, immutable");
   lines.push("");
   lines.push("# Static blog pages (preferred for SEO)");
-  lines.push(`/blog    /blog/index.html    200`);
+  lines.push(`/blog/    /blog/index.html    200`);
   for (const slug of slugs) {
-    lines.push(`/blog/${slug}    /blog/${slug}.html    200`);
+    lines.push(`/blog/${slug}/    /blog/${slug}/index.html    200`);
   }
   lines.push("");
   lines.push("# Static app pages (preferred for SEO)");
@@ -1065,7 +1096,7 @@ function buildSitemapBlogXml(slugs) {
   const today = new Date().toISOString().slice(0, 10);
   const urls = slugs
     .map((slug) => {
-      const loc = `${SITE_URL}/blog/${slug}`;
+      const loc = `${SITE_URL}/blog/${slug}/`;
       return [
         "  <url>",
         `    <loc>${escapeHtml(loc)}</loc>`,
@@ -1092,7 +1123,7 @@ function buildFullSitemapXml(blogSlugs, projects) {
   // Static pages
   const staticPages = [
     { loc: "/", priority: "1.0", changefreq: "weekly" },
-    { loc: "/blog", priority: "0.9", changefreq: "weekly" },
+    { loc: "/blog/", priority: "0.9", changefreq: "weekly" },
     { loc: "/journal/", priority: "0.9", changefreq: "monthly" },
     { loc: `/journal/${JOURNAL_ISSUE.slug}/`, priority: "0.9", changefreq: "monthly" },
     { loc: "/video", priority: "0.8", changefreq: "monthly" },
@@ -1122,7 +1153,7 @@ function buildFullSitemapXml(blogSlugs, projects) {
     urls.push(
       [
         "  <url>",
-        `    <loc>${SITE_URL}/blog/${slug}</loc>`,
+        `    <loc>${SITE_URL}/blog/${slug}/</loc>`,
         `    <lastmod>${today}</lastmod>`,
         "    <changefreq>monthly</changefreq>",
         "    <priority>0.9</priority>",
@@ -1186,24 +1217,10 @@ function main() {
   const indexHtml = fs.readFileSync(DIST_INDEX_HTML, "utf-8");
   ensureDir(DIST_BLOG_DIR);
   const projects = getRuProjects();
+  const blogItems = getBlogItems(slugs);
 
-  // Blog index page (/blog)
-  generateBlogIndexPage({ indexHtml, slugs });
-
-  const blogItems = [];
-  for (const slug of slugs) {
-    try {
-      const md = fs.readFileSync(path.join(PUBLIC_BLOG_DIR, `${slug}.md`), "utf-8");
-      const meta = extractTitleAndExcerpt(md);
-      blogItems.push({
-        slug,
-        title: meta.title,
-        excerpt: getSeoDescription(slug, meta.excerpt),
-      });
-    } catch {
-      blogItems.push({ slug, title: slug, excerpt: "" });
-    }
-  }
+  // Blog index page (/blog/)
+  generateBlogIndexPage({ indexHtml, blogItems });
 
   generateHomePage({ indexHtml, blogItems, projects });
   generateJournalPages({ indexHtml });
@@ -1243,11 +1260,11 @@ function main() {
       `</div>`,
     ].join("\n");
 
-    const canonicalUrl = `${SITE_URL}/blog/${slug}`;
+    const canonicalUrl = `${SITE_URL}/blog/${slug}/`;
     const jsonLd = [
       breadcrumbJsonLd([
         { name: "Главная", url: `${SITE_URL}/` },
-        { name: "Блог", url: `${SITE_URL}/blog` },
+        { name: "Блог", url: `${SITE_URL}/blog/` },
         { name: title, url: canonicalUrl },
       ]),
       {
@@ -1296,6 +1313,7 @@ function main() {
       slug,
       lang: "ru",
       md: mdBody,
+      title,
       seoTitle,
       description,
     }).replaceAll("</script", "<\\/script");

@@ -96,7 +96,7 @@ export function Header() {
               {t("header.krasotulyaCrm")}
             </a>
             <Link
-              to="/blog"
+              to="/blog/"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {t("header.blog")}
@@ -136,6 +136,12 @@ export function Header() {
           <div className="xl:hidden flex items-center" style={{ gap: '10px' }}>
             <button
               className="text-foreground"
+              type="button"
+              aria-label={
+                isMenuOpen ? t("header.closeMenu") : t("header.openMenu")
+              }
+              aria-expanded={isMenuOpen}
+              aria-controls="mobile-navigation"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -145,7 +151,10 @@ export function Header() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="xl:hidden mt-4 flex flex-col gap-4 pb-4 rounded-xl border border-border bg-background/70 backdrop-blur-xl p-4">
+          <nav
+            id="mobile-navigation"
+            className="xl:hidden mt-4 flex flex-col gap-4 pb-4 rounded-xl border border-border bg-background/70 backdrop-blur-xl p-4"
+          >
             <button
               onClick={() => scrollToSection("services")}
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
@@ -174,7 +183,7 @@ export function Header() {
               {t("header.krasotulyaCrm")}
             </a>
             <Link
-              to="/blog"
+              to="/blog/"
               className="text-muted-foreground hover:text-foreground transition-colors text-left"
               onClick={() => setIsMenuOpen(false)}
             >

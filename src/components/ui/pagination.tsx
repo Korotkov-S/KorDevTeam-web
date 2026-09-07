@@ -10,13 +10,13 @@ import { Button, buttonVariants } from "./button";
 import { useTranslation } from "react-i18next";
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
+  const { t } = useTranslation();
   return (
     <nav
       role="navigation"
-      aria-label="pagination"
+      aria-label={t("pagination.label")}
       data-slot="pagination"
       className={cn("mx-auto flex w-full justify-center", className)}
-      style={{ zIndex: 999999, position: 'relative' }}
       {...props}
     />
   );
@@ -30,7 +30,6 @@ function PaginationContent({
     <ul
       data-slot="pagination-content"
       className={cn("flex flex-row items-center gap-1", className)}
-      style={{ zIndex: 999999, position: 'relative' }}
       {...props}
     />
   );
@@ -63,7 +62,6 @@ function PaginationLink({
         }),
         className,
       )}
-      style={{ zIndex: 999999, position: 'relative' }}
       {...props}
     />
   );
@@ -71,35 +69,41 @@ function PaginationLink({
 
 function PaginationPrevious({
   className,
+  showLabel = false,
   ...props
-}: React.ComponentProps<typeof PaginationLink>) {
+}: React.ComponentProps<typeof PaginationLink> & { showLabel?: boolean }) {
   const { t } = useTranslation();
   return (
     <PaginationLink
-      aria-label="Go to previous page"
+      aria-label={t("pagination.previous")}
       size="default"
       className={cn("gap-1 px-2.5 sm:pl-2.5", className)}
       {...props}
     >
       <ChevronLeftIcon />
-      <span className="hidden sm:block">{t("pagination.previous")}</span>
+      <span className={showLabel ? undefined : "hidden sm:block"}>
+        {t("pagination.previous")}
+      </span>
     </PaginationLink>
   );
 }
 
 function PaginationNext({
   className,
+  showLabel = false,
   ...props
-}: React.ComponentProps<typeof PaginationLink>) {
+}: React.ComponentProps<typeof PaginationLink> & { showLabel?: boolean }) {
   const { t } = useTranslation();
   return (
     <PaginationLink
-      aria-label="Go to next page"
+      aria-label={t("pagination.next")}
       size="default"
       className={cn("gap-1 px-2.5 sm:pr-2.5", className)}
       {...props}
     >
-      <span className="hidden sm:block">{t("pagination.next")}</span>
+      <span className={showLabel ? undefined : "hidden sm:block"}>
+        {t("pagination.next")}
+      </span>
       <ChevronRightIcon />
     </PaginationLink>
   );

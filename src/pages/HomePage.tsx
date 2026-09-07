@@ -127,7 +127,7 @@ export function HomePage() {
       </DeferredSection>
       <DeferredSection id="blog" estimatedHeight={980}>
         <Suspense fallback={null}>
-          <Blog withId={false} />
+          <Blog withId={false} mode="preview" />
         </Suspense>
       </DeferredSection>
       <DeferredSection id="under-metup" estimatedHeight={860}>

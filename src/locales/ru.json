@@ -8,7 +8,9 @@
     "journal": "Журнал",
     "underMetup": "Under Metup",
     "contact": "Контакты",
-    "getInTouch": "Бесплатная консультация"
+    "getInTouch": "Бесплатная консультация",
+    "openMenu": "Открыть меню",
+    "closeMenu": "Закрыть меню"
   },
   "common": {
     "freeConsultation": "Бесплатная консультация"
@@ -515,9 +517,12 @@
     "learnPrices": "Узнать цены"
   },
   "pagination": {
+    "label": "Навигация по страницам",
     "previous": "Назад",
-    "next": "Вперед",
-    "morePages": "Еще страницы"
+    "next": "Вперёд",
+    "morePages": "Ещё страницы",
+    "pageOf": "{{current}} из {{total}}",
+    "goToPage": "Перейти на страницу {{page}}"
   },
   "carousel": {
     "previousSlide": "Предыдущий слайд",

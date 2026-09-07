@@ -8,7 +8,9 @@
     "journal": "Magazine",
     "underMetup": "Under Metup",
     "contact": "Contact",
-    "getInTouch": "Free consultation"
+    "getInTouch": "Free consultation",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "common": {
     "freeConsultation": "Free consultation"
@@ -515,9 +517,12 @@
     "learnPrices": "Learn Prices"
   },
   "pagination": {
+    "label": "Page navigation",
     "previous": "Previous",
     "next": "Next",
-    "morePages": "More pages"
+    "morePages": "More pages",
+    "pageOf": "{{current}} of {{total}}",
+    "goToPage": "Go to page {{page}}"
   },
   "carousel": {
     "previousSlide": "Previous slide",

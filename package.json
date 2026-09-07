@@ -80,6 +80,8 @@
     "build:blog": "vite build && node scripts/generate-blog-pages.mjs && node scripts/precompress-assets.mjs",
     "generate:blog": "node scripts/generate-blog-pages.mjs",
     "generate:content-index": "node scripts/generate-content-index.mjs",
+    "test": "node --test tests/blogPresentation.test.mjs server/utils/*.test.js",
+    "test:blog": "node --test tests/blogPresentation.test.mjs",
     "test:server": "node --test server/utils/*.test.js"
   },
   "packageManager": "yarn@3.8.7"

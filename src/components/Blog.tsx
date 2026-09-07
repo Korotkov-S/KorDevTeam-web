@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -29,11 +29,19 @@ import {
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
 } from "./ui/pagination";
+import {
+  buildPaginationItems,
+  getBlogPageHref,
+  normalizeBlogPage,
+  parseBlogDate,
+  sortBlogPostsByDate,
+} from "../lib/blogPresentation.mjs";
 
 interface BlogPost {
   id: string;
@@ -180,10 +188,24 @@ function BlogCardMedia({
   );
 }
 
-export function Blog({ withId = true }: { withId?: boolean } = {}) {
+function getBlogDateTime(value: string) {
+  const timestamp = parseBlogDate(value);
+  return timestamp === null
+    ? undefined
+    : new Date(timestamp).toISOString().slice(0, 10);
+}
+
+export function Blog({
+  withId = true,
+  mode = "index",
+}: {
+  withId?: boolean;
+  mode?: "preview" | "index";
+} = {}) {
   const { t, i18n } = useTranslation();
-  const [currentPage, setCurrentPage] = useState(1);
-  const postsPerPage = 3;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const postsPerPage = mode === "preview" ? 3 : 6;
 
   const fallbackPosts: BlogPost[] = useMemo(
     () => [
@@ -333,9 +355,10 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
   );
 
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(fallbackPosts);
-  const [loadedFromApi, setLoadedFromApi] = useState(false);
+  const [postsResolved, setPostsResolved] = useState(false);
 
   useEffect(() => {
+    setPostsResolved(false);
     const resolved = (
       i18n.resolvedLanguage ||
       i18n.language ||
@@ -362,8 +385,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
         }));
         if (mapped.length) {
           setBlogPosts(mapped);
-          setLoadedFromApi(true);
-          setCurrentPage(1);
+          setPostsResolved(true);
           return;
         }
         throw new Error("empty api index");
@@ -390,29 +412,66 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
           );
           if (mapped.length) {
             setBlogPosts(mapped);
-            setLoadedFromApi(false);
-            setCurrentPage(1);
           } else {
             setBlogPosts(fallbackPosts);
-            setLoadedFromApi(false);
           }
+          setPostsResolved(true);
         } catch {
           setBlogPosts(fallbackPosts);
-          setLoadedFromApi(false);
+          setPostsResolved(true);
         }
       }
     };
     load();
   }, [fallbackPosts, i18n.language, i18n.resolvedLanguage]);
 
-  const totalPages = Math.ceil(blogPosts.length / postsPerPage);
+  const sortedPosts = useMemo(
+    () => sortBlogPostsByDate(blogPosts) as BlogPost[],
+    [blogPosts],
+  );
+  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / postsPerPage));
+  const requestedPage = mode === "index" ? searchParams.get("page") : null;
+  const currentPage =
+    mode === "index" ? normalizeBlogPage(requestedPage, totalPages) : 1;
   const startIndex = (currentPage - 1) * postsPerPage;
   const endIndex = startIndex + postsPerPage;
-  const currentPosts = blogPosts.slice(startIndex, endIndex);
+  const currentPosts = sortedPosts.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (mode !== "index" || !postsResolved) return;
+
+    const expectedPage = currentPage === 1 ? null : String(currentPage);
+    if (requestedPage === expectedPage) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (expectedPage === null) nextParams.delete("page");
+    else nextParams.set("page", expectedPage);
+    setSearchParams(nextParams, { replace: true, preventScrollReset: true });
+  }, [
+    currentPage,
+    mode,
+    postsResolved,
+    requestedPage,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    if (mode !== "index") return;
+    const nextPage = normalizeBlogPage(page, totalPages);
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextPage === 1) nextParams.delete("page");
+    else nextParams.set("page", String(nextPage));
+    setSearchParams(nextParams, { preventScrollReset: true });
+
+    window.requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("blog-heading")?.focus({ preventScroll: true });
+    });
   };
+
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
+  const MotionHeading = mode === "index" ? motion.h1 : motion.h2;
 
   const postCardImageBySlug: Record<string, string> = {
     "krasotulya-crm-launch": "/blog/krasotula1.jpeg",
@@ -436,7 +495,8 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
   return (
     <section
       {...(withId ? { id: "blog" } : {})}
-      className="py-28 px-4 sm:px-6 relative"
+      ref={sectionRef}
+      className="scroll-mt-20 py-28 px-4 sm:px-6 relative"
       itemScope
       itemType="https://schema.org/Blog"
     >
@@ -454,7 +514,9 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
             </span>
           </motion.div>
 
-          <motion.h2
+          <MotionHeading
+            id="blog-heading"
+            tabIndex={-1}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -463,7 +525,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
             itemProp="name"
           >
             {t("blog.title")}
-          </motion.h2>
+          </MotionHeading>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -475,24 +537,21 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
           >
             {t("blog.subtitle")}
           </motion.p>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="mt-4"
-          >
-            <Link
-              to="/blog"
-              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline underline-offset-4"
+          {mode === "preview" && (
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.25 }}
+              className="mt-4"
             >
-              {t("blog.allArticles")} →
-            </Link>
-          </motion.p>
-          {loadedFromApi && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Список статей загружен динамически (из API/SQLite).
-            </p>
+              <Link
+                to="/blog/"
+                className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline underline-offset-4"
+              >
+                {t("blog.allArticles")} →
+              </Link>
+            </motion.p>
           )}
         </div>
 
@@ -516,7 +575,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
               style={{ zIndex: 50 }}
             >
               <Link
-                to={`/blog/${post.slug}`}
+                to={`/blog/${post.slug}/`}
                 className="block relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300"
               >
                 <div className="relative aspect-video overflow-hidden">
@@ -541,7 +600,10 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
                   <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      <time dateTime={post.date} itemProp="datePublished">
+                      <time
+                        dateTime={getBlogDateTime(post.date)}
+                        itemProp="datePublished"
+                      >
                         {post.date}
                       </time>
                     </div>
@@ -567,7 +629,7 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
 
                   <meta
                     itemProp="url"
-                    content={`https://kordev.team/blog/${post.slug}`}
+                    content={`https://kordev.team/blog/${post.slug}/`}
                   />
 
                   <div className="flex items-center gap-2 text-blue-400 group-hover:text-purple-400 transition-colors">
@@ -582,12 +644,21 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
           ))}
         </div>
 
-        {totalPages > 1 && (
-          <Pagination>
-            <PaginationContent>
+        {mode === "index" && totalPages > 1 && (
+          <Pagination aria-label={t("pagination.label")}>
+            <PaginationContent className="w-full justify-between sm:hidden">
               <PaginationItem>
                 <PaginationPrevious
+                  showLabel
+                  href={
+                    currentPage > 1
+                      ? getBlogPageHref(currentPage - 1)
+                      : undefined
+                  }
+                  aria-disabled={currentPage === 1}
+                  tabIndex={currentPage === 1 ? -1 : undefined}
                   onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                     e.preventDefault();
                     if (currentPage > 1) {
                       handlePageChange(currentPage - 1);
@@ -601,26 +672,101 @@ export function Blog({ withId = true }: { withId?: boolean } = {}) {
                 />
               </PaginationItem>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
-                  <PaginationItem key={page}>
+              <PaginationItem>
+                <span className="px-3 text-sm text-muted-foreground" aria-live="polite">
+                  {t("pagination.pageOf", {
+                    current: currentPage,
+                    total: totalPages,
+                  })}
+                </span>
+              </PaginationItem>
+
+              <PaginationItem>
+                <PaginationNext
+                  showLabel
+                  href={
+                    currentPage < totalPages
+                      ? getBlogPageHref(currentPage + 1)
+                      : undefined
+                  }
+                  aria-disabled={currentPage === totalPages}
+                  tabIndex={currentPage === totalPages ? -1 : undefined}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    e.preventDefault();
+                    if (currentPage < totalPages) {
+                      handlePageChange(currentPage + 1);
+                    }
+                  }}
+                  className={
+                    currentPage === totalPages
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+
+            <PaginationContent className="hidden sm:flex">
+              <PaginationItem>
+                <PaginationPrevious
+                  href={
+                    currentPage > 1
+                      ? getBlogPageHref(currentPage - 1)
+                      : undefined
+                  }
+                  aria-disabled={currentPage === 1}
+                  tabIndex={currentPage === 1 ? -1 : undefined}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    e.preventDefault();
+                    if (currentPage > 1) {
+                      handlePageChange(currentPage - 1);
+                    }
+                  }}
+                  className={
+                    currentPage === 1
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+
+              {paginationItems.map((item) =>
+                typeof item === "number" ? (
+                  <PaginationItem key={item}>
                     <PaginationLink
+                      href={getBlogPageHref(item)}
                       onClick={(e) => {
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                         e.preventDefault();
-                        handlePageChange(page);
+                        handlePageChange(item);
                       }}
-                      isActive={currentPage === page}
+                      isActive={currentPage === item}
+                      aria-label={t("pagination.goToPage", { page: item })}
                       className="cursor-pointer"
                     >
-                      {page}
+                      {item}
                     </PaginationLink>
+                  </PaginationItem>
+                ) : (
+                  <PaginationItem key={item}>
+                    <PaginationEllipsis />
                   </PaginationItem>
                 ),
               )}
 
               <PaginationItem>
                 <PaginationNext
+                  href={
+                    currentPage < totalPages
+                      ? getBlogPageHref(currentPage + 1)
+                      : undefined
+                  }
+                  aria-disabled={currentPage === totalPages}
+                  tabIndex={currentPage === totalPages ? -1 : undefined}
                   onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                     e.preventDefault();
                     if (currentPage < totalPages) {
                       handlePageChange(currentPage + 1);

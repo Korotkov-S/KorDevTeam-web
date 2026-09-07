@@ -13,6 +13,7 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "../components/ui/carousel";
+import { resolvePrerenderMeta } from "../lib/blogPresentation.mjs";
 
 interface BlogPostMeta {
   title: string;
@@ -318,7 +319,7 @@ export function BlogPostPage() {
     if (window.history.state?.idx > 0) {
       navigate(-1);
     } else {
-      navigate("/");
+      navigate("/blog/");
     }
   }, [navigate]);
 
@@ -463,6 +464,7 @@ export function BlogPostPage() {
             slug?: string;
             lang?: string;
             md?: string;
+            title?: string;
             seoTitle?: string;
             description?: string;
           };
@@ -475,11 +477,7 @@ export function BlogPostPage() {
             setOgImage(toAbsoluteOgImage(prerenderCover));
             setContent(stripMarkdownImages(stripFirstMarkdownH1(data.md)));
             const prerenderMeta = deriveMetaFromMarkdown(data.md, "ru");
-            setMeta({
-              ...prerenderMeta,
-              seoTitle: data.seoTitle || prerenderMeta.seoTitle,
-              excerpt: data.description || prerenderMeta.excerpt,
-            });
+            setMeta(resolvePrerenderMeta(data, prerenderMeta));
             setLoading(false);
             hasPrerender = true;
           }
@@ -598,7 +596,7 @@ export function BlogPostPage() {
         <SEO
           title={meta.seoTitle || meta.title}
           description={meta.excerpt}
-          canonical={`https://kordev.team/blog/${slug}`}
+          canonical={`https://kordev.team/blog/${slug}/`}
           ogImage={ogImage}
           ogType="article"
           article={{

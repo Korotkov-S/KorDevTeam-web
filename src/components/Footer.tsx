@@ -33,7 +33,7 @@ export function Footer() {
             <ul className="space-y-2 text-muted-foreground">
               <li>
                 <a
-                  href="#services"
+                  href="/#services"
                   className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.webServices")}
@@ -41,7 +41,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="#services"
+                  href="/#services"
                   className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.reactNative")}
@@ -49,7 +49,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="#services"
+                  href="/#services"
                   className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.backend")}
@@ -57,7 +57,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="#services"
+                  href="/#services"
                   className="hover:text-blue-300 transition-colors"
                 >
                   {t("footer.wordpressSupport")}
