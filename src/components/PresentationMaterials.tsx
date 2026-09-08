@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
+import { PRESENTATION_MEDIA } from "../lib/presentationMedia.mjs";
 
-const VIDEO_URL = "/presentations/kordev-company-showcase-with-voice-music.mp4";
 const BUSINESS_PDF_URL = "/presentations/kordev-team-business-presentation.pdf";
 const AGENCY_PDF_URL = "/presentations/kordev-team-agency-presentation.pdf";
 
@@ -57,9 +57,10 @@ export function PresentationMaterials() {
                     autoPlay
                     preload="metadata"
                     playsInline
+                    poster={PRESENTATION_MEDIA.posterUrl}
                     aria-label={t("presentationMaterials.videoLabel")}
                   >
-                    <source src={VIDEO_URL} type="video/mp4" />
+                    <source src={PRESENTATION_MEDIA.videoUrl} type="video/mp4" />
                   </video>
                 ) : (
                   <button
@@ -69,10 +70,10 @@ export function PresentationMaterials() {
                     aria-label={t("presentationMaterials.videoLabel")}
                   >
                     <img
-                      src="/opengraphlogo.jpeg"
+                      src={PRESENTATION_MEDIA.posterUrl}
                       alt=""
-                      width="1200"
-                      height="630"
+                      width="1280"
+                      height="720"
                       loading="lazy"
                       decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"

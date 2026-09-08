@@ -103,6 +103,11 @@ export function HomePage() {
         ogImage="https://kordev.team/opengraphlogo.jpeg"
       />
       <Hero />
+      <DeferredSection id="projects" estimatedHeight={780} rootMargin="1800px">
+        <Suspense fallback={null}>
+          <Projects withId={false} />
+        </Suspense>
+      </DeferredSection>
       <ProductSpotlight />
       <JournalPromo />
       <DeferredSection id="presentation" estimatedHeight={720} rootMargin="350px">
@@ -118,11 +123,6 @@ export function HomePage() {
       <DeferredSection id="technologies" estimatedHeight={680}>
         <Suspense fallback={null}>
           <Technologies withId={false} />
-        </Suspense>
-      </DeferredSection>
-      <DeferredSection id="projects" estimatedHeight={980} rootMargin="1800px">
-        <Suspense fallback={null}>
-          <Projects withId={false} />
         </Suspense>
       </DeferredSection>
       <DeferredSection id="blog" estimatedHeight={980}>
