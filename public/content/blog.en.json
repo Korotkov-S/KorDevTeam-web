@@ -193,28 +193,6 @@
     "mtimeMs": 1780584409042.686
   },
   {
-    "slug": "harmonize-me-story",
-    "lang": "en",
-    "title": "\"HarmonizeMe I broke down again...\" — Daria knows why this happens and will teach you how to avoid breakdowns",
-    "seoTitle": "\"HarmonizeMe I broke down again...\" — Daria knows why this happens and will teach you how to avoid breakdowns",
-    "coverUrl": "/blog/covers/harmonize-me-story.jpg",
-    "imageUrls": [
-      "/blog/covers/harmonize-me-story.jpg"
-    ],
-    "excerpt": "The HarmonizeMe service story: how an online platform helps users work with eating behavior through psychology, courses, and support.",
-    "date": "January 27, 2025",
-    "updatedDate": "January 27, 2025",
-    "readTime": "2 min",
-    "tags": [
-      "Web Platform",
-      "Psychology",
-      "AI",
-      "Education",
-      "Next.js"
-    ],
-    "mtimeMs": 1780584409037.0938
-  },
-  {
     "slug": "government-contractors-guide",
     "lang": "en",
     "title": "How to Effectively Work with Government Contractors in IT?",
@@ -234,7 +212,7 @@
       "Business",
       "Management"
     ],
-    "mtimeMs": 1780584409032.429
+    "mtimeMs": 1784032227586.706
   },
   {
     "slug": "argumentation-guide",
@@ -255,7 +233,29 @@
       "Communication",
       "Business"
     ],
-    "mtimeMs": 1780584409029.3926
+    "mtimeMs": 1784032227579.9463
+  },
+  {
+    "slug": "harmonize-me-story",
+    "lang": "en",
+    "title": "\"HarmonizeMe I broke down again...\" — Daria knows why this happens and will teach you how to avoid breakdowns",
+    "seoTitle": "\"HarmonizeMe I broke down again...\" — Daria knows why this happens and will teach you how to avoid breakdowns",
+    "coverUrl": "/blog/covers/harmonize-me-story.jpg",
+    "imageUrls": [
+      "/blog/covers/harmonize-me-story.jpg"
+    ],
+    "excerpt": "The HarmonizeMe service story: how an online platform helps users work with eating behavior through psychology, courses, and support.",
+    "date": "January 27, 2025",
+    "updatedDate": "January 27, 2025",
+    "readTime": "2 min",
+    "tags": [
+      "Web Platform",
+      "Psychology",
+      "AI",
+      "Education",
+      "Next.js"
+    ],
+    "mtimeMs": 1780584409037.0938
   },
   {
     "slug": "telegram-broadcast-automation",
