@@ -144,7 +144,7 @@ export async function importLegacyContent(options: MigrationOptions = {}) {
       const { frontmatter, content: markdownBody } = parseFrontmatter(content);
       const legacyMeta = parseLegacyMeta(markdownBody);
       const meta = articleMetadata.get(slug) ?? {};
-      add("article", { ...legacyMeta, ...meta, ...frontmatter, slug, content }, source, true,
+      add("article", { ...legacyMeta, ...meta, ...frontmatter, slug, content: markdownBody }, source, true,
         { content, metadata: meta });
     }
   }

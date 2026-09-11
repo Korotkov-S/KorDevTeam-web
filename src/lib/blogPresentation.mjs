@@ -136,3 +136,12 @@ export function resolvePrerenderMeta(data, fallback) {
     excerpt: data.description || fallback.excerpt,
   };
 }
+
+export function buildArticleLoadFailure(knownMeta) {
+  const title = "Ошибка загрузки";
+  const excerpt = "Не удалось загрузить статью.";
+  return {
+    content: `# ${title}\n\n${excerpt}`,
+    meta: knownMeta ?? { title, excerpt, date: "", readTime: "", tags: [] },
+  };
+}

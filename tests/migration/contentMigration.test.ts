@@ -121,6 +121,23 @@ test("legacy SEO helpers return Russian metadata for unsupported language input"
   assert.equal(getSeoTitle("wordpress-optimization", "Fallback", "en"), "Оптимизация WordPress-сайта");
 });
 
+test("Markdown fallback removes frontmatter from presentation while checksumming raw metadata", async t => {
+  const fixtureRoot = await fixture(t);
+  const source = path.join(fixtureRoot, "public/blog/first.md");
+  await writeFile(source, "---\ntitle: Заголовок\ninternalNote: source-marker-one\n---\n\n# Заголовок\n\nТолько текст статьи.");
+  const first = await importLegacyContent({ fixtureRoot, dryRun: true });
+  const article = first.records.find(r => r.command.slug === "first")!;
+  assert.equal(article.command.bodyMd.trim(), "# Заголовок\n\nТолько текст статьи.");
+  assert.equal(article.command.excerpt, "Только текст статьи.");
+  assert.equal(article.command.seoDescription, "Только текст статьи.");
+  await writeFile(source, "---\ntitle: Заголовок\ninternalNote: source-marker-two\n---\n\n# Заголовок\n\nТолько текст статьи.");
+  const second = await importLegacyContent({ fixtureRoot, dryRun: true });
+  const changed = second.records.find(r => r.command.slug === "first")!;
+  assert.deepEqual(changed.command, article.command);
+  assert.notEqual(changed.checksum, article.checksum);
+  assert.notEqual(second.checksums.batch, first.checksums.batch);
+});
+
 test("migration validates compatibility media metadata instead of silently dropping invalid shapes", async t => {
   const fixtureRoot = await fixture(t);
   await writeFile(path.join(fixtureRoot, "public/content/blog.ru.json"), JSON.stringify([

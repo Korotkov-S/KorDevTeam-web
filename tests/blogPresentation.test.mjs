@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildPaginationItems,
+  buildArticleLoadFailure,
   getBlogPageHref,
   normalizeBlogPage,
   parseBlogDate,
@@ -10,6 +11,17 @@ import {
   sortBlogPostsByDate,
 } from "../src/lib/blogPresentation.mjs";
 import { getSeoTitle } from "../scripts/seo-descriptions.mjs";
+
+test("article load failure uses Russian copy and preserves known article metadata", () => {
+  const failure = buildArticleLoadFailure();
+  assert.equal(failure.content, "# Ошибка загрузки\n\nНе удалось загрузить статью.");
+  assert.equal(failure.meta.title, "Ошибка загрузки");
+  assert.equal(failure.meta.excerpt, "Не удалось загрузить статью.");
+  const knownMeta = { title: "Автоматизация", excerpt: "Описание статьи", date: "2026-01-01", readTime: "3 мин", tags: ["CRM"] };
+  const knownFailure = buildArticleLoadFailure(knownMeta);
+  assert.deepEqual(knownFailure.meta, knownMeta);
+  assert.equal(knownFailure.content, failure.content);
+});
 
 test("sortBlogPostsByDate shows the newest localized publication first", () => {
   const posts = [

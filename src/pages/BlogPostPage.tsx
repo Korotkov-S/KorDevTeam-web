@@ -13,7 +13,7 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "../components/ui/carousel";
-import { resolvePrerenderMeta } from "../lib/blogPresentation.mjs";
+import { buildArticleLoadFailure, resolvePrerenderMeta } from "../lib/blogPresentation.mjs";
 
 interface BlogPostMeta {
   title: string;
@@ -561,17 +561,10 @@ export function BlogPostPage() {
         }
       } catch (error) {
         console.error("Error loading markdown:", error);
-        setContent("# Error Loading\n\nFailed to load article content.");
+        const failure = buildArticleLoadFailure(postMeta);
+        setContent(failure.content);
         setHasVideoMedia(false);
-        if (!postMeta) {
-          setMeta({
-            title: "Error Loading",
-            excerpt: "Failed to load article content.",
-            date: "",
-            readTime: "",
-            tags: [],
-          });
-        }
+        setMeta(failure.meta);
       } finally {
         setLoading(false);
       }
