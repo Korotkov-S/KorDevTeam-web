@@ -1,6 +1,24 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      # Development-only local credentials.
+      POSTGRES_USER: kordev
+      POSTGRES_PASSWORD: kordev
+      POSTGRES_DB: kordev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kordev -d kordev"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - kordevteam_postgres:/var/lib/postgresql/data
+      - ./deploy/postgres/init/001-test-database.sql:/docker-entrypoint-initdb.d/001-test-database.sql:ro
+
   kordevteam:
     build:
       context: .
@@ -15,6 +33,7 @@ services:
       - CONTENT_DIST_ROOT=/app/dist
       # Persist SQLite DB to a docker volume
       - SQLITE_PATH=/app/server/data/content.sqlite
+      - DATABASE_URL=postgresql://kordev:kordev@postgres:5432/kordev
     restart: unless-stopped
     volumes:
       - kordevteam_sqlite:/app/server/data
@@ -44,6 +63,8 @@ services:
       - registry
 
 volumes:
+  kordevteam_postgres:
+    name: kordevteam_postgres
   kordevteam_sqlite:
     name: kordevteam_sqlite
   kordevteam_sqlite_registry:
