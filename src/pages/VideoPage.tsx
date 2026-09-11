@@ -9,7 +9,6 @@ import {
   RotateCw,
   ArrowLeft,
 } from "lucide-react";
-import { SEO } from "../components/SEO";
 
 export function VideoPage() {
   const navigate = useNavigate();
@@ -83,13 +82,6 @@ export function VideoPage() {
 
   return (
     <>
-      <SEO
-        title="Видео"
-        description="Видео-презентация KorDevTeam: подход к разработке, примеры работ и атмосфера команды."
-        canonical="https://kordev.team/video"
-        ogType="video.other"
-        ogImage="https://kordev.team/opengraphlogo.jpeg"
-      />
       <div className="min-h-screen bg-white dark:bg-black flex md:items-center justify-center pt-[100px] md:pt-20">
         <div className="w-full max-w-6xl mx-auto px-4">
           {/* Кнопка возврата */}
@@ -107,6 +99,8 @@ export function VideoPage() {
             </button>
           </div>
 
+          <h1 className="text-3xl md:text-4xl font-bold text-black dark:text-white mb-6">Видео KorDevTeam</h1>
+          <p className="text-muted-foreground mb-8">Видео-презентация команды: наш подход к разработке и примеры работ.</p>
           {/* Видео */}
           <div className="w-[80%] mx-auto">
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden pointer-events-none">
@@ -117,6 +111,7 @@ export function VideoPage() {
               ) : (
                 <video
                   ref={videoRef}
+                  controls
                   muted={isMuted}
                   loop
                   playsInline

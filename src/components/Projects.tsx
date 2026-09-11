@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { ExternalLink, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,7 +21,7 @@ function toProjectSlug(id: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-type ProjectCard = {
+export type ProjectCard = {
   id: string;
   title: string;
   description: string;
@@ -32,128 +32,15 @@ type ProjectCard = {
   features?: string[];
 };
 
-export function Projects({ withId = true }: { withId?: boolean } = {}) {
+export function Projects({ withId = true, projects = [] }: { withId?: boolean; projects?: ProjectCard[] } = {}) {
   const { t, i18n } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
   const projectsPerPage = 3;
 
-  const fallbackProjects = useMemo(
-    () => [
-      {
-        id: "Media & Entertainment",
-        title: t("projects.noodome.title"),
-        description: t("projects.noodome.description"),
-        image: "/projects/noodome.png",
-        technologies: ["React", "Node.js", "PostgreSQL", "Stripe"],
-      },
-      {
-        id: "web-site",
-        title: t("projects.asg.title"),
-        description: t("projects.asg.description"),
-        image: "/projects/asg.png",
-        technologies: ["React.js", "Laravel", "MySQL"],
-      },
-      {
-        id: "web-service",
-        title: t("projects.sims.title"),
-        description: t("projects.sims.description"),
-        image: "/projects/sims.png",
-        technologies: ["Next.js", "Node.js", "PostgreSQL"],
-      },
-      {
-        id: "harmonize-me",
-        title: t("projects.harmonizeMe.title"),
-        description: t("projects.harmonizeMe.description"),
-        image: "/projects/harmonizeMe.png",
-        technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
-      },
-      {
-        id: "stroyrem",
-        title: t("projects.stroyrem.title"),
-        description: t("projects.stroyrem.description"),
-        image: "/projects/stroyrem.png",
-        technologies: ["Next.js", "Adonis.js", "PostgreSQL"],
-      },
-      {
-        id: "wowbanner",
-        title: t("projects.wowbanner.title"),
-        description: t("projects.wowbanner.description"),
-        image: "/projects/wowbanner.png",
-        technologies: ["React.js", "Node.js", "MongoDB"],
-      },
-      {
-        id: "serviceplus",
-        title: t("projects.serviceplus.title"),
-        description: t("projects.serviceplus.description"),
-        image: "/projects/serviceplus.png",
-        technologies: ["React Native", "Node.js", "PostgreSQL"],
-      },
-      {
-        id: "amch",
-        title: t("projects.amch.title"),
-        description: t("projects.amch.description"),
-        image: "/projects/amch.png",
-        technologies: ["Python", "React.js", "PostgreSQL"],
-      },
-      {
-        id: "notion-analog",
-        title: t("projects.notionAnalog.title"),
-        description: t("projects.notionAnalog.description"),
-        image: "/projects/notion.png",
-        technologies: ["React.js", "Node.js", "PostgreSQL"],
-      },
-    ],
-    [t]
-  );
 
-  const [projects, setProjects] = useState<ProjectCard[]>(fallbackProjects);
-
-  useEffect(() => {
-    // Обновляем фоллбек при смене языка/переводов
-    setProjects(fallbackProjects);
-  }, [fallbackProjects]);
-
-  useEffect(() => {
-    const lang = "ru";
-    const load = async () => {
-      try {
-        let data: any[] = [];
-        try {
-          const apiRes = await fetch(`/api/projects?lang=${lang}`);
-          if (apiRes.ok) {
-            const payload = (await apiRes.json()) as { projects?: unknown };
-            data = Array.isArray(payload.projects) ? payload.projects : [];
-          }
-        } catch {
-          // На статическом хостинге API может отсутствовать — ниже читаем JSON-снимок.
-        }
-        if (!data.length) {
-          const res = await fetch(`/content/projects.${lang}.json`);
-          if (!res.ok) throw new Error("no json");
-          data = (await res.json()) as any[];
-        }
-        if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
-        const mapped: ProjectCard[] = data.map((p) => ({
-          id: String(p.id),
-          title: String(p.title || p.id),
-          description: String(p.description || ""),
-          image: String(p.image || ""),
-          technologies: Array.isArray(p.technologies) ? p.technologies.map((x: any) => String(x)) : [],
-          impact: p.impact ? String(p.impact) : undefined,
-          highlights: Array.isArray(p.highlights) ? p.highlights.map((x: any) => String(x)) : undefined,
-          features: Array.isArray(p.features) ? p.features.map((x: any) => String(x)) : undefined,
-        }));
-        setProjects(mapped);
-        setCurrentPage(1);
-      } catch {
-        setProjects(fallbackProjects);
-      }
-    };
-    load();
-  }, [fallbackProjects, i18n.language, i18n.resolvedLanguage]);
 
   const safeCurrentPage = currentPage;
-  const safeProjects = projects.length ? projects : fallbackProjects;
+  const safeProjects = projects;
   const totalPages = Math.ceil(safeProjects.length / projectsPerPage);
   const startIndex = (safeCurrentPage - 1) * projectsPerPage;
   const endIndex = startIndex + projectsPerPage;
@@ -214,7 +101,7 @@ export function Projects({ withId = true }: { withId?: boolean } = {}) {
                 className="h-full"
               >
                 <Link
-                  to={`/project/${toProjectSlug(project.id)}`}
+                  to={`/cases/${toProjectSlug(project.id)}/`}
                   aria-label={`${t("projects.viewProject")}: ${project.title}`}
                   className="group flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card/70 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/40 hover:shadow-xl hover:shadow-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:hover:border-blue-400/40"
                 >

@@ -44,7 +44,7 @@ async function waitForHealth(origin: string, output: () => string) {
   );
 }
 
-export async function startTestRuntime(): Promise<TestRuntime> {
+export async function startTestRuntime(environment: Record<string, string> = {}): Promise<TestRuntime> {
   const port = await getAvailablePort();
   const origin = `http://127.0.0.1:${port}`;
   const databaseDirectory = await mkdtemp(path.join(tmpdir(), "kordev-ssr-"));
@@ -56,6 +56,8 @@ export async function startTestRuntime(): Promise<TestRuntime> {
       NODE_ENV: "test",
       PORT: String(port),
       SQLITE_PATH: path.join(databaseDirectory, "content.sqlite"),
+      DATABASE_URL: process.env.TEST_DATABASE_URL,
+      ...environment,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

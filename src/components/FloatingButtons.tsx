@@ -1,9 +1,12 @@
 import { Button } from "./ui/button";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 
 export function FloatingButtons() {
   const { t } = useTranslation();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const content = (
     <div
@@ -38,6 +41,5 @@ export function FloatingButtons() {
   );
 
   // Рендерим прямо в <body>, чтобы кнопки не зависели от stacking context/overflow родительских контейнеров
-  return typeof document !== "undefined" ? createPortal(content, document.body) : null;
+  return mounted ? createPortal(content, document.body) : null;
 }
-

@@ -33,7 +33,7 @@ function MarkdownVideo({ href }: { href: string }) {
 
 const markdownComponents = {
   h1: ({ node, ...props }: any) => (
-    <h1 className="text-4xl mb-8 mt-12 text-foreground" {...props} />
+    <h2 className="text-4xl mb-8 mt-12 text-foreground" {...props} />
   ),
   h2: ({ node, ...props }: any) => (
     <h2 className="text-3xl mt-12 mb-6 text-foreground" {...props} />

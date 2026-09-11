@@ -1,9 +1,8 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, Play } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { useTranslation } from "react-i18next";
-import { SEO } from "../components/SEO";
 
 interface UnderMetupVideoMeta {
   title: string;
@@ -17,8 +16,6 @@ export function UnderMetupPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [meta, setMeta] = useState<UnderMetupVideoMeta | null>(null);
-  const [vkEmbedUrl, setVkEmbedUrl] = useState<string>("");
 
   const navigateGoBack = useCallback(() => {
     if (window.history.state?.idx > 0) {
@@ -79,40 +76,11 @@ export function UnderMetupPage() {
     return url;
   };
 
-  useEffect(() => {
-    if (!slug) {
-      navigateGoBack();
-      return;
-    }
-
-    const videoMeta = videosData[slug];
-    if (!videoMeta) {
-      navigateGoBack();
-      return;
-    }
-
-    setMeta(videoMeta);
-    const embedUrl = convertVkUrlToEmbed(videoMeta.vkUrl);
-    setVkEmbedUrl(embedUrl);
-  }, [slug, navigate, videosData, navigateGoBack]);
-
-  useEffect(() => {
-    if (meta) {
-      document.title = `${meta.title} | Under Metup`;
-    }
-  }, [meta]);
+  const meta = videosData[slug || ""];
+  const vkEmbedUrl = meta ? convertVkUrlToEmbed(meta.vkUrl) : "";
 
   return (
     <>
-      {meta && slug && (
-        <SEO
-          title={meta.title}
-          description={`Запись Under Metup: ${meta.title}, доклады, программа встречи и материалы для IT-сообщества.`}
-          canonical={`https://kordev.team/under-metup/${slug}`}
-          ogType="video.other"
-          ogImage="https://kordev.team/opengraphlogo.jpeg"
-        />
-      )}
       <div className="min-h-screen pt-20 under-metup-page">
       <div className="container mx-auto px-2 md:px-4 py-2 md:py-8">
         {/* Back Button */}

@@ -86,7 +86,7 @@
   animation-delay: 4s;
 }
 
-@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) {
   .animate-blob,
   .animate-gradient,
   .animate-float,

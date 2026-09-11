@@ -3,12 +3,14 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   base: "/",
+  define: { __RELEASE_SHA__: JSON.stringify(process.env.RELEASE_SHA || execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()) },
   plugins: [reactRouter(), tailwindcss()],
   resolve: {
     extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],

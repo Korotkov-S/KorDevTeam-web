@@ -17,7 +17,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { SEO } from "./SEO";
 import { motion } from "motion/react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import {
@@ -43,7 +42,7 @@ import {
   sortBlogPostsByDate,
 } from "../lib/blogPresentation.mjs";
 
-interface BlogPost {
+export interface BlogPost {
   id: string;
   title: string;
   excerpt: string;
@@ -198,227 +197,19 @@ function getBlogDateTime(value: string) {
 export function Blog({
   withId = true,
   mode = "index",
+  posts = [],
 }: {
   withId?: boolean;
   mode?: "preview" | "index";
+  posts?: BlogPost[];
 } = {}) {
   const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionRef = useRef<HTMLElement | null>(null);
   const postsPerPage = mode === "preview" ? 3 : 6;
 
-  const fallbackPosts: BlogPost[] = useMemo(
-    () => [
-      {
-        id: "1",
-        title: t("blog.posts.reactNative.title"),
-        excerpt: t("blog.posts.reactNative.excerpt"),
-        date: t("blog.posts.reactNative.date"),
-        readTime: t("blog.posts.reactNative.readTime"),
-        tags: t("blog.posts.reactNative.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "react-native-best-practices",
-      },
-      {
-        id: "2",
-        title: t("blog.posts.microservices.title"),
-        excerpt: t("blog.posts.microservices.excerpt"),
-        date: t("blog.posts.microservices.date"),
-        readTime: t("blog.posts.microservices.readTime"),
-        tags: t("blog.posts.microservices.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "nodejs-microservices",
-      },
-      {
-        id: "3",
-        title: t("blog.posts.wordpress.title"),
-        excerpt: t("blog.posts.wordpress.excerpt"),
-        date: t("blog.posts.wordpress.date"),
-        readTime: t("blog.posts.wordpress.readTime"),
-        tags: t("blog.posts.wordpress.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "wordpress-optimization",
-      },
-      {
-        id: "4",
-        title: t("blog.posts.laravel.title"),
-        excerpt: t("blog.posts.laravel.excerpt"),
-        date: t("blog.posts.laravel.date"),
-        readTime: t("blog.posts.laravel.readTime"),
-        tags: t("blog.posts.laravel.tags", { returnObjects: true }) as string[],
-        slug: "laravel-api-development",
-      },
-      {
-        id: "5",
-        title: t("blog.posts.businessAutomation.title"),
-        excerpt: t("blog.posts.businessAutomation.excerpt"),
-        date: t("blog.posts.businessAutomation.date"),
-        readTime: t("blog.posts.businessAutomation.readTime"),
-        tags: t("blog.posts.businessAutomation.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "business-automation",
-      },
-      {
-        id: "6",
-        title: t("blog.posts.crmImplementation.title"),
-        excerpt: t("blog.posts.crmImplementation.excerpt"),
-        date: t("blog.posts.crmImplementation.date"),
-        readTime: t("blog.posts.crmImplementation.readTime"),
-        tags: t("blog.posts.crmImplementation.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "crm-implementation",
-      },
-      {
-        id: "7",
-        title: t("blog.posts.telegramBroadcast.title"),
-        excerpt: t("blog.posts.telegramBroadcast.excerpt"),
-        date: t("blog.posts.telegramBroadcast.date"),
-        readTime: t("blog.posts.telegramBroadcast.readTime"),
-        tags: t("blog.posts.telegramBroadcast.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "telegram-broadcast-automation",
-      },
-      {
-        id: "8",
-        title: t("blog.posts.stoneCalculator.title"),
-        excerpt: t("blog.posts.stoneCalculator.excerpt"),
-        date: t("blog.posts.stoneCalculator.date"),
-        readTime: t("blog.posts.stoneCalculator.readTime"),
-        tags: t("blog.posts.stoneCalculator.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "stone-calculator-automation",
-      },
-      {
-        id: "9",
-        title: t("blog.posts.harmonizeMe.title"),
-        excerpt: t("blog.posts.harmonizeMe.excerpt"),
-        date: t("blog.posts.harmonizeMe.date"),
-        readTime: t("blog.posts.harmonizeMe.readTime"),
-        tags: t("blog.posts.harmonizeMe.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "harmonize-me-platform",
-      },
-      {
-        id: "10",
-        title: t("blog.posts.simsDynastyTree.title"),
-        excerpt: t("blog.posts.simsDynastyTree.excerpt"),
-        date: t("blog.posts.simsDynastyTree.date"),
-        readTime: t("blog.posts.simsDynastyTree.readTime"),
-        tags: t("blog.posts.simsDynastyTree.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "sims-dynasty-tree-platform",
-      },
-      {
-        id: "11",
-        title: t("blog.posts.argumentationGuide.title"),
-        excerpt: t("blog.posts.argumentationGuide.excerpt"),
-        date: t("blog.posts.argumentationGuide.date"),
-        readTime: t("blog.posts.argumentationGuide.readTime"),
-        tags: t("blog.posts.argumentationGuide.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "argumentation-guide",
-      },
-      {
-        id: "12",
-        title: t("blog.posts.governmentContractors.title"),
-        excerpt: t("blog.posts.governmentContractors.excerpt"),
-        date: t("blog.posts.governmentContractors.date"),
-        readTime: t("blog.posts.governmentContractors.readTime"),
-        tags: t("blog.posts.governmentContractors.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "government-contractors-guide",
-      },
-      {
-        id: "13",
-        title: t("blog.posts.harmonizeMeStory.title"),
-        excerpt: t("blog.posts.harmonizeMeStory.excerpt"),
-        date: t("blog.posts.harmonizeMeStory.date"),
-        readTime: t("blog.posts.harmonizeMeStory.readTime"),
-        tags: t("blog.posts.harmonizeMeStory.tags", {
-          returnObjects: true,
-        }) as string[],
-        slug: "harmonize-me-story",
-      },
-    ],
-    [t],
-  );
-
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(fallbackPosts);
-  const [postsResolved, setPostsResolved] = useState(false);
-
-  useEffect(() => {
-    setPostsResolved(false);
-    const lang = "ru";
-    const load = async () => {
-      try {
-        // Prefer API index when available (reflects runtime edits in SQLite)
-        const res = await fetch(`/api/content/blog?lang=${lang}`);
-        if (!res.ok) throw new Error("api unavailable");
-        const data = (await res.json()) as { items?: any[] };
-        const items = Array.isArray(data.items) ? data.items : [];
-        const mapped: BlogPost[] = items.map((x) => ({
-          id: String(x.slug),
-          slug: String(x.slug),
-          title: String(x.title || x.slug),
-          excerpt: String(x.excerpt || ""),
-          date: String(x.date || ""),
-          readTime: String(x.readTime || ""),
-          tags: Array.isArray(x.tags) ? x.tags.map((t: any) => String(t)) : [],
-          coverUrl: normalizePublicAssetUrl(x.coverUrl ? String(x.coverUrl) : ""),
-          imageUrls: mapPostImageUrls(x.imageUrls),
-        }));
-        if (mapped.length) {
-          setBlogPosts(mapped);
-          setPostsResolved(true);
-          return;
-        }
-        throw new Error("empty api index");
-      } catch {
-        // Fallback to static index (works on static hosting)
-        try {
-          const resStatic = await fetch(`/content/blog.${lang}.json`);
-          if (!resStatic.ok) throw new Error("no static index");
-          const items = (await resStatic.json()) as any[];
-          const mapped: BlogPost[] = (Array.isArray(items) ? items : []).map(
-            (x) => ({
-              id: String(x.slug),
-              slug: String(x.slug),
-              title: String(x.title || x.slug),
-              excerpt: String(x.excerpt || ""),
-              date: String(x.date || ""),
-              readTime: String(x.readTime || ""),
-              tags: Array.isArray(x.tags)
-                ? x.tags.map((t: any) => String(t))
-                : [],
-              coverUrl: normalizePublicAssetUrl(x.coverUrl ? String(x.coverUrl) : ""),
-              imageUrls: mapPostImageUrls(x.imageUrls),
-            }),
-          );
-          if (mapped.length) {
-            setBlogPosts(mapped);
-          } else {
-            setBlogPosts(fallbackPosts);
-          }
-          setPostsResolved(true);
-        } catch {
-          setBlogPosts(fallbackPosts);
-          setPostsResolved(true);
-        }
-      }
-    };
-    load();
-  }, [fallbackPosts, i18n.language, i18n.resolvedLanguage]);
+  const blogPosts = posts;
+  const postsResolved = true;
 
   const sortedPosts = useMemo(
     () => sortBlogPostsByDate(blogPosts) as BlogPost[],

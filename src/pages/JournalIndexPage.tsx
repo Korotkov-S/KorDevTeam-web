@@ -2,7 +2,6 @@ import { ArrowRight, BookOpen, Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { trackYandexGoal } from "../analytics/yandexMetrika";
-import { SEO } from "../components/SEO";
 import { Button } from "../components/ui/button";
 import { journalIssues } from "../data/journalIssues";
 
@@ -11,16 +10,6 @@ export function JournalIndexPage() {
 
   return (
     <>
-      <SEO
-        title={t("journal.archiveTitle")}
-        description={t("journal.archiveDescription")}
-        canonical="https://kordev.team/journal/"
-        ogType="website"
-        ogImage="https://kordev.team/journal/issue-0-cover.webp"
-        ogImageType="image/webp"
-        ogImageWidth="960"
-        ogImageHeight="1358"
-      />
       <div className="min-h-screen px-4 pb-24 pt-32 sm:px-6">
         <div className="mx-auto max-w-7xl">
           <header className="max-w-3xl">

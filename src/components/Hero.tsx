@@ -31,11 +31,10 @@ export function Hero() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const mqMobile = window.matchMedia("(max-width: 767px)");
     const mqReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const update = () => {
-      setReduceEffects(Boolean(mqMobile.matches || mqReducedMotion.matches));
+      setReduceEffects(mqReducedMotion.matches);
     };
     update();
 
@@ -53,10 +52,8 @@ export function Hero() {
       else mq.removeListener(update);
     };
 
-    add(mqMobile);
     add(mqReducedMotion);
     return () => {
-      remove(mqMobile);
       remove(mqReducedMotion);
     };
   }, []);

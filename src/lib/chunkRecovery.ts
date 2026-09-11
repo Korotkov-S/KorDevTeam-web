@@ -1,0 +1,3 @@
+export function chunkRecoveryScript(releaseSha: string): string {
+  return `(function(){var release=${JSON.stringify(releaseSha).replace(/</g, "\\u003c")};function recover(event){var message=String(event.reason&&event.reason.message||event.message||'');if(!/(Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk [\\w-]+ failed|error loading dynamically imported module)/i.test(message))return;try{if(sessionStorage.getItem('kordevChunkReloadRelease')===release)return;sessionStorage.setItem('kordevChunkReloadRelease',release);}catch(_){return;}console.warn('chunk_recovery',{release:release});location.reload();}window.addEventListener('error',recover);window.addEventListener('unhandledrejection',recover);})();`;
+}

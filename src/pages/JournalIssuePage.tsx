@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { trackYandexGoal } from "../analytics/yandexMetrika";
-import { SEO } from "../components/SEO";
 import { Button } from "../components/ui/button";
 import { currentJournalIssue } from "../data/journalIssues";
 
@@ -51,16 +50,6 @@ export function JournalIssuePage() {
 
   return (
     <>
-      <SEO
-        title={t("journal.seoIssueTitle")}
-        description={t("journal.issueDescription")}
-        canonical={`https://kordev.team/journal/${issue.slug}/`}
-        ogType="article"
-        ogImage={`https://kordev.team${issue.coverUrl}`}
-        ogImageType="image/webp"
-        ogImageWidth="960"
-        ogImageHeight="1358"
-      />
       <article className="min-h-screen px-4 pb-24 pt-28 sm:px-6">
         <div className="mx-auto max-w-7xl">
           <Link
