@@ -1,19 +1,15 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// ESM-friendly __dirname for Vite 6 config loading
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default defineConfig({
-  // Базовый путь для деплоя (можно изменить в зависимости от хостинга)
   base: "/",
-
-  plugins: [react(), tailwindcss()],
-
+  plugins: [reactRouter(), tailwindcss()],
   resolve: {
     extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
     alias: {
@@ -42,8 +38,7 @@ export default defineConfig({
       "@radix-ui/react-radio-group@1.2.3": "@radix-ui/react-radio-group",
       "@radix-ui/react-progress@1.1.2": "@radix-ui/react-progress",
       "@radix-ui/react-popover@1.1.6": "@radix-ui/react-popover",
-      "@radix-ui/react-navigation-menu@1.2.5":
-        "@radix-ui/react-navigation-menu",
+      "@radix-ui/react-navigation-menu@1.2.5": "@radix-ui/react-navigation-menu",
       "@radix-ui/react-menubar@1.1.6": "@radix-ui/react-menubar",
       "@radix-ui/react-label@2.1.2": "@radix-ui/react-label",
       "@radix-ui/react-hover-card@1.1.6": "@radix-ui/react-hover-card",
@@ -59,64 +54,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-
-  build: {
-    // Директория для статичных файлов
-    outDir: "dist",
-
-    // Целевая платформа для сборки
-    target: "es2020",
-
-    // Минификация
-    minify: "esbuild",
-
-    // Настройки для статичного сайта
-    rollupOptions: {
-      // Keep builds stable on environments with a 1024 file-descriptor limit.
-      maxParallelFileOps: 512,
-      output: {
-        // Разделение кода на чанки для лучшего кэширования
-        manualChunks: {
-          vendor: ["react", "react-dom"],
-          router: ["react-router-dom"],
-        },
-        // Настройка имен файлов для лучшего кэширования
-        chunkFileNames: "assets/js/[name]-[hash].js",
-        entryFileNames: "assets/js/[name]-[hash].js",
-        assetFileNames: "assets/[ext]/[name]-[hash].[ext]",
-      },
-    },
-
-    // Оптимизация размера
-    chunkSizeWarningLimit: 1000,
-
-    // Генерация source maps для продакшена (опционально)
-    sourcemap: false,
-
-    // Очистка директории перед сборкой
-    emptyOutDir: true,
-  },
-
-  optimizeDeps: {
-    entries: ["index.html"],
-  },
-
-  // Настройки для предварительного просмотра статичного сайта
-  preview: {
-    port: 4173,
-    open: true,
-    proxy: {
-      "/api": {
-        target: "http://localhost:3001",
-        changeOrigin: true,
-      },
-    },
-  },
-
-  // Настройки dev сервера
   server: {
     port: 3000,
-    open: true,
     proxy: {
       "/api": {
         target: "http://localhost:3001",
@@ -124,7 +63,4 @@ export default defineConfig({
       },
     },
   },
-
-  // Копируем markdown файлы в public для доступа
-  publicDir: "public",
 });

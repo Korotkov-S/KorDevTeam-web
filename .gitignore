@@ -1,5 +1,6 @@
 node_modules
 .yarn
+.react-router
 build
 dist
 .DS_Store
