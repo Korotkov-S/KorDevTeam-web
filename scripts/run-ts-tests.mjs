@@ -31,7 +31,7 @@ function run() {
 
   const result = spawnSync(
     process.execPath,
-    [require.resolve("tsx/cli"), "--test", ...files],
+    [require.resolve("tsx/cli"), "--test", "--test-concurrency=1", ...files],
     { cwd: process.cwd(), stdio: "inherit" },
   );
   if (result.error) throw result.error;
