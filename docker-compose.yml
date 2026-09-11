@@ -4,7 +4,7 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     environment:
       # Development-only local credentials.
       POSTGRES_USER: kordev

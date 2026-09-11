@@ -5,6 +5,9 @@ import * as schema from "./schema";
 
 export function createDb(databaseUrl: string): NodePgDatabase<typeof schema> {
   const pool = new Pool({ connectionString: databaseUrl, allowExitOnIdle: true });
+  pool.on("error", () => {
+    console.error("PostgreSQL pool connection error");
+  });
   return drizzle(pool, { schema });
 }
 
