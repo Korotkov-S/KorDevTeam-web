@@ -81,7 +81,7 @@ async function ensureDirectories() {
 async function saveMarkdownFile(slug, content, lang = 'ru') {
   await ensureDirectories();
   
-  const filename = lang === 'en' ? `${slug}.en.md` : `${slug}.md`;
+  const filename = `${slug}.md`;
   const publicPath = path.join(PUBLIC_BLOG_DIR, filename);
   const srcPath = path.join(SRC_BLOG_DIR, filename);
 
@@ -96,7 +96,7 @@ async function saveMarkdownFile(slug, content, lang = 'ru') {
  * Чтение markdown файла
  */
 async function readMarkdownFile(slug, lang = 'ru') {
-  const filename = lang === 'en' ? `${slug}.en.md` : `${slug}.md`;
+  const filename = `${slug}.md`;
   const filePath = path.join(PUBLIC_BLOG_DIR, filename);
 
   try {
@@ -114,7 +114,7 @@ async function readMarkdownFile(slug, lang = 'ru') {
  * Удаление markdown файла
  */
 async function deleteMarkdownFile(slug, lang = 'ru') {
-  const filename = lang === 'en' ? `${slug}.en.md` : `${slug}.md`;
+  const filename = `${slug}.md`;
   const publicPath = path.join(PUBLIC_BLOG_DIR, filename);
   const srcPath = path.join(SRC_BLOG_DIR, filename);
 

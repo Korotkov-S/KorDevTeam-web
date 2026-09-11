@@ -3,7 +3,6 @@ import { Menu, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { LanguageToggle } from "./LanguageToggle";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 
@@ -122,7 +121,6 @@ export function Header() {
           </nav>
 
           <div className="hidden xl:flex items-center gap-4">
-            <LanguageToggle />
             <ThemeToggle />
             <Button
               onClick={() => scrollToSection("contact")}
@@ -209,7 +207,6 @@ export function Header() {
               {t("header.contact")}
             </button>
             <div className="flex items-center gap-4">
-              <LanguageToggle />
               <ThemeToggle />
               <Button
                 onClick={() => scrollToSection("contact")}

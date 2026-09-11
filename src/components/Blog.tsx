@@ -359,12 +359,7 @@ export function Blog({
 
   useEffect(() => {
     setPostsResolved(false);
-    const resolved = (
-      i18n.resolvedLanguage ||
-      i18n.language ||
-      "en"
-    ).toLowerCase();
-    const lang = resolved === "ru" || resolved.startsWith("ru-") ? "ru" : "en";
+    const lang = "ru";
     const load = async () => {
       try {
         // Prefer API index when available (reflects runtime edits in SQLite)

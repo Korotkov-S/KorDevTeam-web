@@ -21,7 +21,7 @@ import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import { SEO } from "../components/SEO";
 
-type Lang = "ru" | "en";
+type Lang = "ru";
 
 type ContentMeta = {
   slug: string;
@@ -326,7 +326,7 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState<"blog" | "projects" | "service">(
     "blog"
   );
-  const [lang, setLang] = useState<Lang>("ru");
+  const lang: Lang = "ru";
 
   // Indexes
   const [blogIndex, setBlogIndex] = useState<ContentMeta[]>([]);
@@ -1135,22 +1135,6 @@ export function AdminPage() {
               <h1 className="text-3xl font-semibold">Админка</h1>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <div className="flex gap-2 items-center">
-                <Button
-                  size="sm"
-                  variant={lang === "ru" ? "default" : "outline"}
-                  onClick={() => setLang("ru")}
-                >
-                  RU
-                </Button>
-                <Button
-                  size="sm"
-                  variant={lang === "en" ? "default" : "outline"}
-                  onClick={() => setLang("en")}
-                >
-                  EN
-                </Button>
-              </div>
               <Button size="sm" variant="outline" onClick={logout}>
                 Выйти
               </Button>

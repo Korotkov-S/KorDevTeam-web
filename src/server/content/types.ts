@@ -47,6 +47,7 @@ export const saveContentSchema = z.discriminatedUnion("kind", [
   }).default({}) }),
   z.strictObject({ ...base, kind: z.literal("article"), payload: z.strictObject({
     h1: z.string().optional(), author: z.string().optional(), tags: z.array(z.string()).optional(),
+    coverUrl: z.string().optional(), imageUrls: z.array(z.string()).optional(), readTime: z.string().optional(),
   }).default({}) }),
   z.strictObject({ ...base, kind: z.literal("page"), payload: z.strictObject({
     h1: z.string().optional(), sections: z.array(block).optional(), cta: cta.optional(),

@@ -120,10 +120,9 @@ router.post('/', authenticate, async (req, res, next) => {
  */
 router.get('/', async (req, res, next) => {
   try {
-    // Keep endpoint for debugging: returns metas for both languages.
+    // Retained legacy endpoint exposes Russian content only.
     const ru = await listPostMetas({ lang: "ru" });
-    const en = await listPostMetas({ lang: "en" });
-    const posts = { ru, en };
+    const posts = { ru };
     res.json({ posts });
   } catch (error) {
     next(error);

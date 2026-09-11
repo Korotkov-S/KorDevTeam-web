@@ -179,8 +179,7 @@ export function ProjectPage() {
   };
 
   useEffect(() => {
-    const resolved = (i18n.resolvedLanguage || i18n.language || "en").toLowerCase();
-    const lang = resolved === "ru" || resolved.startsWith("ru-") ? "ru" : "en";
+    const lang = "ru";
     const load = async () => {
       setLoadingProjects(true);
       try {

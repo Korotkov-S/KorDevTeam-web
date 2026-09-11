@@ -1,6 +1,8 @@
-import { and, asc, eq, or } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 import type { createDb } from "../db/client";
-import { contentEntries, contentRelations, contentRevisions } from "../db/schema";
+import { contentEntries, contentRelations, contentRevisions, siteSettings } from "../db/schema";
+import { parseContentCommand, validatePublication } from "./types";
+import { matchesImportedEntry, migrationKey, type MigrationRecord } from "./migration";
 import type { ContentEntry, ContentKind, ValidatedContentCommand } from "./types";
 
 export type ContentDatabase = ReturnType<typeof createDb>;
@@ -16,6 +18,51 @@ async function references(tx: Transaction, id: string) {
 
 export function createContentRepository(db: ContentDatabase) {
   return {
+    // Offline, atomic legacy import. Every new record follows draft -> revision -> publication.
+    async importLegacyBatch(batchId: string, batchChecksum: string, records: MigrationRecord[]) {
+      const commands = records.map(record => {
+        const command = parseContentCommand(record.command);
+        if (command.id || command.expectedVersion) throw new Error("content_validation_error");
+        validatePublication(command as ContentEntry);
+        for (const value of Object.values(record.timestamps)) {
+          if (!Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) throw new Error("content_validation_error");
+        }
+        return command;
+      });
+      return db.transaction(async tx => {
+        // Serialize import batches, including different batches targeting the same slugs.
+        await tx.execute(sql`select pg_advisory_xact_lock(706004)`);
+        const key = migrationKey(batchId);
+        const [batch] = await tx.select().from(siteSettings).where(eq(siteSettings.key, key));
+        if (batch && batch.value.checksum !== batchChecksum) throw new Error("migration_batch_checksum_conflict");
+        let inserted = 0;
+        let unchanged = 0;
+        const entries: { id: string; source: string; checksum: string; kind: string; slug: string }[] = [];
+        for (const [index, command] of commands.entries()) {
+          const [existing] = await tx.select().from(contentEntries).where(and(
+            eq(contentEntries.kind, command.kind), eq(contentEntries.slug, command.slug),
+          )).for("update");
+          const timestamps = records[index].timestamps;
+          if (existing && !matchesImportedEntry(existing, command, timestamps)) throw new Error("migration_target_collision");
+          if (batch && !existing) throw new Error("migration_target_missing");
+          let entry = existing;
+          if (!entry) {
+            const historical = Object.fromEntries(Object.entries(timestamps).map(([key, value]) => [key, new Date(value)]));
+            // Migration-only exception: preserve source history; ordinary publication still uses first publish time.
+            const [draft] = await tx.insert(contentEntries).values({ ...command, ...historical, publishedAt: null, status: "draft" }).returning();
+            await tx.insert(contentRevisions).values({ entryId: draft.id, version: 1, snapshot: draft });
+            [entry] = await tx.update(contentEntries).set({ status: "published", version: 2,
+              publishedAt: timestamps.publishedAt ? new Date(timestamps.publishedAt) : new Date(),
+              updatedAt: timestamps.updatedAt ? new Date(timestamps.updatedAt) : new Date() })
+              .where(eq(contentEntries.id, draft.id)).returning();
+            inserted++;
+          } else { unchanged++; }
+          entries.push({ id: entry.id, source: records[index].source, checksum: records[index].checksum, kind: entry.kind, slug: entry.slug });
+        }
+        if (!batch) await tx.insert(siteSettings).values({ key, value: { batchId, checksum: batchChecksum, entries } });
+        return { inserted, unchanged };
+      });
+    },
     async getPublishedEntry(kind: ContentKind, slug: string) {
       const [entry] = await db.select().from(contentEntries).where(and(
         eq(contentEntries.kind, kind), eq(contentEntries.slug, slug), eq(contentEntries.status, "published"),

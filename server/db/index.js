@@ -22,8 +22,8 @@ function nowMs() {
   return Date.now();
 }
 
-function safeLang(x) {
-  return x === "en" ? "en" : "ru";
+function safeLang() {
+  return "ru";
 }
 
 function toJson(val, fallback = "[]") {

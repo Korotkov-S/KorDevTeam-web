@@ -60,15 +60,14 @@ async function bootstrapPostsFromMarkdown() {
   for (const dir of candidates) {
     if (!(await existsDir(dir))) continue;
     const entries = await fs.readdir(dir);
-    const mdFiles = entries.filter((f) => f.endsWith(".md"));
+    const mdFiles = entries.filter((f) => f.endsWith(".md") && !f.endsWith(".en.md"));
     for (const filename of mdFiles) {
       // Skip uploads folder files (images aren't .md, but be safe)
       if (filename.includes("/") || filename.includes("\\"))
         continue;
 
-      const isEn = filename.endsWith(".en.md");
-      const slug = filename.replace(/\.en\.md$/i, "").replace(/\.md$/i, "");
-      const lang = isEn ? "en" : "ru";
+      const slug = filename.replace(/\.md$/i, "");
+      const lang = "ru";
       const filePath = path.join(dir, filename);
 
       const existing = await getPost({ slug, lang });
@@ -140,7 +139,7 @@ async function bootstrapProjectsFromJson() {
 
   let importedLangs = [];
 
-  for (const lang of ["ru", "en"]) {
+  for (const lang of ["ru"]) {
     const existing = await getProjects({ lang: safeLang(lang) });
     if (Array.isArray(existing) && existing.length) continue;
 
@@ -173,4 +172,3 @@ async function bootstrapFromLegacyContentIfEmpty() {
 }
 
 module.exports = { bootstrapFromLegacyContentIfEmpty };
-

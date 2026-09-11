@@ -215,10 +215,9 @@ function getSlugs(dir) {
 }
 
 function buildIndexForDir({ dir, slugs, lang }) {
-  const suffix = lang === "en" ? ".en" : "";
   const items = [];
   for (const slug of slugs) {
-    const mdPath = path.join(dir, `${slug}${suffix}.md`);
+    const mdPath = path.join(dir, `${slug}.md`);
     if (!fs.existsSync(mdPath)) continue;
     const md = fs.readFileSync(mdPath, "utf-8");
     const { title, excerpt } = extractTitleAndExcerpt(md);
@@ -261,17 +260,13 @@ function main() {
   const crmSlugs = getSlugs(CRM_DIR);
 
   const blogRu = buildIndexForDir({ dir: BLOG_DIR, slugs: blogSlugs, lang: "ru" });
-  const blogEn = buildIndexForDir({ dir: BLOG_DIR, slugs: blogSlugs, lang: "en" });
   const crmRu = buildIndexForDir({ dir: CRM_DIR, slugs: crmSlugs, lang: "ru" });
-  const crmEn = buildIndexForDir({ dir: CRM_DIR, slugs: crmSlugs, lang: "en" });
 
   writeJson("blog.ru.json", blogRu);
-  writeJson("blog.en.json", blogEn);
   writeJson("krasotulya-crm.ru.json", crmRu);
-  writeJson("krasotulya-crm.en.json", crmEn);
 
   console.log(
-    `[generate-content-index] blog: ${blogRu.length} ru / ${blogEn.length} en; krasotulya-crm: ${crmRu.length} ru / ${crmEn.length} en`
+    `[generate-content-index] blog: ${blogRu.length} ru; krasotulya-crm: ${crmRu.length} ru`
   );
 }
 

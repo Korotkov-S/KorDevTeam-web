@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "files": [],
-  "include": ["src/server/**/*.ts"],
+  "include": ["src/server/**/*.ts", "scripts/migrate-content-to-postgres.ts", "scripts/verify-content-migration.ts"],
   "exclude": ["src/server/**/*.test.ts"]
 }

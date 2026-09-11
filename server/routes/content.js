@@ -76,10 +76,6 @@ router.get("/:section", async (req, res, next) => {
     // Blog index is now sourced from SQLite (markdown files are optional/legacy).
     if (section === "blog") {
       let items = await listPostMetas({ lang });
-      if (lang !== "ru") {
-        const ruItems = await listPostMetas({ lang: "ru" });
-        items = mergeBlogImagesFromFallback(items, ruItems);
-      }
       return res.json({ section, lang, items });
     }
 

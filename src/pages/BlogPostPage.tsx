@@ -450,9 +450,7 @@ export function BlogPostPage() {
     const postMeta = blogPostsData[slug];
     if (postMeta) setMeta(postMeta);
 
-    const resolved = (i18n.resolvedLanguage || i18n.language || "en").toLowerCase();
-    const isRu = resolved === "ru" || resolved.startsWith("ru-");
-    const langSuffix = isRu ? "" : ".en";
+    const langSuffix = "";
 
     // If this page was statically pre-rendered, grab the markdown immediately to avoid a flash/spinner.
     let hasPrerender = false;
@@ -496,7 +494,7 @@ export function BlogPostPage() {
           if (hasPrerender) {
             loaded = true;
           } else {
-          const apiRes = await fetch(`/api/posts/${slug}?lang=${isRu ? "ru" : "en"}`);
+          const apiRes = await fetch(`/api/posts/${slug}?lang=ru`);
           if (apiRes.ok) {
             const data = (await apiRes.json()) as {
               post?: {
@@ -539,7 +537,7 @@ export function BlogPostPage() {
                 tags: Array.isArray(data.post.tags) ? data.post.tags : [],
               });
             } else {
-              setMeta(deriveMetaFromMarkdown(md, isRu ? "ru" : "en"));
+              setMeta(deriveMetaFromMarkdown(md, "ru"));
             }
             loaded = true;
           }
@@ -559,7 +557,7 @@ export function BlogPostPage() {
           setHasVideoMedia(hasMarkdownVideo(text));
           setContent(stripMarkdownImages(stripFirstMarkdownH1(text)));
           setOgImage(toAbsoluteOgImage(coverForUi));
-          setMeta(deriveMetaFromMarkdown(text, isRu ? "ru" : "en"));
+          setMeta(deriveMetaFromMarkdown(text, "ru"));
         }
       } catch (error) {
         console.error("Error loading markdown:", error);

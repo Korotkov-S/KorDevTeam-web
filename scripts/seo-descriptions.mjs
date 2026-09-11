@@ -75,45 +75,6 @@ export const SEO_DESCRIPTION_OVERRIDES = {
     "Как ускорить и оптимизировать WordPress-сайт: производительность, SEO, изображения, кэширование, безопасность и техническая поддержка.",
 };
 
-export const SEO_DESCRIPTION_OVERRIDES_EN = {
-  "argumentation-guide":
-    "How to build stronger arguments in client negotiations: IT project examples, objection handling, and choosing proof that moves decisions.",
-  "business-automation":
-    "How business process automation cuts manual work, errors, and lost leads with CRM, integrations, email campaigns, and implementation examples.",
-  "crm-implementation":
-    "How to choose and implement a CRM for sales: project stages, pipeline automation, analytics, integrations, and common business mistakes.",
-  "government-contractors-guide":
-    "How IT teams can work with government contractors: procurement rules, communication, deadline risks, and practical vendor guidelines.",
-  "harmonize-me-platform":
-    "Harmonize Me platform case study: online courses, personal accounts, gamification, bonuses, AI assistant, payments, and analytics.",
-  "harmonize-me-story":
-    "The HarmonizeMe service story: how an online platform helps users work with eating behavior through psychology, courses, and support.",
-  "krasotulya-crm-launch":
-    "Launching Krasotulya CRM for small businesses: product news, tutorials, feedback, workflow automation, and lower operating costs.",
-  "krasotulya-landing-launch":
-    "Krasotulya landing page launch: where to see the CRM demo, sign up, pay for a subscription, start using the product, and send feedback.",
-  "krasotulya-online-booking":
-    "Online booking in Krasotulya CRM: available slots, schedule setup, Telegram reminders, analytics, reviews, and branded booking pages.",
-  "krasotulya-problem-1-data-fragmentation":
-    "Why scattered data hurts small businesses and how Krasotulya CRM keeps clients, bookings, requests, and communications in one place.",
-  "krasotulya-problem-4-email-campaigns":
-    "How email campaigns in Krasotulya CRM help bring clients back with segments, personalized offers, and regular communication.",
-  "laravel-api-development":
-    "How to build APIs with Laravel: architecture, routes, validation, security, integrations, and practical approaches for web services.",
-  "nodejs-microservices":
-    "How to design Node.js microservices: responsibility boundaries, APIs, queues, scaling, monitoring, and reliability for production.",
-  "react-native-best-practices":
-    "React Native development best practices: app architecture, performance, navigation, state management, testing, and long-term support.",
-  "sims-dynasty-tree-platform":
-    "Sims Dynasty Tree case study: an online service for The Sims family trees, public links, customization, media, and premium features.",
-  "stone-calculator-automation":
-    "Stone product calculation automation case study: cost calculator, leads, CRM, less manual work, and faster order processing.",
-  "telegram-broadcast-automation":
-    "How to automate Telegram broadcasts with segments, scenarios, notifications, CRM integrations, and safer client communication.",
-  "wordpress-optimization":
-    "How to speed up and optimize a WordPress site: performance, SEO, images, caching, security, technical maintenance, and support.",
-};
-
 export const SEO_TITLE_OVERRIDES = {
   "ai-ops-business-automation-audit":
     "AI-автоматизация: аудит и AI-ops без хаоса",
@@ -129,14 +90,6 @@ export const SEO_TITLE_OVERRIDES = {
   "wordpress-optimization": "Оптимизация WordPress-сайта",
 };
 
-export const SEO_TITLE_OVERRIDES_EN = {
-  "business-automation": "Business Process Automation for Small Business",
-  "crm-implementation": "CRM Implementation for Small Business",
-  "telegram-broadcast-automation": "Telegram Broadcast Automation",
-  "stone-calculator-automation": "Website Cost Calculator",
-  "wordpress-optimization": "WordPress Website Optimization",
-};
-
 export function normalizeWhitespace(str) {
   return String(str || "").replace(/\s+/g, " ").trim();
 }
@@ -150,11 +103,11 @@ export function trimDescription(str, max = 160) {
 }
 
 export function getSeoDescription(slug, fallback, lang = "ru") {
-  const overrides = lang === "en" ? SEO_DESCRIPTION_OVERRIDES_EN : SEO_DESCRIPTION_OVERRIDES;
+  const overrides = SEO_DESCRIPTION_OVERRIDES;
   return trimDescription(overrides[slug] || fallback, 160);
 }
 
 export function getSeoTitle(slug, fallback, lang = "ru") {
-  const overrides = lang === "en" ? SEO_TITLE_OVERRIDES_EN : SEO_TITLE_OVERRIDES;
+  const overrides = SEO_TITLE_OVERRIDES;
   return normalizeWhitespace(overrides[slug] || fallback);
 }

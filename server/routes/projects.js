@@ -14,8 +14,7 @@ function getRoots() {
 }
 
 function getFilename(lang) {
-  const l = lang === "en" ? "en" : "ru";
-  return `projects.${l}.json`;
+  return "projects.ru.json";
 }
 
 function getProjectJsonReadPaths(lang) {
@@ -79,10 +78,6 @@ router.get("/", async (req, res, next) => {
     setPublicContentCache(res);
     const lang = safeLang((req.query.lang || "ru").toString());
     let projects = await getProjects({ lang });
-    if (lang !== "ru" && projects.length) {
-      const ruProjects = await getProjects({ lang: "ru" });
-      projects = mergeProjectImagesFromFallback(projects, ruProjects);
-    }
     if (projects.length) return res.json({ lang, projects });
 
     // Legacy fallback: read JSON from disk and import into DB.
@@ -91,10 +86,6 @@ router.get("/", async (req, res, next) => {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return res.status(500).json({ error: "Invalid legacy projects format" });
     let imported = await replaceProjects({ lang, projects: parsed });
-    if (lang !== "ru") {
-      const ruProjects = await getProjects({ lang: "ru" });
-      imported = mergeProjectImagesFromFallback(imported, ruProjects);
-    }
     return res.json({ lang, projects: imported, source: "legacy_file_imported" });
   } catch (e) {
     next(e);

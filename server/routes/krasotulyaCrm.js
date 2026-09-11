@@ -36,7 +36,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:slug", async (req, res, next) => {
   try {
     const { slug } = req.params;
-    const lang = (req.query.lang || "ru").toString() === "en" ? "en" : "ru";
+    const lang = "ru";
     const { content } = await getHandler().read(slug, lang);
     if (!content) return res.status(404).json({ error: "Post not found" });
     res.json({ slug, lang, content });
@@ -51,7 +51,7 @@ router.post("/", authenticate, async (req, res, next) => {
     const { slug, content, lang = "ru" } = req.body || {};
     if (!slug || !content) return res.status(400).json({ error: "slug and content are required" });
 
-    const normalizedLang = lang === "en" ? "en" : "ru";
+    const normalizedLang = "ru";
     const result = await getHandler().write(slug, content, normalizedLang);
     res.status(201).json({ message: "Created", slug, lang: normalizedLang, ...result });
   } catch (e) {
@@ -66,7 +66,7 @@ router.put("/:slug", authenticate, async (req, res, next) => {
     const { content, lang = "ru" } = req.body || {};
     if (!content) return res.status(400).json({ error: "content is required" });
 
-    const normalizedLang = lang === "en" ? "en" : "ru";
+    const normalizedLang = "ru";
     const existing = await getHandler().read(slug, normalizedLang);
     if (!existing.content) return res.status(404).json({ error: "Post not found" });
 
@@ -81,7 +81,7 @@ router.put("/:slug", authenticate, async (req, res, next) => {
 router.delete("/:slug", authenticate, async (req, res, next) => {
   try {
     const { slug } = req.params;
-    const lang = (req.query.lang || "ru").toString() === "en" ? "en" : "ru";
+    const lang = "ru";
     await getHandler().remove(slug, lang);
     res.json({ message: "Deleted", slug, lang });
   } catch (e) {
@@ -90,4 +90,3 @@ router.delete("/:slug", authenticate, async (req, res, next) => {
 });
 
 module.exports = router;
-

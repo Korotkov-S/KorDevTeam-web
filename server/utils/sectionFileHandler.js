@@ -2,7 +2,7 @@ const fs = require("fs").promises;
 const path = require("path");
 
 function filenameFor(slug, lang) {
-  return lang === "en" ? `${slug}.en.md` : `${slug}.md`;
+  return `${slug}.md`;
 }
 
 async function ensureDir(dir) {
@@ -114,4 +114,3 @@ module.exports = {
   createSectionHandler,
   filenameFor,
 };
-
