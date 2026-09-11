@@ -84,7 +84,7 @@
     "serve": "vite preview --port 4173",
     "start": "node server/runtime.mjs",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "test": "node --test tests/*.test.mjs server/utils/*.test.js && tsx --test tests/**/*.test.ts src/**/*.test.ts",
+    "test": "node --test tests/*.test.mjs server/utils/*.test.js scripts/*.test.mjs && node scripts/run-ts-tests.mjs",
     "build:blog": "vite build && node scripts/generate-blog-pages.mjs && node scripts/precompress-assets.mjs",
     "generate:blog": "node scripts/generate-blog-pages.mjs",
     "generate:content-index": "node scripts/generate-content-index.mjs",

@@ -2,6 +2,10 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
+export const DEFAULT_THEME: Theme = "dark";
+
+type ThemeStorage = Pick<Storage, "getItem">;
+
 interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
@@ -10,21 +14,19 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+export function getInitialTheme(): Theme {
+  return DEFAULT_THEME;
+}
+
+export function getStoredTheme(storage: ThemeStorage | null | undefined): Theme {
+  const savedTheme = storage?.getItem("theme");
+  return savedTheme === "light" || savedTheme === "dark"
+    ? savedTheme
+    : DEFAULT_THEME;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
-
-    // Проверяем localStorage для сохраненной темы
-    const savedTheme = localStorage.getItem("theme") as Theme;
-    if (savedTheme) {
-      return savedTheme;
-    }
-
-    // По умолчанию стартуем в dark (как в WOW-дизайне)
-    return "dark";
-  });
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -43,8 +45,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Применяем начальную тему
-    setTheme(theme);
+    // The server and first browser render use the same snapshot. Restore a
+    // persisted preference only after hydration has completed.
+    setTheme(getStoredTheme(window.localStorage));
 
     // Слушаем изменения системной темы
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
