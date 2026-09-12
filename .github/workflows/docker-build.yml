@@ -1,22 +1,46 @@
-name: Build and Deploy Docker Image
+name: Validate and publish immutable image
 
 on:
   push:
-    branches: [main, develop]
-    tags: ["v*"]
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_ref:
+        description: Exact GHCR image reference (ghcr.io/owner/repository@sha256:...)
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  DATABASE_URL: postgresql://kordev_ci:kordev_ci@127.0.0.1:5432/kordev_ci
+  TEST_DATABASE_URL: postgresql://kordev_ci:kordev_ci@127.0.0.1:5432/kordev_test
 
 jobs:
   build-and-push:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      image-digest: ${{ steps.release.outputs.image_digest }}
+      image-ref: ${{ steps.release.outputs.image_ref }}
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kordev_ci
+          POSTGRES_PASSWORD: kordev_ci
+          POSTGRES_DB: kordev_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kordev_ci -d kordev_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - name: Checkout repository
@@ -25,89 +49,178 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: ".nvmrc"
+          node-version-file: .nvmrc
 
-      - name: Install Yarn 3.8.7
+      - name: Install locked dependencies
         run: |
+          set -euo pipefail
           corepack enable
-          yarn set version 3.8.7 --only-if-needed
-          yarn install
+          corepack prepare yarn@3.8.7 --activate
+          test "$(yarn --version)" = "3.8.7"
+          yarn install --immutable
+
+      - name: Prepare test database
+        run: >-
+          node --input-type=module --eval
+          'import { Client } from "pg";
+          const client = new Client({ connectionString: process.env.DATABASE_URL });
+          await client.connect();
+          try { await client.query("CREATE DATABASE kordev_test"); }
+          finally { await client.end(); }'
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Test
+        run: yarn test
+
+      - name: Build application
+        run: yarn build
+
+      - name: Prepare crawler database
+        run: |
+          yarn db:migrate
+          yarn content:migrate --batch-id "ci-${GITHUB_SHA}"
+
+      - name: Crawl built site
+        run: |
+          set -euo pipefail
+          runtime_log="$RUNNER_TEMP/kordev-runtime.log"
+          yarn start >"$runtime_log" 2>&1 &
+          runtime_pid=$!
+          cleanup() {
+            kill "$runtime_pid" 2>/dev/null || true
+            wait "$runtime_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:3001/api/health/ready >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$runtime_pid" 2>/dev/null; then
+              echo "Built runtime exited before readiness" >&2
+              exit 1
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "Built runtime did not become ready" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          yarn seo:crawl --origin http://127.0.0.1:3001
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Resolve canonical image name
+        id: image
+        run: echo "name=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and publish immutable image
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          build-args: RELEASE_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy via SSH
+      - name: Capture canonical pushed digest
+        id: release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image_ref="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "image_ref=$image_ref" >> "$GITHUB_OUTPUT"
+          umask 077
+          printf '%s\n' "$image_ref" > release-image-ref.txt
+          {
+            echo "## Immutable image published"
+            echo
+            echo "Commit: \`${GITHUB_SHA}\`"
+            echo "Digest: \`${IMAGE_DIGEST}\`"
+            echo "Exact reference: \`${image_ref}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release evidence
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-image-${{ github.sha }}
+          path: release-image-ref.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: kordevteam-production
+      cancel-in-progress: false
+    permissions:
+      contents: none
+      packages: read
+    env:
+      IMAGE_REF: ${{ inputs.image_ref }}
+
+    steps:
+      - name: Validate immutable production image
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_REF" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]]
+          [[ "${IMAGE_REF%@*}" == "ghcr.io/${GITHUB_REPOSITORY,,}" ]]
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify published manifest
+        run: docker buildx imagetools inspect "$IMAGE_REF" >/dev/null
+
+      - name: Deploy checked inactive slot and switch production
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          envs: IMAGE_REF
           script: |
-            set -e
-            echo "🚀 Starting Adonis app deployment..."
-            cd kordevteam
-
-            echo "🔑 Logging into Docker registry..."
-            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ghcr.io -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
-
-            echo "📦 Pulling latest image..."
-            docker compose -f docker-compose.team.yml pull
-
-            echo "🔄 Restarting containers..."
-            docker compose -f docker-compose.team.yml up -d
-
-            echo "✅ Deployment & migrations complete!"
-
-      - name: Generate deployment summary
-        run: |
-          echo "## 🐳 Docker Image Built Successfully" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 How to use:" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "# Pull the image" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "# Run the container" >> $GITHUB_STEP_SUMMARY
-          echo "docker run -p 80:80 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+            bash -se <<'KORDEV_RELEASE'
+            set -euo pipefail
+            cd /opt/kordevteam/current
+            set -a
+            source /etc/kordevteam/operations.env
+            set +a
+            current="$(sed -n 's/^# current-slot: //p' "$TRAEFIK_DYNAMIC_FILE")"
+            case "$current" in
+              blue) inactive=green ;;
+              green) inactive=blue ;;
+              *) echo "Invalid current-slot state" >&2; exit 1 ;;
+            esac
+            bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF"
+            bash scripts/switch-slot.sh "$inactive"
+            bash scripts/prune-releases.sh "${RELEASES_DIR:?RELEASES_DIR is required}"
+            KORDEV_RELEASE

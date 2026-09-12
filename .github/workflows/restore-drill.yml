@@ -1,0 +1,140 @@
+name: Monthly production backup restore drill
+
+on:
+  schedule:
+    - cron: "17 3 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: kordevteam-restore-drill
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout immutable tooling revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify immutable tooling revision
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install locked repository tooling
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare yarn@3.8.7 --activate
+          test "$(yarn --version)" = "3.8.7"
+          yarn install --immutable
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends age awscli postgresql-client
+
+      - name: Restore newest private backup
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TIMEWEB_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TIMEWEB_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.TIMEWEB_S3_REGION }}
+          S3_ENDPOINT: ${{ secrets.TIMEWEB_S3_ENDPOINT }}
+          BACKUP_S3_URI: ${{ secrets.TIMEWEB_BACKUP_S3_URI }}
+          RESTORE_AGE_IDENTITY: ${{ secrets.RESTORE_AGE_IDENTITY }}
+          PRODUCTION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          export RESTORE_CONFIRM=non-production
+          RESTORE_CONTAINER="kordev-restore-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          RESTORE_VOLUME="kordev-restore-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          report="$RUNNER_TEMP/restore-drill-report.json"
+          identity_file="$RUNNER_TEMP/kordev-restore-age-identity"
+          status=failed
+          cleanup() {
+            original_status=$?
+            set +e
+            if docker container inspect "$RESTORE_CONTAINER" >/dev/null 2>&1; then
+              docker rm -f -- "$RESTORE_CONTAINER" >/dev/null
+              container_status=$?
+            else
+              container_status=0
+            fi
+            if docker volume inspect "$RESTORE_VOLUME" >/dev/null 2>&1; then
+              docker volume rm -- "$RESTORE_VOLUME" >/dev/null
+              volume_status=$?
+            else
+              volume_status=0
+            fi
+            rm -f -- "$identity_file"
+            identity_status=$?
+            final_status=$original_status
+            if [ "$final_status" -eq 0 ] && { [ "$container_status" -ne 0 ] || [ "$volume_status" -ne 0 ] || [ "$identity_status" -ne 0 ]; }; then
+              final_status=1
+              status=cleanup_failed
+            fi
+            printf '{"result":"%s","toolingSha":"%s","database":"kordev_restore","checks":["archive checksum","manifest","schema inventory","migration history","published counts"]}\n' "$status" "$GITHUB_SHA" > "$report"
+            trap - EXIT
+            exit "$final_status"
+          }
+          trap cleanup EXIT
+
+          umask 077
+          printf '%s\n' "$RESTORE_AGE_IDENTITY" > "$identity_file"
+
+          docker volume create --name "$RESTORE_VOLUME" >/dev/null
+          docker run --detach \
+            --name "$RESTORE_CONTAINER" \
+            --volume "$RESTORE_VOLUME:/var/lib/postgresql/data" \
+            --publish 127.0.0.1::5432 \
+            --env POSTGRES_USER=kordev_restore \
+            --env POSTGRES_PASSWORD=restore_only_ci_password \
+            --env POSTGRES_DB=kordev_restore \
+            postgres:16-alpine >/dev/null
+          for attempt in $(seq 1 30); do
+            if docker exec "$RESTORE_CONTAINER" pg_isready --username kordev_restore --dbname kordev_restore >/dev/null 2>&1; then
+              break
+            fi
+            [ "$attempt" -lt 30 ] || { echo "Disposable PostgreSQL did not become ready" >&2; exit 1; }
+            sleep 2
+          done
+          restore_port="$(docker port "$RESTORE_CONTAINER" 5432/tcp | sed -n 's/.*://p')"
+          [[ "$restore_port" =~ ^[0-9]+$ ]]
+          export RESTORE_DATABASE_URL="postgresql://kordev_restore:restore_only_ci_password@127.0.0.1:${restore_port}/kordev_restore"
+          export AGE_IDENTITY_FILE="$identity_file"
+
+          backup_uri="${BACKUP_S3_URI%/}"
+          bucket_and_prefix="${backup_uri#s3://}"
+          bucket="${bucket_and_prefix%%/*}"
+          prefix="${bucket_and_prefix#*/}"
+          test -n "$bucket"
+          test "$prefix" != "$bucket_and_prefix"
+          object_key="$(aws --endpoint-url "$S3_ENDPOINT" s3api list-objects-v2 \
+            --bucket "$bucket" \
+            --prefix "${prefix}/" \
+            --query 'reverse(sort_by(Contents[?ends_with(Key, `.tar.age`)], &LastModified))[0].Key' \
+            --output text)"
+          test -n "$object_key"
+          test "$object_key" != None
+
+          bash scripts/restore-postgres.sh "$object_key" >/dev/null
+          status=verified
+
+      - name: Upload sanitized restore report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-drill-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/restore-drill-report.json
+          if-no-files-found: error
+          retention-days: 30
