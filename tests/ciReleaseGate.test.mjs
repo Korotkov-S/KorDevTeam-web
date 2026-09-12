@@ -14,16 +14,19 @@ const loadWorkflow = path => {
 
 const stepIndex = (steps, name) => steps.findIndex(step => step.name === name);
 
-test("main publication runs every application gate before the immutable image push", () => {
+test("read-only validation gates a separate trusted main publisher", () => {
   const { source, value: workflow } = loadWorkflow(".github/workflows/docker-build.yml");
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.deepEqual(workflow.on.pull_request.branches, ["main"]);
   assert.equal(workflow.on.workflow_dispatch.inputs.image_ref.required, true);
 
-  const job = workflow.jobs["build-and-push"];
-  assert.match(job.if, /workflow_dispatch/);
-  assert.equal(job.services.postgres.image, "postgres:16-alpine");
-  const steps = job.steps;
+  const validation = workflow.jobs.validate;
+  assert.ok(validation, "validate job must exist");
+  assert.match(validation.if, /workflow_dispatch/);
+  assert.deepEqual(validation.permissions, { contents: "read" });
+  assert.ok(!Object.values(validation.permissions).includes("write"), "PR validation must have no write token authority");
+  assert.equal(validation.services.postgres.image, "postgres:16-alpine");
+  const steps = validation.steps;
   const gates = [
     "Install locked dependencies",
     "Typecheck",
@@ -36,14 +39,24 @@ test("main publication runs every application gate before the immutable image pu
     assert.notEqual(stepIndex(steps, name), -1, `${name} must exist`);
     if (index) assert.ok(stepIndex(steps, gates[index - 1]) < stepIndex(steps, name), `${gates[index - 1]} must precede ${name}`);
   }
-  const publish = steps.find(step => step.name === "Build and publish immutable image");
-  assert.ok(publish);
-  assert.ok(stepIndex(steps, "Crawl built site") < stepIndex(steps, publish.name));
-  assert.equal(publish.with.push, "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}");
+  const validationBuild = steps.find(step => step.name === "Build image without publishing");
+  assert.ok(validationBuild);
+  assert.equal(validationBuild.with.push, false);
+  assert.ok(stepIndex(steps, "Crawl built site") < stepIndex(steps, validationBuild.name));
+
+  const publisher = workflow.jobs["publish-image"];
+  assert.ok(publisher, "publish-image job must exist");
+  assert.equal(publisher.needs, "validate");
+  assert.equal(publisher.if, "github.event_name == 'push' && github.ref == 'refs/heads/main'");
+  assert.deepEqual(publisher.permissions, { contents: "read", packages: "write" });
+  const checkout = publisher.steps.find(step => /actions\/checkout@v4$/.test(step.uses));
+  assert.equal(checkout.with.ref, "${{ github.sha }}");
+  const publish = publisher.steps.find(step => step.name === "Build and publish immutable image");
+  assert.equal(publish.with.push, true);
   assert.match(publish.with.tags, /\$\{\{ github\.sha \}\}/);
   assert.doesNotMatch(publish.with.tags, /(?:^|:)latest(?:$|\s)/m);
-  assert.ok(job.outputs["image-digest"]);
-  assert.ok(job.outputs["image-ref"]);
+  assert.ok(publisher.outputs["image-digest"]);
+  assert.ok(publisher.outputs["image-ref"]);
   assert.match(source, /upload-artifact@v4/);
   assert.match(source, /GITHUB_STEP_SUMMARY/);
 });
@@ -79,6 +92,8 @@ test("restore drill uses an exact disposable database container and bounded clea
   assert.ok(workflow.on.schedule.some(entry => entry.cron));
   assert.ok(Object.hasOwn(workflow.on, "workflow_dispatch"));
   const job = workflow.jobs["restore-drill"];
+  assert.equal(job.environment, "restore-drill");
+  assert.doesNotMatch(source, /secrets\.SSH_(?:HOST|USER|KEY)/, "restore drill must not receive production SSH authority");
   const checkout = job.steps.find(step => /actions\/checkout@v4$/.test(step.uses));
   assert.equal(checkout.with.ref, "${{ github.sha }}");
   const drill = job.steps.find(step => step.name === "Restore newest private backup");
@@ -136,5 +151,27 @@ test("operator runbook covers approval, exact switching, rollback and public evi
     "BACKUP_S3_URI",
     "AGE_IDENTITY_FILE",
   ]) assert.match(source, new RegExp(evidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), `runbook must cover ${evidence}`);
+  assert.match(source, /SSH_HOST[^\n]+SSH_USER[^\n]+SSH_KEY[^\n]+production[^\n]+environment secrets/i);
+  assert.match(source, /restore-drill[^\n]+environment|read-only S3/i);
+  assert.match(source, /least[- ]privilege|scoped policy/i);
+  assert.match(source, /never[^\n]+production SSH key/i);
   assert.doesNotMatch(source, /staging/i);
+});
+
+test("operator rehearsal loads trusted config before variables and fails before switch", () => {
+  const source = readFileSync("docs/operations/production-release.md", "utf8");
+  const section = source.match(/For an operator rehearsal[\s\S]*?```bash\n([\s\S]*?)\n```/)?.[1];
+  assert.ok(section, "operator rehearsal shell block must exist");
+  const strict = section.indexOf("set -euo pipefail");
+  const checkout = section.indexOf("cd /opt/kordevteam/current");
+  const exportAll = section.indexOf("set -a");
+  const config = section.indexOf("source /etc/kordevteam/operations.env");
+  const stopExport = section.indexOf("set +a");
+  const image = section.indexOf("IMAGE_REF=");
+  const current = section.indexOf("current=");
+  const deploy = section.indexOf("scripts/deploy-slot.sh");
+  const switchSlot = section.indexOf("scripts/switch-slot.sh");
+  assert.ok([strict, checkout, exportAll, config, stopExport, image, current, deploy, switchSlot].every(index => index >= 0));
+  assert.ok(strict < checkout && checkout < exportAll && exportAll < config && config < stopExport);
+  assert.ok(stopExport < image && image < current && current < deploy && deploy < switchSlot);
 });

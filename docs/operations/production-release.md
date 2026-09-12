@@ -6,7 +6,9 @@ Production changes only after an operator starts `workflow_dispatch` with an exa
 
 Create the GitHub environment `production` under **Settings → Environments**. When the repository plan supports deployment protection rules, enable **Required reviewers**, select the owner, and disable self-review if a second operator is required. Keep branch/tag deployment rules limited to the default branch. The workflow also requires `workflow_dispatch`: if required reviewers are not available, manually starting that dispatch with an exact digest is the fallback approval boundary. Restrict Actions write access to trusted operators.
 
-Repository or environment secrets used by the release workflow are named `SSH_HOST`, `SSH_USER`, and `SSH_KEY`. The restore workflow uses `TIMEWEB_S3_ACCESS_KEY_ID`, `TIMEWEB_S3_SECRET_ACCESS_KEY`, `TIMEWEB_S3_REGION`, `TIMEWEB_S3_ENDPOINT`, `TIMEWEB_BACKUP_S3_URI`, `RESTORE_AGE_IDENTITY`, and `PRODUCTION_DATABASE_URL`. Store values only in GitHub secrets; do not put them in workflow YAML, artifacts, summaries, or logs.
+`SSH_HOST`, `SSH_USER`, and `SSH_KEY` are required `production` environment secrets; do not create them as repository secrets. This keeps SSH authority behind the production protection rules and unavailable to validation or restore jobs.
+
+The restore workflow uses `TIMEWEB_S3_ACCESS_KEY_ID`, `TIMEWEB_S3_SECRET_ACCESS_KEY`, `TIMEWEB_S3_REGION`, `TIMEWEB_S3_ENDPOINT`, `TIMEWEB_BACKUP_S3_URI`, `RESTORE_AGE_IDENTITY`, and `PRODUCTION_DATABASE_URL`. Prefer a separate `restore-drill` environment without a required-reviewer rule so the monthly schedule remains unattended. If that environment feature is unavailable, use carefully scoped repository secrets dedicated only to the restore drill. The Timeweb identity requires a least-privilege, read-only S3 policy: allow bucket listing only for the configured private backup prefix and object reads only below that prefix; do not grant object write, delete, bucket administration, or access to other prefixes. Never give the restore workflow the production SSH key or any SSH/VPS permission. Store values only in GitHub secrets; do not put them in workflow YAML, artifacts, summaries, or logs.
 
 Install the audited repository checkout at `/opt/kordevteam/current`. The SSH account must already be authenticated to pull the private GHCR package. Keep `/etc/kordevteam/operations.env` owned by that account, mode `0600`, and treat it as trusted shell configuration. It defines `PRODUCTION_HOST`, `PUBLIC_ORIGIN`, `DEPLOY_STATE_DIR`, `TRAEFIK_DYNAMIC_FILE`, `LOG_ARCHIVE_DIR`, `RELEASES_DIR`, `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BACKUP_DATABASE_URL`, `AGE_RECIPIENT`, `BACKUP_S3_URI`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION`. Define `COMPOSE_FILE` and `TRAEFIK_NETWORK` when host paths/names differ from repository defaults. Application settings, when enabled, are `ADMIN_TOKEN`, `S3_BUCKET`, `S3_PUBLIC_BASE_URL`, `S3_ACCESS_KEY`, and `S3_SECRET_KEY`. `AGE_IDENTITY_FILE` is required only for restore operations and must be an absolute mode-`0600` file.
 
@@ -39,6 +41,11 @@ To proceed, open **Run workflow**, paste that complete `@sha256:` reference into
 For an operator rehearsal, the exact sequence run over SSH is:
 
 ```bash
+set -euo pipefail
+cd /opt/kordevteam/current
+set -a
+source /etc/kordevteam/operations.env
+set +a
 IMAGE_REF='ghcr.io/<owner>/<repository>@sha256:<64 lowercase hex>'
 current="$(sed -n 's/^# current-slot: //p' "$TRAEFIK_DYNAMIC_FILE")"
 case "$current" in blue) inactive=green ;; green) inactive=blue ;; *) exit 1 ;; esac

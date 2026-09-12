@@ -16,6 +16,7 @@ jobs:
   restore-drill:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment: restore-drill
 
     steps:
       - name: Checkout immutable tooling revision
