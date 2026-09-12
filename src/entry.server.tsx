@@ -4,6 +4,7 @@ import { ServerRouter } from "react-router";
 import { renderToPipeableStream } from "react-dom/server";
 export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
+export { checkDatabaseReady } from "./server/db/client";
 
 export default function handleRequest(
   request: Request,

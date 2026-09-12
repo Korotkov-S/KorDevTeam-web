@@ -10,7 +10,7 @@ const mediaRouter = require("./routes/media");
 
 dotenv.config();
 
-function createApiApp() {
+function createApiApp({ checkReady } = {}) {
   const api = express.Router();
 
   api.use(cors());
@@ -36,6 +36,17 @@ function createApiApp() {
 
   api.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  api.get("/api/health/ready", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      if (typeof checkReady !== "function") throw new Error("Database probe unavailable");
+      await checkReady();
+      res.json({ status: "ready" });
+    } catch {
+      res.status(503).json({ status: "not_ready" });
+    }
   });
 
   api.use((err, req, res, next) => {

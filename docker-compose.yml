@@ -1,4 +1,23 @@
-version: "3.8"
+x-web: &web
+  image: kordevteam:local
+  build:
+    context: .
+    target: production
+    args:
+      RELEASE_SHA: ${RELEASE_SHA:-local-rehearsal}
+  environment:
+    NODE_ENV: production
+    PORT: "3001"
+    DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
+  depends_on:
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 20m
+      max-file: "30"
 
 services:
   postgres:
@@ -6,7 +25,7 @@ services:
     ports:
       - "127.0.0.1:5433:5432"
     environment:
-      # Development-only local credentials.
+      # Development-only credentials; production config requires secrets.
       POSTGRES_USER: kordev
       POSTGRES_PASSWORD: kordev
       POSTGRES_DB: kordev
@@ -18,58 +37,17 @@ services:
     volumes:
       - kordevteam_postgres:/var/lib/postgresql/data
       - ./deploy/postgres/init/001-test-database.sql:/docker-entrypoint-initdb.d/001-test-database.sql:ro
-
-  kordevteam:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+  kordevteam-blue:
+    <<: *web
+    container_name: kordevteam-blue
     ports:
-      - "8080:80"
-    environment:
-      - NODE_ENV=production
-      - PORT=80
-      # Where the API should read/write runtime content (uploads, editable markdown/json)
-      - CONTENT_DIST_ROOT=/app/dist
-      # Persist SQLite DB to a docker volume
-      - SQLITE_PATH=/app/server/data/content.sqlite
-      - DATABASE_URL=postgresql://kordev:kordev@postgres:5432/kordev
-    restart: unless-stopped
-    volumes:
-      - kordevteam_sqlite:/app/server/data
-      # Persist blog uploaded images across rebuilds (served from /blog/uploads/*)
-      - kordevteam_blog_uploads:/app/dist/blog/uploads
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.kordevteam.rule=Host(`kordevteam.local`)"
-      - "traefik.http.routers.kordevteam.tls=true"
-      - "traefik.http.routers.kordevteam.tls.certresolver=letsencrypt"
-
-  # Alternative: Use pre-built image from registry
-  kordevteam-registry:
-    image: ghcr.io/korotkov-s/kordevteam:latest
+      - "127.0.0.1:8081:3001"
+  kordevteam-green:
+    <<: *web
+    container_name: kordevteam-green
     ports:
-      - "8081:80"
-    environment:
-      - NODE_ENV=production
-      # Where the API should read/write runtime content (uploads, editable markdown/json)
-      - CONTENT_DIST_ROOT=/app/dist
-      - SQLITE_PATH=/app/server/data/content.sqlite
-    restart: unless-stopped
-    volumes:
-      - kordevteam_sqlite_registry:/app/server/data
-      - kordevteam_blog_uploads_registry:/app/dist/blog/uploads
-    profiles:
-      - registry
+      - "127.0.0.1:8082:3001"
 
 volumes:
   kordevteam_postgres:
     name: kordevteam_postgres
-  kordevteam_sqlite:
-    name: kordevteam_sqlite
-  kordevteam_sqlite_registry:
-    name: kordevteam_sqlite_registry
-  kordevteam_blog_uploads:
-    name: kordevteam_blog_uploads
-  kordevteam_blog_uploads_registry:
-    name: kordevteam_blog_uploads_registry

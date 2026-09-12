@@ -1,0 +1,11 @@
+[Unit]
+Description=Encrypted daily PostgreSQL snapshot for KorDevTeam
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/kordevteam/current
+EnvironmentFile=/etc/kordevteam/operations.env
+Environment=BACKUP_REASON=daily
+ExecStart=/bin/bash /opt/kordevteam/current/scripts/backup-postgres.sh
+UMask=0077

@@ -1,0 +1,9 @@
+[Unit]
+Description=Archive the previous 24 hours of KorDevTeam web logs
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/kordevteam/current
+ExecStart=/bin/bash /opt/kordevteam/current/scripts/archive-web-logs.sh /var/log/kordevteam
+UMask=0077

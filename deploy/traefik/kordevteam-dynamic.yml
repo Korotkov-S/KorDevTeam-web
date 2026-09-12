@@ -1,0 +1,23 @@
+# Bootstrap template: install once with the real host and verified blue slot.
+# Mount the containing directory into Traefik; do not bind-mount this file alone.
+# current-slot: blue
+# previous-slot: none
+http:
+  routers:
+    kordevteam:
+      rule: "Host(`kordevteam.example`)"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      service: kordevteam-active
+      middlewares: [kordevteam-slot]
+  middlewares:
+    kordevteam-slot:
+      headers:
+        customResponseHeaders:
+          X-Kordev-Slot: blue
+  services:
+    kordevteam-active:
+      loadBalancer:
+        servers:
+          - url: "http://kordevteam-blue:3001"

@@ -28,7 +28,7 @@ app.use(async (req, res, next) => {
   if (target) return res.set("Cache-Control", "no-cache").redirect(308, target.href);
   next();
 });
-app.use(createApiApp());
+app.use(createApiApp({ checkReady: build.entry.module.checkDatabaseReady }));
 app.use(
   "/assets",
   express.static("build/client/assets", { immutable: true, maxAge: "1y" }),
