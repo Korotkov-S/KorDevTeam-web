@@ -13,9 +13,9 @@ import { startTestRuntime } from "../ssr/support/runtime";
 import { escapeXml } from "../../src/server/seo/sitemaps";
 import { staticContentDates } from "../../src/server/seo/staticContentDates";
 
-function runCrawler(origin: string) {
+function runCrawler(origin: string, args: string[] = []) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
-    const child = spawn(process.execPath, ["--import", "tsx", "scripts/seo-crawl.ts", "--origin", origin]);
+    const child = spawn(process.execPath, ["--import", "tsx", "scripts/seo-crawl.ts", "--origin", origin, ...args]);
     let stdout = "", stderr = "";
     child.stdout.on("data", data => stdout += data);
     child.stderr.on("data", data => stderr += data);
@@ -86,6 +86,47 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   const crawl = await runCrawler(runtime.origin);
   assert.equal(crawl.code, 0, crawl.stdout + crawl.stderr);
   assert.equal(JSON.parse(crawl.stdout).ok, true);
+});
+
+test("crawler CLI enforces one fetch budget across sitemap entries, canonical targets and high-fanout links", { timeout: 120_000 }, async t => {
+  for (const scenario of ["links", "canonical", "sitemap"] as const) {
+    await t.test(scenario, async t => {
+      const requests = new Map<string, number>();
+      const manyPaths = Array.from({ length: 30 }, (_, index) => `/page-${index}/`);
+      const server = createServer((req, res) => {
+        const pathname = req.url!;
+        requests.set(pathname, (requests.get(pathname) || 0) + 1);
+        if (pathname === "/sitemap-index.xml") {
+          res.setHeader("Content-Type", "application/xml");
+          res.end(`<sitemapindex>${["pages", "blog"].map(name => `<sitemap><loc>https://kordev.team/sitemap-${name}.xml</loc></sitemap>`).join("")}</sitemapindex>`);
+        } else if (pathname.startsWith("/sitemap-")) {
+          const paths = pathname === "/sitemap-blog.xml" ? [] : scenario === "sitemap" ? ["/", ...manyPaths] : ["/"];
+          res.setHeader("Content-Type", "application/xml");
+          res.end(`<urlset>${paths.map(path => `<url><loc>https://kordev.team${path}</loc><lastmod>2025-01-02T03:04:05.000Z</lastmod></url>`).join("")}</urlset>`);
+        } else {
+          res.setHeader("Content-Type", "text/html");
+          const canonical = scenario === "canonical" ? "/canonical-target/" : pathname;
+          const links = scenario === "sitemap" ? [] : [...manyPaths, ...manyPaths, "/#again", "/canonical-target/#again"];
+          res.end(`<!doctype html><html lang="ru"><head><title>Title ${pathname}</title><meta name="description" content="Description ${pathname}"><link rel="canonical" href="https://kordev.team${canonical}"><script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage"}</script></head><body><h1>Heading</h1>${links.map(path => `<a href="${path}">Next</a>`).join("")}</body></html>`);
+        }
+      });
+      await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+      t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+      const address = server.address(); assert.ok(address && typeof address !== "string");
+      // Three sitemap documents plus at most three distinct content destinations.
+      const result = await runCrawler(`http://127.0.0.1:${address.port}`, ["--max-urls", "6"]);
+      const count = [...requests.values()].reduce((sum, value) => sum + value, 0);
+      assert.ok(count <= 6, `Budget 6 exceeded: ${count} network requests`);
+      assert.equal(count, 6, result.stdout + result.stderr);
+      assert.ok([...requests.values()].every(value => value === 1), "Each URL is fetched at most once");
+      assert.equal(result.code, 1, result.stdout + result.stderr);
+      const summary = JSON.parse(result.stdout);
+      assert.equal(summary.ok, false);
+      assert.equal(summary.violations.filter((item: { code: string }) => item.code === "crawl-limit").length, 1, result.stdout);
+      assert.ok(summary.violations.length <= 2, "Budget exhaustion must not generate a violation per skipped link");
+      if (scenario === "canonical") assert.equal(requests.get("/canonical-target/"), 1);
+    });
+  }
 });
 
 test("XML escaping preserves all reserved characters and static content dates are ISO, historical and stable", () => {

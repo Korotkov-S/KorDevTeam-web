@@ -5,30 +5,42 @@ const SITE = "https://kordev.team";
 type Violation = { url: string; code: string; detail: string };
 type Summary = { ok: boolean; origin: string; sitemapUrls: number; internalUrls: number; violations: Violation[] };
 
-export async function crawlSite(origin: string): Promise<Summary> {
+export async function crawlSite(origin: string, { maxUrls = 5000 }: { maxUrls?: number } = {}): Promise<Summary> {
   const target = new URL(origin);
   if (!["http:", "https:"].includes(target.protocol) || target.username || target.password || target.pathname !== "/" || target.search || target.hash) throw new Error("--origin must be an HTTP(S) origin without credentials, path or query");
+  if (!Number.isSafeInteger(maxUrls) || maxUrls < 1) throw new Error("--max-urls must be a positive safe integer");
   const summary: Summary = { ok: false, origin: target.origin, sitemapUrls: 0, internalUrls: 0, violations: [] };
   const fail = (url: string, code: string, detail: string) => summary.violations.push({ url, code, detail });
   const local = (url: string) => { const parsed = new URL(url); return `${target.origin}${parsed.pathname}${parsed.search}`; };
   const fetches = new Map<string, Promise<{ status: number; type: string; body: string }>>();
+  let budgetExceeded = false;
   function get(url: string) {
     const destination = local(url);
     let pending = fetches.get(destination);
     if (!pending) {
-      pending = (async () => {
+      // One shared budget covers sitemap documents, canonicals and internal
+      // destinations. Cached URLs consume no extra slots. Browser navigations
+      // below are fulfilled from this cache, not fetched a second time.
+      if (fetches.size >= maxUrls) {
+        if (!budgetExceeded) fail(url, "crawl-limit", `Document fetch budget of ${maxUrls} URLs exhausted`);
+        budgetExceeded = true;
+        return Promise.resolve(null);
+      }
+      // Reserve the cache slot synchronously before starting network work.
+      pending = Promise.resolve().then(async () => {
         const response = await fetch(destination, { redirect: "manual", headers: { accept: "text/html, application/xml;q=0.9" }, signal: AbortSignal.timeout(15_000) });
         const type = response.headers.get("content-type") || "";
         if (/text\/|xml|json/.test(type)) return { status: response.status, type, body: await response.text() };
         await response.body?.cancel();
         return { status: response.status, type, body: "" };
-      })().catch(error => { fail(url, "fetch", String(error)); return { status: 0, type: "", body: "" }; });
+      }).catch(error => { fail(url, "fetch", String(error)); return { status: 0, type: "", body: "" }; });
       fetches.set(destination, pending);
     }
     return pending;
   }
   async function sitemap(url: string, root: string) {
     const response = await get(url);
+    if (!response) return null;
     if (response.status !== 200) fail(url, "sitemap-status", `Expected 200, received ${response.status}`);
     const $ = load(response.body, { xml: true });
     if (!/xml/.test(response.type) || $(root).length !== 1) fail(url, "sitemap-xml", `Expected XML ${root}`);
@@ -36,6 +48,7 @@ export async function crawlSite(origin: string): Promise<Summary> {
   }
   const indexUrl = `${SITE}/sitemap-index.xml`;
   const index = await sitemap(indexUrl, "sitemapindex");
+  if (!index) return summary;
   const children = index("sitemap > loc").map((_, el) => index(el).text()).get();
   const expectedChildren = [`${SITE}/sitemap-pages.xml`, `${SITE}/sitemap-blog.xml`];
   if (JSON.stringify([...children].sort()) !== JSON.stringify([...expectedChildren].sort())) fail(indexUrl, "sitemap-index", "Index must list exactly pages and blog sitemaps");
@@ -43,6 +56,7 @@ export async function crawlSite(origin: string): Promise<Summary> {
   // Only these exact trusted child paths are fetched, even for a malformed index.
   for (const child of expectedChildren) {
     const $ = await sitemap(child, "urlset");
+    if (!$) { summary.sitemapUrls = urls.size; return summary; }
     for (const element of $("url").toArray()) {
       const url = $(element).find("loc").text();
       const lastmod = $(element).find("lastmod").text();
@@ -58,6 +72,7 @@ export async function crawlSite(origin: string): Promise<Summary> {
   summary.sitemapUrls = urls.size;
   const titles = new Map<string, string>(), descriptions = new Map<string, string>();
   const queue = [...urls];
+  const queued = new Set(queue.map(local));
   const visited = new Set<string>();
   const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
   try {
@@ -70,12 +85,12 @@ export async function crawlSite(origin: string): Promise<Summary> {
       else if (["stylesheet", "font"].includes(request.resourceType()) && new URL(request.url()).origin === target.origin) void request.continue();
       else void request.abort();
     });
-    while (queue.length) {
+    while (queue.length && !budgetExceeded) {
       const url = queue.shift()!;
       if (visited.has(url)) continue;
-      if (visited.size >= 5000) { fail(url, "crawl-limit", "Internal crawl exceeded 5000 URLs"); break; }
-      visited.add(url);
       const response = await get(url);
+      if (!response) break;
+      visited.add(url);
       if (response.status !== 200) { fail(url, urls.has(url) ? "status" : "internal-link", `Expected 200 without redirects, received ${response.status}`); continue; }
       if (!response.type.includes("text/html")) {
         if (urls.has(url)) fail(url, "html", "Sitemap URL is not an HTML document");
@@ -95,7 +110,11 @@ export async function crawlSite(origin: string): Promise<Summary> {
         if (canonicals.length !== 1 || canonical !== url) fail(url, "canonical", `Expected self-canonical ${url}; received ${canonical}`);
         if (canonical) {
           try {
-            if (new URL(canonical).origin === SITE && (await get(canonical)).status !== 200) fail(url, "canonical", "Canonical destination does not return 200");
+            if (new URL(canonical).origin === SITE) {
+              const destination = await get(canonical);
+              if (!destination) break;
+              if (destination.status !== 200) fail(url, "canonical", "Canonical destination does not return 200");
+            }
           } catch { fail(url, "canonical", "Invalid canonical URL"); }
         }
         if ($("html").attr("lang") !== "ru") fail(url, "lang", "Expected lang=ru");
@@ -132,8 +151,10 @@ export async function crawlSite(origin: string): Promise<Summary> {
           link.hash = "";
           const destination = `${SITE}${link.pathname}${link.search}`;
           const result = await get(destination);
+          if (!result) break;
           if (result.status !== 200) fail(url, "internal-link", `${link.href} returns ${result.status}`);
-          if (!visited.has(destination)) queue.push(destination);
+          const key = local(destination);
+          if (!queued.has(key)) { queued.add(key); queue.push(destination); }
         } catch { fail(url, "internal-link", `Malformed internal link: ${href}`); }
       }
     }
@@ -145,9 +166,10 @@ export async function crawlSite(origin: string): Promise<Summary> {
 
 async function main() {
   const originIndex = process.argv.indexOf("--origin");
+  const maxUrlsIndex = process.argv.indexOf("--max-urls");
   try {
-    if (originIndex === -1 || !process.argv[originIndex + 1]) throw new Error("Usage: yarn seo:crawl --origin <url>");
-    const summary = await crawlSite(process.argv[originIndex + 1]);
+    if (originIndex === -1 || !process.argv[originIndex + 1]) throw new Error("Usage: yarn seo:crawl --origin <url> [--max-urls <positive integer>]");
+    const summary = await crawlSite(process.argv[originIndex + 1], { maxUrls: maxUrlsIndex === -1 ? 5000 : Number(process.argv[maxUrlsIndex + 1]) });
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
     process.exitCode = summary.ok ? 0 : 1;
   } catch (error) {
