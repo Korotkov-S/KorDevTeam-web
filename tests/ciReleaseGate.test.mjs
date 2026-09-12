@@ -92,11 +92,17 @@ test("restore drill uses an exact disposable database container and bounded clea
   assert.ok(workflow.on.schedule.some(entry => entry.cron));
   assert.ok(Object.hasOwn(workflow.on, "workflow_dispatch"));
   const job = workflow.jobs["restore-drill"];
+  assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job.environment, "restore-drill");
   assert.doesNotMatch(source, /secrets\.SSH_(?:HOST|USER|KEY)/, "restore drill must not receive production SSH authority");
   const checkout = job.steps.find(step => /actions\/checkout@v4$/.test(step.uses));
   assert.equal(checkout.with.ref, "${{ github.sha }}");
   const drill = job.steps.find(step => step.name === "Restore newest private backup");
+  assert.equal(drill.env.PRODUCTION_DATABASE_NAME, "${{ vars.PRODUCTION_DATABASE_NAME }}");
+  assert.doesNotMatch(source, /\$\{\{\s*secrets\.PRODUCTION_DATABASE_URL\s*\}\}/);
+  assert.match(drill.run, /PRODUCTION_DATABASE_NAME.*\^\[a-zA-Z_\]\[a-zA-Z0-9_\]\{0,62\}\$/);
+  assert.match(drill.run, /PRODUCTION_DATABASE_URL="postgresql:\/\/comparison\.invalid\/\$\{PRODUCTION_DATABASE_NAME\}"/);
+  assert.doesNotMatch(drill.run.match(/PRODUCTION_DATABASE_URL=.*$/m)?.[0] ?? "", /\?/);
   assert.match(drill.run, /scripts\/restore-postgres\.sh/);
   assert.match(drill.run, /RESTORE_CONFIRM=non-production|RESTORE_CONFIRM:\s*non-production/);
   assert.match(drill.run, /docker rm -f -- "\$RESTORE_CONTAINER"/);
@@ -155,6 +161,9 @@ test("operator runbook covers approval, exact switching, rollback and public evi
   assert.match(source, /restore-drill[^\n]+environment|read-only S3/i);
   assert.match(source, /least[- ]privilege|scoped policy/i);
   assert.match(source, /never[^\n]+production SSH key/i);
+  assert.match(source, /restore-drill[^\n]+deployment branch rule[^\n]+main/i);
+  assert.match(source, /PRODUCTION_DATABASE_NAME[^\n]+non-secret[^\n]+environment variable/i);
+  assert.doesNotMatch(source, /`PRODUCTION_DATABASE_URL`[^\n]+secret/i);
   assert.doesNotMatch(source, /staging/i);
 });
 
