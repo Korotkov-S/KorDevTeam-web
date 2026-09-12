@@ -3,6 +3,39 @@ import path from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import yaml from 'js-yaml';
+
+export function validateRoute(target, stateDirectory, host, origin) {
+  safePath(target); safePath(stateDirectory);
+  const bytes = readFileSync(target, 'utf8');
+  const meta = name => {
+    const values = [...bytes.matchAll(new RegExp(`^# ${name}: (.+)$`, 'gm'))];
+    if (values.length !== 1) throw Error('Ambiguous route state');
+    return values[0][1];
+  };
+  const slot = meta('current-slot'), image = meta('current-image');
+  if (!['blue', 'green'].includes(slot) || !/^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*(@sha256:[a-f0-9]{64}|:[a-f0-9]{40})$/.test(image)) throw Error('Invalid route slot/image');
+  const record = path.join(stateDirectory, 'slots', slot); safePath(record);
+  if (readFileSync(record, 'utf8').trim() !== image) throw Error('Current route image differs from recorded image');
+  const document = yaml.load(bytes, { schema: yaml.JSON_SCHEMA });
+  const router = document?.http?.routers?.kordevteam;
+  const match = /^Host\(`([a-z0-9.-]+)`\)$/.exec(router?.rule || '');
+  const url = new URL(origin);
+  if (!match || !host || host !== match[1] || url.hostname !== host || url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw Error('Production host, public origin and route host must agree');
+  const services = document?.http?.services;
+  const service = services?.[router.service];
+  if (service?.loadBalancer?.servers?.length !== 1 || service.loadBalancer.servers[0].url !== `http://kordevteam-${slot}:3001`) throw Error('Current slot disagrees with active backend');
+  const middlewares = router.middlewares;
+  if (!Array.isArray(middlewares) || !middlewares.includes('kordevteam-slot')) throw Error('Active route requires slot middleware');
+  let headers = [];
+  for (const name of middlewares) {
+    const middleware = document.http.middlewares?.[name];
+    if (!middleware || middleware.chain) throw Error('Unknown or chained active middleware');
+    headers.push(...Object.entries(middleware.headers?.customResponseHeaders || {}).filter(([key]) => key.toLowerCase() === 'x-kordev-slot').map(([, value]) => value));
+  }
+  if (headers.length !== 1 || headers[0] !== slot) throw Error('Current slot disagrees with response header');
+  return slot;
+}
 
 export function safePath(target) {
   if (!target || !path.isAbsolute(target) || path.normalize(target) !== target || target === '/') throw Error('Explicit resolved path required');
@@ -48,12 +81,24 @@ function prune(target) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) try {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'validate-path' && args.length === 1) safePath(args[0]);
+  else if (command === 'validate-route' && args.length === 4) console.log(validateRoute(...args));
+  else if (command === 'copy-route' && args.length === 2) { safePath(args[0]); atomicWrite(args[1], readFileSync(args[0])); }
   else if (command === 'prune' && args.length === 1) prune(args[0]);
   else if (command === 'record' && args.length === 2) atomicWrite(args[0], `${args[1]}\n`);
   else if (command === 'route' && args.length === 6) {
     const [target, current, previous, host, currentImage, previousImage] = args;
     if (![current, previous].every(slot => ['blue', 'green'].includes(slot)) || !/^[a-z0-9.-]+$/.test(host)) throw Error('Invalid route configuration');
     if (![currentImage, previousImage].every(image => /^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*(@sha256:[a-f0-9]{64}|:[a-f0-9]{40})$/.test(image))) throw Error('Invalid immutable route image');
-    atomicWrite(target, `# current-slot: ${current}\n# previous-slot: ${previous}\n# current-image: ${currentImage}\n# previous-image: ${previousImage}\nhttp:\n  routers:\n    kordevteam:\n      rule: "Host(\`${host}\`)"\n      entryPoints: [websecure]\n      tls:\n        certResolver: letsencrypt\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n  middlewares:\n    kordevteam-slot:\n      headers:\n        customResponseHeaders:\n          X-Kordev-Slot: "${current}"\n  services:\n    kordevteam-active:\n      loadBalancer:\n        servers:\n          - url: "http://kordevteam-${current}:3001"\n`);
+    // Change only slot routing; retain TLS, security middleware and other settings.
+    validateRoute(target, process.env.DEPLOY_STATE_DIR, host, process.env.PUBLIC_ORIGIN);
+    const document = yaml.load(readFileSync(target, 'utf8'), { schema: yaml.JSON_SCHEMA });
+    const router = document.http.routers.kordevteam;
+    document.http.services[router.service].loadBalancer.servers[0].url = `http://kordevteam-${current}:3001`;
+    for (const name of router.middlewares) {
+      const headers = document.http.middlewares[name].headers?.customResponseHeaders;
+      for (const key of Object.keys(headers || {})) if (key.toLowerCase() === 'x-kordev-slot') headers[key] = current;
+    }
+    const metadata = `# current-slot: ${current}\n# previous-slot: ${previous}\n# current-image: ${currentImage}\n# previous-image: ${previousImage}\n`;
+    atomicWrite(target, metadata + yaml.dump(document, { schema: yaml.JSON_SCHEMA, noRefs: true, forceQuotes: true, quotingType: '"', lineWidth: -1 }));
   } else throw Error('Explicit command and target directory/path required');
 } catch (error) { console.error(error.message); process.exitCode = 1; }

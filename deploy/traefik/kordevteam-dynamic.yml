@@ -2,6 +2,7 @@
 # Mount the containing directory into Traefik; do not bind-mount this file alone.
 # current-slot: blue
 # previous-slot: none
+# current-image: REPLACE_WITH_VERIFIED_IMMUTABLE_BLUE_IMAGE
 http:
   routers:
     kordevteam:

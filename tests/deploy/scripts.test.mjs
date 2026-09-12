@@ -14,7 +14,7 @@ function fixture(t) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   for (const name of ['bin', 'state/slots', 'traefik', 'releases', 'logs']) mkdirSync(path.join(dir, name), { recursive: true });
   const route = path.join(dir, 'traefik/kordevteam-dynamic.yml');
-  writeFileSync(route, '# current-slot: blue\n# previous-slot: none\nhttp:\n  services:\n    active:\n      loadBalancer:\n        servers:\n          - url: http://kordevteam-blue:3001\n');
+  writeFileSync(route, `# current-slot: blue\n# previous-slot: none\n# current-image: ${oldImage}\nhttp:\n  routers:\n    kordevteam:\n      rule: "Host(\`example.com\`)"\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n  middlewares:\n    kordevteam-slot:\n      headers:\n        customResponseHeaders:\n          X-Kordev-Slot: blue\n  services:\n    kordevteam-active:\n      loadBalancer:\n        servers:\n          - url: http://kordevteam-blue:3001\n`);
   writeFileSync(path.join(dir, 'state/slots/blue'), oldImage + '\n');
   writeFileSync(path.join(dir, 'state/slots/green'), image + '\n');
   function stub(name, body) { writeFileSync(path.join(dir, 'bin', name), '#!/bin/bash\nset -eu\n' + body, { mode: 0o755 }); }
@@ -171,4 +171,40 @@ test('deploy refuses missing or corrupt active state before any Docker command',
   const result = f.run('deploy-slot', ['green', image]);
   assert.notEqual(result.status, 0);
   assert.equal(existsSync(`${f.dir}/commands`), false);
+});
+test('inconsistent active routing, slot headers and image records reject deployment before mutations', async t => {
+  for (const mismatch of ['backend', 'header', 'record', 'container', 'public']) await t.test(mismatch, t => {
+    const f = fixture(t);
+    if (mismatch === 'backend') writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('http://kordevteam-blue:3001', 'http://kordevteam-green:3001'));
+    if (mismatch === 'header') writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('X-Kordev-Slot: blue', 'X-Kordev-Slot: green'));
+    if (mismatch === 'record') writeFileSync(`${f.dir}/state/slots/blue`, image + '\n');
+    if (mismatch === 'public') f.stub('curl', 'if [[ "$*" == *--dump-header* ]]; then printf "X-Kordev-Slot: green\\r\\n"; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap-index.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<html><title>Team</title><h1>Team</h1></html>\'; fi\n');
+    const before = readFileSync(f.route, 'utf8');
+    assert.notEqual(f.run('deploy-slot', ['green', image], mismatch === 'container' ? { OLD_IMAGE: image } : {}).status, 0);
+    assert.equal(readFileSync(f.route, 'utf8'), before);
+    const commands = existsSync(`${f.dir}/commands`) ? readFileSync(`${f.dir}/commands`, 'utf8') : '';
+    assert.doesNotMatch(commands, /compose .* (pull|run|up) /);
+  });
+});
+test('failed switch restores exact previous bytes including additional middleware and comments', t => {
+  const f = fixture(t);
+  writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('middlewares: [kordevteam-slot]', 'middlewares: [kordevteam-slot, security]').replace('  middlewares:\n', '  middlewares:\n    security:\n      headers:\n        frameDeny: true\n') + '# operator-maintained comment\n');
+  const before = readFileSync(f.route);
+  const inode = statSync(f.route).ino;
+  const r = f.run('switch-slot', ['green'], { FAIL_PUBLIC: '1' });
+  assert.notEqual(r.status, 0); assert.deepEqual(readFileSync(f.route), before);
+  assert.notEqual(statSync(f.route).ino, inode);
+});
+test('switch refuses disagreements between public origin, configured production host and installed rule', async t => {
+  for (const extra of [{ PUBLIC_ORIGIN: 'https://other.example.com' }, { PRODUCTION_HOST: 'other.example.com' }]) await t.test(JSON.stringify(extra), t => {
+    const f = fixture(t), before = readFileSync(f.route);
+    assert.notEqual(f.run('switch-slot', ['green'], extra).status, 0);
+    assert.deepEqual(readFileSync(f.route), before);
+  });
+});
+test('successful switch preserves existing security middleware configuration', t => {
+  const f = fixture(t);
+  writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('middlewares: [kordevteam-slot]', 'middlewares: [kordevteam-slot, security]').replace('  middlewares:\n', '  middlewares:\n    security:\n      headers:\n        frameDeny: true\n'));
+  const result = f.run('switch-slot', ['green']); assert.equal(result.status, 0, result.stderr);
+  assert.match(readFileSync(f.route, 'utf8'), /frameDeny: true/);
 });

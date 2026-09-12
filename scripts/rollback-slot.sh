@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+rollback_snapshot_locked() {
+  local snapshot="$1" target
+  target="$(validate_route_state "$snapshot")"
+  verify_slot "$target"
+  node "$SCRIPT_DIR/release-files.mjs" copy-route "$snapshot" "$TRAEFIK_DYNAMIC_FILE"
+  public_smoke || fail 'Exact previous route restored but public smoke failed; operator intervention required'
+  printf 'Rollback restored exact previous configuration for %s.\n' "$target"
+}
 rollback_locked() {
   local target previous expected
   target="$(previous_slot)"; previous="$(current_slot)"
@@ -17,5 +25,6 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   source "$(dirname -- "${BASH_SOURCE[0]}")/deploy-common.sh"
   [[ $# == 0 ]] || fail 'Usage: rollback-slot.sh'
   state_init; lock_release
+  validate_route_state > /dev/null
   rollback_locked
 fi

@@ -3,7 +3,6 @@ WORKDIR /app
 RUN corepack enable
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn/cache ./.yarn/cache
 RUN yarn install --immutable
 
 FROM dependencies AS build

@@ -5,6 +5,15 @@ import path from 'node:path';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 
+const tableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
+const migrationHistory = [{ hash: createHash('sha256').update(readFileSync('drizzle/0000_content_foundation.sql')).digest('hex'), created_at: '1789122602054' }];
+function inventoryQuery(sql) {
+  if (sql.includes('pg_catalog.pg_class')) return { rows: Object.keys(tableCounts).map(name => ({ schema: name.split('.')[0], name: name.split('.')[1] })) };
+  if (sql.includes('GROUP BY status')) return { rows: [{ status: 'draft', count: '3' }, { status: 'published', count: '2' }] };
+  const match = /SELECT count\(\*\)::text AS count FROM "([^"]+)"\."([^"]+)"/.exec(sql);
+  if (match) return { rows: [{ count: tableCounts[`${match[1]}.${match[2]}`] }] };
+}
+
 test('backup holds a snapshot through dump, encrypts manifest and uploads only encrypted files privately', async t => {
   const { backupDatabase } = await import('../../scripts/postgres-backup.mjs');
   const dir = mkdtempSync(path.join(tmpdir(), 'backup-fixture-'));
@@ -12,6 +21,7 @@ test('backup holds a snapshot through dump, encrypts manifest and uploads only e
   const events = [], uploads = [];
   const client = { async query(sql) {
     events.push(sql);
+    if (inventoryQuery(sql)) return inventoryQuery(sql);
     if (sql.includes('pg_export_snapshot')) return { rows: [{ snapshot: '0001-0002-1' }] };
     if (sql.includes('GROUP BY')) return { rows: [{ kind: 'article', count: '2' }] };
     return { rows: [] };
@@ -24,6 +34,8 @@ test('backup holds a snapshot through dump, encrypts manifest and uploads only e
     } else if (command === 'tar') {
       const manifest = JSON.parse(readFileSync(path.join(options.cwd, 'manifest.json')));
       assert.deepEqual(manifest.publishedCounts, { article: 2 });
+      assert.deepEqual(manifest.inventory.tables, tableCounts);
+      assert.deepEqual(manifest.inventory.contentStatuses, { draft: '3', published: '2' });
       assert.match(manifest.dumpSha256, /^[a-f0-9]{64}$/);
       writeFileSync(args[1], 'archive fixture');
     } else if (command === 'age') writeFileSync(args[args.indexOf('-o')+1], 'encrypted fixture');
@@ -37,6 +49,17 @@ test('backup holds a snapshot through dump, encrypts manifest and uploads only e
   assert.ok(events.indexOf('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY') < events.indexOf('pg_dump'));
   assert.ok(events.indexOf('COMMIT') > events.indexOf('pg_dump'));
   assert.equal(uploads.length, 2);
+});
+
+test('database inventory counts all actual tables and fails when a required table is missing', async () => {
+  const { databaseInventory } = await import('../../scripts/postgres-backup.mjs');
+  const client = { query: async sql => inventoryQuery(sql) };
+  assert.deepEqual(await databaseInventory(client), { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } });
+  await assert.rejects(databaseInventory({ query: async sql => {
+    const result = inventoryQuery(sql);
+    if (sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== 'content_revisions');
+    return result;
+  }}), /required|inventory/i);
 });
 test('restore rejects a bad archive checksum before decrypt or database mutation', async t => {
   const { restoreDatabase } = await import('../../scripts/postgres-backup.mjs');
@@ -68,7 +91,7 @@ test('restore verifies dump, existing migration history, schema and published co
   const dump = 'PGDMP valid fixture', encrypted = 'encrypted fixture';
   const digest = value => createHash('sha256').update(value).digest('hex');
   const events = [];
-  const manifest = { version: 1, dumpSha256: digest(dump), publishedCounts: { article: 2 }, migrations: [{ hash: 'migration', created_at: '123' }] };
+  const manifest = { version: 2, dumpSha256: digest(dump), publishedCounts: { article: 2 }, migrations: migrationHistory, inventory: { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } } };
   const run = async (command, args) => {
     events.push(command);
     if (command === 'aws') {
@@ -86,6 +109,7 @@ test('restore verifies dump, existing migration history, schema and published co
   };
   const client = { async query(sql) {
     events.push(sql);
+    if (inventoryQuery(sql)) return inventoryQuery(sql);
     if (sql.includes('current_database')) return { rows: [{ name: 'team_restore' }] };
     if (sql.includes('information_schema')) return { rows: [{ count: '0' }] };
     if (sql.includes('GROUP BY')) return { rows: [{ kind: 'article', count: '2' }] };
@@ -94,7 +118,26 @@ test('restore verifies dump, existing migration history, schema and published co
   }, async end() { events.push('closed'); } };
   await restoreDatabase({ directory: dir, objectKey: 'private/backups/backup.tar.age', s3Uri: 's3://private/private/backups', endpoint: 'https://s3.twcstorage.ru', identity: '/fixture/key', targetUrl: 'postgresql://u:p@localhost/team_restore' }, run, async () => client, async () => events.push('migrate'));
   assert.ok(events.indexOf('pg_restore') < events.indexOf('migrate'));
-  assert.equal(events.filter(e => e.includes('GROUP BY')).length, 2);
-  assert.equal(events.filter(e => e.includes('to_regclass')).length, 7);
+  assert.equal(events.filter(e => e.includes('GROUP BY kind')).length, 2);
+  assert.equal(events.filter(e => e.includes('pg_catalog.pg_class')).length, 2);
+  assert.equal(events.filter(e => e.includes('SELECT hash, created_at')).length, 2);
   assert.equal(events.at(-1), 'closed');
+});
+
+test('restore verification rejects lost drafts, revisions, media, missing tables and wrong last migration after migration', async t => {
+  const { verifyRestoreState } = await import('../../scripts/postgres-backup.mjs');
+  const manifest = { inventory: { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } }, publishedCounts: { article: 2 }, migrations: migrationHistory };
+  for (const stage of [false, true]) for (const damage of ['drafts', 'revisions', 'media', 'missing-table', 'history']) await t.test(`${stage ? 'after' : 'before'}:${damage}`, async () => {
+    const client = { async query(sql) {
+      if (sql.includes('SELECT hash, created_at')) return { rows: damage === 'history' ? [{ ...migrationHistory[0], hash: 'wrong-last-hash' }] : migrationHistory };
+      if (sql.includes('GROUP BY kind')) return { rows: [{ kind: 'article', count: '2' }] };
+      const result = inventoryQuery(sql);
+      if (damage === 'drafts' && sql.includes('GROUP BY status')) result.rows[0].count = '2';
+      if (damage === 'revisions' && sql.includes('FROM "public"."content_revisions"')) result.rows[0].count = '7';
+      if (damage === 'media' && sql.includes('FROM "public"."media_assets"')) result.rows[0].count = '0';
+      if (damage === 'missing-table' && sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== 'redirects');
+      return result;
+    }};
+    await assert.rejects(verifyRestoreState(client, manifest, stage), /inventory|verification/i);
+  });
 });

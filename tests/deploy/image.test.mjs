@@ -3,6 +3,17 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
+test('every literal Docker COPY input exists in a clean tracked checkout', () => {
+  const files = spawnSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).stdout.split('\0');
+  for (const line of readFileSync('Dockerfile', 'utf8').split('\n')) {
+    if (!line.startsWith('COPY ') || line.includes('--from=')) continue;
+    for (const source of line.split(/\s+/).slice(1, -1)) {
+      if (source === '.') continue;
+      assert.ok(files.some(file => file === source || file.startsWith(source.replace(/\/$/, '') + '/')), `Docker COPY requires untracked input: ${source}`);
+    }
+  }
+});
+
 test('production image packages SSR, migrations and production dependencies under non-root Node 22.22', () => {
   const dockerfile = readFileSync('Dockerfile', 'utf8');
   assert.match(dockerfile, /FROM node:22\.22\.0-alpine/);

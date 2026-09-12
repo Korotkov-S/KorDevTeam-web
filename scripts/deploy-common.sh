@@ -21,7 +21,7 @@ state_init() {
 }
 lock_release() {
   mkdir -- "$DEPLOY_STATE_DIR/operation.lock" 2>/dev/null || fail 'Another release operation is running (or stale lock needs operator inspection)'
-  trap 'rmdir -- "$DEPLOY_STATE_DIR/operation.lock"' EXIT
+  trap 'rm -f -- "$DEPLOY_STATE_DIR/operation.lock/previous-route.yml"; rmdir -- "$DEPLOY_STATE_DIR/operation.lock"' EXIT
 }
 current_slot() {
   local value
@@ -60,6 +60,21 @@ verify_slot() {
   [[ "$actual" == "$expected" ]] || fail 'Target container image does not match recorded image'
   smoke "$(slot_origin "$target")" || fail 'Target readiness/SSR smoke failed'
 }
+validate_route_state() {
+  node "$SCRIPT_DIR/release-files.mjs" validate-route "${1:-$TRAEFIK_DYNAMIC_FILE}" "$DEPLOY_STATE_DIR" "${PRODUCTION_HOST:-}" "${PUBLIC_ORIGIN:-}"
+}
+public_slot_matches() {
+  local headers value
+  headers="$(curl --fail --silent --show-error --max-time 10 --dump-header - --output /dev/null "$PUBLIC_ORIGIN/api/health/ready")" || return 1
+  value="$(printf '%s\n' "$headers" | tr -d '\r' | sed -n 's/^[Xx]-[Kk][Oo][Rr][Dd][Ee][Vv]-[Ss][Ll][Oo][Tt]: *//p')"
+  [[ "$value" == "$1" ]]
+}
+verify_active() {
+  local active
+  active="$(validate_route_state)"
+  verify_slot "$active"
+  public_slot_matches "$active" || fail 'Public slot disagrees with active route state'
+}
 write_route() {
   node "$SCRIPT_DIR/release-files.mjs" route "$TRAEFIK_DYNAMIC_FILE" "$1" "$2" "${PRODUCTION_HOST:?PRODUCTION_HOST is required}" "$(recorded_image "$1")" "$(recorded_image "$2")"
 }
@@ -69,8 +84,7 @@ public_smoke() {
   local attempt headers expected
   expected="$(current_slot)"
   for ((attempt=0; attempt<${READINESS_ATTEMPTS:-30}; attempt++)); do
-    headers="$(curl --fail --silent --show-error --max-time 10 --dump-header - --output /dev/null "$PUBLIC_ORIGIN/api/health/ready")" || headers=''
-    if printf '%s\n' "$headers" | tr -d '\r' | grep -qi "^X-Kordev-Slot: $expected$" && smoke "$PUBLIC_ORIGIN"; then return 0; fi
+    if public_slot_matches "$expected" && smoke "$PUBLIC_ORIGIN"; then return 0; fi
     sleep "${READINESS_DELAY:-2}"
   done
   return 1

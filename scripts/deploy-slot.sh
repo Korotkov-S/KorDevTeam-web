@@ -7,6 +7,7 @@ target="$1"; image="$2"
 state_init; lock_release
 active="$(current_slot)"
 [[ "$active" != "$target" ]] || fail 'Refusing to deploy the active slot'
+verify_active
 if [[ "$target" == blue ]]; then export BLUE_IMAGE="$image"; else export GREEN_IMAGE="$image"; fi
 # Both refs are required by Compose; use the recorded untouched slot, never latest.
 other_image="$(recorded_image "$active")"
