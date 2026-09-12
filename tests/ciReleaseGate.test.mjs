@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import yaml from "js-yaml";
 
@@ -183,4 +185,32 @@ test("operator rehearsal loads trusted config before variables and fails before 
   assert.ok([strict, checkout, exportAll, config, stopExport, image, current, deploy, switchSlot].every(index => index >= 0));
   assert.ok(strict < checkout && checkout < exportAll && exportAll < config && config < stopExport);
   assert.ok(stopExport < image && image < current && current < deploy && deploy < switchSlot);
+});
+
+test("manual restore rejects an invalid production database name before invoking restore", t => {
+  const source = readFileSync("docs/operations/production-release.md", "utf8");
+  const section = source.match(/For a controlled manual restore[\s\S]*?```bash\n([\s\S]*?)\n```/)?.[1];
+  assert.ok(section, "manual restore shell block must exist");
+  assert.match(section, /^set -euo pipefail$/m);
+  assert.match(section, /if ! \[\[.*PRODUCTION_DATABASE_NAME[\s\S]*?exit 1[\s\S]*?fi/);
+  assert.ok(section.indexOf("PRODUCTION_DATABASE_NAME") < section.indexOf("production_comparison_url="));
+  assert.ok(section.indexOf("production_comparison_url=") < section.indexOf("restore-postgres.sh"));
+  assert.doesNotMatch(section.match(/production_comparison_url=.*$/m)?.[0] ?? "", /\?/);
+
+  const directory = mkdtempSync(path.join(tmpdir(), "kordev-restore-doc-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const marker = path.join(directory, "restore-invoked");
+  writeFileSync(path.join(directory, "bash"), "#!/bin/sh\nprintf invoked > \"$RESTORE_MARKER\"\n", { mode: 0o755 });
+  const result = spawnSync("/bin/bash", ["-c", section], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${directory}:${process.env.PATH}`,
+      PRODUCTION_DATABASE_NAME: "bad?sslmode=disable",
+      RESTORE_MARKER: marker,
+    },
+  });
+  assert.notEqual(result.status, 0, result.stdout + result.stderr);
+  assert.equal(existsSync(marker), false, "invalid identifier must fail before restore invocation");
 });

@@ -98,7 +98,11 @@ aws --endpoint-url "$S3_ENDPOINT" s3 ls "$BACKUP_S3_URI/" --recursive
 Every backup has an exact `.tar.age` object and adjacent `.tar.age.sha256`. The encrypted archive contains `manifest.json` with dump checksum, schema inventory, migration history, content status totals, and published counts. For a controlled manual restore, create a new empty database whose name ends in `_restore` or `_test`, set its explicit localhost `RESTORE_DATABASE_URL`, set `RESTORE_CONFIRM=non-production`, set `AGE_IDENTITY_FILE`, and pass one exact private object key. Construct the same credential-free comparison sentinel from the separately verified production database name; do not add URL query parameters:
 
 ```bash
-[[ "$PRODUCTION_DATABASE_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_]{0,62}$ ]]
+set -euo pipefail
+if ! [[ "${PRODUCTION_DATABASE_NAME:-}" =~ ^[a-zA-Z_][a-zA-Z0-9_]{0,62}$ ]]; then
+  echo "PRODUCTION_DATABASE_NAME must be a 1-63 character PostgreSQL identifier" >&2
+  exit 1
+fi
 production_comparison_url="postgresql://comparison.invalid/${PRODUCTION_DATABASE_NAME}"
 RESTORE_CONFIRM=non-production PRODUCTION_DATABASE_URL="$production_comparison_url" bash scripts/restore-postgres.sh 'private/kordevteam-backups/<exact-object>.tar.age'
 ```
