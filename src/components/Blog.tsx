@@ -39,6 +39,7 @@ import {
   getBlogPageHref,
   normalizeBlogPage,
   parseBlogDate,
+  formatBlogDate,
   sortBlogPostsByDate,
 } from "../lib/blogPresentation.mjs";
 
@@ -191,7 +192,7 @@ function getBlogDateTime(value: string) {
   const timestamp = parseBlogDate(value);
   return timestamp === null
     ? undefined
-    : new Date(timestamp).toISOString().slice(0, 10);
+    : new Date(timestamp).toISOString();
 }
 
 export function Blog({
@@ -390,7 +391,7 @@ export function Blog({
                         dateTime={getBlogDateTime(post.date)}
                         itemProp="datePublished"
                       >
-                        {post.date}
+                        {formatBlogDate(post.date)}
                       </time>
                     </div>
                     <div className="flex items-center gap-1">

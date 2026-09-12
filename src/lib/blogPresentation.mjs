@@ -45,6 +45,13 @@ export function parseBlogDate(value) {
   const date = String(value || "").trim();
   if (!date) return null;
 
+  const timestampMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/);
+  if (timestampMatch) {
+    if (toUtcTimestamp(Number(timestampMatch[1]), Number(timestampMatch[2]) - 1, Number(timestampMatch[3])) === null) return null;
+    const timestamp = Date.parse(date);
+    return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
   const isoMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoMatch) {
     return toUtcTimestamp(
@@ -82,6 +89,13 @@ export function sortBlogPostsByDate(posts) {
       return rightDate - leftDate || left.index - right.index;
     })
     .map(({ post }) => post);
+}
+
+export function formatBlogDate(value) {
+  const timestamp = parseBlogDate(value);
+  return timestamp === null ? "" : new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  }).format(timestamp);
 }
 
 export function normalizeBlogPage(value, totalPages) {
