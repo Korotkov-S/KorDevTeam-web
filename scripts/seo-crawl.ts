@@ -1,9 +1,10 @@
 import { load } from "cheerio";
-import puppeteer from "puppeteer";
+import puppeteer, { type HTTPRequest } from "puppeteer";
 
 const SITE = "https://kordev.team";
 type Violation = { url: string; code: string; detail: string };
 type Summary = { ok: boolean; origin: string; sitemapUrls: number; internalUrls: number; violations: Violation[] };
+type ResourceResponse = { status: number; headers: Record<string, string>; body: Buffer };
 
 export async function crawlSite(origin: string, { maxUrls = 5000 }: { maxUrls?: number } = {}): Promise<Summary> {
   const target = new URL(origin);
@@ -13,19 +14,31 @@ export async function crawlSite(origin: string, { maxUrls = 5000 }: { maxUrls?: 
   const fail = (url: string, code: string, detail: string) => summary.violations.push({ url, code, detail });
   const local = (url: string) => { const parsed = new URL(url); return `${target.origin}${parsed.pathname}${parsed.search}`; };
   const fetches = new Map<string, Promise<{ status: number; type: string; body: string }>>();
+  const resources = new Map<string, Promise<ResourceResponse | null>>();
+  const reserved = new Set<string>();
   let budgetExceeded = false;
+  function reserve(url: string): boolean {
+    const destination = local(url);
+    if (reserved.has(destination)) return true;
+    if (reserved.size >= maxUrls) {
+      if (!budgetExceeded) fail(url, "crawl-limit", `Network URL budget of ${maxUrls} exhausted`);
+      budgetExceeded = true;
+      return false;
+    }
+    // No await between checking and reserving: concurrent browser request
+    // events and document fetches must share exactly the same bounded set.
+    reserved.add(destination);
+    return true;
+  }
   function get(url: string) {
     const destination = local(url);
     let pending = fetches.get(destination);
     if (!pending) {
-      // One shared budget covers sitemap documents, canonicals and internal
-      // destinations. Cached URLs consume no extra slots. Browser navigations
-      // below are fulfilled from this cache, not fetched a second time.
-      if (fetches.size >= maxUrls) {
-        if (!budgetExceeded) fail(url, "crawl-limit", `Document fetch budget of ${maxUrls} URLs exhausted`);
-        budgetExceeded = true;
-        return Promise.resolve(null);
+      const resource = resources.get(destination);
+      if (resource) {
+        return resource.then(response => response ? { status: response.status, type: response.headers["content-type"] || "", body: response.body.toString("utf8") } : { status: 0, type: "", body: "" });
       }
+      if (!reserve(url)) return Promise.resolve(null);
       // Reserve the cache slot synchronously before starting network work.
       pending = Promise.resolve().then(async () => {
         const response = await fetch(destination, { redirect: "manual", headers: { accept: "text/html, application/xml;q=0.9" }, signal: AbortSignal.timeout(15_000) });
@@ -80,9 +93,52 @@ export async function crawlSite(origin: string, { maxUrls = 5000 }: { maxUrls?: 
     await page.setJavaScriptEnabled(false);
     await page.setRequestInterception(true);
     let currentHtml = "";
+    const pendingResources = new Map<HTTPRequest, (response: ResourceResponse | null) => void>();
+    page.on("response", response => {
+      const resolve = pendingResources.get(response.request());
+      if (!resolve) return;
+      pendingResources.delete(response.request());
+      // Puppeteer returns decoded bytes. Replaying compressed-content headers
+      // or the original length would corrupt cached stylesheets/fonts.
+      const headers = { ...response.headers() };
+      delete headers["content-encoding"];
+      delete headers["content-length"];
+      void response.buffer().then(body => resolve({ status: response.status(), headers, body: Buffer.from(body) }), () => resolve(null));
+    });
+    page.on("requestfailed", request => {
+      pendingResources.get(request)?.(null);
+      pendingResources.delete(request);
+    });
+    async function serveResource(request: HTTPRequest) {
+      const destination = local(request.url());
+      const document = fetches.get(destination);
+      if (document) {
+        const response = await document;
+        await request.respond({ status: response.status || 503, contentType: response.type, body: response.body });
+        return;
+      }
+      const cached = resources.get(destination);
+      if (cached) {
+        const response = await cached;
+        if (response) await request.respond(response);
+        else await request.abort();
+        return;
+      }
+      if (!reserve(request.url())) { await request.abort(); return; }
+      // Store the pending response before continue() so concurrent requests
+      // for this URL wait for replay rather than initiating another fetch.
+      resources.set(destination, new Promise(resolve => pendingResources.set(request, resolve)));
+      try { await request.continue(); }
+      catch {
+        pendingResources.get(request)?.(null);
+        pendingResources.delete(request);
+      }
+    }
     page.on("request", request => {
       if (request.isNavigationRequest() && request.frame() === page.mainFrame()) void request.respond({ status: 200, contentType: "text/html", body: currentHtml });
-      else if (["stylesheet", "font"].includes(request.resourceType()) && new URL(request.url()).origin === target.origin) void request.continue();
+      else if (["stylesheet", "font"].includes(request.resourceType()) && new URL(request.url()).origin === target.origin) {
+        void serveResource(request).catch(() => { if (!request.isInterceptResolutionHandled()) void request.abort().catch(() => {}); });
+      }
       else void request.abort();
     });
     while (queue.length && !budgetExceeded) {

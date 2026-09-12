@@ -89,31 +89,42 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
 });
 
 test("crawler CLI enforces one fetch budget across sitemap entries, canonical targets and high-fanout links", { timeout: 120_000 }, async t => {
-  for (const scenario of ["links", "canonical", "sitemap"] as const) {
+  for (const scenario of ["links", "canonical", "sitemap", "styles", "fonts", "resource-repeat"] as const) {
     await t.test(scenario, async t => {
       const requests = new Map<string, number>();
       const manyPaths = Array.from({ length: 30 }, (_, index) => `/page-${index}/`);
       const server = createServer((req, res) => {
         const pathname = req.url!;
         requests.set(pathname, (requests.get(pathname) || 0) + 1);
-        if (pathname === "/sitemap-index.xml") {
+        if (pathname.endsWith(".css")) {
+          res.setHeader("Content-Type", "text/css");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(".requires-css { display: block !important; }");
+        } else if (pathname.endsWith(".woff2")) {
+          res.setHeader("Content-Type", "font/woff2");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(Buffer.from([0, 1, 2, 3]));
+        } else if (pathname === "/sitemap-index.xml") {
           res.setHeader("Content-Type", "application/xml");
           res.end(`<sitemapindex>${["pages", "blog"].map(name => `<sitemap><loc>https://kordev.team/sitemap-${name}.xml</loc></sitemap>`).join("")}</sitemapindex>`);
         } else if (pathname.startsWith("/sitemap-")) {
-          const paths = pathname === "/sitemap-blog.xml" ? [] : scenario === "sitemap" ? ["/", ...manyPaths] : ["/"];
+          const paths = pathname === "/sitemap-blog.xml" ? [] : scenario === "sitemap" ? ["/", ...manyPaths] : scenario === "resource-repeat" ? ["/", "/page-0/"] : ["/"];
           res.setHeader("Content-Type", "application/xml");
           res.end(`<urlset>${paths.map(path => `<url><loc>https://kordev.team${path}</loc><lastmod>2025-01-02T03:04:05.000Z</lastmod></url>`).join("")}</urlset>`);
         } else {
           res.setHeader("Content-Type", "text/html");
           const canonical = scenario === "canonical" ? "/canonical-target/" : pathname;
-          const links = scenario === "sitemap" ? [] : [...manyPaths, ...manyPaths, "/#again", "/canonical-target/#again"];
-          res.end(`<!doctype html><html lang="ru"><head><title>Title ${pathname}</title><meta name="description" content="Description ${pathname}"><link rel="canonical" href="https://kordev.team${canonical}"><script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage"}</script></head><body><h1>Heading</h1>${links.map(path => `<a href="${path}">Next</a>`).join("")}</body></html>`);
+          const links = ["links", "canonical"].includes(scenario) ? [...manyPaths, ...manyPaths, "/#again", "/canonical-target/#again"] : [];
+          const styles = scenario === "styles" ? manyPaths.map((_, index) => `/style-${index}.css`) : scenario === "resource-repeat" ? ["/shared.css", ...(pathname === "/" ? [] : ["/excess.css"])] : [];
+          const fontStyles = scenario === "fonts" ? manyPaths.map((_, index) => `@font-face { font-family: Test${index}; src: url('/font-${index}.woff2'); }`).join("") : "";
+          const fontText = scenario === "fonts" ? manyPaths.map((_, index) => `<span style="font-family:Test${index}">Font text</span>`).join("") : "";
+          res.end(`<!doctype html><html lang="ru"><head><title>Title ${pathname}</title><meta name="description" content="Description ${pathname}"><link rel="canonical" href="https://kordev.team${canonical}"><script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage"}</script><style>${fontStyles}${scenario === "resource-repeat" ? ".requires-css { display:none; }" : ""}</style>${[...styles, ...styles].map(href => `<link rel="stylesheet" href="${href}">`).join("")}</head><body><h1 class="${scenario === "resource-repeat" ? "requires-css" : ""}">Heading</h1>${fontText}${links.map(path => `<a href="${path}">Next</a>`).join("")}</body></html>`);
         }
       });
       await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
       t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
       const address = server.address(); assert.ok(address && typeof address !== "string");
-      // Three sitemap documents plus at most three distinct content destinations.
+      // Three sitemap documents plus at most three document/resource destinations.
       const result = await runCrawler(`http://127.0.0.1:${address.port}`, ["--max-urls", "6"]);
       const count = [...requests.values()].reduce((sum, value) => sum + value, 0);
       assert.ok(count <= 6, `Budget 6 exceeded: ${count} network requests`);
@@ -125,6 +136,11 @@ test("crawler CLI enforces one fetch budget across sitemap entries, canonical ta
       assert.equal(summary.violations.filter((item: { code: string }) => item.code === "crawl-limit").length, 1, result.stdout);
       assert.ok(summary.violations.length <= 2, "Budget exhaustion must not generate a violation per skipped link");
       if (scenario === "canonical") assert.equal(requests.get("/canonical-target/"), 1);
+      if (scenario === "resource-repeat") {
+        assert.equal(requests.get("/shared.css"), 1, "Reuse no-store CSS across rendered pages without a second request");
+        assert.equal(requests.has("/excess.css"), false, "Over-budget resource is aborted");
+        assert.ok(!summary.violations.some((item: { code: string }) => ["h1", "render"].includes(item.code)), "Cached CSS must preserve heading visibility");
+      }
     });
   }
 });
