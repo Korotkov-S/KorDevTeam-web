@@ -1351,20 +1351,11 @@ function main() {
     sitemapBlog,
     "utf-8",
   );
-  fs.writeFileSync(
-    path.join(ROOT, "public", "sitemap-blog.xml"),
-    sitemapBlog,
-    "utf-8",
-  );
+  // Keep legacy dist artifacts isolated: public files would shadow SSR routes.
 
   // Full sitemap with all pages (auto-generated, includes new blogs)
   const sitemapFull = buildFullSitemapXml(slugs, projects);
   fs.writeFileSync(path.join(DIST_DIR, "sitemap.xml"), sitemapFull, "utf-8");
-  fs.writeFileSync(
-    path.join(ROOT, "public", "sitemap.xml"),
-    sitemapFull,
-    "utf-8",
-  );
 
   console.log(
     `[generate-blog-pages] Generated ${slugs.length} blog pages + sitemaps + _redirects`,

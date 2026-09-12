@@ -108,7 +108,11 @@ export async function importLegacyContent(options: MigrationOptions = {}) {
             const metadata = kind === "article" ? articleMetadata.get(row.slug) ?? {} : {};
             const normalized = kind === "article" ? {
               ...metadata,
-              slug: row.slug, title: row.title, content: row.content_md, excerpt: row.excerpt,
+              slug: row.slug, title: row.title, content: row.content_md,
+              // SQLite owns title/body/dates; the curated index owns summaries/SEO.
+              // Older SQLite excerpts can be generic headings (e.g. Введение).
+              excerpt: text(metadata.excerpt) || text(row.excerpt),
+              seoDescription: text(metadata.seoDescription) || text(metadata.excerpt) || text(row.excerpt),
               tags: JSON.parse(row.tags_json ?? "[]"),
               coverUrl: row.cover_url || metadata.coverUrl, readTime: row.read_time_text || metadata.readTime, date: row.date_text || metadata.date,
               updatedDate: row.updated_at_ms ? undefined : metadata.updatedDate,

@@ -98,7 +98,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
     "content:migrate": "tsx scripts/migrate-content-to-postgres.ts",
-    "content:verify": "tsx scripts/verify-content-migration.ts"
+    "content:verify": "tsx scripts/verify-content-migration.ts",
+    "seo:crawl": "tsx scripts/seo-crawl.ts"
   },
   "packageManager": "yarn@3.8.7"
 }

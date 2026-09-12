@@ -92,6 +92,29 @@ test("normalization collisions and malformed records are data errors with machin
   assert.equal(JSON.parse(cli.stdout).collisions.length, 1);
 });
 
+test("curated index excerpts and SEO survive migration while SQLite body and missing-index fallback stay authoritative", async t => {
+  const fixtureRoot = await fixture(t);
+  await writeFile(path.join(fixtureRoot, "public/content/blog.ru.json"), JSON.stringify([
+    { slug: "first", lang: "ru", excerpt: "Уникальное SEO-описание первой статьи из индекса." },
+  ]));
+  const SQL = await require("sql.js")();
+  const legacy = new SQL.Database();
+  legacy.run("CREATE TABLE posts (slug TEXT, lang TEXT, title TEXT, content_md TEXT, excerpt TEXT)");
+  legacy.run("INSERT INTO posts VALUES (?, ?, ?, ?, ?)", ["first", "ru", "Первая статья из базы", "Тело из базы", "Введение"]);
+  legacy.run("INSERT INTO posts VALUES (?, ?, ?, ?, ?)", ["second", "ru", "Вторая статья из базы", "Второе тело из базы", "Описание второй статьи из базы"]);
+  await mkdir(path.join(fixtureRoot, "server/data"), { recursive: true });
+  await writeFile(path.join(fixtureRoot, "server/data/content.sqlite"), legacy.export());
+  legacy.close();
+  const result = await importLegacyContent({ fixtureRoot, dryRun: true });
+  const first = result.records.find(record => record.command.slug === "first")!.command;
+  const second = result.records.find(record => record.command.slug === "second")!.command;
+  assert.equal(first.bodyMd, "Тело из базы");
+  assert.equal(first.excerpt, "Уникальное SEO-описание первой статьи из индекса.");
+  assert.equal(first.seoDescription, "Уникальное SEO-описание первой статьи из индекса.");
+  assert.equal(second.seoDescription, "Описание второй статьи из базы");
+  assert.equal(second.excerpt, "Описание второй статьи из базы");
+});
+
 test("CLI distinguishes runtime failures from data errors without leaking connection secrets", async () => {
   const cli = spawnSync(process.execPath, ["--import", "tsx", "scripts/migrate-content-to-postgres.ts", "--unknown"], { encoding: "utf8" });
   assert.equal(cli.status, 1);
