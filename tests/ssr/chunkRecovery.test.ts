@@ -10,6 +10,14 @@ test("actual router route-import failures reload once per release then render th
   t.after(() => browser.close());
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 1000 });
+  const clickDesktopBlogLink = () => page.$eval('header nav a[href="/blog/"]', anchor => {
+    if (getComputedStyle(anchor.closest("nav")!).display === "none") {
+      throw new Error("Desktop blog navigation must be visible");
+    }
+    // Dispatch through React's Link handler without pointer hit-testing the
+    // Header while its entrance animation is still translating it.
+    (anchor as HTMLElement).click();
+  });
   let documents = 0;
   let blockedImports = 0;
   const diagnostics: string[] = [];
@@ -29,13 +37,13 @@ test("actual router route-import failures reload once per release then render th
   // Header links execute React Router's installed loadRouteModule path.
   await Promise.all([
     page.waitForNavigation({ waitUntil: "networkidle2" }),
-    page.click('header a[href="/blog/"]'),
+    clickDesktopBlogLink(),
   ]);
   assert.equal(documents, 2);
   assert.ok(blockedImports > 0);
   assert.match(await page.evaluate(() => sessionStorage.getItem("kordevChunkReloadRelease")) || "", /^[a-f0-9]{40}$/);
   await page.waitForFunction(() => document.documentElement.dataset.hydrated === "true");
-  await page.click('header a[href="/blog/"]');
+  await clickDesktopBlogLink();
   try {
     await page.waitForFunction(() => document.querySelector("h1")?.textContent === "Не удалось загрузить страницу", { timeout: 10_000 });
   } catch (error) {
