@@ -9,16 +9,17 @@ FROM dependencies AS content-migration
 ARG RELEASE_SHA
 ENV RELEASE_SHA=$RELEASE_SHA
 LABEL org.opencontainers.image.revision=$RELEASE_SHA
-COPY tsconfig.json tsconfig.server.json ./
-COPY src/server/content/repository.ts src/server/content/types.ts src/server/content/migration.ts ./src/server/content/
-COPY src/server/db/client.ts src/server/db/schema.ts ./src/server/db/
-COPY src/lib/blogPresentation.mjs ./src/lib/blogPresentation.mjs
-COPY server/utils/contentMeta.js ./server/utils/contentMeta.js
-COPY server/data/content.sqlite ./server/data/content.sqlite
-COPY public/blog/*.md ./public/blog/
-COPY public/content/blog.ru.json public/content/projects.ru.json ./public/content/
-COPY src/blog/*.md ./src/blog/
-COPY scripts/migrate-content-to-postgres.ts scripts/verify-content-migration.ts scripts/bootstrap-content-check.mjs scripts/release-files.mjs ./scripts/
+COPY --chown=node:node tsconfig.json tsconfig.server.json ./
+COPY --chown=node:node src/server/content/repository.ts src/server/content/types.ts src/server/content/migration.ts ./src/server/content/
+COPY --chown=node:node src/server/db/client.ts src/server/db/schema.ts ./src/server/db/
+COPY --chown=node:node src/lib/blogPresentation.mjs ./src/lib/blogPresentation.mjs
+COPY --chown=node:node server/utils/contentMeta.js ./server/utils/contentMeta.js
+COPY --chown=node:node server/data/content.sqlite ./server/data/content.sqlite
+COPY --chown=node:node public/blog/*.md ./public/blog/
+COPY --chown=node:node public/content/blog.ru.json public/content/projects.ru.json ./public/content/
+COPY --chown=node:node src/blog/*.md ./src/blog/
+COPY --chown=node:node scripts/migrate-content-to-postgres.ts scripts/verify-content-migration.ts scripts/bootstrap-content-check.mjs scripts/release-files.mjs ./scripts/
+RUN chmod 0600 /app/server/data/content.sqlite
 RUN test "${#RELEASE_SHA}" = 40 && printf '%s' "$RELEASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
 USER node
 CMD ["node", "--import", "tsx", "scripts/migrate-content-to-postgres.ts", "--dry-run"]

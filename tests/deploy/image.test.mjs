@@ -7,7 +7,7 @@ test('every literal Docker COPY input exists in a clean tracked checkout', () =>
   const files = spawnSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).stdout.split('\0');
   for (const line of readFileSync('Dockerfile', 'utf8').split('\n')) {
     if (!line.startsWith('COPY ') || line.includes('--from=')) continue;
-    for (const source of line.split(/\s+/).slice(1, -1)) {
+    for (const source of line.split(/\s+/).slice(1, -1).filter(part => !part.startsWith('--'))) {
       if (source === '.') continue;
       const glob = new RegExp('^' + source.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$');
       assert.ok(files.some(file => glob.test(file) || file.startsWith(source.replace(/\/$/, '') + '/')), `Docker COPY requires untracked input: ${source}`);
