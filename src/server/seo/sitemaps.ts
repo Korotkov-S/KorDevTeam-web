@@ -24,6 +24,7 @@ function recordUrls(entries: ContentEntry[], blog: boolean) {
 }
 function urlset(items: Array<{ loc: string; lastmod: string }>) {
   const unique = new Map(items.map(item => [item.loc, item]));
+  if (unique.size > 50_000) throw new Error("sitemap_url_limit_exceeded");
   return xml("urlset", [...unique.values()].sort((a, b) => a.loc.localeCompare(b.loc)).map(item => `<url><loc>${escapeXml(item.loc)}</loc><lastmod>${escapeXml(item.lastmod)}</lastmod></url>`).join(""));
 }
 export function buildSitemapIndex(): string {
@@ -33,5 +34,5 @@ export function buildPagesSitemap(entries: ContentEntry[]): string {
   return urlset([...Object.entries(staticContentDates).map(([pathname, lastmod]) => ({ loc: canonicalUrl({ pathname }), lastmod })), ...recordUrls(entries, false)]);
 }
 export function buildBlogSitemap(entries: ContentEntry[]): string { return urlset(recordUrls(entries, true)); }
-export function buildRobotsText(): string { return `User-agent: *\nDisallow: /admin/\n\nSitemap: ${SITE_ORIGIN}/sitemap-index.xml\n`; }
+export function buildRobotsText(): string { return `User-agent: *\nDisallow: /admin/\n\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`; }
 export const sitemapHeaders = { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-cache" };

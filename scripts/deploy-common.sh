@@ -50,7 +50,7 @@ smoke() {
     body="$(curl --fail --silent --show-error --max-time 20 -H 'Accept: text/html' "$origin$route")" || return 1
     [[ "$body" == *'<h1'* && "$body" == *'<title>'* ]] || return 1
   done
-  body="$(curl --fail --silent --show-error --max-time 20 "$origin/sitemap-index.xml")" || return 1
+  body="$(curl --fail --silent --show-error --max-time 20 "$origin/sitemap.xml")" || return 1
   [[ "$body" == *'<urlset'* || "$body" == *'<sitemapindex'* ]]
 }
 verify_slot() {

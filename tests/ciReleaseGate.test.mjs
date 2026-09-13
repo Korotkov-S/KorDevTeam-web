@@ -153,7 +153,7 @@ test("operator runbook covers approval, exact switching, rollback and public evi
     "switch-slot.sh",
     "rollback-slot.sh",
     "restore-postgres.sh",
-    "sitemap-index.xml",
+    "sitemap.xml",
     "canonical",
     "X-Kordev-Slot",
     "BACKUP_S3_URI",

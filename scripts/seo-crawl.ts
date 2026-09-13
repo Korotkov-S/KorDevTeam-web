@@ -59,7 +59,7 @@ export async function crawlSite(origin: string, { maxUrls = 5000 }: { maxUrls?: 
     if (!/xml/.test(response.type) || $(root).length !== 1) fail(url, "sitemap-xml", `Expected XML ${root}`);
     return $;
   }
-  const indexUrl = `${SITE}/sitemap-index.xml`;
+  const indexUrl = `${SITE}/sitemap.xml`;
   const index = await sitemap(indexUrl, "sitemapindex");
   if (!index) return summary;
   const children = index("sitemap > loc").map((_, el) => index(el).text()).get();

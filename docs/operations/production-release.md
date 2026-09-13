@@ -69,10 +69,10 @@ curl --silent --show-error --dump-header - --output /dev/null "http://$PRODUCTIO
 curl --silent --show-error --dump-header - --output /dev/null "https://www.$PRODUCTION_HOST/blog/"
 curl --silent --show-error --dump-header - --output /dev/null "$PUBLIC_ORIGIN/blog"
 curl --fail --silent --show-error "$PUBLIC_ORIGIN/blog/" | sed -n '/rel="canonical"/p'
-curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap-index.xml"
+curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap.xml"
 ```
 
-The final canonical URLs are HTTPS, non-`www`, and trailing-slash URLs; each redirect must point straight to that final form. Final pages and `sitemap-index.xml` must return 200 without a redirect. The canonical link must name the same final URL.
+The final canonical URLs are HTTPS, non-`www`, and trailing-slash URLs; each redirect must point straight to that final form. Final pages and `sitemap.xml` must return 200 without a redirect. The canonical link must name the same final URL.
 
 ## Roll back
 
@@ -82,7 +82,7 @@ The previous container and recorded image must still be healthy. From the truste
 bash scripts/rollback-slot.sh
 node scripts/release-files.mjs validate-route "$TRAEFIK_DYNAMIC_FILE" "$DEPLOY_STATE_DIR" "$PRODUCTION_HOST" "$PUBLIC_ORIGIN"
 curl --fail --silent --show-error --dump-header - --output /dev/null "$PUBLIC_ORIGIN/api/health/ready"
-curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap-index.xml" >/dev/null
+curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap.xml" >/dev/null
 ```
 
 Confirm that `X-Kordev-Slot` is the recorded previous color. Rollback changes only the application route/image; shared-database migrations must be backward-compatible expand migrations and are not reversed by this command.

@@ -28,7 +28,9 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
   await resetTestDatabase(databaseUrl);
-  await importLegacyContent({ db: createDb(databaseUrl), batchId: "sitemap-runtime" });
+  const imported = await importLegacyContent({ db: createDb(databaseUrl), batchId: "sitemap-runtime" });
+  assert.equal(imported.ok, true);
+  assert.deepEqual(imported.counts, { articles: 46, cases: 9 });
   const service = createContentService(createDb(databaseUrl));
   const actor = randomUUID();
   await createDb(databaseUrl).insert(adminUsers).values({ id: actor, login: "sitemap-admin", passwordDigest: "unused", passwordSalt: "unused" });
@@ -52,13 +54,15 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
     assert.equal(response.headers.get("cache-control"), "no-cache");
     return load(await response.text(), { xml: true });
   };
-  const index = await getXml("/sitemap-index.xml");
+  const index = await getXml("/sitemap.xml");
+  const compatibilityIndex = await getXml("/sitemap-index.xml");
+  assert.equal(compatibilityIndex.xml(), index.xml());
   assert.deepEqual(index("sitemap > loc").map((_, el) => index(el).text()).get(), ["https://kordev.team/sitemap-pages.xml", "https://kordev.team/sitemap-blog.xml"]);
   const pages = await getXml("/sitemap-pages.xml");
   const blog = await getXml("/sitemap-blog.xml");
   const locations = [pages, blog].map($ => $("url > loc").map((_, el) => $(el).text()).get());
   assert.equal(locations[0].filter(loc => locations[1].includes(loc)).length, 0);
-  for (const pathname of ["/", "/services/", "/cases/", "/journal/", "/video/", "/requisites/", "/privacy/", "/about-test/", "/services/test-service/"]) assert.ok(locations[0].includes(`https://kordev.team${pathname}`), pathname);
+  for (const pathname of ["/", "/blog/", "/services/", "/cases/", "/journal/", "/journal/issue-0/", "/video/", "/under-metup/video-1/", "/under-metup/video-2/", "/under-metup/video-3/", "/requisites/", "/privacy/", "/about-test/", "/services/test-service/"]) assert.ok(locations[0].includes(`https://kordev.team${pathname}`), pathname);
   assert.ok(locations[1].length > 0);
   assert.ok(locations[1].every(loc => loc.startsWith("https://kordev.team/blog/")));
   assert.ok(locations.flat().every(loc => !/private-draft|hidden-entry/.test(loc)));
@@ -73,6 +77,8 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
       if (record) assert.equal(lastmod, record.updatedAt.toISOString());
       const response = await fetch(runtime.origin + new URL(loc).pathname, { redirect: "manual", headers: { accept: "text/html" } });
       assert.equal(response.status, 200, loc);
+      const document = load(await response.text());
+      assert.equal(document('meta[name="robots"]').attr("content"), "index, follow", loc);
     }
   }
   assert.equal(pages("url").filter((_, el) => pages(el).find("loc").text().endsWith("/about-test/")).find("lastmod").text(), published.updatedAt.toISOString());
@@ -80,8 +86,12 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   assert.deepEqual(again("lastmod").map((_, el) => again(el).text()).get(), pages("lastmod").map((_, el) => pages(el).text()).get());
   const robots = await fetch(runtime.origin + "/robots.txt");
   assert.equal(robots.status, 200);
-  assert.match(await robots.text(), /Disallow: \/admin\/\n[\s\S]*Sitemap: https:\/\/kordev\.team\/sitemap-index\.xml/);
-  assert.equal((await fetch(runtime.origin + "/sitemap.xml")).status, 404);
+  assert.match(await robots.text(), /Disallow: \/admin\/\n[\s\S]*Sitemap: https:\/\/kordev\.team\/sitemap\.xml\n/);
+  for (const pathname of ["/under-metup/", "/under-metup/unknown/"]) {
+    const response = await fetch(runtime.origin + pathname, { redirect: "manual" });
+    assert.equal(response.status, 404);
+    assert.equal(load(await response.text())('meta[name="robots"]').attr("content"), "noindex, follow");
+  }
   for (const pathname of ["/private-draft/", "/services/missing-service/"]) assert.equal((await fetch(runtime.origin + pathname)).status, 404);
   const crawl = await runCrawler(runtime.origin);
   assert.equal(crawl.code, 0, crawl.stdout + crawl.stderr);
@@ -104,7 +114,7 @@ test("crawler CLI enforces one fetch budget across sitemap entries, canonical ta
           res.setHeader("Content-Type", "font/woff2");
           res.setHeader("Cache-Control", "no-store");
           res.end(Buffer.from([0, 1, 2, 3]));
-        } else if (pathname === "/sitemap-index.xml") {
+        } else if (pathname === "/sitemap.xml") {
           res.setHeader("Content-Type", "application/xml");
           res.end(`<sitemapindex>${["pages", "blog"].map(name => `<sitemap><loc>https://kordev.team/sitemap-${name}.xml</loc></sitemap>`).join("")}</sitemapindex>`);
         } else if (pathname.startsWith("/sitemap-")) {
@@ -173,7 +183,7 @@ test("crawler CLI reports P0 failures and rejects redirects, invisible headings,
   const xml = (body: string) => `<?xml version="1.0"?>${body}`;
   const server = createServer((req, res) => {
     const path = req.url!;
-    if (path === "/sitemap-index.xml") { res.setHeader("Content-Type", "application/xml"); res.end(xml(`<sitemapindex>${["pages", "blog"].map(name => `<sitemap><loc>${loc(`/sitemap-${name}.xml`)}</loc></sitemap>`).join("")}</sitemapindex>`)); return; }
+    if (path === "/sitemap.xml") { res.setHeader("Content-Type", "application/xml"); res.end(xml(`<sitemapindex>${["pages", "blog"].map(name => `<sitemap><loc>${loc(`/sitemap-${name}.xml`)}</loc></sitemap>`).join("")}</sitemapindex>`)); return; }
     if (/^\/sitemap-(pages|blog)\.xml$/.test(path)) { res.setHeader("Content-Type", "application/xml"); res.end(xml(`<urlset>${(path.includes("pages") ? paths : []).map(p => `<url><loc>${loc(p)}</loc><lastmod>2025-01-02T03:04:05.000Z</lastmod></url>`).join("")}</urlset>`)); return; }
     if (path === "/redirect/") { res.writeHead(308, { location: "/good/" }); res.end(); return; }
     if (path === "/broken/") { res.writeHead(404); res.end("missing"); return; }

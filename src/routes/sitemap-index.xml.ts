@@ -1,2 +1,2 @@
-import { buildSitemapIndex, sitemapHeaders } from "../server/seo/sitemaps";
-export function loader() { return new Response(buildSitemapIndex(), { headers: sitemapHeaders }); }
+// Direct-200 compatibility alias; discovery and smoke checks use /sitemap.xml.
+export { loader } from "./sitemap.xml";

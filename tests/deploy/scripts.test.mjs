@@ -19,7 +19,7 @@ function fixture(t) {
   writeFileSync(path.join(dir, 'state/slots/green'), image + '\n');
   function stub(name, body) { writeFileSync(path.join(dir, 'bin', name), '#!/bin/bash\nset -eu\n' + body, { mode: 0o755 }); }
   stub('docker', 'printf "%s\\n" "$*" >> "$TEST_DIR/commands"\nif [[ "$1" == inspect ]]; then if [[ "$*" == *blue* ]]; then printf "%s\\n" "$OLD_IMAGE"; else printf "%s\\n" "$TARGET_IMAGE"; fi; fi\n');
-  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap-index.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
+  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir,
     DEPLOY_STATE_DIR: `${dir}/state`, TRAEFIK_DYNAMIC_FILE: route, PUBLIC_ORIGIN: 'https://example.com',
     TARGET_IMAGE: image, OLD_IMAGE: oldImage, READINESS_ATTEMPTS: '1', READINESS_DELAY: '0',
@@ -147,7 +147,7 @@ test('smoke requests canonical catalog paths and the real dynamic sitemap endpoi
   const r = f.run('switch-slot', ['green']); assert.equal(r.status, 0, r.stderr);
   const requests = readFileSync(`${f.dir}/requests`, 'utf8');
   assert.match(requests, /127\.0\.0\.1:8082\/services\//);
-  assert.match(requests, /127\.0\.0\.1:8082\/sitemap-index\.xml/);
+  assert.match(requests, /127\.0\.0\.1:8082\/sitemap\.xml/);
 });
 test('public smoke rejects responses from a stale Traefik target and rolls back', t => {
   const f = fixture(t);
@@ -178,7 +178,7 @@ test('inconsistent active routing, slot headers and image records reject deploym
     if (mismatch === 'backend') writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('http://kordevteam-blue:3001', 'http://kordevteam-green:3001'));
     if (mismatch === 'header') writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('X-Kordev-Slot: blue', 'X-Kordev-Slot: green'));
     if (mismatch === 'record') writeFileSync(`${f.dir}/state/slots/blue`, image + '\n');
-    if (mismatch === 'public') f.stub('curl', 'if [[ "$*" == *--dump-header* ]]; then printf "X-Kordev-Slot: green\\r\\n"; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap-index.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<html><title>Team</title><h1>Team</h1></html>\'; fi\n');
+    if (mismatch === 'public') f.stub('curl', 'if [[ "$*" == *--dump-header* ]]; then printf "X-Kordev-Slot: green\\r\\n"; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<html><title>Team</title><h1>Team</h1></html>\'; fi\n');
     const before = readFileSync(f.route, 'utf8');
     assert.notEqual(f.run('deploy-slot', ['green', image], mismatch === 'container' ? { OLD_IMAGE: image } : {}).status, 0);
     assert.equal(readFileSync(f.route, 'utf8'), before);
