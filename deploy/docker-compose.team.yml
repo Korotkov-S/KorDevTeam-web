@@ -9,6 +9,7 @@ x-web: &web
   init: true
   environment:
     NODE_ENV: production
+    CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
     TRUST_PROXY_HOPS: "1"
     DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}

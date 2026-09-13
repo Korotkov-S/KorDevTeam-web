@@ -2,6 +2,10 @@
 
 Production changes only after an operator starts `workflow_dispatch` with an exact GHCR digest. A push to `main` validates and publishes an image but cannot change production. Never substitute a tag, including a commit tag, for the canonical `ghcr.io/<owner>/<repository>@sha256:<64 lowercase hex>` reference recorded by the build.
 
+Published-content reads bypass the process-local cache in production. The Docker image and both blue/green services in production and rehearsal Compose set `CONTENT_CACHE_TTL_SECONDS=0`. Every entry/list request reads PostgreSQL, so a prewarmed inactive slot sees committed publication changes immediately when traffic switches; sitemap lists use the same reads. This adds database reads but avoids cross-process stale content without a distributed invalidation mechanism.
+
+The runtime also defaults to TTL 0 when `NODE_ENV=production` and the TTL variable is absent, or when `NODE_ENV` is absent/unrecognized. Only `NODE_ENV=development` or `test` defaults to the bounded 60-second cache (maximum 500 records). `CONTENT_CACHE_TTL_SECONDS` accepts decimal integers 0–60; malformed, negative, fractional, or larger values throw `content_cache_config_invalid` on cache initialization. Positive environment-configured TTLs outside development/test are rejected, including production; production cannot re-enable the cache even through an explicit constructor TTL. Do not use development/test mode for multi-process deployments. TTL 0 performs no cache storage or cloning, while retaining the same-process guard against in-flight reads crossing a write.
+
 ## One-time GitHub and host configuration
 
 Create the GitHub environment `production` under **Settings → Environments**. When the repository plan supports deployment protection rules, enable **Required reviewers**, select the owner, and disable self-review if a second operator is required. Keep branch/tag deployment rules limited to the default branch. The workflow also requires `workflow_dispatch`: if required reviewers are not available, manually starting that dispatch with an exact digest is the fallback approval boundary. Restrict Actions write access to trusted operators.

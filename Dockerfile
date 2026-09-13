@@ -17,7 +17,7 @@ RUN yarn plugin import workspace-tools && yarn workspaces focus --all --producti
 
 FROM node:22.22.0-alpine AS production
 WORKDIR /app
-ENV NODE_ENV=production PORT=3001 CONTENT_DIST_ROOT=/app/build/client SQLITE_PATH=/app/server/data/content.sqlite
+ENV NODE_ENV=production PORT=3001 CONTENT_CACHE_TTL_SECONDS=0 CONTENT_DIST_ROOT=/app/build/client SQLITE_PATH=/app/server/data/content.sqlite
 ARG RELEASE_SHA
 ENV RELEASE_SHA=$RELEASE_SHA
 LABEL org.opencontainers.image.revision=$RELEASE_SHA

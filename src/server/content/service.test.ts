@@ -7,6 +7,7 @@ import { adminUsers, contentEntries, contentRelations, contentRevisions } from "
 import { resetTestDatabase } from "../db/testDatabase";
 import { ContentCache } from "./cache";
 import { createContentService } from "./service";
+import { buildPagesSitemap } from "../seo/sitemaps";
 
 const databaseUrl = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = databaseUrl ? test : test.skip;
@@ -124,7 +125,7 @@ databaseTest("hard delete rejects stale versions and cascades revisions and both
 });
 
 databaseTest("writes invalidate old/new slugs, lists, relationship lists and sitemaps only on commit", async () => {
-  const cache = new ContentCache();
+  const cache = new ContentCache(Date.now, 60);
   const service = createContentService(db, cache);
   const command = draftCommand();
   const draft = await service.saveDraft(command, adminId);
@@ -186,7 +187,7 @@ databaseTest("all content kinds save and publish through the same validated boun
 
 test("cache expires after 60 seconds, evicts above 500 records, and isolates callers", () => {
   let now = 0;
-  const cache = new ContentCache(() => now);
+  const cache = new ContentCache(() => now, 60);
   cache.set("first", { value: 1 });
   const read = cache.get<{ value: number }>("first")!;
   read.value = 99;
@@ -201,7 +202,7 @@ test("cache expires after 60 seconds, evicts above 500 records, and isolates cal
 });
 
 test("a public read in flight cannot repopulate cache with content invalidated during its query", async () => {
-  const cache = new ContentCache();
+  const cache = new ContentCache(Date.now, 60);
   let resolve!: (value: string) => void;
   let calls = 0;
   const pending = cache.read("entry:article:slug", () => {
@@ -212,4 +213,57 @@ test("a public read in flight cannot repopulate cache with content invalidated d
   resolve("old");
   assert.equal(await pending, "new");
   assert.equal(cache.get("entry:article:slug"), "new");
+});
+
+databaseTest("independent production slots immediately observe publication changes in entries and sitemap lists", async (t) => {
+  const originalEnvironment = process.env.NODE_ENV;
+  const originalTtl = process.env.CONTENT_CACHE_TTL_SECONDS;
+  process.env.NODE_ENV = "production";
+  delete process.env.CONTENT_CACHE_TTL_SECONDS;
+  t.after(() => {
+    if (originalEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalEnvironment;
+    if (originalTtl === undefined) delete process.env.CONTENT_CACHE_TTL_SECONDS;
+    else process.env.CONTENT_CACHE_TTL_SECONDS = originalTtl;
+  });
+  const reader = createContentService(db, new ContentCache());
+  const writer = createContentService(db, new ContentCache());
+  const command = draftCommand();
+  const draft = await writer.saveDraft(command, adminId);
+  const visible = async (slug: string, version: number | null) => {
+    assert.equal((await reader.getPublishedEntry("service", slug))?.version ?? null, version);
+    const entries = await reader.listPublishedEntries("service");
+    assert.equal(entries.find(e => e.slug === slug)?.version ?? null, version);
+    assert.equal(buildPagesSitemap(entries).includes(`/services/${slug}/`), version !== null);
+  };
+  await visible(draft.slug, null); // Prewarm the inactive slot before a write elsewhere.
+  await writer.publishEntry(draft.id, 1, adminId);
+  await visible(draft.slug, 2);
+  await writer.unpublishEntry(draft.id, 2, adminId);
+  await visible(draft.slug, null);
+  await writer.publishEntry(draft.id, 3, adminId);
+  await visible(draft.slug, 4);
+  const renamed = await writer.saveDraft({ ...command, id: draft.id, expectedVersion: 4, slug: `updated-${randomUUID()}` }, adminId);
+  await visible(draft.slug, null);
+  await visible(renamed.slug, null);
+  await writer.publishEntry(renamed.id, 5, adminId);
+  await visible(renamed.slug, 6);
+});
+
+test("TTL zero bypasses retention and cloning but still retries invalidated in-flight reads", async () => {
+  const cache = new ContentCache(Date.now, 0);
+  const value = { uncloneable() { return "fresh"; } };
+  assert.doesNotThrow(() => cache.set("entry:article:slug", value));
+  assert.equal(cache.get("entry:article:slug"), undefined);
+  assert.equal(await cache.read("entry:article:slug", async () => value), value);
+  assert.equal(cache.get("entry:article:slug"), undefined);
+  assert.equal(await cache.read("entry:article:slug", async () => "next"), "next");
+  let resolve!: (value: string) => void;
+  let calls = 0;
+  const pending = cache.read("entry:article:slug", () => ++calls === 1
+    ? new Promise<string>(r => { resolve = r; }) : Promise.resolve("current"));
+  cache.invalidate(["entry:article:slug"]);
+  resolve("stale");
+  assert.equal(await pending, "current");
+  assert.equal(cache.get("entry:article:slug"), undefined);
 });

@@ -22,6 +22,7 @@ test('production image packages SSR, migrations and production dependencies unde
   assert.match(dockerfile, /workspaces focus --all --production/);
   assert.match(dockerfile, /server\/runtime\.mjs/);
   assert.match(dockerfile, /health\/ready/);
+  assert.match(dockerfile, /ENV .*CONTENT_CACHE_TTL_SECONDS=0(?:\s|$)/m);
 });
 test('local topology has shared loopback PostgreSQL and distinct blue green ports', () => {
   const r = spawnSync('docker', ['compose', 'config', '--format', 'json'], { encoding: 'utf8' });
@@ -31,6 +32,8 @@ test('local topology has shared loopback PostgreSQL and distinct blue green port
     const service = services[`kordevteam-${color}`]; assert.ok(service);
     assert.ok(service.ports.some(p => p.host_ip === '127.0.0.1' && p.published === port));
     assert.equal(service.environment.DATABASE_URL, 'postgresql://kordev:kordev@postgres:5432/kordev');
+    assert.equal(service.environment.NODE_ENV, 'production');
+    assert.equal(service.environment.CONTENT_CACHE_TTL_SECONDS, '0');
     assert.equal(service.logging.options['max-file'], '30');
   }
   assert.deepEqual(Object.keys(services).filter(s => s.includes('postgres')), ['postgres']);
@@ -47,4 +50,8 @@ test('production compose resolves both immutable slots without a public database
   assert.equal(services['kordevteam-blue'].image, ref);
   assert.equal(services['kordevteam-green'].image, ref);
   assert.equal(services['kordevteam-blue'].environment.DATABASE_URL, services['kordevteam-green'].environment.DATABASE_URL);
+  for (const color of ['blue', 'green']) {
+    assert.equal(services[`kordevteam-${color}`].environment.NODE_ENV, 'production');
+    assert.equal(services[`kordevteam-${color}`].environment.CONTENT_CACHE_TTL_SECONDS, '0');
+  }
 });
