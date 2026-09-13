@@ -6,10 +6,18 @@
 http:
   routers:
     kordevteam:
-      rule: "Host(`kordevteam.example`)"
+      rule: "Host(`kordevteam.example`) || Host(`www.kordevteam.example`)"
       entryPoints: [websecure]
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: kordevteam.example
+            sans: [www.kordevteam.example]
+      service: kordevteam-active
+      middlewares: [kordevteam-slot]
+    kordevteam-http:
+      rule: "Host(`kordevteam.example`) || Host(`www.kordevteam.example`)"
+      entryPoints: [web]
       service: kordevteam-active
       middlewares: [kordevteam-slot]
   middlewares:

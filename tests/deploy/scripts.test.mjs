@@ -14,12 +14,12 @@ function fixture(t) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   for (const name of ['bin', 'state/slots', 'traefik', 'releases', 'logs']) mkdirSync(path.join(dir, name), { recursive: true });
   const route = path.join(dir, 'traefik/kordevteam-dynamic.yml');
-  writeFileSync(route, `# current-slot: blue\n# previous-slot: none\n# current-image: ${oldImage}\nhttp:\n  routers:\n    kordevteam:\n      rule: "Host(\`example.com\`)"\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n  middlewares:\n    kordevteam-slot:\n      headers:\n        customResponseHeaders:\n          X-Kordev-Slot: blue\n  services:\n    kordevteam-active:\n      loadBalancer:\n        servers:\n          - url: http://kordevteam-blue:3001\n`);
+  writeFileSync(route, `# current-slot: blue\n# previous-slot: none\n# current-image: ${oldImage}\nhttp:\n  routers:\n    kordevteam:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [websecure]\n      tls:\n        certResolver: letsencrypt\n        domains:\n          - main: example.com\n            sans: [www.example.com]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n    kordevteam-http:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [web]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n  middlewares:\n    kordevteam-slot:\n      headers:\n        customResponseHeaders:\n          X-Kordev-Slot: blue\n  services:\n    kordevteam-active:\n      loadBalancer:\n        servers:\n          - url: http://kordevteam-blue:3001\n`);
   writeFileSync(path.join(dir, 'state/slots/blue'), oldImage + '\n');
   writeFileSync(path.join(dir, 'state/slots/green'), image + '\n');
   function stub(name, body) { writeFileSync(path.join(dir, 'bin', name), '#!/bin/bash\nset -eu\n' + body, { mode: 0o755 }); }
   stub('docker', 'printf "%s\\n" "$*" >> "$TEST_DIR/commands"\nif [[ "$1" == inspect ]]; then if [[ "$*" == *blue* ]]; then printf "%s\\n" "$OLD_IMAGE"; else printf "%s\\n" "$TARGET_IMAGE"; fi; fi\n');
-  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap-index.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
+  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap-index.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir,
     DEPLOY_STATE_DIR: `${dir}/state`, TRAEFIK_DYNAMIC_FILE: route, PUBLIC_ORIGIN: 'https://example.com',
     TARGET_IMAGE: image, OLD_IMAGE: oldImage, READINESS_ATTEMPTS: '1', READINESS_DELAY: '0',
@@ -207,4 +207,10 @@ test('successful switch preserves existing security middleware configuration', t
   writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('middlewares: [kordevteam-slot]', 'middlewares: [kordevteam-slot, security]').replace('  middlewares:\n', '  middlewares:\n    security:\n      headers:\n        frameDeny: true\n'));
   const result = f.run('switch-slot', ['green']); assert.equal(result.status, 0, result.stderr);
   assert.match(readFileSync(f.route, 'utf8'), /frameDeny: true/);
+});
+test('public smoke exercises HTTP and www single-hop canonical redirects', t => {
+  const f = fixture(t);
+  const result = f.run('switch-slot', ['green']); assert.equal(result.status, 0, result.stderr);
+  const requests = readFileSync(`${f.dir}/requests`, 'utf8');
+  for (const origin of ['http://example.com', 'http://www.example.com', 'https://www.example.com']) assert.ok(requests.includes(`${origin}/privacy?utm_source=deploy`));
 });

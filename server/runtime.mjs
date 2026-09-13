@@ -1,6 +1,7 @@
 import express from "express";
 import { createRequestHandler } from "@react-router/express";
 import { createRequire } from "node:module";
+import { configureProxy } from "./proxy.mjs";
 
 const require = createRequire(import.meta.url);
 const { createApiApp } = require("./api-app.js");
@@ -9,7 +10,7 @@ const { bootstrapFromLegacyContentIfEmpty } = require("./db/bootstrap.js");
 const app = express();
 const build = await import("../build/server/index.js");
 app.disable("x-powered-by");
-app.set("trust proxy", "loopback");
+configureProxy(app);
 app.use(async (req, res, next) => {
   const request = new Request(`${req.protocol}://${req.get("host")}${req.originalUrl}`, {
     method: req.method,

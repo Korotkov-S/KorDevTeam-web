@@ -84,8 +84,16 @@ public_smoke() {
   local attempt headers expected
   expected="$(current_slot)"
   for ((attempt=0; attempt<${READINESS_ATTEMPTS:-30}; attempt++)); do
-    if public_slot_matches "$expected" && smoke "$PUBLIC_ORIGIN"; then return 0; fi
+    if public_slot_matches "$expected" && smoke "$PUBLIC_ORIGIN" && public_canonical_redirects; then return 0; fi
     sleep "${READINESS_DELAY:-2}"
   done
   return 1
+}
+public_canonical_redirects() {
+  local host="${PUBLIC_ORIGIN#https://}" origin result expected
+  expected="$PUBLIC_ORIGIN/privacy/?utm_source=deploy"
+  for origin in "http://$host" "http://www.$host" "https://www.$host"; do
+    result="$(curl --fail --silent --show-error --max-time 10 -H 'Accept: text/html' --output /dev/null --write-out '%{http_code} %{redirect_url}' "$origin/privacy?utm_source=deploy")" || return 1
+    [[ "$result" == "308 $expected" || "$result" == "301 $expected" ]] || return 1
+  done
 }

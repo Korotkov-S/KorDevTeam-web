@@ -18,22 +18,26 @@ export function validateRoute(target, stateDirectory, host, origin) {
   const record = path.join(stateDirectory, 'slots', slot); safePath(record);
   if (readFileSync(record, 'utf8').trim() !== image) throw Error('Current route image differs from recorded image');
   const document = yaml.load(bytes, { schema: yaml.JSON_SCHEMA });
-  const router = document?.http?.routers?.kordevteam;
-  const match = /^Host\(`([a-z0-9.-]+)`\)$/.exec(router?.rule || '');
   const url = new URL(origin);
-  if (!match || !host || host !== match[1] || url.hostname !== host || url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw Error('Production host, public origin and route host must agree');
-  const services = document?.http?.services;
-  const service = services?.[router.service];
-  if (service?.loadBalancer?.servers?.length !== 1 || service.loadBalancer.servers[0].url !== `http://kordevteam-${slot}:3001`) throw Error('Current slot disagrees with active backend');
-  const middlewares = router.middlewares;
-  if (!Array.isArray(middlewares) || !middlewares.includes('kordevteam-slot')) throw Error('Active route requires slot middleware');
-  let headers = [];
-  for (const name of middlewares) {
-    const middleware = document.http.middlewares?.[name];
-    if (!middleware || middleware.chain) throw Error('Unknown or chained active middleware');
-    headers.push(...Object.entries(middleware.headers?.customResponseHeaders || {}).filter(([key]) => key.toLowerCase() === 'x-kordev-slot').map(([, value]) => value));
+  if (!host || !/^[a-z0-9.-]+$/.test(host) || host.startsWith('www.') || url.hostname !== host || url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw Error('Production host, public origin and route host must agree');
+  const secure = document?.http?.routers?.kordevteam;
+  const plain = document?.http?.routers?.['kordevteam-http'];
+  const expectedRule = `Host(\`${host}\`) || Host(\`www.${host}\`)`;
+  if (!secure || !plain || secure.rule !== expectedRule || plain.rule !== expectedRule || secure.service !== plain.service) throw Error('HTTP and HTTPS routes must cover the same canonical/www hosts and active service');
+  if (JSON.stringify(secure.entryPoints) !== '["websecure"]' || JSON.stringify(plain.entryPoints) !== '["web"]' || plain.tls !== undefined) throw Error('HTTP and HTTPS entrypoints must be separate');
+  if (typeof secure.tls?.certResolver !== 'string' || !secure.tls.certResolver || JSON.stringify(secure.tls.domains) !== JSON.stringify([{ main: host, sans: [`www.${host}`] }])) throw Error('TLS certificate must cover canonical and www hosts');
+  for (const router of [secure, plain]) {
+    const service = document?.http?.services?.[router.service];
+    if (service?.loadBalancer?.servers?.length !== 1 || service.loadBalancer.servers[0].url !== `http://kordevteam-${slot}:3001`) throw Error('Current slot disagrees with active backend');
+    if (!Array.isArray(router.middlewares) || !router.middlewares.includes('kordevteam-slot')) throw Error('Active route requires slot middleware');
+    const headers = [];
+    for (const name of router.middlewares) {
+      const middleware = document.http.middlewares?.[name];
+      if (!middleware || middleware.chain || middleware.redirectScheme || middleware.redirectRegex) throw Error('Unknown, chained or redirecting middleware would bypass canonicalization');
+      headers.push(...Object.entries(middleware.headers?.customResponseHeaders || {}).filter(([key]) => key.toLowerCase() === 'x-kordev-slot').map(([, value]) => value));
+    }
+    if (headers.length !== 1 || headers[0] !== slot) throw Error('Current slot disagrees with response header');
   }
-  if (headers.length !== 1 || headers[0] !== slot) throw Error('Current slot disagrees with response header');
   return slot;
 }
 
@@ -92,11 +96,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // Change only slot routing; retain TLS, security middleware and other settings.
     validateRoute(target, process.env.DEPLOY_STATE_DIR, host, process.env.PUBLIC_ORIGIN);
     const document = yaml.load(readFileSync(target, 'utf8'), { schema: yaml.JSON_SCHEMA });
-    const router = document.http.routers.kordevteam;
-    document.http.services[router.service].loadBalancer.servers[0].url = `http://kordevteam-${current}:3001`;
-    for (const name of router.middlewares) {
-      const headers = document.http.middlewares[name].headers?.customResponseHeaders;
-      for (const key of Object.keys(headers || {})) if (key.toLowerCase() === 'x-kordev-slot') headers[key] = current;
+    for (const router of [document.http.routers.kordevteam, document.http.routers['kordevteam-http']]) {
+      document.http.services[router.service].loadBalancer.servers[0].url = `http://kordevteam-${current}:3001`;
+      for (const name of router.middlewares) {
+        const headers = document.http.middlewares[name].headers?.customResponseHeaders;
+        for (const key of Object.keys(headers || {})) if (key.toLowerCase() === 'x-kordev-slot') headers[key] = current;
+      }
     }
     const metadata = `# current-slot: ${current}\n# previous-slot: ${previous}\n# current-image: ${currentImage}\n# previous-image: ${previousImage}\n`;
     atomicWrite(target, metadata + yaml.dump(document, { schema: yaml.JSON_SCHEMA, noRefs: true, forceQuotes: true, quotingType: '"', lineWidth: -1 }));
