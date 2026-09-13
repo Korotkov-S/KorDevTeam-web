@@ -18,6 +18,8 @@ Set `PRODUCTION_HOST`, `PUBLIC_ORIGIN` (HTTPS origin without trailing slash), `D
 
 ## First installation: reviewed Russian content before traffic
 
+The tooling container interface is its default CMD (source dry-run) or direct `node --import tsx scripts/migrate-content-to-postgres.ts ...` / `node --import tsx scripts/verify-content-migration.ts ...`, as used by bootstrap. It runs read-only with a noexec `/tmp` tmpfs. Yarn commands are supported in the host developer checkout, not inside this hardened container; do not enable executable tmpfs to run Yarn.
+
 Use a clean, exact 40-character release checkout with locked dependencies (`yarn install --immutable`). Build/pull both immutable images for that same SHA. The guarded tooling build rejects a dirty checkout and tags/labels its image with the exact SHA:
 
 ```bash
