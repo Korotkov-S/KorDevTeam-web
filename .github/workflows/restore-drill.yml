@@ -20,6 +20,12 @@ jobs:
     environment: restore-drill
 
     steps:
+      - name: Initialize sanitized restore report
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '{"result":"failed"}\n' > "$RUNNER_TEMP/restore-drill-report.json"
+
       - name: Checkout immutable tooling revision
         uses: actions/checkout@v4
         with:
@@ -57,43 +63,57 @@ jobs:
           PRODUCTION_DATABASE_NAME: ${{ vars.PRODUCTION_DATABASE_NAME }}
         run: |
           set -euo pipefail
-          [[ "$PRODUCTION_DATABASE_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_]{0,62}$ ]]
-          export RESTORE_CONFIRM=non-production
-          export PRODUCTION_DATABASE_URL="postgresql://comparison.invalid/${PRODUCTION_DATABASE_NAME}"
           RESTORE_CONTAINER="kordev-restore-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           RESTORE_VOLUME="kordev-restore-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           report="$RUNNER_TEMP/restore-drill-report.json"
+          export RESTORE_EVIDENCE_FILE="$report"
           identity_file="$RUNNER_TEMP/kordev-restore-age-identity"
           status=failed
           cleanup() {
             original_status=$?
             set +e
-            if docker container inspect "$RESTORE_CONTAINER" >/dev/null 2>&1; then
+            container_names="$(docker container ls --all --filter "name=^/${RESTORE_CONTAINER}$" --format '{{.Names}}' 2>/dev/null)"
+            container_status=$?
+            if [ "$container_status" -eq 0 ] && [ "$container_names" = "$RESTORE_CONTAINER" ]; then
               docker rm -f -- "$RESTORE_CONTAINER" >/dev/null
               container_status=$?
-            else
-              container_status=0
+            elif [ -n "$container_names" ]; then
+              container_status=1
             fi
-            if docker volume inspect "$RESTORE_VOLUME" >/dev/null 2>&1; then
+            volume_names="$(docker volume ls --filter "name=^${RESTORE_VOLUME}$" --format '{{.Name}}' 2>/dev/null)"
+            volume_status=$?
+            if [ "$volume_status" -eq 0 ] && [ "$volume_names" = "$RESTORE_VOLUME" ]; then
               docker volume rm -- "$RESTORE_VOLUME" >/dev/null
               volume_status=$?
-            else
-              volume_status=0
+            elif [ -n "$volume_names" ]; then
+              volume_status=1
             fi
             rm -f -- "$identity_file"
             identity_status=$?
             final_status=$original_status
-            if [ "$final_status" -eq 0 ] && { [ "$container_status" -ne 0 ] || [ "$volume_status" -ne 0 ] || [ "$identity_status" -ne 0 ]; }; then
+            if [ "$container_status" -ne 0 ] || [ "$volume_status" -ne 0 ] || [ "$identity_status" -ne 0 ]; then
               final_status=1
               status=cleanup_failed
+            elif [ "$final_status" -ne 0 ]; then
+              status=failed
             fi
-            printf '{"result":"%s","toolingSha":"%s","database":"kordev_restore","checks":["archive checksum","manifest","schema inventory","migration history","published counts"]}\n' "$status" "$GITHUB_SHA" > "$report"
+            if ! node scripts/restore-evidence.mjs finalize "$report" "$status"; then
+              final_status=1
+              umask 077
+              printf '{"result":"failed"}\n' > "$report"
+            fi
             trap - EXIT
             exit "$final_status"
           }
           trap cleanup EXIT
 
           umask 077
+          if ! [[ "$PRODUCTION_DATABASE_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_]{0,62}$ ]]; then
+            echo 'Invalid production database identifier' >&2
+            exit 1
+          fi
+          export RESTORE_CONFIRM=non-production
+          export PRODUCTION_DATABASE_URL="postgresql://comparison.invalid/${PRODUCTION_DATABASE_NAME}"
           printf '%s\n' "$RESTORE_AGE_IDENTITY" > "$identity_file"
 
           docker volume create --name "$RESTORE_VOLUME" >/dev/null

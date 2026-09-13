@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, realpathSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -91,7 +91,7 @@ test('restore verifies dump, existing migration history, schema and published co
   const dump = 'PGDMP valid fixture', encrypted = 'encrypted fixture';
   const digest = value => createHash('sha256').update(value).digest('hex');
   const events = [];
-  const manifest = { version: 2, dumpSha256: digest(dump), publishedCounts: { article: 2 }, migrations: migrationHistory, inventory: { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } } };
+  const manifest = { version: 2, createdAt: '2026-09-13T00:00:00.000Z', reason: 'daily', dumpSha256: digest(dump), publishedCounts: { article: 2 }, migrations: migrationHistory, inventory: { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } } };
   const run = async (command, args) => {
     events.push(command);
     if (command === 'aws') {
@@ -109,19 +109,85 @@ test('restore verifies dump, existing migration history, schema and published co
   };
   const client = { async query(sql) {
     events.push(sql);
-    if (inventoryQuery(sql)) return inventoryQuery(sql);
+    if (sql.includes('FROM "public"."new_empty_table"')) return { rows: [{ count: '0' }] };
+    if (inventoryQuery(sql)) {
+      const result = inventoryQuery(sql);
+      if (events.includes('migrate') && sql.includes('pg_catalog.pg_class')) result.rows.push({ schema: 'public', name: 'new_empty_table' });
+      return result;
+    }
     if (sql.includes('current_database')) return { rows: [{ name: 'team_restore' }] };
     if (sql.includes('information_schema')) return { rows: [{ count: '0' }] };
     if (sql.includes('GROUP BY')) return { rows: [{ kind: 'article', count: '2' }] };
     if (sql.includes('__drizzle_migrations')) return { rows: manifest.migrations };
     return { rows: [{ name: 'table' }] };
   }, async end() { events.push('closed'); } };
-  await restoreDatabase({ directory: dir, objectKey: 'private/backups/backup.tar.age', s3Uri: 's3://private/private/backups', endpoint: 'https://s3.twcstorage.ru', identity: '/fixture/key', targetUrl: 'postgresql://u:p@localhost/team_restore' }, run, async () => client, async () => events.push('migrate'));
+  const evidenceFile = path.join(realpathSync(dir), 'report.json');
+  const config = { directory: dir, objectKey: 'private/backups/backup.tar.age', s3Uri: 's3://private/private/backups', endpoint: 'https://s3.twcstorage.ru', identity: '/fixture/key', targetUrl: 'postgresql://u:supersecret@localhost/team_restore', evidenceFile, toolingSha: 'a'.repeat(40) };
+  await restoreDatabase(config, run, async () => client, async () => { assert.equal(existsSync(evidenceFile), false); events.push('migrate'); });
   assert.ok(events.indexOf('pg_restore') < events.indexOf('migrate'));
   assert.equal(events.filter(e => e.includes('GROUP BY kind')).length, 2);
   assert.equal(events.filter(e => e.includes('pg_catalog.pg_class')).length, 2);
   assert.equal(events.filter(e => e.includes('SELECT hash, created_at')).length, 2);
   assert.equal(events.at(-1), 'closed');
+  assert.equal(existsSync(evidenceFile), true, 'successful restore must write measured evidence');
+  const evidence = JSON.parse(readFileSync(evidenceFile));
+  assert.equal(statSync(evidenceFile).mode & 0o777, 0o600);
+  assert.equal(evidence.result, 'verified');
+  assert.equal(evidence.objectKey, 'private/backups/backup.tar.age');
+  assert.equal(evidence.transferSha256, digest(encrypted));
+  assert.deepEqual(evidence.manifest, { version: 2, createdAt: '2026-09-13T00:00:00.000Z', reason: 'daily', dumpSha256: digest(dump) });
+  assert.deepEqual(evidence.beforeMigrations.inventory.tables, tableCounts);
+  assert.deepEqual(evidence.afterMigrations.inventory.tables, { ...tableCounts, 'public.new_empty_table': '0' });
+  assert.deepEqual(evidence.afterMigrations.inventory.contentStatuses, { draft: '3', published: '2' });
+  assert.deepEqual(evidence.afterMigrations.publishedCounts, { article: 2 });
+  assert.deepEqual(evidence.beforeMigrations.migrations, migrationHistory);
+  assert.deepEqual(evidence.afterMigrations.migrations, migrationHistory);
+  assert.equal(evidence.afterMigrations.lastMigrationHash, migrationHistory[0].hash);
+  assert.equal(evidence.toolingSha, 'a'.repeat(40));
+  assert.doesNotMatch(JSON.stringify(evidence), /supersecret|postgresql|s3:\/\/|twcstorage|fixture\/key/);
+
+  for (const failure of ['migrations', 'post-count', 'close']) {
+    events.length = 0;
+    let migrated = false;
+    const failedEvidence = path.join(realpathSync(dir), `failed-${failure}.json`);
+    const failedClient = { ...client, query: async sql => {
+      if (failure === 'post-count' && migrated && sql.includes('GROUP BY kind')) return { rows: [{ kind: 'article', count: '1' }] };
+      return client.query(sql);
+    }, end: async () => { if (failure === 'close') throw Error('private connection detail'); } };
+    await assert.rejects(restoreDatabase({ ...config, evidenceFile: failedEvidence }, run, async () => failedClient, async () => { migrated = true; if (failure === 'migrations') throw Error('private migration detail'); }), failure === 'post-count' ? /verification mismatch/ : /private/);
+    assert.equal(migrated, true, `${failure} fixture must reach the migration boundary`);
+    assert.equal(existsSync(failedEvidence), false);
+  }
+  events.length = 0;
+  const withoutSha = await restoreDatabase({ ...config, evidenceFile: undefined, toolingSha: 'secret-not-a-sha' }, run, async () => client, async () => {});
+  assert.equal(Object.hasOwn(withoutSha, 'toolingSha'), false);
+  for (const changes of [{ reason: 'secret reason' }, { createdAt: 'secret date' }, { migrations: [{ hash: 'secret hash', created_at: '123' }] }]) {
+    events.length = 0;
+    const invalidFile = path.join(realpathSync(dir), 'invalid-manifest.json');
+    const original = structuredClone(manifest);
+    Object.assign(manifest, changes);
+    await assert.rejects(restoreDatabase({ ...config, evidenceFile: invalidFile }, run, async () => { throw Error('connection reached'); }), /manifest mismatch/);
+    assert.equal(existsSync(invalidFile), false);
+    Object.assign(manifest, original);
+  }
+});
+
+test('restore rejects unsafe evidence paths and object keys before external commands', async t => {
+  const { restoreDatabase } = await import('../../scripts/postgres-backup.mjs');
+  const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'restore-evidence-path-')));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  mkdirSync(`${directory}/actual`); symlinkSync(`${directory}/actual`, `${directory}/linked`);
+  writeFileSync(`${directory}/private.json`, 'untouched', { mode: 0o600 }); symlinkSync(`${directory}/private.json`, `${directory}/link.json`);
+  let calls = 0;
+  const config = { directory, objectKey: 'private/backups/backup.tar.age', s3Uri: 's3://private/private/backups' };
+  for (const evidenceFile of ['relative.json', '/', `${directory}/linked/report.json`, `${directory}/link.json`, `${directory}/missing/report.json`]) {
+    await assert.rejects(restoreDatabase({ ...config, evidenceFile }, async () => { calls++; throw Error('external boundary reached'); }));
+  }
+  for (const objectKey of ['private/backups/../bad.tar.age', 'another/backup.tar.age', 'private/backups/secret?password.tar.age']) {
+    await assert.rejects(restoreDatabase({ ...config, objectKey }, async () => { calls++; throw Error('external boundary reached'); }));
+  }
+  assert.equal(calls, 0, 'invalid report path/key must fail before download');
+  assert.equal(readFileSync(`${directory}/private.json`, 'utf8'), 'untouched');
 });
 
 test('restore verification rejects lost drafts, revisions, media, missing tables and wrong last migration after migration', async t => {

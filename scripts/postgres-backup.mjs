@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrateProduction } from './migrate-production.mjs';
 import { readMigrationFiles } from 'drizzle-orm/migrator';
+import { validateEvidencePath, writeEvidence } from './restore-evidence.mjs';
 
 const exec = promisify(execFile);
 const checksum = file => createHash('sha256').update(readFileSync(file)).digest('hex');
@@ -76,9 +77,12 @@ export async function verifyRestoreState(client, manifest, afterMigrations = fal
   }
   same(Object.entries(inventory.tables).sort(), Object.entries(expectedTables).sort());
   same(inventory.contentStatuses, manifest.inventory.contentStatuses);
-  same(await publishedCounts(client), manifest.publishedCounts);
+  const counts = await publishedCounts(client);
+  same(counts, manifest.publishedCounts);
   // Exact ordered journal comparison includes the expected last migration hash.
-  same(await migrationRows(client), history);
+  const migrations = await migrationRows(client);
+  same(migrations, history);
+  return { inventory, publishedCounts: counts, migrations, lastMigrationHash: migrations.at(-1)?.hash ?? null };
 }
 function same(actual, expected) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw Error('Restored database verification mismatch');
@@ -118,6 +122,10 @@ export async function restoreDatabase(config, run = runCommand, connect = async 
   const client = new Client({ connectionString: value, connectionTimeoutMillis: 10000 }); await client.connect(); return client;
 }, applyMigrations = migrateProduction) {
   const { directory, objectKey, s3Uri, endpoint, identity, targetUrl } = config;
+  const evidenceFile = config.evidenceFile;
+  if (evidenceFile !== undefined) validateEvidencePath(evidenceFile);
+  const prefix = new URL(s3Uri).pathname.slice(1) + '/';
+  if (typeof objectKey !== 'string' || !objectKey.startsWith(prefix) || objectKey.includes('..') || !/^[a-zA-Z0-9/_-]+\.tar\.age$/.test(objectKey)) throw Error('Explicit backup object key under the private prefix required');
   const bucket = new URL(s3Uri).hostname;
   const encrypted = path.join(directory, 'backup.tar.age');
   for (const suffix of ['', '.sha256']) await run('aws', ['--endpoint-url', endpoint, 's3', 'cp', `s3://${bucket}/${objectKey}${suffix}`, `${encrypted}${suffix}`, '--only-show-errors']);
@@ -130,18 +138,27 @@ export async function restoreDatabase(config, run = runCommand, connect = async 
   await run('tar', ['-xf', archive, '--no-same-owner', '--no-same-permissions', '-C', directory]);
   for (const name of names) if (!lstatSync(path.join(directory, name)).isFile()) throw Error('Invalid archive entry');
   const manifest = JSON.parse(readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
-  if (manifest.version !== 2 || !manifest.publishedCounts || !Array.isArray(manifest.migrations) || !manifest.inventory?.contentStatuses || requiredTables.some(name => !/^\d+$/.test(manifest.inventory?.tables?.[name] ?? '')) || checksum(path.join(directory, 'backup.dump')) !== manifest.dumpSha256) throw Error('Dump checksum or manifest mismatch');
+  if (manifest.version !== 2 || !['daily', 'pre-release'].includes(manifest.reason) || typeof manifest.createdAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(manifest.createdAt) || !Number.isFinite(Date.parse(manifest.createdAt)) || !manifest.publishedCounts || !Array.isArray(manifest.migrations) || manifest.migrations.some(row => !/^[a-f0-9]{64}$/.test(row.hash) || !/^\d+$/.test(row.created_at) || Object.keys(row).sort().join(',') !== 'created_at,hash') || !manifest.inventory?.contentStatuses || requiredTables.some(name => !/^\d+$/.test(manifest.inventory?.tables?.[name] ?? '')) || checksum(path.join(directory, 'backup.dump')) !== manifest.dumpSha256) throw Error('Dump checksum or manifest mismatch');
   const client = await connect(targetUrl);
+  let beforeMigrations, afterMigrations;
   try {
     const actual = (await client.query('SELECT current_database() AS name')).rows[0].name;
     if (actual !== databaseUrl(targetUrl).pathname.slice(1)) throw Error('Unexpected restore database');
     const tables = (await client.query("SELECT count(*)::text AS count FROM information_schema.tables WHERE table_schema IN ('public', 'drizzle')")).rows[0].count;
     if (Number(tables) !== 0) throw Error('Restore requires an empty target database');
     await run('pg_restore', ['--exit-on-error', '--single-transaction', '--no-owner', '--no-privileges', '--dbname', actual, path.join(directory, 'backup.dump')], { env: pgEnvironment(targetUrl) });
-    await verifyRestoreState(client, manifest);
+    beforeMigrations = await verifyRestoreState(client, manifest);
     await applyMigrations(targetUrl);
-    await verifyRestoreState(client, manifest, true);
+    afterMigrations = await verifyRestoreState(client, manifest, true);
   } finally { await client.end(); }
+  const evidence = {
+    result: 'verified', objectKey, transferSha256: hash[0],
+    manifest: { version: manifest.version, createdAt: manifest.createdAt, reason: manifest.reason, dumpSha256: manifest.dumpSha256 },
+    beforeMigrations, afterMigrations,
+    ...(/^[a-f0-9]{40}$/.test(config.toolingSha ?? '') ? { toolingSha: config.toolingSha } : {}),
+  };
+  if (evidenceFile !== undefined) writeEvidence(evidenceFile, evidence);
+  return evidence;
 }
 async function cli() {
   const [command, ...args] = process.argv.slice(2);
@@ -161,7 +178,7 @@ async function cli() {
     const s3 = s3Config(), prefix = new URL(s3.s3Uri).pathname.slice(1) + '/';
     const objectKey = args[0];
     if (!objectKey.startsWith(prefix) || objectKey.includes('..') || !/^[a-zA-Z0-9/_-]+\.tar\.age$/.test(objectKey)) throw Error('Explicit backup object key under the private prefix required');
-    config = { ...s3, targetUrl, identity, objectKey };
+    config = { ...s3, targetUrl, identity, objectKey, evidenceFile: process.env.RESTORE_EVIDENCE_FILE, toolingSha: process.env.GITHUB_SHA };
   } else throw Error('Usage: backup-postgres.sh OR restore-postgres.sh <explicit-object-key>');
   process.umask(0o077);
   const directory = mkdtempSync(path.join(tmpdir(), 'kordev-backup-'));
