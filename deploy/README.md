@@ -4,19 +4,54 @@ These files are a deployment toolkit, not an installed production environment. N
 
 ## Image and local rehearsal
 
-Build an immutable image with `docker build --build-arg RELEASE_SHA=<40-character-commit> -t <registry/image>:<same-commit> .`. Node is pinned to 22.22.0 and the existing React Router/Vite pins are unchanged. The runtime includes SSR client/server output, PostgreSQL migrations and production dependencies, and runs as UID 1000. Build tooling and local SQLite data/secrets are excluded. `/api/health` is liveness; `/api/health/ready` executes `SELECT 1` through the same Drizzle singleton as SSR and returns only `ready` or `not_ready`.
+Build an immutable image with `docker build --target production --build-arg RELEASE_SHA=<40-character-commit> -t <registry/image>:<same-commit> .` from a clean checkout at that commit. Node is pinned to 22.22.0 and the existing React Router/Vite pins are unchanged. The runtime includes SSR client/server output, PostgreSQL migrations and production dependencies, and runs as UID 1000. Build tooling and local SQLite data/secrets are excluded from production. The separate `content-migration` target includes locked full dependencies and the sanitized Russian migration sources. `/api/health` is liveness; `/api/health/ready` executes `SELECT 1` through the same Drizzle singleton as SSR and returns only `ready` or `not_ready`.
 
-For the local rehearsal: `docker compose build`, `docker compose run --rm --no-deps kordevteam-blue node scripts/migrate-production.mjs`, then `docker compose up -d postgres kordevteam-blue`. PostgreSQL is shared, with development-only credentials and the existing test database initializer. Readiness is `http://127.0.0.1:8081/api/health/ready`; green uses 8082. Both web ports and the local PostgreSQL port are loopback-only. Local image tag `kordevteam:local` is deliberately rejected by production release scripts.
+For the local rehearsal: `docker compose up -d --wait postgres`, `docker compose build`, `docker compose run --rm --no-deps kordevteam-blue node scripts/migrate-production.mjs`, then `docker compose up -d kordevteam-blue`. PostgreSQL is shared, with development-only credentials and the existing test database initializer. Readiness is `http://127.0.0.1:8081/api/health/ready`; green uses 8082. Both web ports and the local PostgreSQL port are loopback-only. Local image tag `kordevteam:local` is deliberately rejected by production release scripts.
 
 ## Host preparation
 
 The operator provisions Node 22.22, Bash, Docker Compose, curl, PostgreSQL 16 client tools (`pg_dump`, `pg_restore`), age, tar and AWS CLI. The operations checkout needs its locked production Node dependencies (`pg`, `drizzle-orm`). Supply environment through a private service environment file or secret manager; do not shell-source untrusted dotenv files. Use private mode 0600 for `/etc/kordevteam/operations.env`, age identity and AWS credentials. The production Compose file does not publish PostgreSQL. Host backup access can use a private Docker-network address or an explicitly configured loopback tunnel in `BACKUP_DATABASE_URL`; never publish PostgreSQL publicly.
 
-Create resolved, non-symlink directories `/var/lib/kordevteam/deploy/slots`, `/etc/traefik/dynamic`, `/var/log/kordevteam`, and an explicit releases directory. Restrict state/log directories to the operations account. Configure the existing Traefik to watch the entire dynamic directory (a file-only bind mount does not follow atomic inode replacement), with entrypoints `web` (80) and `websecure` (443), resolver `letsencrypt`, and the external `traefik` network. PostgreSQL lives only on the internal backend network; both colors reach the same database and use the same secret/S3 configuration.
+Create resolved, non-symlink directories `/var/lib/kordevteam/deploy`, `/etc/traefik/dynamic`, `/var/log/kordevteam`, and an explicit releases directory. Keep the deploy directory empty for first installation; bootstrap creates `slots/blue` only after verification. Restrict state/log directories to the operations account. Configure the existing Traefik to watch the entire dynamic directory (a file-only bind mount does not follow atomic inode replacement), with entrypoints `web` (80) and `websecure` (443), resolver `letsencrypt`, and the external `traefik` network. PostgreSQL lives only on the internal backend network; both colors reach the same database and use the same secret/S3 configuration.
 
 Set `PRODUCTION_HOST`, `PUBLIC_ORIGIN` (HTTPS origin without trailing slash), `DEPLOY_STATE_DIR`, `TRAEFIK_DYNAMIC_FILE`, `LOG_ARCHIVE_DIR`, and optionally `COMPOSE_FILE`/`TRAEFIK_NETWORK`. Set the production Compose variables `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BLUE_IMAGE`, `GREEN_IMAGE`, and application S3/admin settings. An immutable image reference must have a complete SHA-256 digest or an exact 40-character commit tag.
 
-For first installation, start/migrate the blue slot with the intended immutable image, import/verify the approved content separately, and verify readiness and SSR before routing traffic. Write that exact ref into `DEPLOY_STATE_DIR/slots/blue` as one line and into the template's `current-image` comment. Install the Traefik bootstrap template once, replacing the example hostname. Its current slot is blue and no previous slot exists. Confirm the public `X-Kordev-Slot: blue` response before the first green deploy. Never copy the bootstrap template over a live route during subsequent releases.
+## First installation: reviewed Russian content before traffic
+
+Use a clean, exact 40-character release checkout with locked dependencies (`yarn install --immutable`). Build/pull both immutable images for that same SHA. The guarded tooling build rejects a dirty checkout and tags/labels its image with the exact SHA:
+
+```bash
+RELEASE_SHA="$(git rev-parse HEAD)"
+WEB_IMAGE="registry.example/team:$RELEASE_SHA"
+TOOL_IMAGE="registry.example/team-content:$RELEASE_SHA"
+docker build --target production --build-arg "RELEASE_SHA=$RELEASE_SHA" -t "$WEB_IMAGE" .
+bash scripts/build-content-migration.sh "$RELEASE_SHA" "$TOOL_IMAGE"
+```
+
+Run the workflow on the prepared host using an exact clean operations checkout, loaded images, Node/Docker Compose/curl and the private environment described above. `DATABASE_URL` must address `postgres:5432`, match `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`, and have no URL query override. `ADMIN_TOKEN` must be nonempty. The existing external proxy network must exist, but **the site route must not**. `DEPLOY_STATE_DIR` must be absent or empty. Reports must use a dedicated resolved directory outside the checkout (for example `/var/lib/kordevteam/first-import-<SHA>`).
+
+```bash
+REPORT_DIR="/var/lib/kordevteam/first-import-$RELEASE_SHA"
+bash scripts/bootstrap-production-content.sh dry-run "$RELEASE_SHA" "$WEB_IMAGE" "$TOOL_IMAGE" "$REPORT_DIR"
+```
+
+This starts only PostgreSQL, rejects a database containing application data, runs schema migrations with the immutable web image, then runs the importer through the tooling service on the internal Compose backend. No host PostgreSQL port or host tsx installation is used. It writes a mode-0600 `dry-run.json`, requiring exactly 46 Russian articles / 9 cases with no collisions or invalid records. Review the full report, sources, batch and SHA-256. Approval must be copied explicitly from that reviewed report; do not auto-derive approval flags in the same command as apply:
+
+```bash
+bash scripts/bootstrap-production-content.sh apply "$RELEASE_SHA" "$WEB_IMAGE" "$TOOL_IMAGE" "$REPORT_DIR" \
+  --approved-batch 'first-<exact-40-character-SHA>' \
+  --approved-checksum '<reviewed-64-character-SHA256>'
+```
+
+Apply rechecks the empty route/state/database, exact checkout and both image revision labels. A fresh dry-run must match both the reviewed report and the supplied approval. Only then does it import, run source/target verification, check the actual database has exactly 46 published articles / 9 published cases, start blue locally, and check readiness, rendered catalogs and sitemap. It records the immutable image in `DEPLOY_STATE_DIR/slots/blue` after those checks. `import.json`, `verify.json` and `apply-dry-run.json` are private and never overwrite prior reports. A failure retains reports and database state for inspection; it does not delete content, tear down PostgreSQL or install routing. Partial successful imports require operator investigation, not an automatic reset. A stale bootstrap lock is likewise inspected manually.
+
+**Public Traefik installation/switching is a separate manual operation.** After successful local blue verification, prepare a candidate from `deploy/traefik/kordevteam-dynamic.yml` outside the watched directory. Set the intended canonical hostname and its www alias, TLS names and exact `current-image`; current slot is blue and previous slot is none. Validate the candidate against the recorded state:
+
+```bash
+node scripts/release-files.mjs validate-route /explicit/private/bootstrap-candidate.yml "$DEPLOY_STATE_DIR" "$PRODUCTION_HOST" "$PUBLIC_ORIGIN"
+```
+
+Review the candidate and the existing Traefik configuration/DNS/certificates. An operator installs the validated candidate only when the destination route is still absent; never overwrite a live route. Confirm public readiness, canonical redirects and `X-Kordev-Slot: blue` before the first green deploy. Later releases use `deploy-slot.sh` and manual switch/rollback. The bootstrap script itself never writes to the Traefik path or switches public traffic.
 
 ## Proxy trust and canonical routing
 

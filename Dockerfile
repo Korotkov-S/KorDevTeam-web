@@ -5,8 +5,28 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --immutable
 
+FROM dependencies AS content-migration
+ARG RELEASE_SHA
+ENV RELEASE_SHA=$RELEASE_SHA
+LABEL org.opencontainers.image.revision=$RELEASE_SHA
+COPY tsconfig.json tsconfig.server.json ./
+COPY src/server/content/repository.ts src/server/content/types.ts src/server/content/migration.ts ./src/server/content/
+COPY src/server/db/client.ts src/server/db/schema.ts ./src/server/db/
+COPY src/lib/blogPresentation.mjs ./src/lib/blogPresentation.mjs
+COPY server/utils/contentMeta.js ./server/utils/contentMeta.js
+COPY server/data/content.sqlite ./server/data/content.sqlite
+COPY public/blog/*.md ./public/blog/
+COPY public/content/blog.ru.json public/content/projects.ru.json ./public/content/
+COPY src/blog/*.md ./src/blog/
+COPY scripts/migrate-content-to-postgres.ts scripts/verify-content-migration.ts scripts/bootstrap-content-check.mjs scripts/release-files.mjs ./scripts/
+RUN test "${#RELEASE_SHA}" = 40 && printf '%s' "$RELEASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
+USER node
+CMD ["node", "--import", "tsx", "scripts/migrate-content-to-postgres.ts", "--dry-run"]
+
 FROM dependencies AS build
 COPY . .
+# Keep the sanitized migration database out of every production image layer.
+RUN rm -f /app/server/data/content.sqlite
 # CI supplies the exact commit; local Compose uses an explicit rehearsal value.
 ARG RELEASE_SHA
 ENV RELEASE_SHA=$RELEASE_SHA

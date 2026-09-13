@@ -19,5 +19,8 @@ build
 server/data
 **/*.sqlite
 **/*.sqlite-*
+!server/data/
+server/data/*
+!server/data/content.sqlite
 **/*.pem
 **/*.key

@@ -9,7 +9,8 @@ test('every literal Docker COPY input exists in a clean tracked checkout', () =>
     if (!line.startsWith('COPY ') || line.includes('--from=')) continue;
     for (const source of line.split(/\s+/).slice(1, -1)) {
       if (source === '.') continue;
-      assert.ok(files.some(file => file === source || file.startsWith(source.replace(/\/$/, '') + '/')), `Docker COPY requires untracked input: ${source}`);
+      const glob = new RegExp('^' + source.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$');
+      assert.ok(files.some(file => glob.test(file) || file.startsWith(source.replace(/\/$/, '') + '/')), `Docker COPY requires untracked input: ${source}`);
     }
   }
 });

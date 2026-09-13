@@ -30,6 +30,16 @@ x-web: &web
       condition: service_healthy
 
 services:
+  content-migration:
+    image: ${CONTENT_MIGRATION_IMAGE:-kordevteam-content:unconfigured}
+    profiles: [content-migration]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
+    networks: [backend]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
