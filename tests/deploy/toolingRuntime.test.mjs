@@ -3,6 +3,18 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
+test('tooling preloads pinned Yarn in a shared readable Corepack home without changing production', () => {
+  const dockerfile = readFileSync('Dockerfile', 'utf8');
+  const target = dockerfile.split('FROM dependencies AS content-migration\n')[1].split('FROM dependencies AS build')[0];
+  const manager = JSON.parse(readFileSync('package.json', 'utf8')).packageManager;
+  assert.match(target, /ENV COREPACK_HOME=\/opt\/corepack/);
+  assert.ok(target.includes(`corepack prepare ${manager} --activate`));
+  assert.match(target, /chmod -R a\+rX \/opt\/corepack/);
+  assert.match(target, /ENV COREPACK_ENABLE_NETWORK=0/);
+  assert.ok(target.indexOf('corepack prepare') < target.indexOf('USER node'));
+  assert.doesNotMatch(dockerfile.split('FROM node:22.22.0-alpine AS production\n')[1], /COREPACK_HOME|\/opt\/corepack/);
+});
+
 test('tooling copies its private SQLite source with non-root ownership', () => {
   const target=readFileSync('Dockerfile','utf8').split('FROM dependencies AS content-migration\n')[1].split('FROM dependencies AS build')[0];
   assert.match(target,/COPY --chown=node:node server\/data\/content.sqlite /);

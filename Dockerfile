@@ -6,6 +6,10 @@ COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --immutable
 
 FROM dependencies AS content-migration
+# Prepare the pinned runner before dropping privileges; runtime has no writable home.
+ENV COREPACK_HOME=/opt/corepack
+RUN corepack prepare yarn@3.8.7 --activate && chmod -R a+rX /opt/corepack
+ENV COREPACK_ENABLE_NETWORK=0
 ARG RELEASE_SHA
 ENV RELEASE_SHA=$RELEASE_SHA
 LABEL org.opencontainers.image.revision=$RELEASE_SHA
