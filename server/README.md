@@ -17,11 +17,13 @@ cp server/.env.example .env
 3. Настройте переменные окружения в `.env`:
 ```env
 PORT=3001
-API_KEY=your-secret-api-key-here
+ADMIN_USER=replace-with-admin-login
+ADMIN_PASSWORD=replace-with-a-long-random-password
+ADMIN_TOKEN=replace-with-a-random-token
 NODE_ENV=development
 ```
 
-Для генерации безопасного API ключа:
+Для генерации безопасного токена и пароля:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
@@ -53,7 +55,7 @@ GET /api/health
 ### Создание поста
 ```
 POST /api/posts
-Authorization: Bearer <API_KEY>
+Authorization: Bearer <ADMIN_TOKEN>
 Content-Type: application/json
 
 {
@@ -95,7 +97,7 @@ GET /api/posts/:slug?lang=ru
 ### Обновление поста
 ```
 PUT /api/posts/:slug
-Authorization: Bearer <API_KEY>
+Authorization: Bearer <ADMIN_TOKEN>
 Content-Type: application/json
 
 {
@@ -112,7 +114,7 @@ Content-Type: application/json
 ### Удаление поста
 ```
 DELETE /api/posts/:slug?lang=ru
-Authorization: Bearer <API_KEY>
+Authorization: Bearer <ADMIN_TOKEN>
 ```
 
 **Параметры:**
@@ -172,9 +174,9 @@ Slug генерируется автоматически из заголовка
 
 ## Безопасность
 
-- Все операции создания, обновления и удаления требуют аутентификации через API ключ
-- API ключ передается в заголовке `Authorization: Bearer <API_KEY>`
-- В режиме разработки, если `API_KEY` не установлен, аутентификация отключается (только для локальной разработки!)
+- Все операции создания, обновления и удаления требуют серверной аутентификации.
+- Админка использует Basic с явно заданными `ADMIN_USER` и `ADMIN_PASSWORD`; автоматизация использует `Authorization: Bearer <ADMIN_TOKEN>`.
+- Встроенных и development-учётных данных нет. Если ни один способ не настроен, защищённые маршруты отвечают `503` и ничего не изменяют.
 
 ## Обработка ошибок
 

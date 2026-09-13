@@ -14,7 +14,7 @@ The operator provisions Node 22.22, Bash, Docker Compose, curl, PostgreSQL 16 cl
 
 Create resolved, non-symlink directories `/var/lib/kordevteam/deploy`, `/etc/traefik/dynamic`, `/var/log/kordevteam`, and an explicit releases directory. Keep the deploy directory empty for first installation; bootstrap creates `slots/blue` only after verification. Restrict state/log directories to the operations account. Configure the existing Traefik to watch the entire dynamic directory (a file-only bind mount does not follow atomic inode replacement), with entrypoints `web` (80) and `websecure` (443), resolver `letsencrypt`, and the external `traefik` network. PostgreSQL lives only on the internal backend network; both colors reach the same database and use the same secret/S3 configuration.
 
-Set `PRODUCTION_HOST`, `PUBLIC_ORIGIN` (HTTPS origin without trailing slash), `DEPLOY_STATE_DIR`, `TRAEFIK_DYNAMIC_FILE`, `LOG_ARCHIVE_DIR`, and optionally `COMPOSE_FILE`/`TRAEFIK_NETWORK`. Set the production Compose variables `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BLUE_IMAGE`, `GREEN_IMAGE`, and application S3/admin settings. An immutable image reference must have a complete SHA-256 digest or an exact 40-character commit tag.
+Set `PRODUCTION_HOST`, `PUBLIC_ORIGIN` (HTTPS origin without trailing slash), `DEPLOY_STATE_DIR`, `TRAEFIK_DYNAMIC_FILE`, `LOG_ARCHIVE_DIR`, and optionally `COMPOSE_FILE`/`TRAEFIK_NETWORK`. Set the production Compose variables `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BLUE_IMAGE`, `GREEN_IMAGE`, `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_TOKEN`, and application S3 settings. All three admin values must be nonempty secrets: Basic UI login uses the user/password pair, while automation may use the Bearer token. There are no fallback credentials. An immutable image reference must have a complete SHA-256 digest or an exact 40-character commit tag.
 
 ## First installation: reviewed Russian content before traffic
 
@@ -30,7 +30,7 @@ docker build --target production --build-arg "RELEASE_SHA=$RELEASE_SHA" -t "$WEB
 bash scripts/build-content-migration.sh "$RELEASE_SHA" "$TOOL_IMAGE"
 ```
 
-Run the workflow on the prepared host using an exact clean operations checkout, loaded images, Node/Docker Compose/curl and the private environment described above. `DATABASE_URL` must address `postgres:5432`, match `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`, and have no URL query override. `ADMIN_TOKEN` must be nonempty. The existing external proxy network must exist, but **the site route must not**. `DEPLOY_STATE_DIR` must be absent or empty. Reports must use a dedicated resolved directory outside the checkout (for example `/var/lib/kordevteam/first-import-<SHA>`).
+Run the workflow on the prepared host using an exact clean operations checkout, loaded images, Node/Docker Compose/curl and the private environment described above. `DATABASE_URL` must address `postgres:5432`, match `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`, and have no URL query override. `ADMIN_USER`, `ADMIN_PASSWORD`, and `ADMIN_TOKEN` must be nonempty. The existing external proxy network must exist, but **the site route must not**. `DEPLOY_STATE_DIR` must be absent or empty. Reports must use a dedicated resolved directory outside the checkout (for example `/var/lib/kordevteam/first-import-<SHA>`).
 
 ```bash
 REPORT_DIR="/var/lib/kordevteam/first-import-$RELEASE_SHA"

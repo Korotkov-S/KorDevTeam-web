@@ -313,15 +313,9 @@ function buildBlogStorageContent({
 }
 
 export function AdminPage() {
-  const [username, setUsername] = useState<string>(
-    () => localStorage.getItem("ADMIN_USERNAME") || ""
-  );
-  const [password, setPassword] = useState<string>(
-    () => localStorage.getItem("ADMIN_PASSWORD") || ""
-  );
-  const [authHeaderValue, setAuthHeaderValue] = useState<string>(
-    () => localStorage.getItem("ADMIN_AUTH") || ""
-  );
+  const [username, setUsername] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [authHeaderValue, setAuthHeaderValue] = useState<string>("");
   const [isAuthed, setIsAuthed] = useState(false);
   const [activeTab, setActiveTab] = useState<"blog" | "projects" | "service">(
     "blog"
@@ -487,18 +481,6 @@ export function AdminPage() {
     toast.success("Данные обновлены");
   }, [loadIndexes, loadProjects]);
 
-  useEffect(() => {
-    localStorage.setItem("ADMIN_USERNAME", username);
-  }, [username]);
-
-  useEffect(() => {
-    localStorage.setItem("ADMIN_PASSWORD", password);
-  }, [password]);
-
-  useEffect(() => {
-    localStorage.setItem("ADMIN_AUTH", authHeaderValue);
-  }, [authHeaderValue]);
-
   const verifyAuth = useCallback(async () => {
     if (!authHeaderValue) {
       setIsAuthed(false);
@@ -509,8 +491,6 @@ export function AdminPage() {
       setIsAuthed(true);
       return true;
     }
-    // If API is unreachable, don't force logout; keep current state.
-    if (r.status === null) return false;
     setIsAuthed(false);
     return false;
   }, [authHeaderValue]);
@@ -1040,27 +1020,18 @@ export function AdminPage() {
         return;
       }
 
-      // Local gate (so login UI works even when API isn't running)
-      if (u !== "adminKor" || p !== "adminKor") {
-        toast.error("Неверный логин/пароль");
-        setIsAuthed(false);
-        return;
-      }
-
       const header = `Basic ${btoa(`${u}:${p}`)}`;
-      setAuthHeaderValue(header);
-      setIsAuthed(true);
       const r = await checkAuth(header);
       if (!r.ok) {
+        setAuthHeaderValue("");
+        setIsAuthed(false);
         if (r.status === null)
-          toast(
-            "Вход выполнен, но API сервер недоступен — сохранение/генерация не будут работать."
-          );
+          toast.error("API сервер недоступен. Вход не выполнен.");
         else
-          toast(
-            "Вход выполнен, но API отклонил запрос. Проверь, что сервер обновлён и запущен."
-          );
+          toast.error("Неверный логин/пароль или доступ не настроен.");
       } else {
+        setAuthHeaderValue(header);
+        setIsAuthed(true);
         toast.success("Вход выполнен");
       }
     } catch (e: any) {
@@ -1072,7 +1043,7 @@ export function AdminPage() {
   const logout = useCallback(() => {
     setIsAuthed(false);
     setAuthHeaderValue("");
-    localStorage.removeItem("ADMIN_AUTH");
+    setPassword("");
     toast.success("Выход");
   }, []);
 

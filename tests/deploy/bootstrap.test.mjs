@@ -19,7 +19,7 @@ function fixture(t) {
     else if(s.includes('migrate-content-to-postgres.ts') || s.includes('verify-content-migration.ts')) console.log(JSON.stringify({ok:true,batchId:'first-${sha}',counts:{articles:process.env.WRONG_COUNTS==='1'?45:46,cases:9},collisions:[],invalidRecords:[],checksums:{batch:process.env.CHANGED_CHECKSUM==='1'?'c'.repeat(64):'${checksum}'},mismatches:[]}));`);
   stub('curl', `const s=process.argv.join(' '); if(process.env.FAIL_SMOKE==='1') process.exit(22); console.log(s.includes('health/ready')?'{{"status":"ready"}}'.slice(1,-1):s.includes('sitemap.xml')?'<sitemapindex/>':'<title>Сайт</title><h1>Сайт</h1>');`);
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir, DEPLOY_STATE_DIR: `${dir}/state`,
-    TRAEFIK_DYNAMIC_FILE: `${dir}/traefik/route.yml`, DATABASE_URL: 'postgresql://u:secret@postgres/team', POSTGRES_USER: 'u', POSTGRES_PASSWORD: 'secret', POSTGRES_DB: 'team', ADMIN_TOKEN: 'token', READINESS_ATTEMPTS: '1', READINESS_DELAY: '0' };
+    TRAEFIK_DYNAMIC_FILE: `${dir}/traefik/route.yml`, DATABASE_URL: 'postgresql://u:secret@postgres/team', POSTGRES_USER: 'u', POSTGRES_PASSWORD: 'secret', POSTGRES_DB: 'team', ADMIN_USER: 'owner', ADMIN_PASSWORD: 'admin-password', ADMIN_TOKEN: 'token', READINESS_ATTEMPTS: '1', READINESS_DELAY: '0' };
   return { dir, env, run(mode='dry-run', extra={}, approval=[]) { return spawnSync('bash', ['scripts/bootstrap-production-content.sh', mode, sha, web, tool, `${dir}/reports`, ...approval], { env: {...env,...extra}, encoding:'utf8' }); }, commands() { return existsSync(`${dir}/commands`) ? readFileSync(`${dir}/commands`,'utf8') : ''; } };
 }
 test('first-install dry-run migrates schema internally and writes private report without applying or starting web', t => {
@@ -38,7 +38,7 @@ test('apply requires reviewed exact batch and checksum, verifies counts then sta
   assert.equal(existsSync(f.env.TRAEFIK_DYNAMIC_FILE),false);
 });
 test('bootstrap rejects dirty checkout, wrong image revision, nonempty database and wrong counts', t => {
-  for(const extra of [{DIRTY:'1'},{WRONG_HEAD:'1'},{WRONG_LABEL:'1'},{WRONG_TOOL_LABEL:'1'},{NONEMPTY:'1'},{WRONG_COUNTS:'1'},{ADMIN_TOKEN:''}]) {
+  for(const extra of [{DIRTY:'1'},{WRONG_HEAD:'1'},{WRONG_LABEL:'1'},{WRONG_TOOL_LABEL:'1'},{NONEMPTY:'1'},{WRONG_COUNTS:'1'},{ADMIN_USER:''},{ADMIN_PASSWORD:''},{ADMIN_TOKEN:''}]) {
     const f=fixture(t),r=f.run('dry-run',extra); assert.notEqual(r.status,0,r.stderr); assert.doesNotMatch(f.commands(),/up -d --no-deps kordevteam-blue/);
     if(extra.NONEMPTY) assert.doesNotMatch(f.commands(),/migrate-production.mjs/);
   }

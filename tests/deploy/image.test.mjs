@@ -43,7 +43,8 @@ test('production compose resolves both immutable slots without a public database
   const ref = 'ghcr.io/example/team:' + 'a'.repeat(40);
   const r = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.team.yml', 'config', '--format', 'json'], {
     encoding: 'utf8', env: { ...process.env, BLUE_IMAGE: ref, GREEN_IMAGE: ref,
-      DATABASE_URL: 'postgresql://user:fixture@postgres/team', POSTGRES_PASSWORD: 'fixture', POSTGRES_USER: 'user', POSTGRES_DB: 'team' },
+      DATABASE_URL: 'postgresql://user:fixture@postgres/team', POSTGRES_PASSWORD: 'fixture', POSTGRES_USER: 'user', POSTGRES_DB: 'team',
+      ADMIN_USER: 'owner', ADMIN_PASSWORD: 'admin-password', ADMIN_TOKEN: 'admin-token' },
   });
   assert.equal(r.status, 0, r.stderr);
   const { services } = JSON.parse(r.stdout);
@@ -54,5 +55,20 @@ test('production compose resolves both immutable slots without a public database
   for (const color of ['blue', 'green']) {
     assert.equal(services[`kordevteam-${color}`].environment.NODE_ENV, 'production');
     assert.equal(services[`kordevteam-${color}`].environment.CONTENT_CACHE_TTL_SECONDS, '0');
+    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_USER, 'owner');
+    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_PASSWORD, 'admin-password');
+    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_TOKEN, 'admin-token');
+  }
+});
+test('production compose refuses missing admin secrets', () => {
+  const ref = 'ghcr.io/example/team:' + 'a'.repeat(40);
+  const base = { ...process.env, BLUE_IMAGE: ref, GREEN_IMAGE: ref,
+    DATABASE_URL: 'postgresql://user:fixture@postgres/team', POSTGRES_PASSWORD: 'fixture', POSTGRES_USER: 'user', POSTGRES_DB: 'team',
+    ADMIN_USER: 'owner', ADMIN_PASSWORD: 'admin-password', ADMIN_TOKEN: 'admin-token' };
+  for (const key of ['ADMIN_USER', 'ADMIN_PASSWORD', 'ADMIN_TOKEN']) {
+    const result = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.team.yml', 'config'], {
+      encoding: 'utf8', env: { ...base, [key]: '' },
+    });
+    assert.notEqual(result.status, 0, `${key} must be mandatory`);
   }
 });

@@ -13,7 +13,9 @@ x-web: &web
     PORT: "3001"
     TRUST_PROXY_HOPS: "1"
     DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
-    ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    ADMIN_USER: ${ADMIN_USER:?Provide ADMIN_USER}
+    ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Provide ADMIN_PASSWORD}
+    ADMIN_TOKEN: ${ADMIN_TOKEN:?Provide ADMIN_TOKEN}
     S3_ENDPOINT: ${S3_ENDPOINT:-https://s3.twcstorage.ru}
     S3_REGION: ${S3_REGION:-ru-1}
     S3_BUCKET: ${S3_BUCKET:-}

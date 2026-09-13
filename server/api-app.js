@@ -10,10 +10,22 @@ const mediaRouter = require("./routes/media");
 
 dotenv.config();
 
+function allowCorsOrigin(origin, callback) {
+  if (
+    process.env.NODE_ENV !== "production" ||
+    !origin ||
+    origin === "https://kordev.team"
+  ) {
+    callback(null, true);
+    return;
+  }
+  callback(null, false);
+}
+
 function createApiApp({ checkReady } = {}) {
   const api = express.Router();
 
-  api.use(cors());
+  api.use(cors({ origin: allowCorsOrigin }));
   api.use(express.json({ limit: process.env.JSON_LIMIT || "25mb" }));
   api.use(
     express.urlencoded({

@@ -31,7 +31,7 @@ SQLITE_PATH=server/data/runtime.sqlite NODE_ENV=production PORT=3001 yarn start
 curl http://127.0.0.1:3001/api/health/ready
 ```
 
-Сборка создаёт `build/client` и `build/server`; `server/runtime.mjs` обслуживает SSR и API на одном порту. Отдельный legacy-сервер `server/index.js`, статический `dist/` и Vite Preview не являются production-путём. Секреты администрирования и S3 передаются через окружение; не используйте прежние демонстрационные пароли.
+Сборка создаёт `build/client` и `build/server`; `server/runtime.mjs` обслуживает SSR и API на одном порту. Отдельный legacy-сервер `server/index.js`, статический `dist/` и Vite Preview не являются production-путём. Защищённые legacy API не имеют встроенных учётных данных: задайте непустые `ADMIN_USER`, `ADMIN_PASSWORD` и отдельный `ADMIN_TOKEN` через секретное окружение. Basic-вход админки проверяет логин/пароль только на сервере; Bearer-доступ использует `ADMIN_TOKEN`.
 
 ## Docker и первое production-развёртывание
 

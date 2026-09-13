@@ -6,14 +6,15 @@
  */
 
 const API_URL = process.env.API_URL || 'http://localhost:3001';
-const API_KEY = process.env.API_KEY || 'your-secret-api-key-here';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+if (!ADMIN_TOKEN) throw new Error('ADMIN_TOKEN is required');
 
 async function createPost() {
   try {
     const response = await fetch(`${API_URL}/api/posts`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${ADMIN_TOKEN}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
