@@ -16,6 +16,13 @@ function unauthorized(res, status, error) {
 }
 
 const authenticate = (req, res, next) => {
+  if (process.env.NODE_ENV === "production" && !req.secure) {
+    return res
+      .status(426)
+      .set("Cache-Control", "no-store")
+      .json({ error: "HTTPS is required for admin authentication" });
+  }
+
   const adminToken = process.env.ADMIN_TOKEN;
   const adminUser = process.env.ADMIN_USER;
   const adminPassword = process.env.ADMIN_PASSWORD;

@@ -78,6 +78,8 @@ curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap.xml"
 
 The final canonical URLs are HTTPS, non-`www`, and trailing-slash URLs; each redirect must point straight to that final form. Final pages and `sitemap.xml` must return 200 without a redirect. The canonical link must name the same final URL.
 
+Admin and automated API clients must use only the canonical HTTPS origin. The runtime returns `426` for privileged credentials received through the trusted HTTP proxy path and emits a one-year HSTS header on HTTPS responses; an HTTP response must never be accepted as evidence that an authenticated API call succeeded.
+
 ## Roll back
 
 The previous container and recorded image must still be healthy. From the trusted checkout/config shell used above:
