@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { ClaimedJob } from "./contracts";
+import { FatalTempCleanupError } from "./objectStore";
 import { DeliveryFailure } from "./retry";
 import type { LeadRepository, RateDecision } from "./repository";
 import { checkLeadWorkerReady, runLeadWorker, runWorkerBatch, type WorkerOptions } from "./worker";
@@ -274,6 +275,17 @@ test("shutdown aborts hanging materialization, stops heartbeat and exits after r
   assert.equal(f.states.get(attachmentJob.id), "retry");
   assert.equal(renewals, renewalsAtExit, "heartbeat must stop before worker exits");
   assert.equal(f.claims, 1);
+});
+
+test("fatal materialization cleanup stops the long-running worker without retry or another claim", async () => {
+  const attachmentJob = job("email", 1, true);
+  const f = fixture([attachmentJob]);
+  f.options.store = { async materialize() { throw new FatalTempCleanupError(); } };
+  await assert.rejects(() => runLeadWorker(f.options), /^Error: lead_temp_cleanup_failed$/);
+  assert.equal(f.claims, 1);
+  assert.equal(f.states.size, 0);
+  assert.equal(f.events.some(value => value.startsWith("provider:")), false);
+  assert.equal(f.events.some(value => value.startsWith("retry:")), false);
 });
 
 test("worker readiness validates configuration and database only", async () => {

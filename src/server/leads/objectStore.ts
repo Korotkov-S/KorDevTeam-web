@@ -22,6 +22,15 @@ export class MissingPrivateObjectError extends LeadError {
   constructor() { super("storage_unavailable"); this.name = "MissingPrivateObjectError"; }
 }
 
+/** A private local file could not be removed after bounded retries. Never attach paths or causes. */
+export class FatalTempCleanupError extends Error {
+  readonly code = "lead_temp_cleanup_failed" as const;
+  constructor() {
+    super("lead_temp_cleanup_failed");
+    Object.defineProperty(this, "name", { value: "FatalTempCleanupError", configurable: true });
+  }
+}
+
 type PrivateFileOperations = { unlink(path: string): Promise<void> };
 type PrivateStoreRuntimeOptions = Partial<PrivateFileOperations> & { operationTimeoutMs?: number };
 const defaultFileOperations: PrivateFileOperations = { unlink: unlinkFile };
@@ -43,7 +52,7 @@ async function unlinkWithRetry(path: string, operations: PrivateFileOperations):
     try { await operations.unlink(path); return; }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-      if (attempt === 3) throw new LeadError("storage_unavailable");
+      if (attempt === 3) throw new FatalTempCleanupError();
     }
   }
 }

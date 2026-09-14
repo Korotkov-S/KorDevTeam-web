@@ -3,7 +3,7 @@ import type { ClaimedJob } from "./contracts";
 import { readLeadWorkerConfig, type LeadWorkerConfig } from "./config";
 import { sendToCrm, type CrmReceipt, type DeliveryEnvelope } from "./crm";
 import { createLeadEmailTransport, sendLeadEmail, type EmailReceipt } from "./email";
-import { createPrivateAttachmentStore, MissingPrivateObjectError, sweepMaterializedAttachments, type PrivateAttachmentStore } from "./objectStore";
+import { createPrivateAttachmentStore, FatalTempCleanupError, MissingPrivateObjectError, sweepMaterializedAttachments, type PrivateAttachmentStore } from "./objectStore";
 import { createLeadRepository, type LeadRepository } from "./repository";
 import {
   classifyDeliveryFailure, CRM_CUTOFF_MS, nextRetryAt, type DeliveryDecision,
@@ -194,7 +194,9 @@ async function processClaimedJob(job: ClaimedJob, options: WorkerOptions): Promi
         materialized = await options.store.materialize({ objectKey: job.attachment.objectKey, tempRoot: options.tempRoot, signal: options.signal });
       } catch (error) {
         await stopHeartbeat();
-        if (error instanceof MissingPrivateObjectError) {
+        if (error instanceof FatalTempCleanupError) {
+          throw new Error("lead_temp_cleanup_failed");
+        } else if (error instanceof MissingPrivateObjectError) {
           await recordDecision(job, options, { kind: "manual_action", code: "attachment_missing" }, job.providerAttemptCount);
         } else {
           await scheduleInfrastructureFailure(job, options);

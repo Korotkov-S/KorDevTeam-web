@@ -8,7 +8,7 @@ import { once } from "node:events";
 import test from "node:test";
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { LeadS3Config } from "./config";
-import { createPrivateAttachmentStore, createPrivateS3Client, MissingPrivateObjectError, sweepMaterializedAttachments } from "./objectStore";
+import { createPrivateAttachmentStore, createPrivateS3Client, FatalTempCleanupError, MissingPrivateObjectError, sweepMaterializedAttachments } from "./objectStore";
 
 const config: LeadS3Config = { endpoint: new URL("https://private.invalid"), region: "lead-region", bucket: "private-leads", accessKeyId: "lead-only", secretAccessKey: "private-secret", prefix: "intake/private/", serverSideEncryption: "AES256" };
 function client(send: (command: any) => Promise<any>): Pick<S3Client, "send"> { return { send: send as S3Client["send"] }; }
@@ -84,6 +84,27 @@ test("a broken download removes partial files and sanitizes the dependency error
   const store = createPrivateAttachmentStore(config, client(async () => ({ Body: Readable.from((async function* () { yield "partial"; throw new Error("secret endpoint"); })()) })));
   await assert.rejects(store.materialize({ objectKey: "intake/private/key", tempRoot }), /^LeadError: storage_unavailable$/);
   assert.deepEqual(await readdir(tempRoot), []);
+});
+
+test("partial download plus exhausted unlink retries preserves fatal sanitized cleanup semantics", async t => {
+  const tempRoot = await root(t);
+  let unlinkAttempts = 0;
+  const store = createPrivateAttachmentStore(config, client(async () => ({
+    Body: Readable.from((async function* () { yield "partial private bytes"; throw new Error("private stream cause"); })()),
+  })), {
+    async unlink() { unlinkAttempts += 1; throw Object.assign(new Error("private path cause"), { code: "EBUSY" }); },
+  });
+  await assert.rejects(store.materialize({ objectKey: "intake/private/key", tempRoot }), error => {
+    assert.ok(error instanceof FatalTempCleanupError);
+    assert.equal(error.name, "FatalTempCleanupError");
+    assert.equal(error.message, "lead_temp_cleanup_failed");
+    assert.equal(error.code, "lead_temp_cleanup_failed");
+    assert.equal(error.cause, undefined);
+    assert.deepEqual(Object.keys(error), ["code"]);
+    assert.doesNotMatch(String(error), /private|lead-store|attachment/i);
+    return true;
+  });
+  assert.equal(unlinkAttempts, 3);
 });
 
 test("empty and over-limit downloads fail closed and clean staging", async t => {
