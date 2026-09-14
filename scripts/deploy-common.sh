@@ -25,7 +25,7 @@ state_init() {
 }
 lock_release() {
   mkdir -- "$DEPLOY_STATE_DIR/operation.lock" 2>/dev/null || fail 'Another release operation is running (or stale lock needs operator inspection)'
-  trap 'rm -f -- "$DEPLOY_STATE_DIR/operation.lock/previous-route.yml"; rmdir -- "$DEPLOY_STATE_DIR/operation.lock"' EXIT
+  trap 'rm -f -- "$DEPLOY_STATE_DIR/operation.lock/previous-route.yml" "$DEPLOY_STATE_DIR/operation.lock/previous-worker-image"; rmdir -- "$DEPLOY_STATE_DIR/operation.lock"' EXIT
 }
 current_slot() {
   local value
@@ -44,16 +44,40 @@ recorded_image() {
   value="$(< "$record")"; image_valid "$value"; printf '%s' "$value"
 }
 worker_record_path() { printf '%s' "$DEPLOY_STATE_DIR/worker-image"; }
+file_mode() {
+  local target="$1" mode
+  if mode="$(stat -f '%Lp' -- "$target" 2>/dev/null)"; then printf '%s' "$mode"
+  else stat -c '%a' -- "$target"
+  fi
+}
 recorded_worker_image() {
   local record value
   record="$(worker_record_path)"; safe_path "$record"
   [[ -f "$record" && ! -L "$record" ]] || fail 'Missing recorded worker image'
+  [[ "$(file_mode "$record")" == 600 ]] || fail 'Worker image state must be a private mode-0600 file'
   value="$(< "$record")"; image_valid "$value"; printf '%s' "$value"
 }
 record_worker_image() {
   local image="$1" record
   image_valid "$image"; record="$(worker_record_path)"
   node "$SCRIPT_DIR/release-files.mjs" record "$record" "$image"
+}
+copy_private_state() {
+  local source="$1" target="$2" mode
+  safe_path "$source"; safe_path "$target"
+  [[ -f "$source" && ! -L "$source" ]] || return 1
+  mode="$(file_mode "$source")" || return 1
+  node "$SCRIPT_DIR/release-files.mjs" copy-route "$source" "$target" || return 1
+  chmod "$mode" "$target" || return 1
+  [[ "$(file_mode "$target")" == "$mode" ]]
+}
+restore_worker_state() {
+  local snapshot="$1" expected="$2" record
+  image_valid "$expected"; record="$(worker_record_path)"
+  copy_private_state "$snapshot" "$record" || return 1
+  cmp -s -- "$snapshot" "$record" || return 1
+  [[ "$(file_mode "$snapshot")" == "$(file_mode "$record")" ]] || return 1
+  [[ "$(< "$record")" == "$expected" ]]
 }
 slot_origin() {
   if [[ "$1" == blue ]]; then printf 'http://127.0.0.1:8081'; else printf 'http://127.0.0.1:8082'; fi

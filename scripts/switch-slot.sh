@@ -15,7 +15,9 @@ verify_slot "$previous"
 previous_worker_image="$(recorded_worker_image)"
 [[ "$previous_worker_image" == "$(recorded_image "$previous")" ]] || fail 'Previous worker image does not match active slot'
 snapshot="$DEPLOY_STATE_DIR/operation.lock/previous-route.yml"
+worker_snapshot="$DEPLOY_STATE_DIR/operation.lock/previous-worker-image"
 node "$SCRIPT_DIR/release-files.mjs" copy-route "$TRAEFIK_DYNAMIC_FILE" "$snapshot"
+copy_private_state "$(worker_record_path)" "$worker_snapshot" || fail 'Unable to snapshot worker image state'
 write_route "$target" "$previous"
 if ! public_smoke; then
   printf 'Public smoke failed; attempting automatic rollback.\n' >&2
@@ -32,10 +34,11 @@ if ! activate_worker "$target_worker_image"; then
   fail 'Worker activation failed; route and worker restored'
 fi
 if ! record_worker_image "$target_worker_image"; then
-  restore_worker_ok=0
+  restore_worker_ok=0; restore_worker_state_ok=0
   if activate_worker "$previous_worker_image"; then restore_worker_ok=1; fi
+  if restore_worker_state "$worker_snapshot" "$previous_worker_image"; then restore_worker_state_ok=1; fi
   rollback_snapshot_locked "$snapshot"
-  [[ "$restore_worker_ok" == 1 ]] || fail 'Worker state recording failed; route restored but previous worker needs operator intervention'
+  [[ "$restore_worker_ok" == 1 && "$restore_worker_state_ok" == 1 ]] || fail 'Worker state recording failed; route restored but previous worker or state needs operator intervention'
   fail 'Worker state recording failed; route and worker restored'
 fi
 printf 'Production now targets %s.\n' "$target"

@@ -8,7 +8,7 @@ import test from 'node:test';
 const root = process.cwd();
 const image = `ghcr.io/example/team:${'a'.repeat(40)}`;
 const oldImage = `ghcr.io/example/team:${'b'.repeat(40)}`;
-const scripts = ['deploy-slot', 'switch-slot', 'rollback-slot', 'backup-postgres', 'restore-postgres', 'prune-releases'];
+const scripts = ['deploy-slot', 'switch-slot', 'rollback-slot', 'run-lead-retention', 'backup-postgres', 'restore-postgres', 'prune-releases'];
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'kordev-deploy-')));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -183,6 +183,18 @@ test('failed worker activation restores exact previous route and previous worker
   assert.ok(failed >= 0 && restored > failed, commands);
 });
 
+test('switch restores exact worker state bytes and mode when record fails after replacement', t => {
+  const f = fixture(t); const record = `${f.dir}/state/worker-image`;
+  writeFileSync(record, oldImage + '\n\n', { mode: 0o600 });
+  const before = readFileSync(record); const beforeMode = statSync(record).mode & 0o777;
+  f.stub('node', 'if [[ "$1" == *release-files.mjs && "$2" == record ]]; then temp="$3.failed"; printf "%s\\n" "$4" > "$temp"; chmod 0644 "$temp"; mv "$temp" "$3"; exit 1; else exec "$REAL_NODE" "$@"; fi\n');
+  const result = f.run('switch-slot', ['green']);
+  assert.notEqual(result.status, 0); assert.match(result.stderr, /worker state.*restor/i);
+  assert.deepEqual(readFileSync(record), before);
+  assert.equal(statSync(record).mode & 0o777, beforeMode);
+  assert.match(readFileSync(f.route, 'utf8'), /current-slot: blue/);
+});
+
 test('rollback synchronizes worker to the restored slot image', t => {
   const f = fixture(t);
   assert.equal(f.run('switch-slot', ['green']).status, 0);
@@ -200,6 +212,19 @@ test('failed rollback worker activation restores the pre-rollback route and work
   assert.deepEqual(readFileSync(f.route), before);
   assert.equal(readFileSync(`${f.dir}/state/worker-image`, 'utf8').trim(), image);
 });
+test('rollback restores exact worker state bytes and mode when record fails after replacement', t => {
+  const f = fixture(t);
+  assert.equal(f.run('switch-slot', ['green']).status, 0);
+  const record = `${f.dir}/state/worker-image`;
+  writeFileSync(record, image + '\n\n', { mode: 0o600 });
+  const before = readFileSync(record); const beforeMode = statSync(record).mode & 0o777;
+  f.stub('node', 'if [[ "$1" == *release-files.mjs && "$2" == record ]]; then temp="$3.failed"; printf "%s\\n" "$4" > "$temp"; chmod 0644 "$temp"; mv "$temp" "$3"; exit 1; else exec "$REAL_NODE" "$@"; fi\n');
+  const result = f.run('rollback-slot');
+  assert.notEqual(result.status, 0); assert.match(result.stderr, /worker state.*restor/i);
+  assert.deepEqual(readFileSync(record), before);
+  assert.equal(statSync(record).mode & 0o777, beforeMode);
+  assert.match(readFileSync(f.route, 'utf8'), /current-slot: green/);
+});
 test('symlinked worker image state fails closed before routing changes', t => {
   const f = fixture(t); const before = readFileSync(f.route);
   const real = `${f.dir}/state/worker-image-real`;
@@ -207,6 +232,26 @@ test('symlinked worker image state fails closed before routing changes', t => {
   const result = f.run('switch-slot', ['green']);
   assert.notEqual(result.status, 0);
   assert.deepEqual(readFileSync(f.route), before);
+});
+
+test('host retention wrapper uses authoritative protected worker image state', t => {
+  const f = fixture(t);
+  const result = f.run('run-lead-retention', [], { WORKER_IMAGE: image });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(readFileSync(`${f.dir}/commands`, 'utf8'), new RegExp(`WORKER_IMAGE=${oldImage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} compose .* run --rm --no-deps lead-worker node server/lead-retention.mjs`));
+});
+
+test('host retention wrapper rejects missing invalid symlinked or exposed state before Docker', async t => {
+  for (const kind of ['missing', 'invalid', 'symlink', 'mode']) await t.test(kind, t => {
+    const f = fixture(t); const record = `${f.dir}/state/worker-image`;
+    if (kind === 'missing') rmSync(record);
+    if (kind === 'invalid') writeFileSync(record, 'kordevteam:latest\n', { mode: 0o600 });
+    if (kind === 'symlink') { const target = `${record}.real`; writeFileSync(target, oldImage + '\n', { mode: 0o600 }); rmSync(record); symlinkSync(target, record); }
+    if (kind === 'mode') { rmSync(record); writeFileSync(record, oldImage + '\n', { mode: 0o644 }); }
+    const result = f.run('run-lead-retention');
+    assert.notEqual(result.status, 0);
+    assert.equal(existsSync(`${f.dir}/commands`), false);
+  });
 });
 test('backup failure prevents migrations, replacement and slot record update', t => {
   const f = fixture(t); const before = readFileSync(f.route, 'utf8');

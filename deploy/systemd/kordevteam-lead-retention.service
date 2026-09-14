@@ -2,12 +2,13 @@
 Description=Delete expired KorDevTeam lead copies
 After=docker.service network-online.target
 Requires=docker.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot
 User=kordevteam
 WorkingDirectory=/opt/kordevteam/current
 EnvironmentFile=/etc/kordevteam/operations.env
-ExecStart=/usr/bin/docker compose -f /opt/kordevteam/current/deploy/docker-compose.team.yml run --rm --no-deps lead-worker node server/lead-retention.mjs
+ExecStart=/bin/bash /opt/kordevteam/current/scripts/run-lead-retention.sh
 UMask=0077
 NoNewPrivileges=true

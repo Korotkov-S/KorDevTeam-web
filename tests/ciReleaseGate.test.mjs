@@ -45,6 +45,11 @@ test("read-only validation gates a separate trusted main publisher", () => {
   assert.ok(validationBuild);
   assert.equal(validationBuild.with.push, false);
   assert.ok(stepIndex(steps, "Crawl built site") < stepIndex(steps, validationBuild.name));
+  const clamavSmoke = steps.find(step => step.name === "Smoke-test pinned local ClamAV");
+  assert.ok(clamavSmoke);
+  assert.match(clamavSmoke.run, /docker compose up -d --wait clamav/);
+  assert.match(clamavSmoke.run, /docker compose port clamav 3310/);
+  assert.match(clamavSmoke.run, /docker compose rm -s -f clamav/);
 
   const publisher = workflow.jobs["publish-image"];
   assert.ok(publisher, "publish-image job must exist");

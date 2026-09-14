@@ -68,6 +68,7 @@ services:
       start_period: 60s
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     logging:
       driver: json-file
       options:
@@ -96,7 +97,10 @@ services:
         condition: service_healthy
       clamav:
         condition: service_healthy
-    networks: [backend, egress]
+    networks:
+      backend: {}
+      egress:
+        gw_priority: 1
     tmpfs: ["/tmp:size=96m,mode=1777"]
     healthcheck:
       test: [CMD, node, server/lead-worker.mjs, --check]

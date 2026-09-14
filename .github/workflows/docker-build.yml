@@ -86,6 +86,15 @@ jobs:
           try { await client.query("CREATE DATABASE kordev_test"); }
           finally { await client.end(); }'
 
+      - name: Smoke-test pinned local ClamAV
+        run: |
+          set -euo pipefail
+          cleanup() { docker compose rm -s -f clamav; }
+          trap cleanup EXIT
+          docker compose up -d --wait clamav
+          published="$(docker compose port clamav 3310 2>/dev/null || true)"
+          test -z "$published"
+
       - name: Typecheck
         run: yarn typecheck
 

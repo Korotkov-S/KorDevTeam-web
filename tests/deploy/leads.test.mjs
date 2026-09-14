@@ -26,7 +26,7 @@ test('production topology has one private lead worker and internal ClamAV', () =
   assert.deepEqual(Object.keys(services).filter(name => name === 'lead-worker'), ['lead-worker']);
   const worker = services['lead-worker'];
   assert.equal(worker.ports, undefined);
-  assert.deepEqual(worker.networks, { backend: null, egress: null });
+  assert.deepEqual(worker.networks, { backend: {}, egress: { gw_priority: 1 } });
   assert.deepEqual(worker.command, ['node', 'server/lead-worker.mjs']);
   assert.deepEqual(worker.healthcheck.test, ['CMD', 'node', 'server/lead-worker.mjs', '--check']);
   assert.equal(worker.restart, 'unless-stopped');
@@ -35,6 +35,8 @@ test('production topology has one private lead worker and internal ClamAV', () =
 
   assert.equal(services.clamav.ports, undefined);
   assert.deepEqual(services.clamav.networks, { backend: null });
+  assert.deepEqual(services.clamav.cap_add, ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETGID', 'SETUID']);
+  assert.deepEqual(services.clamav.cap_drop, ['ALL']);
   assert.equal(services.clamav.image, `clamav/clamav@sha256:${'c'.repeat(64)}`);
   assert.ok(services.clamav.healthcheck);
   assert.ok(services.clamav.volumes.some(volume => volume.target === '/var/lib/clamav'));
@@ -42,6 +44,7 @@ test('production topology has one private lead worker and internal ClamAV', () =
   assert.equal(networks.backend.internal, true);
   assert.notEqual(networks.egress.external, true);
   assert.equal(worker.networks.proxy, undefined);
+  assert.equal(worker.networks.egress.gw_priority, 1);
   assert.equal(services.postgres.ports, undefined);
 });
 
@@ -81,8 +84,11 @@ test('local topology uses one private worker, internal ClamAV and no database ho
   assert.deepEqual(Object.keys(services).filter(name => name === 'lead-worker'), ['lead-worker']);
   for (const name of ['lead-worker', 'clamav', 'postgres']) assert.equal(services[name].ports, undefined);
   assert.deepEqual(services['lead-worker'].command, ['node', 'server/lead-worker.mjs']);
-  assert.deepEqual(services['lead-worker'].networks, { backend: null, egress: null });
+  assert.deepEqual(services['lead-worker'].networks, { backend: {}, egress: { gw_priority: 1 } });
   assert.deepEqual(services.clamav.networks, { backend: null });
+  assert.deepEqual(services.clamav.cap_add, ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETGID', 'SETUID']);
+  assert.deepEqual(services.clamav.cap_drop, ['ALL']);
+  assert.equal(services['lead-worker'].networks.egress.gw_priority, 1);
   assert.ok(services.postgres.networks.backend !== undefined);
   assert.deepEqual(services['lead-worker'].healthcheck.test, ['CMD', 'node', 'server/lead-worker.mjs', '--check']);
   assert.match(services.clamav.image, /^clamav\/clamav:[0-9]+\.[0-9]+\.[0-9]+$/);
@@ -91,4 +97,12 @@ test('local topology uses one private worker, internal ClamAV and no database ho
 test('lead retention systemd unit is structurally verifiable on Linux CI', { skip: process.platform !== 'linux' || process.env.CI !== 'true' }, () => {
   const result = spawnSync('systemd-analyze', ['verify', 'deploy/systemd/kordevteam-lead-retention.service', 'deploy/systemd/kordevteam-lead-retention.timer'], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
+});
+
+test('lead retention systemd unit waits for network and delegates image selection to the host wrapper', () => {
+  const unit = readFileSync('deploy/systemd/kordevteam-lead-retention.service', 'utf8');
+  assert.match(unit, /^Wants=network-online\.target$/m);
+  assert.match(unit, /^After=docker\.service network-online\.target$/m);
+  assert.match(unit, /^ExecStart=\/bin\/bash \/opt\/kordevteam\/current\/scripts\/run-lead-retention\.sh$/m);
+  assert.doesNotMatch(unit, /^ExecStart=.*docker compose/m);
 });
