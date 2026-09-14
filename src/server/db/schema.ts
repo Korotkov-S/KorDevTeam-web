@@ -239,6 +239,7 @@ export const leadDeliveryJobs = pgTable(
     channel: leadDeliveryChannel("channel").notNull(),
     status: leadDeliveryStatus("status").notNull().default("pending"),
     attemptCount: integer("attempt_count").notNull().default(0),
+    providerAttemptCount: integer("provider_attempt_count").notNull().default(0),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
     leaseOwner: varchar("lease_owner", { length: 255 }),
     leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
@@ -254,6 +255,7 @@ export const leadDeliveryJobs = pgTable(
     index("lead_delivery_jobs_due_idx").on(table.status, table.nextAttemptAt),
     index("lead_delivery_jobs_lease_expires_at_idx").on(table.leaseExpiresAt),
     check("lead_delivery_jobs_attempt_count_non_negative", sql`${table.attemptCount} >= 0`),
+    check("lead_delivery_jobs_provider_attempt_count_non_negative", sql`${table.providerAttemptCount} >= 0`),
     check(
       "lead_delivery_jobs_lease_fields_paired",
       sql`(${table.leaseOwner} IS NULL) = (${table.leaseExpiresAt} IS NULL)`,

@@ -8,7 +8,7 @@ import { once } from "node:events";
 import test from "node:test";
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { LeadS3Config } from "./config";
-import { createPrivateAttachmentStore, MissingPrivateObjectError } from "./objectStore";
+import { createPrivateAttachmentStore, MissingPrivateObjectError, sweepMaterializedAttachments } from "./objectStore";
 
 const config: LeadS3Config = { endpoint: new URL("https://private.invalid"), region: "lead-region", bucket: "private-leads", accessKeyId: "lead-only", secretAccessKey: "private-secret", prefix: "intake/private/", serverSideEncryption: "AES256" };
 function client(send: (command: any) => Promise<any>): Pick<S3Client, "send"> { return { send: send as S3Client["send"] }; }
@@ -46,6 +46,37 @@ test("materialize uses random 0600 files and an idempotent disposer", async t =>
   assert.equal(await readFile(first.path, "utf8"), "private bytes");
   await Promise.all([first.dispose(), first.dispose(), second.dispose()]);
   assert.deepEqual(await readdir(tempRoot), []);
+});
+
+test("materialized disposer retries bounded unlink failures", async t => {
+  const tempRoot = await root(t);
+  let attempts = 0;
+  const store = createPrivateAttachmentStore(config, client(async () => ({ Body: Readable.from(["private bytes"]) })), {
+    async unlink(path) {
+      attempts += 1;
+      if (attempts < 3) throw Object.assign(new Error("busy private path"), { code: "EBUSY" });
+      await rm(path);
+    },
+  });
+  const materialized = await store.materialize({ objectKey: "intake/private/key", tempRoot });
+  await materialized.dispose();
+  assert.equal(attempts, 3);
+  assert.deepEqual(await readdir(tempRoot), []);
+});
+
+test("startup sweep removes only old owned regular materializations", async t => {
+  const tempRoot = await root(t);
+  const old = join(tempRoot, "11111111-2222-4333-8444-555555555555.attachment");
+  const recent = join(tempRoot, "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.attachment");
+  const foreign = join(tempRoot, "foreign.attachment");
+  const target = join(tempRoot, "target");
+  const link = join(tempRoot, "99999999-8888-4777-8666-555555555555.attachment");
+  await Promise.all([writeFile(old, "old"), writeFile(recent, "recent"), writeFile(foreign, "foreign"), writeFile(target, "target")]);
+  const { symlink, utimes } = await import("node:fs/promises");
+  await symlink(target, link);
+  await utimes(old, new Date(1), new Date(1));
+  await sweepMaterializedAttachments(tempRoot, new Date(1000));
+  assert.deepEqual((await readdir(tempRoot)).sort(), ["99999999-8888-4777-8666-555555555555.attachment", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.attachment", "foreign.attachment", "target"].sort());
 });
 
 test("a broken download removes partial files and sanitizes the dependency error", async t => {

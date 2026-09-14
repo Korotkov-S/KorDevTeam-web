@@ -64,6 +64,7 @@ export type ClaimedJob = {
   leadId: string;
   channel: "crm" | "email";
   attemptCount: number;
+  providerAttemptCount: number;
   acceptedAt: Date;
   leaseExpiresAt: Date;
   lead: NormalizedLeadFields & { pagePath: string; referrer: string | null };

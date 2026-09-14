@@ -3,7 +3,7 @@ import type { ClaimedJob } from "./contracts";
 import { readLeadWorkerConfig, type LeadWorkerConfig } from "./config";
 import { sendToCrm, type CrmReceipt, type DeliveryEnvelope } from "./crm";
 import { createLeadEmailTransport, sendLeadEmail, type EmailReceipt } from "./email";
-import { createPrivateAttachmentStore, MissingPrivateObjectError, type PrivateAttachmentStore } from "./objectStore";
+import { createPrivateAttachmentStore, MissingPrivateObjectError, sweepMaterializedAttachments, type PrivateAttachmentStore } from "./objectStore";
 import { createLeadRepository, type LeadRepository } from "./repository";
 import {
   classifyDeliveryFailure, CRM_CUTOFF_MS, nextRetryAt, type DeliveryDecision,
@@ -11,7 +11,9 @@ import {
 import { subjectHash } from "./validation";
 
 const LEASE_MS = 120_000;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 40_000;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
+const STARTUP_SWEEP_AGE_MS = 24 * 60 * 60_000;
 
 export type WorkerClock = { now(): Date };
 export type WorkerOptions = {
@@ -28,6 +30,8 @@ export type WorkerOptions = {
   signal?: AbortSignal;
   pollIntervalMs?: number;
   sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
+  heartbeatIntervalMs?: number;
+  heartbeatSleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
 };
 
 type ReadinessOptions = {
@@ -72,95 +76,177 @@ async function recordDecision(
   job: ClaimedJob,
   options: WorkerOptions,
   decision: DeliveryDecision,
+  providerAttemptCount: number,
 ): Promise<void> {
   const claim = fence(job, options.ownerId);
   if (decision.kind === "terminal") {
-    await options.repository.markTerminal({ ...claim, code: decision.code });
+    await requireLease(options.repository.markTerminal({ ...claim, code: decision.code }));
     return;
   }
   if (decision.kind === "manual_action") {
-    await options.repository.markManualAction({ ...claim, code: decision.code });
+    await requireLease(options.repository.markManualAction({ ...claim, code: decision.code }));
     return;
   }
+  let nextAttemptAt: Date;
   try {
-    const nextAttemptAt = nextRetryAt({
+    nextAttemptAt = nextRetryAt({
       channel: job.channel,
-      attemptCount: job.attemptCount,
+      attemptCount: providerAttemptCount,
       acceptedAt: job.acceptedAt,
       now: options.clock.now(),
       retryAfterSeconds: decision.retryAfterSeconds,
       random: options.random,
     });
-    await options.repository.reschedule({ ...claim, code: `${job.channel}_delivery_retry`, nextAttemptAt });
   } catch (error) {
     const finalDecision = classifyDeliveryFailure(job.channel, error);
-    await options.repository.markManualAction({
+    await requireLease(options.repository.markManualAction({
       ...claim,
       code: finalDecision.kind === "retry" ? "retry_configuration_invalid" : finalDecision.code,
-    });
+    }));
+    return;
+  }
+  await requireLease(options.repository.reschedule({ ...claim, code: `${job.channel}_delivery_retry`, nextAttemptAt }));
+}
+
+async function requireLease(operation: Promise<boolean>): Promise<void> {
+  if (!await operation) throw new Error("lead_lease_lost");
+}
+
+function startLeaseHeartbeat(job: ClaimedJob, options: WorkerOptions): { stop(): Promise<void> } {
+  const controller = new AbortController();
+  let failure: Error | undefined, stopped: Promise<void> | undefined;
+  const interval = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+  const loop = (async () => {
+    while (!controller.signal.aborted) {
+      await (options.heartbeatSleep ?? wait)(interval, controller.signal);
+      if (controller.signal.aborted) break;
+      try {
+        if (!await options.repository.renewLease(fence(job, options.ownerId), LEASE_MS)) {
+          failure = new Error("lead_lease_lost");
+          break;
+        }
+      } catch {
+        failure = new Error("lead_worker_heartbeat_failed");
+        break;
+      }
+    }
+  })();
+  return {
+    stop() {
+      return stopped ??= (async () => {
+        controller.abort();
+        await loop;
+        if (failure) throw failure;
+      })();
+    },
+  };
+}
+
+async function scheduleInfrastructureFailure(job: ClaimedJob, options: WorkerOptions): Promise<void> {
+  const claim = fence(job, options.ownerId), nextAttemptAt = new Date(+options.clock.now() + 1_000);
+  if (job.channel === "crm" && +nextAttemptAt >= +job.acceptedAt + CRM_CUTOFF_MS) {
+    await requireLease(options.repository.markManualAction({ ...claim, code: "crm_idempotency_window_expired" }));
+  } else {
+    await requireLease(options.repository.reschedule({ ...claim, code: `${job.channel}_storage_retry`, nextAttemptAt }));
   }
 }
 
 async function processClaimedJob(job: ClaimedJob, options: WorkerOptions): Promise<void> {
   const claim = fence(job, options.ownerId);
-  const currentTime = options.clock.now();
-  if (job.channel === "crm" && +currentTime >= +job.acceptedAt + CRM_CUTOFF_MS) {
-    await options.repository.markManualAction({ ...claim, code: "crm_idempotency_window_expired" });
-    return;
-  }
-
-  if (job.channel === "crm") {
-    const token = await options.repository.reserveCrmTokenAttempt(options.crmTokenHash);
-    if (token.kind === "rate_limited") {
-      try {
-        const nextAttemptAt = nextRetryAt({
-          channel: "crm", attemptCount: job.attemptCount, acceptedAt: job.acceptedAt,
-          now: options.clock.now(), retryAfterSeconds: token.retryAfterSeconds, random: options.random,
-        });
-        await options.repository.reschedule({ ...claim, code: "crm_rate_limited", nextAttemptAt });
-      } catch (error) {
-        const decision = classifyDeliveryFailure("crm", error);
-        await options.repository.markManualAction({
-          ...claim, code: decision.kind === "retry" ? "retry_configuration_invalid" : decision.code,
-        });
-      }
-      return;
+  const heartbeat = startLeaseHeartbeat(job, options);
+  let heartbeatStopped = false;
+  const stopHeartbeat = async () => {
+    if (!heartbeatStopped) {
+      await heartbeat.stop();
+      heartbeatStopped = true;
     }
-  }
-
+  };
+  const currentTime = options.clock.now();
   let materialized: Awaited<ReturnType<PrivateAttachmentStore["materialize"]>> | undefined;
   try {
+    if (job.channel === "crm" && +currentTime >= +job.acceptedAt + CRM_CUTOFF_MS) {
+      await stopHeartbeat();
+      await requireLease(options.repository.markManualAction({ ...claim, code: "crm_idempotency_window_expired" }));
+      return;
+    }
+    if (job.channel === "email" && job.providerAttemptCount >= 12) {
+      await stopHeartbeat();
+      await requireLease(options.repository.markManualAction({ ...claim, code: "email_attempts_exhausted" }));
+      return;
+    }
+
+    if (job.channel === "crm") {
+      const token = await options.repository.reserveCrmTokenAttempt(options.crmTokenHash);
+      if (token.kind === "rate_limited") {
+        await stopHeartbeat();
+        const nextAttemptAt = new Date(+options.clock.now() + token.retryAfterSeconds * 1000);
+        if (+nextAttemptAt >= +job.acceptedAt + CRM_CUTOFF_MS) {
+          await requireLease(options.repository.markManualAction({ ...claim, code: "crm_idempotency_window_expired" }));
+        } else {
+          await requireLease(options.repository.reschedule({ ...claim, code: "crm_rate_limited", nextAttemptAt }));
+        }
+        return;
+      }
+    }
+
     if (job.attachment) {
       try {
         materialized = await options.store.materialize({ objectKey: job.attachment.objectKey, tempRoot: options.tempRoot });
       } catch (error) {
-        await recordDecision(job, options, error instanceof MissingPrivateObjectError
-          ? { kind: "manual_action", code: "attachment_missing" }
-          : { kind: "retry" });
+        await stopHeartbeat();
+        if (error instanceof MissingPrivateObjectError) {
+          await recordDecision(job, options, { kind: "manual_action", code: "attachment_missing" }, job.providerAttemptCount);
+        } else {
+          await scheduleInfrastructureFailure(job, options);
+        }
         return;
       }
     }
     const deliveryEnvelope = envelope(job, materialized?.path ?? null);
+    const providerAttemptCount = await options.repository.beginProviderAttempt(claim);
+    if (providerAttemptCount === null) throw new Error("lead_lease_lost");
     if (job.channel === "crm") {
       let receipt: CrmReceipt;
       try { receipt = await options.crm(deliveryEnvelope); }
-      catch (error) { await recordDecision(job, options, classifyDeliveryFailure(job.channel, error)); return; }
-      await options.repository.markDelivered({
+      catch (error) {
+        await stopHeartbeat();
+        await recordDecision(job, options, classifyDeliveryFailure(job.channel, error), providerAttemptCount);
+        return;
+      }
+      if (receipt.rateLimit !== null && receipt.rateRemaining !== null) {
+        if (receipt.rateLimit < 1 || receipt.rateRemaining > receipt.rateLimit) {
+          await stopHeartbeat();
+          await recordDecision(job, options, { kind: "manual_action", code: "crm_invalid_response" }, providerAttemptCount);
+          return;
+        }
+        await options.repository.syncCrmTokenBudget(options.crmTokenHash, receipt.rateLimit, receipt.rateRemaining);
+      }
+      await stopHeartbeat();
+      await requireLease(options.repository.markDelivered({
         ...claim,
         ...(receipt.requestId ? { vendorRequestId: receipt.requestId } : {}),
         responseMetadata: receiptMetadata(receipt, ["requestId", "taskId", "taskCode", "taskStatus", "dueDate", "replayed", "rateLimit", "rateRemaining"]),
-      });
+      }));
     } else {
       let receipt: EmailReceipt;
       try { receipt = await options.email(deliveryEnvelope); }
-      catch (error) { await recordDecision(job, options, classifyDeliveryFailure(job.channel, error)); return; }
-      await options.repository.markDelivered({ ...claim, responseMetadata: receiptMetadata(receipt, ["messageId"]) });
+      catch (error) {
+        await stopHeartbeat();
+        await recordDecision(job, options, classifyDeliveryFailure(job.channel, error), providerAttemptCount);
+        return;
+      }
+      await stopHeartbeat();
+      await requireLease(options.repository.markDelivered({ ...claim, responseMetadata: receiptMetadata(receipt, ["messageId"]) }));
     }
   } finally {
+    let heartbeatFailure: "lead_lease_lost" | "lead_worker_heartbeat_failed" | undefined;
+    try { await stopHeartbeat(); }
+    catch (error) { heartbeatFailure = error instanceof Error && error.message === "lead_lease_lost" ? "lead_lease_lost" : "lead_worker_heartbeat_failed"; }
     if (materialized) {
       try { await materialized.dispose(); }
-      catch { /* A private temporary-file cleanup failure must not duplicate a completed vendor delivery. */ }
+      catch { throw new Error("lead_temp_cleanup_failed"); }
     }
+    if (heartbeatFailure) throw new Error(heartbeatFailure);
   }
 }
 
@@ -173,12 +259,22 @@ function assertWorkerOptions(options: WorkerOptions): void {
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1000) throw new Error("lead_worker_batch_invalid");
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 1 || pollIntervalMs > 60_000) throw new Error("lead_worker_poll_invalid");
+  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+  if (!Number.isInteger(heartbeatIntervalMs) || heartbeatIntervalMs < 1 || heartbeatIntervalMs >= LEASE_MS) throw new Error("lead_worker_heartbeat_invalid");
 }
 
 export async function runWorkerBatch(options: WorkerOptions): Promise<number> {
   assertWorkerOptions(options);
+  if (options.signal?.aborted) return 0;
   const jobs = await options.repository.claimDueJobs(options.ownerId, options.batchSize ?? 10, LEASE_MS);
-  for (const job of jobs) await processClaimedJob(job, options);
+  const results = await Promise.allSettled(jobs.map(job => processClaimedJob(job, options)));
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length) {
+    const codes = failures.map(result => result.reason instanceof Error ? result.reason.message : "");
+    if (codes.includes("lead_lease_lost")) throw new Error("lead_lease_lost");
+    if (codes.includes("lead_temp_cleanup_failed")) throw new Error("lead_temp_cleanup_failed");
+    throw new Error("lead_worker_batch_failed");
+  }
   return jobs.length;
 }
 
@@ -231,5 +327,8 @@ export function createLeadWorker(input: {
     clock: { now: () => new Date() },
     signal: input.signal,
   };
-  return () => runLeadWorker(options);
+  return async () => {
+    await sweepMaterializedAttachments(config.tempRoot, new Date(+options.clock.now() - STARTUP_SWEEP_AGE_MS));
+    await runLeadWorker(options);
+  };
 }

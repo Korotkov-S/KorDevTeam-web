@@ -15,6 +15,7 @@ function job(channel: "crm" | "email", attemptCount = 1, attachment = false): Cl
     leadId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
     channel,
     attemptCount,
+    providerAttemptCount: 0,
     acceptedAt,
     leaseExpiresAt: new Date(+now + 120_000),
     lead: {
@@ -38,6 +39,9 @@ function fixture(jobs: ClaimedJob[], token: RateDecision = { kind: "allowed" }) 
       return claims === 1 ? jobs : [];
     },
     async reserveCrmTokenAttempt(hash: string) { events.push(`token:${hash}`); return token; },
+    async syncCrmTokenBudget(hash: string, limit: number, remaining: number) { events.push(`sync:${hash}:${limit}:${remaining}`); },
+    async renewLease(command: { jobId: string }, leaseMs: number) { events.push(`renew:${command.jobId}:${leaseMs}`); return true; },
+    async beginProviderAttempt(command: { jobId: string }) { events.push(`provider:${command.jobId}`); return (jobs.find(item => item.id === command.jobId)?.providerAttemptCount ?? 0) + 1; },
     async markDelivered(command: { jobId: string; responseMetadata?: Record<string, string> }) {
       states.set(command.jobId, "delivered"); events.push(`delivered:${command.jobId}:${JSON.stringify(command.responseMetadata ?? {})}`); return true;
     },
@@ -97,7 +101,7 @@ test("CRM token delay crossing the cutoff becomes manual action immediately", as
 
 test("CRM cutoff skips delivery and the twelfth transient SMTP failure becomes manual action", async () => {
   const crmJob = { ...job("crm"), acceptedAt: new Date(+now - (23 * 60 + 55) * 60_000) };
-  const emailJob = job("email", 12);
+  const emailJob = { ...job("email", 12), providerAttemptCount: 11 };
   const f = fixture([crmJob, emailJob]);
   let calls = 0;
   f.options.crm = async () => { calls += 1; return {} as never; };
@@ -131,10 +135,76 @@ test("delivery persists only the bounded receipt projection", async () => {
   } as never);
   await runWorkerBatch(f.options);
   const delivered = f.events.filter(value => value.startsWith("delivered:"));
-  assert.match(delivered[0], /"taskId":"42"/);
-  assert.match(delivered[0], /"rateRemaining":"19"/);
-  assert.doesNotMatch(delivered[0], /name|phone|token/i);
-  assert.match(delivered[1], /"messageId":"<lead@example.test>"/);
+  const crmDelivery = delivered.find(value => value.includes(crmJob.id)) ?? "";
+  const emailDelivery = delivered.find(value => value.includes(emailJob.id)) ?? "";
+  assert.match(crmDelivery, /"taskId":"42"/);
+  assert.match(crmDelivery, /"rateRemaining":"19"/);
+  assert.doesNotMatch(crmDelivery, /name|phone|token/i);
+  assert.match(emailDelivery, /"messageId":"<lead@example.test>"/);
+  assert.ok(f.events.includes(`sync:${"f".repeat(64)}:20:19`));
+});
+
+test("claimed jobs start concurrently and renew their leases while providers are in flight", async () => {
+  const first = job("crm"), second = job("email");
+  const f = fixture([first, second]);
+  let started = 0, release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  f.options.heartbeatIntervalMs = 1;
+  f.options.crm = async () => { started += 1; await gate; return { requestId: null, taskId: 1, taskCode: "ONE", taskStatus: "new", dueDate: "2026-09-15 18:00:00", replayed: false, rateLimit: 20, rateRemaining: 18 }; };
+  f.options.email = async () => { started += 1; await gate; return { messageId: "mail" }; };
+  const running = runWorkerBatch(f.options);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(started, 2, "later jobs must not wait behind the first provider call");
+  assert.ok(f.events.some(value => value.startsWith(`renew:${first.id}:`)));
+  assert.ok(f.events.some(value => value.startsWith(`renew:${second.id}:`)));
+  release();
+  assert.equal(await running, 2);
+});
+
+test("lost lease transition rejects the completed batch with a sanitized operational error", async () => {
+  const f = fixture([job("email")]);
+  f.options.repository.markDelivered = async () => false;
+  await assert.rejects(() => runWorkerBatch(f.options), /^Error: lead_lease_lost$/);
+});
+
+test("heartbeat lease loss prevents the post-provider state transition", async () => {
+  const emailJob = job("email");
+  const f = fixture([emailJob]);
+  f.options.heartbeatIntervalMs = 1;
+  f.options.repository.renewLease = async () => false;
+  f.options.email = async () => {
+    await new Promise(resolve => setTimeout(resolve, 10));
+    return { messageId: "ambiguous-provider-result" };
+  };
+  await assert.rejects(() => runWorkerBatch(f.options), /^Error: lead_lease_lost$/);
+  assert.equal(f.states.has(emailJob.id), false);
+});
+
+test("provider attempts exclude token and materialization failures and prevent a thirteenth SMTP call", async () => {
+  const blocked = fixture([job("crm", 4, true)], { kind: "rate_limited", retryAfterSeconds: 5 });
+  await runWorkerBatch(blocked.options);
+  assert.equal(blocked.events.some(value => value.startsWith("provider:")), false);
+
+  const storageFailure = fixture([job("email", 7, true)]);
+  storageFailure.options.store = { async materialize() { throw new Error("private S3 endpoint"); } };
+  await runWorkerBatch(storageFailure.options);
+  assert.equal(storageFailure.events.some(value => value.startsWith("provider:")), false);
+  assert.equal(storageFailure.states.get(job("email").id), "retry");
+
+  const exhaustedJob = { ...job("email", 9), providerAttemptCount: 12 };
+  const exhausted = fixture([exhaustedJob]);
+  let calls = 0;
+  exhausted.options.email = async () => { calls += 1; return { messageId: "never" }; };
+  await runWorkerBatch(exhausted.options);
+  assert.equal(calls, 0);
+  assert.equal(exhausted.states.get(exhaustedJob.id), "manual_action");
+});
+
+test("dispose failure is retried by the store and then surfaces after delivery", async () => {
+  const f = fixture([job("email", 1, true)]);
+  f.options.store = { async materialize() { return { path: "/private/materialized", async dispose() { throw new Error("private path"); } }; } };
+  await assert.rejects(() => runWorkerBatch(f.options), /^Error: lead_temp_cleanup_failed$/);
+  assert.equal(f.states.get(job("email").id), "delivered");
 });
 
 test("competing worker batches never deliver a job hidden by an active lease", async () => {

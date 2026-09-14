@@ -1,0 +1,2 @@
+ALTER TABLE "lead_delivery_jobs" ADD COLUMN "provider_attempt_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "lead_delivery_jobs" ADD CONSTRAINT "lead_delivery_jobs_provider_attempt_count_non_negative" CHECK ("lead_delivery_jobs"."provider_attempt_count" >= 0);

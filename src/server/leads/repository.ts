@@ -51,7 +51,10 @@ export interface LeadRepository {
   reschedule(command: RescheduleCommand): Promise<boolean>;
   markTerminal(command: FailedCommand): Promise<boolean>;
   markManualAction(command: FailedCommand): Promise<boolean>;
+  renewLease(command: LeaseFence, leaseMs: number): Promise<boolean>;
+  beginProviderAttempt(command: LeaseFence): Promise<number | null>;
   reserveCrmTokenAttempt(tokenHash: string): Promise<RateDecision>;
+  syncCrmTokenBudget(tokenHash: string, rateLimit: number, rateRemaining: number): Promise<void>;
   findExpiredLeads(limit: number): Promise<ExpiredLead[]>;
   attachmentKeyExists(key: string): Promise<boolean>;
   /** Caller must successfully delete the private object before deleting its row. */
@@ -89,6 +92,17 @@ async function consumeBucket(db: Database | Transaction, kind: keyof typeof rate
 
 function assertBatchLimit(limit: number): void {
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error("lead_batch_limit_invalid");
+}
+
+function assertLeaseDuration(leaseMs: number): void {
+  if (!Number.isInteger(leaseMs) || leaseMs < 1 || leaseMs > 120_000) throw new Error("lead_lease_duration_invalid");
+}
+
+function assertCrmRateLimit(tokenHash: string, rateLimit: number, rateRemaining: number): void {
+  if (!/^[0-9a-f]{64}$/.test(tokenHash) || !Number.isSafeInteger(rateLimit) || rateLimit < 1 ||
+      !Number.isSafeInteger(rateRemaining) || rateRemaining < 0 || rateRemaining > rateLimit) {
+    throw new Error("lead_crm_rate_limit_invalid");
+  }
 }
 
 const receiptKeys = ["requestId", "taskId", "taskCode", "taskStatus", "dueDate", "replayed", "rateLimit", "rateRemaining", "messageId"];
@@ -133,6 +147,19 @@ export function createLeadRepository(db: Database, clock: LeadClock): LeadReposi
     },
     consumeIpAttempt(ipHash) { return consumeBucket(db, "ip", ipHash, clock.now()); },
     reserveCrmTokenAttempt(tokenHash) { return consumeBucket(db, "crm_token", tokenHash, clock.now()); },
+    async syncCrmTokenBudget(tokenHash, rateLimit, rateRemaining) {
+      assertCrmRateLimit(tokenHash, rateLimit, rateRemaining);
+      const now = clock.now(), windowMs = ratePolicies.crm_token.windowMs;
+      const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
+      const windowEnd = new Date(windowStart.getTime() + windowMs);
+      const consumedFloor = ratePolicies.crm_token.limit - Math.min(ratePolicies.crm_token.limit, rateRemaining);
+      await db.execute(sql`
+        insert into lead_rate_limits (kind, subject_hash, window_started_at, count, expires_at)
+        values ('crm_token', ${tokenHash}, ${windowStart.toISOString()}, ${consumedFloor}, ${windowEnd.toISOString()})
+        on conflict (kind, subject_hash, window_started_at)
+        do update set count = greatest(lead_rate_limits.count, excluded.count), expires_at = excluded.expires_at
+      `);
+    },
 
     async accept(command) {
       return db.transaction(async (tx): Promise<AcceptDecision> => {
@@ -175,7 +202,7 @@ export function createLeadRepository(db: Database, clock: LeadClock): LeadReposi
     async claimDueJobs(ownerId, limit, leaseMs) {
       assertBatchLimit(limit);
       if (!ownerId || ownerId.length > 255) throw new Error("lead_lease_owner_invalid");
-      if (!Number.isInteger(leaseMs) || leaseMs < 1 || leaseMs > 120_000) throw new Error("lead_lease_duration_invalid");
+      assertLeaseDuration(leaseMs);
       return db.transaction(async (tx) => {
         const now = clock.now();
         const due = await tx.select({ id: leadDeliveryJobs.id }).from(leadDeliveryJobs).where(or(
@@ -196,6 +223,7 @@ export function createLeadRepository(db: Database, clock: LeadClock): LeadReposi
           const { lead, attachment } = byLead.get(job.leadId)!;
           return {
             id: job.id, leadId: job.leadId, channel: job.channel, attemptCount: job.attemptCount,
+            providerAttemptCount: job.providerAttemptCount,
             acceptedAt: lead.acceptedAt, leaseExpiresAt,
             lead: {
               name: lead.name, phone: lead.phone, phoneDigits: lead.phone.replace(/[^0-9]/g, ""),
@@ -208,6 +236,31 @@ export function createLeadRepository(db: Database, clock: LeadClock): LeadReposi
           };
         });
       });
+    },
+
+    async renewLease(command, leaseMs) {
+      assertLeaseDuration(leaseMs);
+      const now = clock.now();
+      const rows = await db.update(leadDeliveryJobs).set({
+        leaseExpiresAt: new Date(+now + leaseMs), updatedAt: now,
+      }).where(and(
+        eq(leadDeliveryJobs.id, command.jobId), eq(leadDeliveryJobs.leaseOwner, command.ownerId),
+        eq(leadDeliveryJobs.attemptCount, command.attemptCount), eq(leadDeliveryJobs.status, "processing"),
+        gt(leadDeliveryJobs.leaseExpiresAt, now),
+      )).returning({ id: leadDeliveryJobs.id });
+      return rows.length === 1;
+    },
+
+    async beginProviderAttempt(command) {
+      const now = clock.now();
+      const rows = await db.update(leadDeliveryJobs).set({
+        providerAttemptCount: sql`${leadDeliveryJobs.providerAttemptCount} + 1`, updatedAt: now,
+      }).where(and(
+        eq(leadDeliveryJobs.id, command.jobId), eq(leadDeliveryJobs.leaseOwner, command.ownerId),
+        eq(leadDeliveryJobs.attemptCount, command.attemptCount), eq(leadDeliveryJobs.status, "processing"),
+        gt(leadDeliveryJobs.leaseExpiresAt, now),
+      )).returning({ providerAttemptCount: leadDeliveryJobs.providerAttemptCount });
+      return rows[0]?.providerAttemptCount ?? null;
     },
 
     markDelivered(command) {

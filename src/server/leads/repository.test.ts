@@ -130,6 +130,20 @@ databaseTest("concurrent CRM reservations admit twenty per token and reset at th
   assert.deepEqual(await repository.reserveCrmTokenAttempt("f".repeat(64)), { kind: "allowed" });
 });
 
+databaseTest("validated CRM response quota atomically reduces the shared fixed-window budget", async () => {
+  const { db, repository } = await fixture();
+  const tokenHash = "f".repeat(64);
+  assert.equal((await Promise.all(Array.from({ length: 5 }, () => repository.reserveCrmTokenAttempt(tokenHash)))).filter(result => result.kind === "allowed").length, 5);
+  await repository.syncCrmTokenBudget(tokenHash, 20, 2);
+  const remaining = await Promise.all(Array.from({ length: 8 }, () => repository.reserveCrmTokenAttempt(tokenHash)));
+  assert.equal(remaining.filter(result => result.kind === "allowed").length, 2);
+  assert.equal((await db.select().from(leadRateLimits))[0].count, 20);
+  const exhaustedToken = "e".repeat(64);
+  await repository.syncCrmTokenBudget(exhaustedToken, 20, 0);
+  assert.deepEqual(await repository.reserveCrmTokenAttempt(exhaustedToken), { kind: "rate_limited", retryAfterSeconds: 60 });
+  await assert.rejects(() => repository.syncCrmTokenBudget(tokenHash, 10, 11), /lead_crm_rate_limit_invalid/);
+});
+
 databaseTest("concurrent workers claim disjoint jobs and receive immutable lead metadata without internal hashes", async () => {
   const { db, repository } = await fixture();
   const input = command({ attachment });
@@ -140,6 +154,7 @@ databaseTest("concurrent workers claim disjoint jobs and receive immutable lead 
   assert.equal(new Set(jobs.map((job) => job.id)).size, 2);
   for (const job of jobs) {
     assert.equal(job.attemptCount, 1);
+    assert.equal(job.providerAttemptCount, 0);
     assert.equal(job.leaseExpiresAt.toISOString(), "2026-09-14T09:02:00.000Z");
     assert.equal(job.acceptedAt.toISOString(), "2026-09-14T09:00:00.000Z");
     assert.deepEqual(job.lead, { ...input.fields, pagePath: input.context.pagePath, referrer: input.context.referrer });
@@ -150,6 +165,24 @@ databaseTest("concurrent workers claim disjoint jobs and receive immutable lead 
   }
   assert.deepEqual(await repository.claimDueJobs("other", 10, 120_000), []);
   assert.ok((await db.select().from(leadDeliveryJobs)).every((job) => job.status === "processing"));
+});
+
+databaseTest("lease renewal and provider attempt increment are fenced and independent", async () => {
+  const { db, repository, advance } = await fixture();
+  await repository.accept(command());
+  const [job] = await repository.claimDueJobs("owner", 1, 120_000);
+  const claim = { jobId: job.id, ownerId: "owner", attemptCount: job.attemptCount };
+  assert.equal(await repository.beginProviderAttempt(claim), 1);
+  assert.equal(await repository.beginProviderAttempt(claim), 2);
+  advance(60_000);
+  assert.equal(await repository.renewLease(claim, 120_000), true);
+  const [row] = await db.select().from(leadDeliveryJobs).where(eq(leadDeliveryJobs.id, job.id));
+  assert.equal(row.attemptCount, 1, "lease generation is not a provider counter");
+  assert.equal(row.providerAttemptCount, 2);
+  assert.equal(row.leaseExpiresAt?.toISOString(), "2026-09-14T09:03:00.000Z");
+  advance(120_000);
+  assert.equal(await repository.renewLease(claim, 120_000), false);
+  assert.equal(await repository.beginProviderAttempt(claim), null);
 });
 
 databaseTest("only expired processing leases are reclaimed once and stale attempts cannot mutate", async () => {

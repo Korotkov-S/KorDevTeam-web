@@ -15,6 +15,13 @@
       "when": 1789370977706,
       "tag": "0001_lead_intake",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789387439441,
+      "tag": "0002_lead_delivery_resilience",
+      "breakpoints": true
     }
   ]
 }

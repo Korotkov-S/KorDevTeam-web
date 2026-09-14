@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 import { createDb } from "./client";
 import {
@@ -144,6 +145,11 @@ databaseTest("lead delivery and rate-limit counters reject negative values", asy
     channel: "crm",
     attemptCount: -1,
   }));
+  await assertConstraintViolation(() => db.insert(leadDeliveryJobs).values({
+    leadId: lead.id,
+    channel: "email",
+    providerAttemptCount: -1,
+  }));
   await assertConstraintViolation(() => db.insert(leadRateLimits).values({
     kind: "ip",
     subjectHash: "e".repeat(64),
@@ -151,4 +157,19 @@ databaseTest("lead delivery and rate-limit counters reject negative values", asy
     count: -1,
     expiresAt: new Date("2026-09-14T09:30:00.000Z"),
   }));
+});
+
+databaseTest("0002 additively upgrades existing delivery jobs with a zero provider counter", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const [lead] = await db.insert(leads).values(leadFixture).returning();
+  await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });
+  await db.execute(sql`ALTER TABLE lead_delivery_jobs DROP CONSTRAINT lead_delivery_jobs_provider_attempt_count_non_negative`);
+  await db.execute(sql`ALTER TABLE lead_delivery_jobs DROP COLUMN provider_attempt_count`);
+  await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at = 1789387439441`);
+
+  await migrate(db, { migrationsFolder: "drizzle" });
+
+  const [job] = await db.select().from(leadDeliveryJobs);
+  assert.equal(job.providerAttemptCount, 0);
 });

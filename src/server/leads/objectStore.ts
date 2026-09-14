@@ -1,7 +1,7 @@
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { lstat, realpath, unlink } from "node:fs/promises";
+import { lstat, readdir, realpath, unlink as unlinkFile } from "node:fs/promises";
 import { isAbsolute, join, parse } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -21,12 +21,61 @@ export class MissingPrivateObjectError extends LeadError {
   constructor() { super("storage_unavailable"); this.name = "MissingPrivateObjectError"; }
 }
 
+type PrivateFileOperations = { unlink(path: string): Promise<void> };
+const defaultFileOperations: PrivateFileOperations = { unlink: unlinkFile };
+const materializedName = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.attachment$/i;
+
+async function validatedTempRoot(tempRoot: string): Promise<string> {
+  const info = await lstat(tempRoot);
+  const root = await realpath(tempRoot);
+  if (!isAbsolute(tempRoot) || !info.isDirectory() || info.isSymbolicLink() || root === parse(root).root ||
+      (info.mode & 0o022) !== 0 || (process.getuid && info.uid !== process.getuid())) {
+    throw new LeadError("storage_unavailable");
+  }
+  return root;
+}
+
+async function unlinkWithRetry(path: string, operations: PrivateFileOperations): Promise<void> {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try { await operations.unlink(path); return; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      if (attempt === 3) throw new LeadError("storage_unavailable");
+    }
+  }
+}
+
+export async function sweepMaterializedAttachments(
+  tempRoot: string,
+  cutoff: Date,
+  operations: PrivateFileOperations = defaultFileOperations,
+): Promise<number> {
+  if (!Number.isFinite(+cutoff)) throw new LeadError("storage_unavailable");
+  const root = await validatedTempRoot(tempRoot);
+  let removed = 0;
+  for (const name of await readdir(root)) {
+    if (!materializedName.test(name)) continue;
+    const path = join(root, name);
+    let info;
+    try { info = await lstat(path); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw new LeadError("storage_unavailable"); }
+    if (!info.isFile() || info.isSymbolicLink() || info.mtime >= cutoff) continue;
+    await unlinkWithRetry(path, operations);
+    removed += 1;
+  }
+  return removed;
+}
+
 function storageError(error: unknown): LeadError {
   return error instanceof MissingPrivateObjectError || (error && typeof error === "object" && "name" in error && error.name === "NoSuchKey")
     ? new MissingPrivateObjectError() : new LeadError("storage_unavailable");
 }
 
-export function createPrivateAttachmentStore(config: LeadS3Config, injectedClient?: Pick<S3Client, "send">): PrivateAttachmentStore {
+export function createPrivateAttachmentStore(
+  config: LeadS3Config,
+  injectedClient?: Pick<S3Client, "send">,
+  fileOperations: PrivateFileOperations = defaultFileOperations,
+): PrivateAttachmentStore {
   const client = injectedClient ?? new S3Client({
     endpoint: config.endpoint.href, region: config.region, forcePathStyle: true,
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
@@ -57,13 +106,10 @@ export function createPrivateAttachmentStore(config: LeadS3Config, injectedClien
       let path: string | undefined;
       let disposal: Promise<void> | undefined;
       const dispose = () => disposal ??= (async () => {
-        if (path) try { await unlink(path); }
-        catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new LeadError("storage_unavailable"); }
+        if (path) await unlinkWithRetry(path, fileOperations);
       })();
       try {
-        const info = await lstat(tempRoot);
-        const root = await realpath(tempRoot);
-        if (!isAbsolute(tempRoot) || !info.isDirectory() || info.isSymbolicLink() || root === parse(root).root || (info.mode & 0o022) !== 0 || (process.getuid && info.uid !== process.getuid())) throw new LeadError("storage_unavailable");
+        const root = await validatedTempRoot(tempRoot);
         const result = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }));
         if (!(result.Body instanceof Readable)) throw new LeadError("storage_unavailable");
         path = join(root, `${randomUUID()}.attachment`);
