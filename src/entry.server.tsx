@@ -2,9 +2,17 @@ import { PassThrough, Readable } from "node:stream";
 import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
 import { renderToPipeableStream } from "react-dom/server";
+import { checkDatabaseReady } from "./server/db/client";
+import { assertLeadWebConfig } from "./server/leads/config";
 export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
+export { createLeadRouter } from "./server/leads/http";
+
+export async function checkApplicationReady(): Promise<void> {
+  await checkDatabaseReady();
+  assertLeadWebConfig(process.env);
+}
 
 export default function handleRequest(
   request: Request,

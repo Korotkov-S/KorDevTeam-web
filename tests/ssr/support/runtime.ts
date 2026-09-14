@@ -6,6 +6,7 @@ import path from "node:path";
 
 type TestRuntime = {
   origin: string;
+  output: () => string;
   close: () => Promise<void>;
 };
 
@@ -79,6 +80,7 @@ export async function startTestRuntime(environment: Record<string, string> = {})
 
   return {
     origin,
+    output: () => output,
     close: async () => {
       if (runtime.exitCode !== null) return;
       await new Promise<void>((resolve) => {

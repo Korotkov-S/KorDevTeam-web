@@ -22,9 +22,10 @@ function allowCorsOrigin(origin, callback) {
   callback(null, false);
 }
 
-function createApiApp({ checkReady } = {}) {
+function createApiApp({ checkReady, leadRouter } = {}) {
   const api = express.Router();
 
+  if (leadRouter) api.use("/api/leads", leadRouter);
   api.use(cors({ origin: allowCorsOrigin }));
   api.use(express.json({ limit: process.env.JSON_LIMIT || "25mb" }));
   api.use(
