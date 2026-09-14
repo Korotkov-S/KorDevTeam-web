@@ -5,16 +5,28 @@ import path from 'node:path';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 
-const tableCounts = { 'drizzle.__drizzle_migrations': '2', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
-const migrationHistory = [
+const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
+const postMigrationTableCounts = {
+  ...preMigrationTableCounts,
+  'drizzle.__drizzle_migrations': '2',
+  'public.leads': '0',
+  'public.lead_attachments': '0',
+  'public.lead_delivery_jobs': '0',
+  'public.lead_rate_limits': '0',
+};
+const preMigrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0000_content_foundation.sql')).digest('hex'), created_at: '1789122602054' },
+];
+const migrationHistory = [
+  ...preMigrationHistory,
   { hash: createHash('sha256').update(readFileSync('drizzle/0001_lead_intake.sql')).digest('hex'), created_at: '1789370977706' },
 ];
-function inventoryQuery(sql) {
-  if (sql.includes('pg_catalog.pg_class')) return { rows: Object.keys(tableCounts).map(name => ({ schema: name.split('.')[0], name: name.split('.')[1] })) };
+const tableCounts = postMigrationTableCounts;
+function inventoryQuery(sql, tables = tableCounts) {
+  if (sql.includes('pg_catalog.pg_class')) return { rows: Object.keys(tables).map(name => ({ schema: name.split('.')[0], name: name.split('.')[1] })) };
   if (sql.includes('GROUP BY status')) return { rows: [{ status: 'draft', count: '3' }, { status: 'published', count: '2' }] };
   const match = /SELECT count\(\*\)::text AS count FROM "([^"]+)"\."([^"]+)"/.exec(sql);
-  if (match) return { rows: [{ count: tableCounts[`${match[1]}.${match[2]}`] }] };
+  if (match) return { rows: [{ count: tables[`${match[1]}.${match[2]}`] }] };
 }
 
 test('backup holds a snapshot through dump, encrypts manifest and uploads only encrypted files privately', async t => {
@@ -94,7 +106,7 @@ test('restore verifies dump, existing migration history, schema and published co
   const dump = 'PGDMP valid fixture', encrypted = 'encrypted fixture';
   const digest = value => createHash('sha256').update(value).digest('hex');
   const events = [];
-  const manifest = { version: 2, createdAt: '2026-09-13T00:00:00.000Z', reason: 'daily', dumpSha256: digest(dump), publishedCounts: { article: 2 }, migrations: migrationHistory, inventory: { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } } };
+  const manifest = { version: 2, createdAt: '2026-09-13T00:00:00.000Z', reason: 'daily', dumpSha256: digest(dump), publishedCounts: { article: 2 }, migrations: preMigrationHistory, inventory: { tables: preMigrationTableCounts, contentStatuses: { draft: '3', published: '2' } } };
   const run = async (command, args) => {
     events.push(command);
     if (command === 'aws') {
@@ -110,23 +122,25 @@ test('restore verifies dump, existing migration history, schema and published co
     } else throw Error('Unexpected command');
     return '';
   };
+  let migrationsApplied = false;
   const client = { async query(sql) {
     events.push(sql);
     if (sql.includes('FROM "public"."new_empty_table"')) return { rows: [{ count: '0' }] };
-    if (inventoryQuery(sql)) {
-      const result = inventoryQuery(sql);
-      if (events.includes('migrate') && sql.includes('pg_catalog.pg_class')) result.rows.push({ schema: 'public', name: 'new_empty_table' });
+    const inventory = inventoryQuery(sql, migrationsApplied ? postMigrationTableCounts : preMigrationTableCounts);
+    if (inventory) {
+      if (migrationsApplied && sql.includes('pg_catalog.pg_class')) inventory.rows.push({ schema: 'public', name: 'new_empty_table' });
+      const result = inventory;
       return result;
     }
     if (sql.includes('current_database')) return { rows: [{ name: 'team_restore' }] };
     if (sql.includes('information_schema')) return { rows: [{ count: '0' }] };
     if (sql.includes('GROUP BY')) return { rows: [{ kind: 'article', count: '2' }] };
-    if (sql.includes('__drizzle_migrations')) return { rows: manifest.migrations };
+    if (sql.includes('__drizzle_migrations')) return { rows: migrationsApplied ? migrationHistory : preMigrationHistory };
     return { rows: [{ name: 'table' }] };
   }, async end() { events.push('closed'); } };
   const evidenceFile = path.join(realpathSync(dir), 'report.json');
   const config = { directory: dir, objectKey: 'private/backups/backup.tar.age', s3Uri: 's3://private/private/backups', endpoint: 'https://s3.twcstorage.ru', identity: '/fixture/key', targetUrl: 'postgresql://u:supersecret@localhost/team_restore', evidenceFile, toolingSha: 'a'.repeat(40) };
-  await restoreDatabase(config, run, async () => client, async () => { assert.equal(existsSync(evidenceFile), false); events.push('migrate'); });
+  await restoreDatabase(config, run, async () => client, async () => { assert.equal(existsSync(evidenceFile), false); migrationsApplied = true; events.push('migrate'); });
   assert.ok(events.indexOf('pg_restore') < events.indexOf('migrate'));
   assert.equal(events.filter(e => e.includes('GROUP BY kind')).length, 2);
   assert.equal(events.filter(e => e.includes('pg_catalog.pg_class')).length, 2);
@@ -139,11 +153,11 @@ test('restore verifies dump, existing migration history, schema and published co
   assert.equal(evidence.objectKey, 'private/backups/backup.tar.age');
   assert.equal(evidence.transferSha256, digest(encrypted));
   assert.deepEqual(evidence.manifest, { version: 2, createdAt: '2026-09-13T00:00:00.000Z', reason: 'daily', dumpSha256: digest(dump) });
-  assert.deepEqual(evidence.beforeMigrations.inventory.tables, tableCounts);
-  assert.deepEqual(evidence.afterMigrations.inventory.tables, { ...tableCounts, 'public.new_empty_table': '0' });
+  assert.deepEqual(evidence.beforeMigrations.inventory.tables, preMigrationTableCounts);
+  assert.deepEqual(evidence.afterMigrations.inventory.tables, { ...postMigrationTableCounts, 'public.new_empty_table': '0' });
   assert.deepEqual(evidence.afterMigrations.inventory.contentStatuses, { draft: '3', published: '2' });
   assert.deepEqual(evidence.afterMigrations.publishedCounts, { article: 2 });
-  assert.deepEqual(evidence.beforeMigrations.migrations, migrationHistory);
+  assert.deepEqual(evidence.beforeMigrations.migrations, preMigrationHistory);
   assert.deepEqual(evidence.afterMigrations.migrations, migrationHistory);
   assert.equal(evidence.afterMigrations.lastMigrationHash, migrationHistory.at(-1).hash);
   assert.equal(evidence.toolingSha, 'a'.repeat(40));
@@ -151,18 +165,24 @@ test('restore verifies dump, existing migration history, schema and published co
 
   for (const failure of ['migrations', 'post-count', 'close']) {
     events.length = 0;
+    migrationsApplied = false;
     let migrated = false;
     const failedEvidence = path.join(realpathSync(dir), `failed-${failure}.json`);
     const failedClient = { ...client, query: async sql => {
       if (failure === 'post-count' && migrated && sql.includes('GROUP BY kind')) return { rows: [{ kind: 'article', count: '1' }] };
       return client.query(sql);
     }, end: async () => { if (failure === 'close') throw Error('private connection detail'); } };
-    await assert.rejects(restoreDatabase({ ...config, evidenceFile: failedEvidence }, run, async () => failedClient, async () => { migrated = true; if (failure === 'migrations') throw Error('private migration detail'); }), failure === 'post-count' ? /verification mismatch/ : /private/);
+    await assert.rejects(restoreDatabase({ ...config, evidenceFile: failedEvidence }, run, async () => failedClient, async () => {
+      migrated = true;
+      if (failure === 'migrations') throw Error('private migration detail');
+      migrationsApplied = true;
+    }), failure === 'post-count' ? /verification mismatch/ : /private/);
     assert.equal(migrated, true, `${failure} fixture must reach the migration boundary`);
     assert.equal(existsSync(failedEvidence), false);
   }
   events.length = 0;
-  const withoutSha = await restoreDatabase({ ...config, evidenceFile: undefined, toolingSha: 'secret-not-a-sha' }, run, async () => client, async () => {});
+  migrationsApplied = false;
+  const withoutSha = await restoreDatabase({ ...config, evidenceFile: undefined, toolingSha: 'secret-not-a-sha' }, run, async () => client, async () => { migrationsApplied = true; });
   assert.equal(Object.hasOwn(withoutSha, 'toolingSha'), false);
   for (const changes of [{ reason: 'secret reason' }, { createdAt: 'secret date' }, { migrations: [{ hash: 'secret hash', created_at: '123' }] }]) {
     events.length = 0;
