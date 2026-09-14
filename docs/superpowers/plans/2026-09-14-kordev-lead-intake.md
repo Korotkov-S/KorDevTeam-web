@@ -1,102 +1,102 @@
-# KorDevTeam Durable Lead Intake Implementation Plan
+# План реализации надёжного приёма заявок KorDevTeam
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Для агентных исполнителей:** ОБЯЗАТЕЛЬНЫЙ ДОПОЛНИТЕЛЬНЫЙ НАВЫК: используйте `superpowers:subagent-driven-development` (рекомендуется) или `superpowers:executing-plans`, чтобы выполнять этот план по задачам. Для отслеживания прогресса шаги оформлены флажками (`- [ ]`).
 
-**Goal:** Add a reusable Russian lead form that durably stores an accepted request in PostgreSQL and then delivers it independently to Kusidis/Krasotula CRM and `team@korotkov.dev`, including one safely scanned private attachment.
+**Цель:** добавить переиспользуемую русскоязычную форму, которая надёжно сохраняет принятую заявку в PostgreSQL, а затем независимо доставляет её в Kusidis/Krasotula CRM и на `team@korotkov.dev`, включая одно безопасно проверенное приватное вложение.
 
-**Architecture:** The React form posts streaming multipart data to an Express router exported from the React Router server bundle. A focused TypeScript lead service validates and scans the upload, stores it in a private Timeweb S3 location, and commits the lead plus two outbox jobs atomically in PostgreSQL. One separate worker from the same immutable image claims jobs with PostgreSQL leases, applies the supplied CRM contract and SMTP policy, while a daily command removes 30-day site copies.
+**Архитектура:** React-форма потоково отправляет multipart-данные в Express-маршрутизатор, экспортируемый из серверного бандла React Router. Отдельный TypeScript-сервис заявок валидирует и проверяет загрузку, сохраняет её в приватном хранилище Timeweb S3 и атомарно записывает в PostgreSQL заявку вместе с двумя outbox-заданиями. Один отдельный worker из того же неизменяемого образа забирает задания с арендой через PostgreSQL, соблюдает предоставленный контракт CRM и правила SMTP, а ежедневная команда удаляет копии сайта через 30 дней.
 
-**Tech Stack:** Node 22.22, React 18, React Router 7.9.4, Express 5, TypeScript 5.9, PostgreSQL 16, Drizzle ORM/Kit, Busboy, Nodemailer, yauzl, AWS SDK v3, ClamAV INSTREAM, Node test runner, Testing Library, Docker Compose, systemd.
+**Технологический стек:** Node 22.22, React 18, React Router 7.9.4, Express 5, TypeScript 5.9, PostgreSQL 16, Drizzle ORM/Kit, Busboy, Nodemailer, yauzl, AWS SDK v3, ClamAV INSTREAM, встроенный запуск тестов Node, Testing Library, Docker Compose, systemd.
 
-**Spec:** `docs/superpowers/specs/2026-09-14-kordev-lead-intake-design.md`
+**Спецификация:** `docs/superpowers/specs/2026-09-14-kordev-lead-intake-design.md`
 
-## Global Constraints
+## Общие ограничения
 
-- Keep Node `22.22.0`, React `18.3.1`, React Router `7.9.4`, Vite `6.3.5`, PostgreSQL `16`, and the current light/dark visual direction.
-- The public fields are exactly required `name`, required `phone`, optional `description`, optional one `file`, and required site-only `consent`; do not add email, company, service, or budget.
-- Accept one file up to exactly `26_214_400` bytes: PDF, DOC, DOCX, XLS, XLSX, JPG/JPEG, or PNG with matching extension, declared MIME, and inspected content.
-- Keep CRM endpoint/token, SMTP credentials, private S3 credentials, ClamAV address, and HMAC key server-only.
-- A public success means the local lead, consent evidence, attachment metadata, and both outbox jobs are durable; it does not mean CRM or SMTP has already succeeded.
-- Use one stable browser UUID per unchanged browser retry and a separate immutable lead UUID as the CRM `Idempotency-Key`.
-- CRM retries reuse identical fields and file bytes, stop before its 24-hour idempotency record expires, and remain below 20 modifying requests per minute per token.
-- Store no raw client IP. Retain the site-owned lead and private object for exactly 30 days, then delete the object before the database row.
-- Use honeypot plus rate limits without CAPTCHA. Do not emit an analytics success for ignored honeypot requests.
-- Ordinary motion remains; `MotionConfig reducedMotion="user"` continues to honor `prefers-reduced-motion`.
-- Tests and deployment readiness must not contact real CRM, SMTP, or production S3 and must not insert a production smoke lead unless an operator explicitly enables it.
-- Do not push, deploy, or switch production as part of implementation without a new explicit owner request.
-
----
-
-## File structure locked by this plan
-
-Create:
-
-- `src/server/leads/contracts.ts` — constants, normalized input, public response, job, and adapter types.
-- `src/server/leads/config.ts` — fail-closed web/worker environment parsing without network activity.
-- `src/server/leads/errors.ts` — stable safe error codes and public status mapping.
-- `src/server/leads/validation.ts` — field, phone, context, fingerprint, filename, and HMAC normalization.
-- `src/server/leads/repository.ts` — PostgreSQL idempotency, rate-limit, outbox lease, and retention operations.
-- `src/server/leads/multipart.ts` — bounded Busboy parsing into mode-`0600` temporary files.
-- `src/server/leads/fileInspection.ts` — MIME/extension/signature, OOXML ZIP, and legacy CFB checks.
-- `src/server/leads/clamav.ts` — ClamAV INSTREAM adapter.
-- `src/server/leads/objectStore.ts` — private Timeweb S3 upload/materialize/delete/list adapter.
-- `src/server/leads/service.ts` — acceptance orchestration and S3 compensation.
-- `src/server/leads/http.ts` — same-origin HTTPS Express router and safe response mapping.
-- `src/server/leads/crm.ts` — supplied Kusidis Website Intake API adapter.
-- `src/server/leads/email.ts` — SMTP adapter with deterministic Message-ID.
-- `src/server/leads/retry.ts` — bounded retry classification and scheduling.
-- `src/server/leads/worker.ts` — leased outbox processing loop.
-- `src/server/leads/retention.ts` — 30-day deletion and orphan-object sweep.
-- `server/lead-worker.mjs` — production worker entrypoint importing the built server bundle.
-- `server/lead-retention.mjs` — bounded daily retention entrypoint.
-- `src/components/LeadForm.tsx` — reusable accessible browser form.
-- `tests/fixtures/leads/clean.doc` and `tests/fixtures/leads/clean.xls` — minimal non-sensitive legacy Office containers for structural inspection tests.
-- `tests/fixtures/deploy-leads.env` — fake-only values for rendering the production Compose topology in tests.
-- `deploy/systemd/kordevteam-lead-retention.service` and `deploy/systemd/kordevteam-lead-retention.timer` — daily cleanup schedule.
-- Focused tests beside each TypeScript server module plus `tests/ssr/leads.test.ts` and `tests/deploy/leads.test.mjs`.
-
-Modify:
-
-- `package.json`, `yarn.lock` — multipart, SMTP, ZIP inspection, and DOM-test dependencies and commands.
-- `src/server/db/schema.ts`, `drizzle/0001_lead_intake.sql`, `drizzle/meta/_journal.json`, `drizzle/meta/0001_snapshot.json` — lead tables, enums, indexes, and constraints.
-- `src/server/db/schema.test.ts` — cascade and constraint integration tests.
-- `src/entry.server.tsx` — export router, readiness, worker, and retention factories to the production bundle.
-- `server/api-app.js`, `server/runtime.mjs` — mount multipart before JSON parsing and use composite readiness.
-- `src/components/Contact.tsx`, `src/locales/ru.json` — embed the form and Russian state/error copy.
-- `src/routes/legal.tsx` — make the owner-review privacy draft match the actual fields and processors.
-- `tests/ssr/support/runtime.ts` — inject safe local lead test settings.
-- `Dockerfile`, `docker-compose.yml`, `deploy/docker-compose.team.yml` — writable private temp space, ClamAV, one worker, and backend-only configuration.
-- `scripts/deploy-slot.sh`, `scripts/switch-slot.sh`, `scripts/rollback-slot.sh`, `scripts/deploy-common.sh` — validate the worker image/config and keep it aligned with the active release.
-- `tests/deploy/readiness.test.mjs`, `tests/deploy/image.test.mjs`, `tests/deploy/scripts.test.mjs`, `tests/postgresCompose.test.ts` — deployment regression coverage.
-- `server/.env.example`, `server/README.md`, `deploy/README.md`, `.github/workflows/docker-build.yml` — operator configuration and verification gates.
-
-Do not modify the legacy SQLite lead path because none exists. Do not reuse `server/utils/s3.js`: it intentionally supports public media URLs and ACL fallback, while lead attachments require a separate fail-closed private policy.
+- Сохранить Node `22.22.0`, React `18.3.1`, React Router `7.9.4`, Vite `6.3.5`, PostgreSQL `16` и текущее визуальное направление со светлой и тёмной темами.
+- Публичные поля строго ограничены обязательными `name` и `phone`, необязательными `description` и одним `file`, а также обязательным только для сайта `consent`; не добавлять email, компанию, услугу или бюджет.
+- Принимать один файл размером не более `26_214_400` байт: PDF, DOC, DOCX, XLS, XLSX, JPG/JPEG или PNG с совпадающими расширением, заявленным MIME-типом и проверенным содержимым.
+- Хранить endpoint и токен CRM, учётные данные SMTP и приватного S3, адрес ClamAV и HMAC-ключ только на сервере.
+- Публичный успешный ответ означает, что локальная заявка, подтверждение согласия, метаданные вложения и оба outbox-задания надёжно записаны; он не означает, что доставка в CRM или SMTP уже завершилась.
+- Использовать один стабильный браузерный UUID для повторов неизменённой отправки и отдельный неизменяемый UUID заявки как `Idempotency-Key` CRM.
+- Повторы CRM используют идентичные поля и байты файла, прекращаются до истечения 24-часовой записи идемпотентности и не превышают 20 изменяющих запросов в минуту на токен.
+- Не сохранять исходный IP клиента. Хранить принадлежащие сайту заявку и приватный объект ровно 30 дней, после чего удалять объект до строки базы данных.
+- Использовать honeypot и ограничения частоты без CAPTCHA. Не отправлять событие успешной аналитики для проигнорированных honeypot-запросов.
+- Обычные анимации сохраняются; `MotionConfig reducedMotion="user"` продолжает учитывать `prefers-reduced-motion`.
+- Тесты и проверки готовности к релизу не должны обращаться к реальным CRM, SMTP или production S3 и не должны создавать тестовую заявку в production без явного включения оператором.
+- Не выполнять push, развёртывание или переключение production в рамках реализации без нового явного запроса владельца.
 
 ---
 
-### Task 1: Lock the lead contract, configuration, and pure validation
+## Структура файлов, зафиксированная планом
 
-**Files:**
+Создать:
 
-- Modify: `package.json`
-- Modify: `yarn.lock`
-- Create: `src/server/leads/contracts.ts`
-- Create: `src/server/leads/config.ts`
-- Create: `src/server/leads/errors.ts`
-- Create: `src/server/leads/validation.ts`
-- Test: `src/server/leads/validation.test.ts`
-- Test: `src/server/leads/config.test.ts`
+- `src/server/leads/contracts.ts` — константы и типы нормализованного ввода, публичного ответа, заданий и адаптеров.
+- `src/server/leads/config.ts` — закрытая по умолчанию проверка окружения web/worker без сетевых обращений.
+- `src/server/leads/errors.ts` — стабильные безопасные коды ошибок и сопоставление с публичными статусами.
+- `src/server/leads/validation.ts` — нормализация полей, телефона, контекста, fingerprint, имени файла и HMAC.
+- `src/server/leads/repository.ts` — операции PostgreSQL для идемпотентности, rate limit, аренды outbox-заданий и хранения.
+- `src/server/leads/multipart.ts` — ограниченный разбор Busboy в временные файлы с правами `0600`.
+- `src/server/leads/fileInspection.ts` — проверки MIME, расширения, сигнатуры, OOXML ZIP и устаревшего CFB.
+- `src/server/leads/clamav.ts` — адаптер ClamAV INSTREAM.
+- `src/server/leads/objectStore.ts` — адаптер загрузки, материализации, удаления и перечисления объектов в приватном Timeweb S3.
+- `src/server/leads/service.ts` — координация приёма и компенсационное удаление из S3.
+- `src/server/leads/http.ts` — HTTPS Express-маршрутизатор для одного origin и безопасное сопоставление ответов.
+- `src/server/leads/crm.ts` — адаптер предоставленного Kusidis Website Intake API.
+- `src/server/leads/email.ts` — SMTP-адаптер с детерминированным Message-ID.
+- `src/server/leads/retry.ts` — ограниченная классификация и расписание повторов.
+- `src/server/leads/worker.ts` — цикл обработки outbox с арендой заданий.
+- `src/server/leads/retention.ts` — удаление через 30 дней и очистка бесхозных объектов.
+- `server/lead-worker.mjs` — production-точка входа worker, импортирующая собранный серверный бандл.
+- `server/lead-retention.mjs` — ограниченная ежедневная команда хранения.
+- `src/components/LeadForm.tsx` — переиспользуемая доступная браузерная форма.
+- `tests/fixtures/leads/clean.doc` и `tests/fixtures/leads/clean.xls` — минимальные нечувствительные контейнеры старых форматов Office для тестов структуры.
+- `tests/fixtures/deploy-leads.env` — только тестовые значения для построения production-топологии Compose в тестах.
+- `deploy/systemd/kordevteam-lead-retention.service` и `deploy/systemd/kordevteam-lead-retention.timer` — ежедневное расписание очистки.
+- Сфокусированные тесты рядом с каждым серверным TypeScript-модулем, а также `tests/ssr/leads.test.ts` и `tests/deploy/leads.test.mjs`.
 
-**Interfaces:**
+Изменить:
 
-- Produces: `MAX_FILE_BYTES = 26_214_400`, `MAX_DESCRIPTION_LENGTH = 10_000`, `CONSENT_FIELD_VALUE = "accepted"`.
-- Produces: `normalizeLeadFields(raw: RawLeadFields): NormalizedLeadFields`.
-- Produces: `normalizeLeadContext(raw: RawLeadContext): LeadContext`.
-- Produces: `requestFingerprint(input: FingerprintInput): string` and `subjectHash(secret: string, kind: "ip" | "phone" | "crm_token", value: string): string`.
-- Produces: `readLeadWebConfig(env): LeadWebConfig`, `assertLeadWebConfig(env): void`, and `readLeadWorkerConfig(env): LeadWorkerConfig`.
-- Produces: `LeadError` with a fixed `code`, HTTP `status`, optional bounded `retryAfterSeconds`, and no arbitrary public message.
+- `package.json`, `yarn.lock` — зависимости и команды для multipart, SMTP, проверки ZIP и DOM-тестов.
+- `src/server/db/schema.ts`, `drizzle/0001_lead_intake.sql`, `drizzle/meta/_journal.json`, `drizzle/meta/0001_snapshot.json` — таблицы заявок, enum, индексы и ограничения.
+- `src/server/db/schema.test.ts` — интеграционные тесты каскадов и ограничений.
+- `src/entry.server.tsx` — экспорт фабрик маршрутизатора, readiness, worker и retention в production-бандл.
+- `server/api-app.js`, `server/runtime.mjs` — подключение multipart до разбора JSON и составная проверка готовности.
+- `src/components/Contact.tsx`, `src/locales/ru.json` — встраивание формы и русский текст состояний/ошибок.
+- `src/routes/legal.tsx` — приведение черновика политики к фактическим полям и обработчикам с последующей проверкой владельцем.
+- `tests/ssr/support/runtime.ts` — безопасные локальные тестовые настройки заявок.
+- `Dockerfile`, `docker-compose.yml`, `deploy/docker-compose.team.yml` — доступное для записи приватное временное пространство, ClamAV, один worker и конфигурация только для backend.
+- `scripts/deploy-slot.sh`, `scripts/switch-slot.sh`, `scripts/rollback-slot.sh`, `scripts/deploy-common.sh` — проверка образа/конфигурации worker и синхронизация с активным релизом.
+- `tests/deploy/readiness.test.mjs`, `tests/deploy/image.test.mjs`, `tests/deploy/scripts.test.mjs`, `tests/postgresCompose.test.ts` — регрессионное покрытие развёртывания.
+- `server/.env.example`, `server/README.md`, `deploy/README.md`, `.github/workflows/docker-build.yml` — конфигурация оператора и проверочные барьеры.
 
-- [ ] **Step 1: Write failing contract and validation tests**
+Не изменять старый SQLite-путь заявок, потому что его нет. Не переиспользовать `server/utils/s3.js`: он намеренно поддерживает публичные URL медиа и fallback для ACL, тогда как вложения заявок требуют отдельной закрытой по умолчанию приватной политики.
+
+---
+
+### Задача 1: Зафиксировать контракт заявки, конфигурацию и чистую валидацию
+
+**Файлы:**
+
+- Изменить: `package.json`
+- Изменить: `yarn.lock`
+- Создать: `src/server/leads/contracts.ts`
+- Создать: `src/server/leads/config.ts`
+- Создать: `src/server/leads/errors.ts`
+- Создать: `src/server/leads/validation.ts`
+- Тест: `src/server/leads/validation.test.ts`
+- Тест: `src/server/leads/config.test.ts`
+
+**Интерфейсы:**
+
+- Создаёт: `MAX_FILE_BYTES = 26_214_400`, `MAX_DESCRIPTION_LENGTH = 10_000`, `CONSENT_FIELD_VALUE = "accepted"`.
+- Создаёт: `normalizeLeadFields(raw: RawLeadFields): NormalizedLeadFields`.
+- Создаёт: `normalizeLeadContext(raw: RawLeadContext): LeadContext`.
+- Создаёт: `requestFingerprint(input: FingerprintInput): string` и `subjectHash(secret: string, kind: "ip" | "phone" | "crm_token", value: string): string`.
+- Создаёт: `readLeadWebConfig(env): LeadWebConfig`, `assertLeadWebConfig(env): void` и `readLeadWorkerConfig(env): LeadWorkerConfig`.
+- Создаёт: `LeadError` с фиксированными `code`, HTTP-статусом, необязательным ограниченным `retryAfterSeconds` и без произвольного публичного сообщения.
+
+- [ ] **Шаг 1: Написать падающие тесты контракта и валидации**
 
 ```ts
 test("normalizes the exact approved fields", () => {
@@ -121,24 +121,24 @@ test("fingerprints are canonical and HMAC domains are separated", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and confirm imports fail**
+- [ ] **Шаг 2: Запустить тесты и подтвердить падение импортов**
 
-Run: `yarn tsx --test src/server/leads/validation.test.ts src/server/leads/config.test.ts`
+Команда: `yarn tsx --test src/server/leads/validation.test.ts src/server/leads/config.test.ts`
 
-Expected: FAIL because the lead modules do not exist.
+Ожидается: FAIL, потому что модули заявок ещё не существуют.
 
-- [ ] **Step 3: Install the locked runtime and test dependencies**
+- [ ] **Шаг 3: Установить зафиксированные runtime- и тестовые зависимости**
 
-Run:
+Команды:
 
 ```bash
 yarn add busboy nodemailer yauzl
 yarn add --dev @types/busboy @types/nodemailer @types/yauzl @testing-library/dom @testing-library/react @testing-library/user-event @types/jsdom jsdom
 ```
 
-Keep the versions resolved by Yarn in `yarn.lock`; do not change the existing Node, React, router, Vite, PostgreSQL, or Drizzle pins.
+Сохранить разрешённые Yarn версии в `yarn.lock`; не менять текущие зафиксированные версии Node, React, router, Vite, PostgreSQL и Drizzle.
 
-- [ ] **Step 4: Define exact types, errors, and normalization**
+- [ ] **Шаг 4: Определить точные типы, ошибки и нормализацию**
 
 ```ts
 export const MAX_FILE_BYTES = 26_214_400;
@@ -169,11 +169,11 @@ export type StoredLead = { id: string; submissionKey: string; requestFingerprint
 export type ClaimedJob = { id: string; leadId: string; channel: "crm" | "email"; attemptCount: number; acceptedAt: Date; leaseExpiresAt: Date; lead: NormalizedLeadFields & { pagePath: string; referrer: string | null }; attachment: null | { objectKey: string; originalName: string; mediaType: AllowedMediaType; sha256: string } };
 ```
 
-Allow only `name`, `phone`, `description`, `consent`, `website`, `pagePath`, `referrer`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, and `utmTerm`. Trim text, normalize CRLF to LF, cap context values at 500 characters, accept only an absolute-path `pagePath`, and reduce referrer to origin plus path. Count Unicode code points for name/description and ASCII digits for the CRM phone rule.
+Разрешить только `name`, `phone`, `description`, `consent`, `website`, `pagePath`, `referrer`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent` и `utmTerm`. Обрезать пробелы, нормализовать CRLF в LF, ограничить значения контекста 500 символами, принимать только абсолютный путь в `pagePath`, а referrer сокращать до origin и пути. Для name/description считать кодовые точки Unicode, а для телефонного правила CRM — цифры ASCII.
 
-Use SHA-256 over canonical sorted JSON for the request fingerprint and HMAC-SHA-256 with domain prefixes for rate-limit subjects. Compare fingerprints with `timingSafeEqual` after confirming equal byte length.
+Для fingerprint запроса использовать SHA-256 от канонического отсортированного JSON, а для субъектов rate limit — HMAC-SHA-256 с префиксами доменов. Сравнивать fingerprint через `timingSafeEqual` после проверки равной длины в байтах.
 
-- [ ] **Step 5: Parse configuration without exposing values**
+- [ ] **Шаг 5: Разбирать конфигурацию без раскрытия значений**
 
 ```ts
 export type LeadWebConfig = {
@@ -200,15 +200,15 @@ export type LeadWorkerConfig = LeadWebConfig & {
 };
 ```
 
-Production requires non-empty `LEAD_CONSENT_VERSION`, base64 `LEAD_HASH_KEY` decoding to at least 32 bytes, all `LEAD_S3_*` values, `CLAMAV_HOST`, `CLAMAV_PORT`, HTTPS `CRM_INTAKE_ENDPOINT` ending in `/api/v1/board-intake/{publicId}/requests`, `CRM_INTAKE_TOKEN`, all `SMTP_*` values, and `LEAD_EMAIL_TO=team@korotkov.dev`. Development/test factories receive explicit safe values; never embed production-looking fallback secrets.
+Production требует непустой `LEAD_CONSENT_VERSION`, base64-значение `LEAD_HASH_KEY`, декодируемое минимум в 32 байта, все значения `LEAD_S3_*`, `CLAMAV_HOST`, `CLAMAV_PORT`, HTTPS-адрес `CRM_INTAKE_ENDPOINT`, заканчивающийся на `/api/v1/board-intake/{publicId}/requests`, `CRM_INTAKE_TOKEN`, все значения `SMTP_*` и `LEAD_EMAIL_TO=team@korotkov.dev`. Фабрики разработки и тестов получают явные безопасные значения; не встраивать fallback-секреты, похожие на production.
 
-- [ ] **Step 6: Pass focused tests and typecheck**
+- [ ] **Шаг 6: Обеспечить прохождение сфокусированных тестов и typecheck**
 
-Run: `yarn tsx --test src/server/leads/validation.test.ts src/server/leads/config.test.ts && yarn typecheck`
+Команда: `yarn tsx --test src/server/leads/validation.test.ts src/server/leads/config.test.ts && yarn typecheck`
 
-Expected: all focused tests PASS and typecheck exits `0`.
+Ожидается: все сфокусированные тесты проходят, typecheck завершается с кодом `0`.
 
-- [ ] **Step 7: Commit the contract slice**
+- [ ] **Шаг 7: Зафиксировать срез контракта коммитом**
 
 ```bash
 git add package.json yarn.lock src/server/leads/contracts.ts src/server/leads/config.ts src/server/leads/errors.ts src/server/leads/validation.ts src/server/leads/validation.test.ts src/server/leads/config.test.ts
@@ -217,23 +217,23 @@ git commit -m "feat(leads): define intake contract and configuration"
 
 ---
 
-### Task 2: Add the PostgreSQL lead, attachment, outbox, and rate-limit schema
+### Задача 2: Добавить PostgreSQL-схему заявок, вложений, outbox и rate limit
 
-**Files:**
+**Файлы:**
 
-- Modify: `src/server/db/schema.ts`
-- Modify: `src/server/db/schema.test.ts`
-- Create: `drizzle/0001_lead_intake.sql`
-- Modify: `drizzle/meta/_journal.json`
-- Create: `drizzle/meta/0001_snapshot.json`
+- Изменить: `src/server/db/schema.ts`
+- Изменить: `src/server/db/schema.test.ts`
+- Создать: `drizzle/0001_lead_intake.sql`
+- Изменить: `drizzle/meta/_journal.json`
+- Создать: `drizzle/meta/0001_snapshot.json`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Produces: Drizzle exports `leads`, `leadAttachments`, `leadDeliveryJobs`, and `leadRateLimits`.
-- Produces: enums `leadDeliveryChannel`, `leadDeliveryStatus`, and `leadRateLimitKind`.
-- Preserves: existing content/admin tables and `resetTestDatabase()` behavior.
+- Создаёт: экспорты Drizzle `leads`, `leadAttachments`, `leadDeliveryJobs` и `leadRateLimits`.
+- Создаёт: enum `leadDeliveryChannel`, `leadDeliveryStatus` и `leadRateLimitKind`.
+- Сохраняет: существующие таблицы контента/администраторов и поведение `resetTestDatabase()`.
 
-- [ ] **Step 1: Add a failing schema integration test**
+- [ ] **Шаг 1: Добавить падающий интеграционный тест схемы**
 
 ```ts
 databaseTest("lead deletion cascades its attachment and two channel jobs", async () => {
@@ -251,15 +251,15 @@ databaseTest("lead deletion cascades its attachment and two channel jobs", async
 });
 ```
 
-Also test duplicate `submission_key`, duplicate `(lead_id, channel)`, more than one attachment, and negative attempt/count values.
+Также проверить дублирование `submission_key`, дублирование `(lead_id, channel)`, более одного вложения и отрицательные значения попыток/счётчиков.
 
-- [ ] **Step 2: Run the schema test and confirm missing exports**
+- [ ] **Шаг 2: Запустить тест схемы и подтвердить отсутствие экспортов**
 
-Run: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/db/schema.test.ts`
+Команда: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/db/schema.test.ts`
 
-Expected: FAIL because the four lead tables are not defined.
+Ожидается: FAIL, потому что четыре таблицы заявок ещё не определены.
 
-- [ ] **Step 3: Add constrained Drizzle tables**
+- [ ] **Шаг 3: Добавить таблицы Drizzle с ограничениями**
 
 ```ts
 export const leadDeliveryChannel = pgEnum("lead_delivery_channel", ["crm", "email"]);
@@ -291,17 +291,17 @@ export const leads = pgTable("leads", {
 ]);
 ```
 
-Define the remaining tables exactly from the design: attachment key/checksum/scan fields, one unique attachment per lead, one unique job per lead/channel, lease fields, bounded JSON metadata, and rate bucket composite primary key `(kind, subject_hash, window_started_at)`. Add database checks for 64-character lowercase hex hashes, positive attachment size no greater than `26_214_400`, non-negative counters, and `expires_at > accepted_at`.
+Остальные таблицы определить строго по спецификации: поля ключа, checksum и проверки вложения; одно уникальное вложение на заявку; одно уникальное задание на пару заявка/канал; поля аренды; ограниченные JSON-метаданные; составной первичный ключ rate bucket `(kind, subject_hash, window_started_at)`. Добавить ограничения БД для 64-символьных hex-хешей в нижнем регистре, положительного размера вложения не более `26_214_400`, неотрицательных счётчиков и условия `expires_at > accepted_at`.
 
-- [ ] **Step 4: Generate and inspect the versioned migration**
+- [ ] **Шаг 4: Создать и проверить версионированную миграцию**
 
-Run: `yarn db:generate --name lead_intake && yarn db:check`
+Команда: `yarn db:generate --name lead_intake && yarn db:check`
 
-Expected: Drizzle writes `drizzle/0001_lead_intake.sql` plus its snapshot/journal entry, and `db:check` exits `0`. Inspect the SQL to confirm it only creates the three enums, four tables, their foreign keys, indexes, and checks; it must not drop or rewrite content tables.
+Ожидается: Drizzle создаёт `drizzle/0001_lead_intake.sql`, snapshot и запись журнала, а `db:check` завершается с кодом `0`. Проверить SQL: он должен только создавать три enum, четыре таблицы, их внешние ключи, индексы и ограничения, не удаляя и не переписывая таблицы контента.
 
-- [ ] **Step 5: Apply twice and pass schema tests**
+- [ ] **Шаг 5: Дважды применить миграции и обеспечить прохождение тестов схемы**
 
-Run:
+Команды:
 
 ```bash
 docker compose up -d postgres
@@ -310,9 +310,9 @@ DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev yarn db:migrate
 TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/db/schema.test.ts
 ```
 
-Expected: both migration commands exit `0`; every schema test passes.
+Ожидается: обе команды миграции завершаются с кодом `0`, все тесты схемы проходят.
 
-- [ ] **Step 6: Commit the schema slice**
+- [ ] **Шаг 6: Зафиксировать срез схемы коммитом**
 
 ```bash
 git add src/server/db/schema.ts src/server/db/schema.test.ts drizzle/0001_lead_intake.sql drizzle/meta/_journal.json drizzle/meta/0001_snapshot.json
@@ -321,23 +321,23 @@ git commit -m "feat(leads): add durable intake schema"
 
 ---
 
-### Task 3: Implement transactional idempotency, rate limits, leases, and repository reads
+### Задача 3: Реализовать транзакционную идемпотентность, rate limit, аренду и чтение репозитория
 
-**Files:**
+**Файлы:**
 
-- Create: `src/server/leads/repository.ts`
-- Test: `src/server/leads/repository.test.ts`
+- Создать: `src/server/leads/repository.ts`
+- Тест: `src/server/leads/repository.test.ts`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: Task 1 normalized types and Task 2 tables.
-- Produces: `createLeadRepository(db, clock): LeadRepository`.
-- Produces: `findBySubmissionKey(submissionKey): Promise<StoredLead | null>` for cheap replay checks before scanning/upload.
-- Produces: `consumeIpAttempt(ipHash): Promise<RateDecision>` and `accept(command): Promise<AcceptDecision>`.
-- Produces: `claimDueJobs(ownerId, limit, leaseMs): Promise<ClaimedJob[]>`, `markDelivered`, `reschedule`, `markTerminal`, and `markManualAction`.
-- Produces: `reserveCrmTokenAttempt(tokenHash): Promise<RateDecision>`, `findExpiredLeads(limit)`, `attachmentKeyExists(key)`, and `deleteLeadAfterObject(id)`.
+- Использует: нормализованные типы задачи 1 и таблицы задачи 2.
+- Создаёт: `createLeadRepository(db, clock): LeadRepository`.
+- Создаёт: `findBySubmissionKey(submissionKey): Promise<StoredLead | null>` для дешёвой проверки повтора до сканирования/загрузки.
+- Создаёт: `consumeIpAttempt(ipHash): Promise<RateDecision>` и `accept(command): Promise<AcceptDecision>`.
+- Создаёт: `claimDueJobs(ownerId, limit, leaseMs): Promise<ClaimedJob[]>`, `markDelivered`, `reschedule`, `markTerminal` и `markManualAction`.
+- Создаёт: `reserveCrmTokenAttempt(tokenHash): Promise<RateDecision>`, `findExpiredLeads(limit)`, `attachmentKeyExists(key)` и `deleteLeadAfterObject(id)`.
 
-- [ ] **Step 1: Write failing concurrency and atomicity tests**
+- [ ] **Шаг 1: Написать падающие тесты конкурентности и атомарности**
 
 ```ts
 databaseTest("concurrent identical accepts create one lead and two jobs", async () => {
@@ -351,15 +351,15 @@ databaseTest("concurrent identical accepts create one lead and two jobs", async 
 });
 ```
 
-Add cases for same submission key/different fingerprint returning `conflict`, no partial row after an injected transaction error, the sixth IP attempt returning a bounded retry time, the fourth new phone lead in one hour being rejected, the twenty-first CRM reservation in a minute being delayed, and expired leases being reclaimed by only one concurrent worker.
+Добавить случаи: одинаковый ключ отправки с другим fingerprint возвращает `conflict`; после внедрённой транзакционной ошибки не остаётся частичных строк; шестая попытка с одного IP получает ограниченное время повтора; четвёртая новая заявка с телефона за час отклоняется; двадцать первое резервирование CRM за минуту откладывается; просроченную аренду возвращает в работу только один конкурентный worker.
 
-- [ ] **Step 2: Run the repository test and confirm it fails**
+- [ ] **Шаг 2: Запустить тест репозитория и подтвердить падение**
 
-Run: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/leads/repository.test.ts`
+Команда: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/leads/repository.test.ts`
 
-Expected: FAIL because `createLeadRepository` is missing.
+Ожидается: FAIL, потому что `createLeadRepository` отсутствует.
 
-- [ ] **Step 3: Implement serialized acceptance**
+- [ ] **Шаг 3: Реализовать сериализованный приём**
 
 ```ts
 export type AcceptDecision =
@@ -373,11 +373,11 @@ async function lockSubmission(tx: Transaction, submissionKey: string) {
 }
 ```
 
-Inside one transaction: lock the submission key, load an existing lead, compare its fingerprint with constant-time comparison, return its stored response for a replay, consume the phone bucket only for a genuinely new lead, then insert the lead, optional attachment metadata, and exactly two jobs. Set `expiresAt` from `acceptedAt + 30 * 24 * 60 * 60 * 1000` using the injected clock.
+В одной транзакции: заблокировать ключ отправки, загрузить существующую заявку, сравнить fingerprint за постоянное время, вернуть сохранённый ответ для повтора, учитывать phone bucket только для действительно новой заявки, затем вставить заявку, необязательные метаданные вложения и ровно два задания. Рассчитать `expiresAt` как `acceptedAt + 30 * 24 * 60 * 60 * 1000` через внедрённые часы.
 
-- [ ] **Step 4: Implement rate buckets and job leasing**
+- [ ] **Шаг 4: Реализовать rate bucket и аренду заданий**
 
-Use one atomic `INSERT ... ON CONFLICT ... DO UPDATE ... WHERE count < limit RETURNING count` per bucket. IP uses 5 attempts/30 minutes, phone uses 3 accepted leads/60 minutes, and CRM token uses 20 sends/60 seconds. Derive `retryAfterSeconds` from the exact persisted window end and cap the public value at the remaining window.
+Для каждого bucket использовать один атомарный `INSERT ... ON CONFLICT ... DO UPDATE ... WHERE count < limit RETURNING count`. IP допускает 5 попыток за 30 минут, телефон — 3 принятые заявки за 60 минут, токен CRM — 20 отправок за 60 секунд. Вычислять `retryAfterSeconds` из точного сохранённого конца окна и ограничивать публичное значение оставшимся временем окна.
 
 ```ts
 const result = await tx.execute(sql`
@@ -390,15 +390,15 @@ const result = await tx.execute(sql`
 `);
 ```
 
-Claim due jobs in a transaction with `FOR UPDATE SKIP LOCKED`, change them to `processing`, increment `attempt_count`, and set a two-minute lease. Return joined immutable lead and attachment metadata, never a secret. Reclaim only `processing` jobs whose lease has expired.
+Забирать готовые задания в транзакции через `FOR UPDATE SKIP LOCKED`, переводить их в `processing`, увеличивать `attempt_count` и устанавливать двухминутную аренду. Возвращать связанные неизменяемые данные заявки и метаданные вложения, но никогда не секрет. Повторно забирать только задания `processing` с истёкшей арендой.
 
-- [ ] **Step 5: Pass repository integration tests**
+- [ ] **Шаг 5: Обеспечить прохождение интеграционных тестов репозитория**
 
-Run: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/leads/repository.test.ts`
+Команда: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/leads/repository.test.ts`
 
-Expected: every concurrency, rate, transaction, and lease test passes without duplicate rows.
+Ожидается: все тесты конкурентности, ограничений, транзакций и аренды проходят без дублирования строк.
 
-- [ ] **Step 6: Commit the repository slice**
+- [ ] **Шаг 6: Зафиксировать срез репозитория коммитом**
 
 ```bash
 git add src/server/leads/repository.ts src/server/leads/repository.test.ts
@@ -407,27 +407,27 @@ git commit -m "feat(leads): persist idempotent outbox submissions"
 
 ---
 
-### Task 4: Stream multipart uploads and inspect every allowed file format
+### Задача 4: Потоково принимать multipart и проверять каждый разрешённый формат файла
 
-**Files:**
+**Файлы:**
 
-- Create: `src/server/leads/multipart.ts`
-- Create: `src/server/leads/fileInspection.ts`
-- Test: `src/server/leads/multipart.test.ts`
-- Test: `src/server/leads/fileInspection.test.ts`
-- Create: `tests/fixtures/leads/clean.doc`
-- Create: `tests/fixtures/leads/clean.xls`
+- Создать: `src/server/leads/multipart.ts`
+- Создать: `src/server/leads/fileInspection.ts`
+- Тест: `src/server/leads/multipart.test.ts`
+- Тест: `src/server/leads/fileInspection.test.ts`
+- Создать: `tests/fixtures/leads/clean.doc`
+- Создать: `tests/fixtures/leads/clean.xls`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: `MAX_FILE_BYTES`, `MAX_MULTIPART_BYTES`, allowed fields, and `LeadError`.
-- Produces: `parseLeadMultipart(request, tempRoot): Promise<ParsedLeadMultipart>`.
-- Produces: `inspectAttachment(staged): Promise<VerifiedAttachment>`.
-- Produces: `ParsedLeadMultipart.dispose(): Promise<void>` that is safe to call more than once.
+- Использует: `MAX_FILE_BYTES`, `MAX_MULTIPART_BYTES`, разрешённые поля и `LeadError`.
+- Создаёт: `parseLeadMultipart(request, tempRoot): Promise<ParsedLeadMultipart>`.
+- Создаёт: `inspectAttachment(staged): Promise<VerifiedAttachment>`.
+- Создаёт: `ParsedLeadMultipart.dispose(): Promise<void>`, который безопасно вызывать многократно.
 
-- [ ] **Step 1: Write failing parser and content-inspection tests**
+- [ ] **Шаг 1: Написать падающие тесты парсера и проверки содержимого**
 
-Create deterministic fixture builders for minimal PDF, JPEG, PNG, DOCX, and XLSX files and checked-in small legacy DOC/XLS fixtures. Test exact maximum size, one byte over maximum, an empty file, two files, unknown fields, a renamed PNG declared as PDF, a ZIP without `word/document.xml`, a DOC without `WordDocument`, an XLS without `Workbook`/`Book`, an encrypted ZIP flag, and parser abort cleanup.
+Создать детерминированные генераторы минимальных PDF, JPEG, PNG, DOCX и XLSX, а также небольшие сохранённые fixtures старых DOC/XLS. Проверить точный максимальный размер, превышение на один байт, пустой файл, два файла, неизвестные поля, переименованный PNG с MIME PDF, ZIP без `word/document.xml`, DOC без `WordDocument`, XLS без `Workbook`/`Book`, флаг шифрования ZIP и очистку после прерывания парсера.
 
 ```ts
 test("streams one attachment to a private temporary file", async (t) => {
@@ -439,15 +439,15 @@ test("streams one attachment to a private temporary file", async (t) => {
 });
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm missing modules**
+- [ ] **Шаг 2: Запустить сфокусированные тесты и подтвердить отсутствие модулей**
 
-Run: `yarn tsx --test src/server/leads/multipart.test.ts src/server/leads/fileInspection.test.ts`
+Команда: `yarn tsx --test src/server/leads/multipart.test.ts src/server/leads/fileInspection.test.ts`
 
-Expected: FAIL because both modules are missing.
+Ожидается: FAIL, потому что оба модуля отсутствуют.
 
-- [ ] **Step 3: Implement bounded Busboy streaming**
+- [ ] **Шаг 3: Реализовать ограниченную потоковую обработку Busboy**
 
-Reject non-multipart requests and `Content-Length > MAX_MULTIPART_BYTES` before reading. Count every incoming request byte as it streams so chunked/missing/false `Content-Length` cannot exceed the same total. Configure Busboy with one file, 12 fields, 500-byte context limits, exact name/phone/description limits, and `fileSize: MAX_FILE_BYTES`. Stream the file through a SHA-256 transform into a random mode-`0600` file under `LEAD_TEMP_ROOT`; never use the user filename as a path. Abort on truncation or any parser limit and unlink every staged file in `dispose()`/error paths.
+До чтения отклонять запросы не в формате multipart и запросы с `Content-Length > MAX_MULTIPART_BYTES`. Считать каждый входящий байт потока, чтобы chunked-запросы или отсутствующий/ложный `Content-Length` не могли превысить общий лимит. Настроить Busboy на один файл, 12 полей, 500-байтовые лимиты контекста, точные лимиты name/phone/description и `fileSize: MAX_FILE_BYTES`. Потоково пропускать файл через SHA-256 transform в случайный файл с правами `0600` внутри `LEAD_TEMP_ROOT`; никогда не использовать имя пользователя как путь. При обрыве или любом лимите парсера прекращать обработку и удалять каждый временный файл в `dispose()` и путях ошибок.
 
 ```ts
 const parser = busboy({
@@ -458,7 +458,7 @@ const objectName = `${randomUUID()}.upload`;
 const output = createWriteStream(resolveInside(tempRoot, objectName), { flags: "wx", mode: 0o600 });
 ```
 
-- [ ] **Step 4: Implement fail-closed content inspection**
+- [ ] **Шаг 4: Реализовать закрытую по умолчанию проверку содержимого**
 
 ```ts
 export type VerifiedAttachment = StagedAttachment & {
@@ -474,15 +474,15 @@ export async function inspectAttachment(staged: StagedAttachment): Promise<Verif
 }
 ```
 
-Check `%PDF-` at byte zero and `%%EOF` near the end, PNG's eight-byte signature plus terminal `IEND`, JPEG SOI/EOI markers, and reject trailing second-format signatures. Open OOXML with yauzl in lazy mode, reject encrypted entries/path traversal/duplicate critical entries, cap entry count and total uncompressed size, and require `[Content_Types].xml` plus `word/document.xml` for DOCX or `xl/workbook.xml` for XLSX. Parse the CFB header, sector sizes, FAT/DIFAT chains, and directory entries with bounded reads; require `WordDocument` for DOC and `Workbook` or `Book` for XLS. Reject loops, out-of-range sectors, malformed containers, and mismatched expected streams.
+Проверять `%PDF-` с нулевого байта и `%%EOF` рядом с концом, восьмибайтовую сигнатуру PNG и завершающий `IEND`, маркеры SOI/EOI JPEG; отклонять сигнатуры второго формата после конца. Открывать OOXML через yauzl в lazy-режиме, отклонять зашифрованные записи, обход пути и дубли критических записей, ограничивать число записей и общий распакованный размер, требовать `[Content_Types].xml` вместе с `word/document.xml` для DOCX или `xl/workbook.xml` для XLSX. Ограниченно читать заголовок CFB, размеры секторов, цепочки FAT/DIFAT и записи каталогов; требовать `WordDocument` для DOC и `Workbook` или `Book` для XLS. Отклонять циклы, выходящие за диапазон сектора, повреждённые контейнеры и несовпадающие ожидаемые потоки.
 
-- [ ] **Step 5: Pass file tests and verify no temp residue**
+- [ ] **Шаг 5: Обеспечить прохождение файловых тестов и отсутствие временных остатков**
 
-Run: `yarn tsx --test src/server/leads/multipart.test.ts src/server/leads/fileInspection.test.ts`
+Команда: `yarn tsx --test src/server/leads/multipart.test.ts src/server/leads/fileInspection.test.ts`
 
-Expected: all format and cleanup tests pass; each test's temporary directory is empty after `dispose()`.
+Ожидается: все тесты форматов и очистки проходят; временный каталог каждого теста пуст после `dispose()`.
 
-- [ ] **Step 6: Commit the upload-safety slice**
+- [ ] **Шаг 6: Зафиксировать срез безопасности загрузок коммитом**
 
 ```bash
 git add src/server/leads/multipart.ts src/server/leads/fileInspection.ts src/server/leads/multipart.test.ts src/server/leads/fileInspection.test.ts
@@ -491,27 +491,27 @@ git commit -m "feat(leads): validate streamed attachments"
 
 ---
 
-### Task 5: Add private S3, ClamAV, and durable acceptance orchestration
+### Задача 5: Добавить приватный S3, ClamAV и надёжную координацию приёма
 
-**Files:**
+**Файлы:**
 
-- Create: `src/server/leads/clamav.ts`
-- Create: `src/server/leads/objectStore.ts`
-- Create: `src/server/leads/service.ts`
-- Test: `src/server/leads/clamav.test.ts`
-- Test: `src/server/leads/objectStore.test.ts`
-- Test: `src/server/leads/service.test.ts`
+- Создать: `src/server/leads/clamav.ts`
+- Создать: `src/server/leads/objectStore.ts`
+- Создать: `src/server/leads/service.ts`
+- Тест: `src/server/leads/clamav.test.ts`
+- Тест: `src/server/leads/objectStore.test.ts`
+- Тест: `src/server/leads/service.test.ts`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: Tasks 1–4 types and `LeadRepository`.
-- Produces: `ClamAvScanner.scan(path): Promise<CleanScan>`.
-- Produces: `PrivateAttachmentStore.putFile`, `materialize`, `delete`, and `listOlderThan`.
-- Produces: `createLeadService(dependencies).accept(input): Promise<ServiceDecision>`.
+- Использует: типы задач 1–4 и `LeadRepository`.
+- Создаёт: `ClamAvScanner.scan(path): Promise<CleanScan>`.
+- Создаёт: `PrivateAttachmentStore.putFile`, `materialize`, `delete` и `listOlderThan`.
+- Создаёт: `createLeadService(dependencies).accept(input): Promise<ServiceDecision>`.
 
-- [ ] **Step 1: Write failing adapter and service-order tests**
+- [ ] **Шаг 1: Написать падающие тесты адаптеров и порядка работы сервиса**
 
-Use a local TCP fake that records the ClamAV `zINSTREAM\0` command, length-prefixed chunks, and zero terminator. Use an injected fake `S3Client` to assert `PutObjectCommand` has no public ACL, uses the configured private bucket/prefix, streams a file body, and supplies configured server-side encryption. Service tests must prove: replay skips scan/upload; malware/unavailable scanner creates no lead; clean file scans before upload; database failure deletes the uploaded object; a racing replay deletes its redundant object; and a durable no-file lead creates both jobs without calling S3 or ClamAV.
+Использовать локальную TCP-заглушку, которая записывает команду ClamAV `zINSTREAM\0`, блоки с префиксом длины и нулевой терминатор. Через внедрённый fake `S3Client` подтвердить, что `PutObjectCommand` не содержит публичного ACL, использует настроенные приватные bucket/prefix, потоково передаёт тело файла и указывает настроенное серверное шифрование. Тесты сервиса должны доказать: повтор пропускает сканирование/загрузку; вредоносный файл или недоступный scanner не создаёт заявку; чистый файл сканируется до загрузки; ошибка БД удаляет загруженный объект; конкурентный повтор удаляет лишний объект; надёжная заявка без файла создаёт оба задания без вызова S3 или ClamAV.
 
 ```ts
 test("compensates the private object when persistence fails", async () => {
@@ -528,15 +528,15 @@ test("a stored replay performs no external file work", async () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and confirm missing adapters**
+- [ ] **Шаг 2: Запустить тесты и подтвердить отсутствие адаптеров**
 
-Run: `yarn tsx --test src/server/leads/clamav.test.ts src/server/leads/objectStore.test.ts src/server/leads/service.test.ts`
+Команда: `yarn tsx --test src/server/leads/clamav.test.ts src/server/leads/objectStore.test.ts src/server/leads/service.test.ts`
 
-Expected: FAIL because the scanner, store, and service do not exist.
+Ожидается: FAIL, потому что scanner, хранилище и сервис не существуют.
 
-- [ ] **Step 3: Implement the ClamAV INSTREAM adapter**
+- [ ] **Шаг 3: Реализовать адаптер ClamAV INSTREAM**
 
-Open a TCP connection to configured host/port, write `zINSTREAM\0`, then stream the complete file in chunks prefixed by four-byte big-endian lengths and finish with four zero bytes. Apply one end-to-end timeout. Map only `stream: OK` to clean, `FOUND` to `unsafe_file`, and connection/timeout/malformed/size errors to `scan_unavailable`; include the engine signature in private scan metadata but not public errors.
+Открыть TCP-соединение с настроенными host/port, записать `zINSTREAM\0`, затем потоково передать весь файл блоками с четырёхбайтовым big-endian префиксом длины и завершить четырьмя нулевыми байтами. Применить единый сквозной timeout. Только `stream: OK` считать чистым результатом, `FOUND` сопоставлять с `unsafe_file`, а ошибки соединения, timeout, формата или размера — с `scan_unavailable`; сигнатуру движка включать в приватные метаданные проверки, но не в публичные ошибки.
 
 ```ts
 socket.write(Buffer.from("zINSTREAM\0"));
@@ -549,7 +549,7 @@ for await (const chunk of createReadStream(path)) {
 socket.end(Buffer.alloc(4));
 ```
 
-- [ ] **Step 4: Implement the private S3 adapter**
+- [ ] **Шаг 4: Реализовать адаптер приватного S3**
 
 ```ts
 export interface PrivateAttachmentStore {
@@ -560,9 +560,9 @@ export interface PrivateAttachmentStore {
 }
 ```
 
-Use a separate `S3Client` configured only from `LEAD_S3_*`. Put `createReadStream(path)` with `CacheControl: private, no-store`, configured SSE, and no public URL/ACL fallback. Materialization streams `GetObjectCommand.Body` into a mode-`0600` temp file and cleans partial files. Treat a confirmed `NoSuchKey` as already deleted only in retention; propagate it during delivery.
+Использовать отдельный `S3Client`, настроенный только через `LEAD_S3_*`. Передавать `createReadStream(path)` с `CacheControl: private, no-store`, настроенным SSE и без fallback на публичный URL/ACL. При материализации потоково записывать `GetObjectCommand.Body` во временный файл с правами `0600` и удалять частичные файлы. Подтверждённый `NoSuchKey` считать уже удалённым только в retention; при доставке пробрасывать эту ошибку.
 
-- [ ] **Step 5: Implement acceptance in the required order**
+- [ ] **Шаг 5: Реализовать приём в требуемом порядке**
 
 ```ts
 export type ServiceDecision =
@@ -572,17 +572,17 @@ export type ServiceDecision =
   | { kind: "rate_limited"; retryAfterSeconds: number };
 ```
 
-Return `ignored` immediately after bounded parsing when the honeypot is non-empty. Normalize fields/context, HMAC the request IP, consume the IP attempt, load an existing submission to resolve its stored consent version, compute the fingerprint, and return replay/conflict before expensive work. For a new attachment: inspect, scan, create a random key under `LEAD_S3_PREFIX`, upload, then call `repository.accept`. Delete the just-uploaded object on transaction failure, conflict, rate limit, or racing replay. Always dispose local temp files in `finally`.
+Сразу после ограниченного разбора возвращать `ignored`, если honeypot не пуст. Нормализовать поля/контекст, вычислить HMAC IP запроса, учесть IP-попытку, загрузить существующую отправку для определения сохранённой версии согласия, рассчитать fingerprint и вернуть replay/conflict до дорогих операций. Для нового вложения: проверить формат, просканировать, создать случайный ключ под `LEAD_S3_PREFIX`, загрузить и затем вызвать `repository.accept`. Удалять только что загруженный объект при ошибке транзакции, конфликте, rate limit или конкурентном повторе. Всегда удалять локальные временные файлы в `finally`.
 
-Convert a repository `conflict` to `LeadError("idempotency_conflict", 409)` after compensation; it is not a successful `ServiceDecision` variant.
+После компенсации преобразовывать `conflict` репозитория в `LeadError("idempotency_conflict", 409)`; это не успешный вариант `ServiceDecision`.
 
-- [ ] **Step 6: Pass focused service tests**
+- [ ] **Шаг 6: Обеспечить прохождение сфокусированных тестов сервиса**
 
-Run: `yarn tsx --test src/server/leads/clamav.test.ts src/server/leads/objectStore.test.ts src/server/leads/service.test.ts`
+Команда: `yarn tsx --test src/server/leads/clamav.test.ts src/server/leads/objectStore.test.ts src/server/leads/service.test.ts`
 
-Expected: all adapter, ordering, and compensation tests pass.
+Ожидается: все тесты адаптеров, порядка операций и компенсации проходят.
 
-- [ ] **Step 7: Commit the acceptance slice**
+- [ ] **Шаг 7: Зафиксировать срез приёма коммитом**
 
 ```bash
 git add src/server/leads/clamav.ts src/server/leads/objectStore.ts src/server/leads/service.ts src/server/leads/clamav.test.ts src/server/leads/objectStore.test.ts src/server/leads/service.test.ts
@@ -591,26 +591,26 @@ git commit -m "feat(leads): accept scanned durable submissions"
 
 ---
 
-### Task 6: Mount the secure public lead endpoint and non-mutating readiness
+### Задача 6: Подключить безопасный публичный endpoint заявок и немутирующую readiness-проверку
 
-**Files:**
+**Файлы:**
 
-- Create: `src/server/leads/http.ts`
-- Modify: `src/entry.server.tsx`
-- Modify: `server/api-app.js`
-- Modify: `server/runtime.mjs`
-- Modify: `tests/ssr/support/runtime.ts`
-- Create: `tests/ssr/leads.test.ts`
-- Modify: `tests/deploy/readiness.test.mjs`
+- Создать: `src/server/leads/http.ts`
+- Изменить: `src/entry.server.tsx`
+- Изменить: `server/api-app.js`
+- Изменить: `server/runtime.mjs`
+- Изменить: `tests/ssr/support/runtime.ts`
+- Создать: `tests/ssr/leads.test.ts`
+- Изменить: `tests/deploy/readiness.test.mjs`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: `createLeadService`, `parseLeadMultipart`, and Task 1 config.
-- Produces: `createLeadRouter(overrides?): express.Router` exported from `src/entry.server.tsx`.
-- Produces: `checkApplicationReady(): Promise<void>` exported from `src/entry.server.tsx`.
-- Preserves: `GET /api/health` and `GET /api/health/ready` response shapes.
+- Использует: `createLeadService`, `parseLeadMultipart` и конфигурацию задачи 1.
+- Создаёт: экспортируемый из `src/entry.server.tsx` `createLeadRouter(overrides?): express.Router`.
+- Создаёт: экспортируемый из `src/entry.server.tsx` `checkApplicationReady(): Promise<void>`.
+- Сохраняет: форматы ответов `GET /api/health` и `GET /api/health/ready`.
 
-- [ ] **Step 1: Write failing endpoint tests**
+- [ ] **Шаг 1: Написать падающие тесты endpoint**
 
 ```ts
 test("POST /api/leads returns a durable 201 without leaking delivery state", async (t) => {
@@ -630,19 +630,19 @@ test("POST /api/leads returns a durable 201 without leaking delivery state", asy
 });
 ```
 
-Add tests for `200` replay plus `Idempotency-Replayed: true`, `202` honeypot with no `leadId`, `409` conflicting key, `413`, `415`, `422`, `429` plus bounded `Retry-After`, safe `503`, invalid UUID, foreign `Origin`, cross-site `Sec-Fetch-Site`, and production HTTP returning `426`. Assert no response includes SQL, paths, credentials, full vendor errors, or a raw contact.
+Добавить тесты для повтора `200` с `Idempotency-Replayed: true`, honeypot-ответа `202` без `leadId`, конфликта ключа `409`, статусов `413`, `415`, `422`, `429` с ограниченным `Retry-After`, безопасного `503`, неверного UUID, чужого `Origin`, межсайтового `Sec-Fetch-Site` и возврата `426` для HTTP в production. Подтвердить, что ответы не содержат SQL, путей, учётных данных, полных ошибок поставщика или исходного контакта.
 
-- [ ] **Step 2: Run the endpoint test and confirm 404/missing export**
+- [ ] **Шаг 2: Запустить тест endpoint и подтвердить 404/отсутствующий экспорт**
 
-Run: `yarn build && TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/ssr/leads.test.ts tests/deploy/readiness.test.mjs`
+Команда: `yarn build && TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/ssr/leads.test.ts tests/deploy/readiness.test.mjs`
 
-Expected: FAIL because `/api/leads` and composite readiness are absent.
+Ожидается: FAIL, потому что `/api/leads` и составная readiness-проверка отсутствуют.
 
-- [ ] **Step 3: Implement the Express router and response map**
+- [ ] **Шаг 3: Реализовать Express-маршрутизатор и сопоставление ответов**
 
-Require UUID `Idempotency-Key`; in production require `req.secure`, canonical `Origin: https://kordev.team`, and `Sec-Fetch-Site` absent or `same-origin`. Set `Cache-Control: no-store`, `Vary: Origin`, and `X-Content-Type-Options: nosniff`. Mount the lead router before `express.json()` and `express.urlencoded()` so those parsers never consume multipart bytes.
+Требовать UUID в `Idempotency-Key`; в production требовать `req.secure`, канонический `Origin: https://kordev.team` и отсутствие `Sec-Fetch-Site` либо значение `same-origin`. Устанавливать `Cache-Control: no-store`, `Vary: Origin` и `X-Content-Type-Options: nosniff`. Подключать маршрутизатор заявок до `express.json()` и `express.urlencoded()`, чтобы эти парсеры никогда не потребляли байты multipart.
 
-Map service decisions exactly:
+Точно сопоставлять решения сервиса:
 
 ```ts
 accepted  -> 201 { leadId, status: "accepted" }
@@ -650,9 +650,9 @@ replayed  -> 200 + Idempotency-Replayed: true + stored response
 ignored   -> 202 { status: "received" }
 ```
 
-Map only `LeadError.code` values to the public error schema `{ error: { code, message, field_errors? }, request_id }`; choose Russian messages from a fixed table and log only request ID, opaque lead/job ID, status/code, and duration.
+Сопоставлять с публичной схемой ошибки `{ error: { code, message, field_errors? }, request_id }` только значения `LeadError.code`; русские сообщения брать из фиксированной таблицы, а в журнал записывать только request ID, непрозрачный ID заявки/задания, статус/код и длительность.
 
-- [ ] **Step 4: Bridge the built router into the existing runtime**
+- [ ] **Шаг 4: Подключить собранный маршрутизатор к существующему runtime**
 
 ```ts
 // src/entry.server.tsx
@@ -672,15 +672,15 @@ app.use(createApiApp({
 }));
 ```
 
-In `server/api-app.js`, mount `leadRouter` at `/api/leads` before generic body parsers. Readiness calls PostgreSQL and structural web configuration checks only; it must not insert a lead, upload an object, scan a file, or call CRM/SMTP.
+В `server/api-app.js` подключить `leadRouter` на `/api/leads` до общих парсеров тела. Readiness обращается только к PostgreSQL и структурно проверяет web-конфигурацию; она не должна вставлять заявку, загружать объект, сканировать файл или вызывать CRM/SMTP.
 
-- [ ] **Step 5: Pass HTTP, readiness, build, and type checks**
+- [ ] **Шаг 5: Обеспечить прохождение HTTP-, readiness-, build- и type-проверок**
 
-Run: `yarn typecheck && yarn build && TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/ssr/leads.test.ts && node --test tests/deploy/readiness.test.mjs`
+Команда: `yarn typecheck && yarn build && TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/ssr/leads.test.ts && node --test tests/deploy/readiness.test.mjs`
 
-Expected: all commands pass; endpoint tests observe the exact statuses/headers and readiness remains non-mutating.
+Ожидается: все команды проходят; тесты endpoint подтверждают точные статусы/заголовки, readiness остаётся немутирующей.
 
-- [ ] **Step 6: Commit the HTTP slice**
+- [ ] **Шаг 6: Зафиксировать HTTP-срез коммитом**
 
 ```bash
 git add src/server/leads/http.ts src/entry.server.tsx server/api-app.js server/runtime.mjs tests/ssr/support/runtime.ts tests/ssr/leads.test.ts tests/deploy/readiness.test.mjs
@@ -689,31 +689,31 @@ git commit -m "feat(leads): expose secure multipart endpoint"
 
 ---
 
-### Task 7: Implement the exact CRM adapter and SMTP delivery adapter
+### Задача 7: Реализовать точный адаптер CRM и адаптер SMTP-доставки
 
-**Files:**
+**Файлы:**
 
-- Create: `src/server/leads/crm.ts`
-- Create: `src/server/leads/email.ts`
-- Create: `src/server/leads/retry.ts`
-- Test: `src/server/leads/crm.test.ts`
-- Test: `src/server/leads/email.test.ts`
-- Test: `src/server/leads/retry.test.ts`
+- Создать: `src/server/leads/crm.ts`
+- Создать: `src/server/leads/email.ts`
+- Создать: `src/server/leads/retry.ts`
+- Тест: `src/server/leads/crm.test.ts`
+- Тест: `src/server/leads/email.test.ts`
+- Тест: `src/server/leads/retry.test.ts`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: claimed immutable lead/job data and `PrivateAttachmentStore.materialize()`.
-- Produces: `sendToCrm(envelope, config, fetchImpl): Promise<CrmReceipt>`.
-- Produces: `sendLeadEmail(envelope, config, transport): Promise<EmailReceipt>`.
-- Produces: `classifyDeliveryFailure(channel, error): DeliveryDecision` and `nextRetryAt(input): Date`.
+- Использует: полученные неизменяемые данные заявки/задания и `PrivateAttachmentStore.materialize()`.
+- Создаёт: `sendToCrm(envelope, config, fetchImpl): Promise<CrmReceipt>`.
+- Создаёт: `sendLeadEmail(envelope, config, transport): Promise<EmailReceipt>`.
+- Создаёт: `classifyDeliveryFailure(channel, error): DeliveryDecision` и `nextRetryAt(input): Date`.
 
-`DeliveryEnvelope` contains the immutable claimed job, normalized lead, and an optional materialized attachment `{ path, originalName, mediaType, sha256 }`. `CrmReceipt` contains only `requestId`, `taskId`, `taskCode`, `taskStatus`, `dueDate`, `replayed`, `rateLimit`, and `rateRemaining`. `EmailReceipt` contains only the provider message ID. `DeliveryDecision` is one of `{ kind: "retry"; retryAfterSeconds?: number }`, `{ kind: "terminal"; code: string }`, or `{ kind: "manual_action"; code: string }`.
+`DeliveryEnvelope` содержит неизменяемое полученное задание, нормализованную заявку и необязательное материализованное вложение `{ path, originalName, mediaType, sha256 }`. `CrmReceipt` содержит только `requestId`, `taskId`, `taskCode`, `taskStatus`, `dueDate`, `replayed`, `rateLimit` и `rateRemaining`. `EmailReceipt` содержит только ID сообщения поставщика. `DeliveryDecision` принимает один из видов: `{ kind: "retry"; retryAfterSeconds?: number }`, `{ kind: "terminal"; code: string }` или `{ kind: "manual_action"; code: string }`.
 
-- [ ] **Step 1: Write failing CRM contract tests against a local mock server**
+- [ ] **Шаг 1: Написать падающие контрактные тесты CRM с локальным mock-сервером**
 
-Assert `POST /api/v1/board-intake/{publicId}/requests`, `Authorization: Bearer`, stable lead UUID in `Idempotency-Key`, stable job UUID in `X-Request-Id`, exact multipart names `name`/`phone`/optional `description`/one optional `file`, and no consent/context/internal fields. Assert only `201` with the documented response shape succeeds and stores only `request_id`, task `id`, `code`, `status`, `due_date`, plus rate-limit numbers.
+Проверить `POST /api/v1/board-intake/{publicId}/requests`, `Authorization: Bearer`, стабильный UUID заявки в `Idempotency-Key`, стабильный UUID задания в `X-Request-Id`, точные multipart-имена `name`/`phone`/необязательное `description`/один необязательный `file` и отсутствие согласия, контекста и внутренних полей. Убедиться, что успешным считается только `201` с документированной схемой ответа и сохраняются только `request_id`, `id`, `code`, `status`, `due_date` задачи и числа rate limit.
 
-Exercise network failure, 15-second abort, `429` with valid/invalid `Retry-After`, `500`, all documented `400`/`401`/`403`/`409` variants, `413`, `415`, malformed JSON, malformed success schema, and `Idempotency-Replayed: true`.
+Проверить сетевую ошибку, прерывание через 15 секунд, `429` с корректным/некорректным `Retry-After`, `500`, все документированные варианты `400`/`401`/`403`/`409`, `413`, `415`, повреждённый JSON, неверную схему успешного ответа и `Idempotency-Replayed: true`.
 
 ```ts
 test("sends the exact vendor multipart contract", async () => {
@@ -727,9 +727,9 @@ test("sends the exact vendor multipart contract", async () => {
 });
 ```
 
-- [ ] **Step 2: Write failing SMTP and retry tests**
+- [ ] **Шаг 2: Написать падающие тесты SMTP и повторов**
 
-Use an injected Nodemailer transport and assert recipient `team@korotkov.dev`, sender from config, subject `Новая заявка KorDevTeam · <8-char lead suffix>`, deterministic `<lead-<uuid>@kordev.team>` Message-ID, Russian plain-text body, sanitized filename, and no raw IP/HMAC/vendor token. Assert SMTP 4xx/network errors retry and authentication/configuration/5xx recipient errors become manual action.
+Через внедрённый transport Nodemailer проверить получателя `team@korotkov.dev`, отправителя из конфигурации, тему `Новая заявка KorDevTeam · <последние 8 символов ID>`, детерминированный Message-ID `<lead-<uuid>@kordev.team>`, русское текстовое тело, очищенное имя файла и отсутствие исходного IP, HMAC и токена поставщика. Убедиться, что ошибки SMTP 4xx/сети повторяются, а ошибки аутентификации, конфигурации и получателя 5xx переходят в ручное действие.
 
 ```ts
 test("email uses a deterministic identity and one private attachment", async () => {
@@ -741,15 +741,15 @@ test("email uses a deterministic identity and one private attachment", async () 
 });
 ```
 
-- [ ] **Step 3: Run tests and confirm missing adapters**
+- [ ] **Шаг 3: Запустить тесты и подтвердить отсутствие адаптеров**
 
-Run: `yarn tsx --test src/server/leads/crm.test.ts src/server/leads/email.test.ts src/server/leads/retry.test.ts`
+Команда: `yarn tsx --test src/server/leads/crm.test.ts src/server/leads/email.test.ts src/server/leads/retry.test.ts`
 
-Expected: FAIL because the three modules are absent.
+Ожидается: FAIL, потому что три модуля отсутствуют.
 
-- [ ] **Step 4: Implement streaming CRM multipart delivery**
+- [ ] **Шаг 4: Реализовать потоковую multipart-доставку в CRM**
 
-Materialize a private object to a mode-`0600` worker temp file, open it with Node 22 `openAsBlob(path, { type })`, append it once to native `FormData`, and remove the temp file in `finally`. Send with `AbortSignal.timeout(15_000)` and never set multipart `Content-Type` manually. Validate success with a strict Zod schema and consume `X-Request-Id`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `Idempotency-Replayed` without logging raw response bodies.
+Материализовать приватный объект во временный файл worker с правами `0600`, открыть через Node 22 `openAsBlob(path, { type })`, один раз добавить в нативный `FormData` и удалить временный файл в `finally`. Отправлять с `AbortSignal.timeout(15_000)` и никогда не задавать multipart `Content-Type` вручную. Валидировать успех строгой схемой Zod и обрабатывать `X-Request-Id`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` и `Idempotency-Replayed`, не журналируя исходные тела ответов.
 
 ```ts
 const form = new FormData();
@@ -767,11 +767,11 @@ const response = await fetchImpl(config.endpoint, {
 });
 ```
 
-Classify `idempotency_in_progress` as retry; `configuration_invalid` and `idempotency_conflict` as manual action; network/timeout/429/5xx as retry; and the remaining documented 400/401/403/413/415 errors as terminal/manual action without changing the body or key.
+Классифицировать `idempotency_in_progress` как повтор; `configuration_invalid` и `idempotency_conflict` — как ручное действие; сеть/timeout/429/5xx — как повтор; остальные документированные ошибки 400/401/403/413/415 — как terminal/manual action без изменения тела или ключа.
 
-- [ ] **Step 5: Implement SMTP delivery and retry scheduling**
+- [ ] **Шаг 5: Реализовать SMTP-доставку и расписание повторов**
 
-Create one Nodemailer transporter from `SMTP_*`. Send plain text plus one attachment path when present. The email channel uses exponential delay beginning at one minute, capped at six hours with deterministic jitter in tests, and becomes `manual_action` after 12 failed sends. CRM delays honor a valid `Retry-After` from 1–3600 seconds or use exponential delay beginning at one second; prevent any next CRM attempt at or after `acceptedAt + 23h55m`.
+Создать один transporter Nodemailer из `SMTP_*`. Отправлять обычный текст и путь одного вложения при его наличии. Email-канал использует экспоненциальную задержку от одной минуты с максимумом шесть часов и детерминированным jitter в тестах, переходя в `manual_action` после 12 неудачных отправок. Задержки CRM учитывают корректный `Retry-After` от 1 до 3600 секунд либо используют экспоненциальную задержку от одной секунды; не допускать следующую попытку CRM в момент `acceptedAt + 23h55m` или позже.
 
 ```ts
 const CRM_CUTOFF_MS = 23 * 60 * 60 * 1000 + 55 * 60 * 1000;
@@ -786,13 +786,13 @@ await transport.sendMail({
 });
 ```
 
-- [ ] **Step 6: Pass adapter contract tests**
+- [ ] **Шаг 6: Обеспечить прохождение контрактных тестов адаптеров**
 
-Run: `yarn tsx --test src/server/leads/crm.test.ts src/server/leads/email.test.ts src/server/leads/retry.test.ts`
+Команда: `yarn tsx --test src/server/leads/crm.test.ts src/server/leads/email.test.ts src/server/leads/retry.test.ts`
 
-Expected: all response classifications, stable headers, multipart fields, email content, and cutoff boundaries pass.
+Ожидается: проходят все классификации ответов, стабильные заголовки, multipart-поля, содержимое email и граничные значения прекращения повторов.
 
-- [ ] **Step 7: Commit the delivery-adapter slice**
+- [ ] **Шаг 7: Зафиксировать срез адаптеров доставки коммитом**
 
 ```bash
 git add src/server/leads/crm.ts src/server/leads/email.ts src/server/leads/retry.ts src/server/leads/crm.test.ts src/server/leads/email.test.ts src/server/leads/retry.test.ts
@@ -801,23 +801,23 @@ git commit -m "feat(leads): deliver to CRM and email"
 
 ---
 
-### Task 8: Run one crash-safe outbox worker from the production image
+### Задача 8: Запустить один устойчивый к сбоям outbox-worker из production-образа
 
-**Files:**
+**Файлы:**
 
-- Create: `src/server/leads/worker.ts`
-- Create: `src/server/leads/worker.test.ts`
-- Create: `server/lead-worker.mjs`
-- Modify: `src/entry.server.tsx`
-- Modify: `package.json`
+- Создать: `src/server/leads/worker.ts`
+- Создать: `src/server/leads/worker.test.ts`
+- Создать: `server/lead-worker.mjs`
+- Изменить: `src/entry.server.tsx`
+- Изменить: `package.json`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: repository claim/update methods, CRM/email adapters, retry policy, and private object materialization.
-- Produces: `runLeadWorker(options): Promise<void>`, `runWorkerBatch(options): Promise<number>`, and `checkLeadWorkerReady(): Promise<void>`.
-- Produces: `node server/lead-worker.mjs` and `node server/lead-worker.mjs --check`.
+- Использует: методы получения/обновления репозитория, адаптеры CRM/email, политику повторов и материализацию приватного объекта.
+- Создаёт: `runLeadWorker(options): Promise<void>`, `runWorkerBatch(options): Promise<number>` и `checkLeadWorkerReady(): Promise<void>`.
+- Создаёт: `node server/lead-worker.mjs` и `node server/lead-worker.mjs --check`.
 
-- [ ] **Step 1: Write failing worker tests**
+- [ ] **Шаг 1: Написать падающие тесты worker**
 
 ```ts
 test("one channel failure does not suppress the other channel", async () => {
@@ -828,15 +828,15 @@ test("one channel failure does not suppress the other channel", async () => {
 });
 ```
 
-Add tests for two workers never delivering the same live lease, expired lease recovery, delivery metadata sanitization, CRM token exhaustion rescheduling without a vendor call, 24-hour CRM cutoff to `manual_action`, SMTP attempt cutoff, S3 materialization cleanup, graceful abort, and `--check` performing no delivery.
+Добавить тесты, подтверждающие, что два worker не доставляют одну действующую аренду; просроченная аренда восстанавливается; метаданные доставки очищаются; исчерпание лимита токена CRM переносит задание без вызова поставщика; 24-часовая граница CRM переводит задание в `manual_action`; лимит попыток SMTP соблюдается; материализация S3 очищается; остановка выполняется корректно; `--check` ничего не доставляет.
 
-- [ ] **Step 2: Run tests and confirm the worker is missing**
+- [ ] **Шаг 2: Запустить тесты и подтвердить отсутствие worker**
 
-Run: `yarn tsx --test src/server/leads/worker.test.ts`
+Команда: `yarn tsx --test src/server/leads/worker.test.ts`
 
-Expected: FAIL because worker functions are absent.
+Ожидается: FAIL, потому что функции worker отсутствуют.
 
-- [ ] **Step 3: Implement one bounded worker loop**
+- [ ] **Шаг 3: Реализовать один ограниченный цикл worker**
 
 ```ts
 export async function runWorkerBatch({ repository, crm, email, store, ownerId, batchSize = 10, clock }: WorkerOptions) {
@@ -848,13 +848,13 @@ export async function runWorkerBatch({ repository, crm, email, store, ownerId, b
 }
 ```
 
-`WorkerOptions` contains `LeadRepository`, CRM/email sender functions, `PrivateAttachmentStore`, UUID `ownerId`, `batchSize`, injected clock/random source, and optional `AbortSignal`. The long-running wrapper adds only polling and signal handling around `runWorkerBatch`.
+`WorkerOptions` содержит `LeadRepository`, функции отправки CRM/email, `PrivateAttachmentStore`, UUID `ownerId`, `batchSize`, внедрённые часы/источник случайности и необязательный `AbortSignal`. Долгоживущая обёртка добавляет к `runWorkerBatch` только опрос и обработку сигналов.
 
-Before each CRM send, reserve the shared token bucket. If exhausted, reschedule to the bucket end without incrementing a vendor failure. Materialize an attachment for only the current job and dispose it in `finally`. Persist only bounded receipt fields or sanitized codes. Poll every second when idle, accept `AbortSignal`, stop claiming on SIGTERM/SIGINT, and let current bounded sends finish before exit.
+Перед каждой отправкой в CRM резервировать общий token bucket. Если он исчерпан, переносить задание к концу окна, не увеличивая счётчик ошибки поставщика. Материализовать вложение только для текущего задания и удалять его в `finally`. Сохранять только ограниченные поля квитанции или очищенные коды. При простое опрашивать раз в секунду, принимать `AbortSignal`, прекращать получение заданий по SIGTERM/SIGINT и перед выходом дать текущим ограниченным отправкам завершиться.
 
-- [ ] **Step 4: Export and create production entrypoint**
+- [ ] **Шаг 4: Экспортировать и создать production-точку входа**
 
-Export the worker factory/readiness from `src/entry.server.tsx`. `server/lead-worker.mjs` imports `../build/server/index.js`, supports only no argument or `--check`, generates one process UUID, and exits nonzero with a sanitized line on configuration/database failure. Add scripts:
+Экспортировать фабрику worker/readiness из `src/entry.server.tsx`. `server/lead-worker.mjs` импортирует `../build/server/index.js`, поддерживает только запуск без аргумента или с `--check`, создаёт один UUID процесса и завершается с ненулевым кодом и очищенной строкой при ошибке конфигурации/БД. Добавить команды:
 
 ```json
 {
@@ -863,13 +863,13 @@ Export the worker factory/readiness from `src/entry.server.tsx`. `server/lead-wo
 }
 ```
 
-- [ ] **Step 5: Pass unit, build, and entrypoint checks**
+- [ ] **Шаг 5: Обеспечить прохождение unit-, build- и entrypoint-проверок**
 
-Run: `yarn typecheck && yarn build && yarn tsx --test src/server/leads/worker.test.ts && NODE_ENV=test DATABASE_URL="$TEST_DATABASE_URL" yarn lead:worker:check`
+Команда: `yarn typecheck && yarn build && yarn tsx --test src/server/leads/worker.test.ts && NODE_ENV=test DATABASE_URL="$TEST_DATABASE_URL" yarn lead:worker:check`
 
-Expected: tests/build pass and the check command exits `0` without creating or delivering a lead.
+Ожидается: тесты и build проходят, команда проверки завершается с кодом `0`, не создавая и не доставляя заявку.
 
-- [ ] **Step 6: Commit the worker slice**
+- [ ] **Шаг 6: Зафиксировать срез worker коммитом**
 
 ```bash
 git add src/server/leads/worker.ts src/server/leads/worker.test.ts server/lead-worker.mjs src/entry.server.tsx package.json
@@ -878,27 +878,27 @@ git commit -m "feat(leads): process outbox with leased worker"
 
 ---
 
-### Task 9: Delete expired site copies and stale orphan objects safely
+### Задача 9: Безопасно удалять просроченные копии сайта и старые бесхозные объекты
 
-**Files:**
+**Файлы:**
 
-- Create: `src/server/leads/retention.ts`
-- Create: `src/server/leads/retention.test.ts`
-- Create: `server/lead-retention.mjs`
-- Modify: `src/entry.server.tsx`
-- Modify: `package.json`
-- Create: `deploy/systemd/kordevteam-lead-retention.service`
-- Create: `deploy/systemd/kordevteam-lead-retention.timer`
+- Создать: `src/server/leads/retention.ts`
+- Создать: `src/server/leads/retention.test.ts`
+- Создать: `server/lead-retention.mjs`
+- Изменить: `src/entry.server.tsx`
+- Изменить: `package.json`
+- Создать: `deploy/systemd/kordevteam-lead-retention.service`
+- Создать: `deploy/systemd/kordevteam-lead-retention.timer`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: repository expiration/object-reference methods and private store delete/list.
-- Produces: `runLeadRetention({ limit: 100 }): Promise<RetentionReport>`.
-- Produces: `node server/lead-retention.mjs` as a finite command.
+- Использует: методы репозитория для истечения срока/ссылок на объекты и операции delete/list приватного хранилища.
+- Создаёт: `runLeadRetention({ limit: 100 }): Promise<RetentionReport>`.
+- Создаёт: конечную команду `node server/lead-retention.mjs`.
 
-- [ ] **Step 1: Write failing retention ordering tests**
+- [ ] **Шаг 1: Написать падающие тесты порядка retention**
 
-Assert attachment object deletion completes before row deletion, S3 failure retains the lead for a later run, `NoSuchKey` allows row deletion, a no-file lead deletes directly, only rows with `expiresAt <= now` are selected, each run stops at 100 rows, and orphan keys younger than two hours or referenced in PostgreSQL remain untouched.
+Подтвердить, что удаление объекта вложения завершается до удаления строки; сбой S3 сохраняет заявку для следующего запуска; `NoSuchKey` разрешает удалить строку; заявка без файла удаляется напрямую; выбираются только строки с `expiresAt <= now`; один запуск ограничен 100 строками; бесхозные ключи младше двух часов и ключи со ссылками в PostgreSQL остаются нетронутыми.
 
 ```ts
 test("never deletes the row before its private object", async () => {
@@ -916,13 +916,13 @@ test("storage failure preserves the database row", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and confirm retention is missing**
+- [ ] **Шаг 2: Запустить тест и подтвердить отсутствие retention**
 
-Run: `yarn tsx --test src/server/leads/retention.test.ts`
+Команда: `yarn tsx --test src/server/leads/retention.test.ts`
 
-Expected: FAIL because `runLeadRetention` is absent.
+Ожидается: FAIL, потому что `runLeadRetention` отсутствует.
 
-- [ ] **Step 3: Implement bounded retention and orphan cleanup**
+- [ ] **Шаг 3: Реализовать ограниченный retention и очистку бесхозных объектов**
 
 ```ts
 for (const lead of await repository.findExpiredLeads(limit)) {
@@ -931,25 +931,25 @@ for (const lead of await repository.findExpiredLeads(limit)) {
 }
 ```
 
-After expired rows, page through only the configured private prefix and delete an object only when it is older than two hours and `attachmentKeyExists(key)` is false. Log counts and opaque IDs only. Continue other records after a per-record storage failure, return failed counts, and exit nonzero from the command when any deletion failed.
+После просроченных строк постранично обходить только настроенный приватный prefix и удалять объект, только если он старше двух часов и `attachmentKeyExists(key)` возвращает false. Журналировать только количества и непрозрачные ID. После сбоя хранилища на отдельной записи продолжать остальные, возвращать число ошибок и завершать команду с ненулевым кодом, если хотя бы одно удаление не удалось.
 
-- [ ] **Step 4: Add the daily production timer**
+- [ ] **Шаг 4: Добавить ежедневный production-таймер**
 
-The service runs as the dedicated unprivileged operations user and invokes:
+Сервис запускается от отдельного непривилегированного операционного пользователя и вызывает:
 
 ```bash
 docker compose -f /opt/kordevteam/current/deploy/docker-compose.team.yml run --rm --no-deps lead-worker node server/lead-retention.mjs
 ```
 
-The unit sets `User=kordevteam`, `WorkingDirectory=/opt/kordevteam/current`, and `EnvironmentFile=/etc/kordevteam/operations.env`. The timer uses `OnCalendar=*-*-* 03:30:00 Europe/Moscow`, `Persistent=true`, and `RandomizedDelaySec=15m`. Add `lead:retention` to `package.json`.
+Unit задаёт `User=kordevteam`, `WorkingDirectory=/opt/kordevteam/current` и `EnvironmentFile=/etc/kordevteam/operations.env`. Таймер использует `OnCalendar=*-*-* 03:30:00 Europe/Moscow`, `Persistent=true` и `RandomizedDelaySec=15m`. Добавить `lead:retention` в `package.json`.
 
-- [ ] **Step 5: Pass retention and systemd syntax tests**
+- [ ] **Шаг 5: Обеспечить прохождение тестов retention и синтаксиса systemd**
 
-Run: `yarn tsx --test src/server/leads/retention.test.ts && systemd-analyze verify deploy/systemd/kordevteam-lead-retention.service deploy/systemd/kordevteam-lead-retention.timer`
+Команда: `yarn tsx --test src/server/leads/retention.test.ts && systemd-analyze verify deploy/systemd/kordevteam-lead-retention.service deploy/systemd/kordevteam-lead-retention.timer`
 
-Expected: retention tests pass; systemd units verify on Linux. On macOS, CI performs the `systemd-analyze` command and the local run records it as platform-skipped, not passed.
+Ожидается: тесты retention проходят; systemd units проверяются в Linux. На macOS команду `systemd-analyze` выполняет CI, а локальный запуск отмечается как пропущенный из-за платформы, а не как успешный.
 
-- [ ] **Step 6: Commit the retention slice**
+- [ ] **Шаг 6: Зафиксировать срез retention коммитом**
 
 ```bash
 git add src/server/leads/retention.ts src/server/leads/retention.test.ts server/lead-retention.mjs src/entry.server.tsx package.json deploy/systemd/kordevteam-lead-retention.service deploy/systemd/kordevteam-lead-retention.timer
@@ -958,26 +958,26 @@ git commit -m "feat(leads): expire private lead copies"
 
 ---
 
-### Task 10: Build the reusable accessible form and correct the privacy draft
+### Задача 10: Создать переиспользуемую доступную форму и исправить черновик политики
 
-**Files:**
+**Файлы:**
 
-- Create: `src/components/LeadForm.tsx`
-- Create: `src/components/LeadForm.test.tsx`
-- Modify: `src/components/Contact.tsx`
-- Modify: `src/locales/ru.json`
-- Modify: `src/routes/legal.tsx`
-- Modify: `tests/ssr/frameworkBoot.test.ts`
+- Создать: `src/components/LeadForm.tsx`
+- Создать: `src/components/LeadForm.test.tsx`
+- Изменить: `src/components/Contact.tsx`
+- Изменить: `src/locales/ru.json`
+- Изменить: `src/routes/legal.tsx`
+- Изменить: `tests/ssr/frameworkBoot.test.ts`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: `POST /api/leads` public contract.
-- Produces: `LeadForm({ pagePath?, className? })` reusable on the home/contact section and future commercial pages.
-- Preserves: existing contact methods, dark/light theme, ordinary motion, and reduced-motion behavior.
+- Использует: публичный контракт `POST /api/leads`.
+- Создаёт: `LeadForm({ pagePath?, className? })`, переиспользуемую в секции контактов главной и на будущих коммерческих страницах.
+- Сохраняет: существующие способы связи, тёмную/светлую тему, обычные анимации и поведение reduced motion.
 
-- [ ] **Step 1: Write failing browser-component tests**
+- [ ] **Шаг 1: Написать падающие тесты браузерного компонента**
 
-Set up jsdom and Testing Library. Assert labeled required name/phone/consent, optional description/file, exact `accept` extensions, Russian inline errors/live region, keyboard submit, one in-flight request after double-click, and the button becoming usable after failure. Capture fetch requests and assert native multipart, one UUID header, same UUID for an unchanged retry, a new UUID after any field/file change, no manual `Content-Type`, and success only for `200`/`201` containing a valid `leadId`.
+Настроить jsdom и Testing Library. Проверить подписанные обязательные name/phone/consent, необязательные description/file, точные расширения `accept`, русские inline-ошибки/live region, отправку клавиатурой, один выполняющийся запрос после двойного клика и повторную доступность кнопки после ошибки. Перехватывать fetch-запросы и проверять нативный multipart, один UUID-заголовок, тот же UUID для неизменённого повтора, новый UUID после изменения любого поля/файла, отсутствие вручную заданного `Content-Type` и успех только для `200`/`201` с корректным `leadId`.
 
 ```tsx
 test("submits only the approved visible fields and site consent", async () => {
@@ -990,17 +990,17 @@ test("submits only the approved visible fields and site consent", async () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and confirm the component is absent**
+- [ ] **Шаг 2: Запустить тесты и подтвердить отсутствие компонента**
 
-Run: `yarn tsx --test src/components/LeadForm.test.tsx`
+Команда: `yarn tsx --test src/components/LeadForm.test.tsx`
 
-Expected: FAIL because `LeadForm` does not exist.
+Ожидается: FAIL, потому что `LeadForm` не существует.
 
-- [ ] **Step 3: Implement form behavior and copy**
+- [ ] **Шаг 3: Реализовать поведение формы и тексты**
 
-Use native semantic `<form>`, `<label>`, inputs, textarea, file input, and checkbox; reuse existing `Input`, `Textarea`, and `Button` where semantics remain native. Add `aria-invalid`, `aria-describedby`, focus the first invalid field, and announce request state in `role="status" aria-live="polite"`. Display «Ответим в течение рабочего дня» and «Пн–Пт, 09:00–18:00 по Москве».
+Использовать нативные семантические `<form>`, `<label>`, input, textarea, файловый input и checkbox; переиспользовать существующие `Input`, `Textarea` и `Button` там, где семантика остаётся нативной. Добавить `aria-invalid`, `aria-describedby`, фокусировать первое неверное поле и объявлять состояние запроса через `role="status" aria-live="polite"`. Показывать «Ответим в течение рабочего дня» и «Пн–Пт, 09:00–18:00 по Москве».
 
-Keep a snapshot hash plus UUID in a ref. Reuse the UUID only when the normalized fields and file name/size/lastModified are unchanged after a network/transient response; clear it on any edit after an attempt and after success. Never persist name, phone, description, file, or UUID in localStorage/sessionStorage.
+Хранить hash снимка и UUID в ref. Повторно использовать UUID, только когда нормализованные поля и name/size/lastModified файла не изменились после сетевого/временного ответа; сбрасывать его при любом редактировании после попытки и после успеха. Никогда не сохранять name, phone, description, file или UUID в localStorage/sessionStorage.
 
 ```tsx
 const submission = sameSnapshot(retryRef.current, snapshot)
@@ -1016,21 +1016,21 @@ const body = await response.json();
 if (![200, 201].includes(response.status) || !UUID_PATTERN.test(body.leadId)) throw publicLeadError(response.status, body);
 ```
 
-- [ ] **Step 4: Embed the form without removing contact links**
+- [ ] **Шаг 4: Встроить форму без удаления ссылок для связи**
 
-Change `Contact` to a responsive two-column layout: contact cards remain in one column and `LeadForm` occupies the other. Keep the section `id="contact"`, existing motion, and mobile single-column order. Ensure SSR HTML contains the form, consent link `/privacy/`, business-hours copy, and no hidden email/company/service/budget inputs.
+Изменить `Contact` на адаптивную двухколоночную компоновку: карточки связи остаются в одной колонке, `LeadForm` занимает другую. Сохранить `id="contact"`, существующие анимации и одноколоночный порядок на мобильных. Убедиться, что SSR HTML содержит форму, ссылку согласия `/privacy/`, текст рабочих часов и не содержит скрытых input для email/company/service/budget.
 
-- [ ] **Step 5: Update the owner-review privacy draft**
+- [ ] **Шаг 5: Обновить черновик политики для проверки владельцем**
 
-Replace the obsolete “one contact/company/service/budget” wording with name, required phone, optional description and one optional file. Name Kusidis/Krasotula CRM, email delivery to `team@korotkov.dev`, private Timeweb object storage, ClamAV antivirus processing, and automatic 30-day site retention. Keep the existing comment that owner/legal review is required; do not claim legal approval.
+Заменить устаревшую формулировку «один контакт/company/service/budget» на имя, обязательный телефон, необязательное описание и один необязательный файл. Указать Kusidis/Krasotula CRM, доставку по email на `team@korotkov.dev`, приватное объектное хранилище Timeweb, антивирусную обработку ClamAV и автоматическое хранение сайта 30 дней. Сохранить существующий комментарий о необходимости проверки владельцем/юристом; не заявлять о юридическом утверждении.
 
-- [ ] **Step 6: Pass component, SSR, and accessibility assertions**
+- [ ] **Шаг 6: Обеспечить прохождение проверок компонента, SSR и доступности**
 
-Run: `yarn tsx --test src/components/LeadForm.test.tsx tests/ssr/frameworkBoot.test.ts && yarn typecheck && yarn build`
+Команда: `yarn tsx --test src/components/LeadForm.test.tsx tests/ssr/frameworkBoot.test.ts && yarn typecheck && yarn build`
 
-Expected: component interactions pass and SSR home HTML contains the complete Russian form before hydration.
+Ожидается: взаимодействия компонента проходят, SSR HTML главной содержит полную русскую форму до гидратации.
 
-- [ ] **Step 7: Commit the public form slice**
+- [ ] **Шаг 7: Зафиксировать срез публичной формы коммитом**
 
 ```bash
 git add src/components/LeadForm.tsx src/components/LeadForm.test.tsx src/components/Contact.tsx src/locales/ru.json src/routes/legal.tsx tests/ssr/frameworkBoot.test.ts
@@ -1039,38 +1039,38 @@ git commit -m "feat(leads): add accessible request form"
 
 ---
 
-### Task 11: Package one worker, ClamAV, private settings, and release checks
+### Задача 11: Настроить один worker, ClamAV, приватные параметры и проверки релиза
 
-**Files:**
+**Файлы:**
 
-- Modify: `Dockerfile`
-- Modify: `docker-compose.yml`
-- Modify: `deploy/docker-compose.team.yml`
-- Modify: `scripts/deploy-common.sh`
-- Modify: `scripts/deploy-slot.sh`
-- Modify: `scripts/switch-slot.sh`
-- Modify: `scripts/rollback-slot.sh`
-- Modify: `tests/deploy/image.test.mjs`
-- Create: `tests/deploy/leads.test.mjs`
-- Modify: `tests/deploy/scripts.test.mjs`
-- Modify: `tests/postgresCompose.test.ts`
-- Create: `tests/fixtures/deploy-leads.env`
-- Modify: `.github/workflows/docker-build.yml`
-- Modify: `server/.env.example`
-- Modify: `server/README.md`
-- Modify: `deploy/README.md`
+- Изменить: `Dockerfile`
+- Изменить: `docker-compose.yml`
+- Изменить: `deploy/docker-compose.team.yml`
+- Изменить: `scripts/deploy-common.sh`
+- Изменить: `scripts/deploy-slot.sh`
+- Изменить: `scripts/switch-slot.sh`
+- Изменить: `scripts/rollback-slot.sh`
+- Изменить: `tests/deploy/image.test.mjs`
+- Создать: `tests/deploy/leads.test.mjs`
+- Изменить: `tests/deploy/scripts.test.mjs`
+- Изменить: `tests/postgresCompose.test.ts`
+- Создать: `tests/fixtures/deploy-leads.env`
+- Изменить: `.github/workflows/docker-build.yml`
+- Изменить: `server/.env.example`
+- Изменить: `server/README.md`
+- Изменить: `deploy/README.md`
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: the built router/worker/retention exports and all production variables defined in Task 1.
-- Produces: exactly one `lead-worker` service and one internal `clamav` service.
-- Produces: inactive-image worker configuration check before traffic switch and worker image alignment after successful switch/rollback.
+- Использует: готовые экспорты маршрутизатора, worker и очистки, а также все production-переменные, определённые в задаче 1.
+- Создаёт: ровно один сервис `lead-worker` и один внутренний сервис `clamav`.
+- Создаёт: проверку конфигурации worker из неактивного образа до переключения трафика и синхронизацию образа worker после успешного переключения или отката.
 
-- [ ] **Step 1: Write failing topology and release-script tests**
+- [ ] **Шаг 1: Написать падающие тесты топологии и скриптов релиза**
 
-Parse both Compose files and assert: one worker only; no public worker/ClamAV/database port; worker and both web slots receive backend-only lead settings; private S3 variables are distinct from public media variables; web/worker have bounded `/tmp`; ClamAV is internal and healthy; worker overrides the image's HTTP healthcheck with `node server/lead-worker.mjs --check`; production refuses missing CRM/SMTP/S3/ClamAV/HMAC/consent variables; and logs rotate under the existing policy.
+Разобрать оба Compose-файла и проверить: worker только один; порты worker, ClamAV и базы данных не опубликованы; worker и оба web-слота получают только серверные настройки заявок; приватные переменные S3 отделены от переменных публичных медиафайлов; для web и worker задан ограниченный `/tmp`; ClamAV доступен только во внутренней сети и исправен; worker заменяет HTTP healthcheck образа командой `node server/lead-worker.mjs --check`; production не запускается без переменных CRM, SMTP, S3, ClamAV, HMAC и версии согласия; журналы ротируются по существующей политике.
 
-Extend script fixtures to assert inactive deployment runs `lead-worker.mjs --check` from the candidate image before declaring it ready, successful switch restarts the single worker with the new active immutable image, failed public smoke leaves the old worker untouched, and rollback restores the previous recorded image.
+Расширить фикстуры скриптов и проверить, что развёртывание неактивного слота запускает `lead-worker.mjs --check` из образа-кандидата до объявления готовности; успешное переключение перезапускает единственный worker с новым активным неизменяемым образом; неудачная публичная smoke-проверка не затрагивает старый worker; откат восстанавливает ранее записанный образ.
 
 ```js
 test("production topology has one private lead worker", () => {
@@ -1083,17 +1083,17 @@ test("production topology has one private lead worker", () => {
 });
 ```
 
-- [ ] **Step 2: Run deployment tests and confirm missing topology**
+- [ ] **Шаг 2: Запустить тесты развёртывания и подтвердить отсутствие требуемой топологии**
 
-Run: `node --test tests/deploy/leads.test.mjs tests/deploy/image.test.mjs tests/deploy/scripts.test.mjs && yarn tsx --test tests/postgresCompose.test.ts`
+Запустить: `node --test tests/deploy/leads.test.mjs tests/deploy/image.test.mjs tests/deploy/scripts.test.mjs && yarn tsx --test tests/postgresCompose.test.ts`
 
-Expected: FAIL because worker/ClamAV/configuration and script synchronization are absent.
+Ожидается: FAIL, потому что worker, ClamAV, конфигурация и синхронизация скриптов ещё отсутствуют.
 
-- [ ] **Step 3: Add local and production services**
+- [ ] **Шаг 3: Добавить локальные и production-сервисы**
 
-Use `CLAMAV_IMAGE` as an operator-supplied immutable digest in production and a documented local development tag in root Compose. Give ClamAV its own definitions volume and only the internal backend network. Mount a `tmpfs` large enough for one 25 MiB upload plus bounded multipart/worker copies; keep `no-new-privileges` and dropped capabilities.
+В production использовать `CLAMAV_IMAGE` как задаваемый оператором неизменяемый digest, а в корневом Compose — документированный тег для локальной разработки. Выделить ClamAV отдельный том для баз сигнатур и подключить только к внутренней backend-сети. Смонтировать `tmpfs`, достаточный для одного файла размером 25 МиБ и ограниченных копий multipart/worker; сохранить `no-new-privileges` и отключённые capabilities.
 
-Define `lead-worker` once with `WORKER_IMAGE`, the same `DATABASE_URL`/lead secrets/backend network as web, command `node server/lead-worker.mjs`, restart policy, one replica by topology, and its command healthcheck. Do not attach the proxy network or publish a port.
+Определить `lead-worker` в единственном экземпляре с `WORKER_IMAGE`, теми же `DATABASE_URL`, секретами заявок и backend-сетью, что и web, командой `node server/lead-worker.mjs`, политикой перезапуска, одной репликой по топологии и собственным командным healthcheck. Не подключать proxy-сеть и не публиковать порт.
 
 ```yaml
 lead-worker:
@@ -1109,9 +1109,9 @@ lead-worker:
     retries: 3
 ```
 
-- [ ] **Step 4: Keep worker image synchronized atomically with releases**
+- [ ] **Шаг 4: Атомарно синхронизировать образ worker с релизами**
 
-During `deploy-slot.sh`, set `WORKER_IMAGE` to the recorded active image so Compose interpolation is complete, then run candidate `node server/lead-worker.mjs --check` after migrations and before inactive readiness succeeds. During `switch-slot.sh`, change traffic first, complete public smoke, then recreate `lead-worker` with the target's recorded immutable image and verify its health; if worker replacement fails, restore the prior route and prior worker image. Apply the inverse order safely in `rollback-slot.sh`. Record worker image state under the existing protected deployment directory.
+Во время выполнения `deploy-slot.sh` установить `WORKER_IMAGE` в записанный активный образ, чтобы интерполяция Compose была полной, затем после миграций и до успешной проверки готовности неактивного слота выполнить для образа-кандидата `node server/lead-worker.mjs --check`. В `switch-slot.sh` сначала переключить трафик и завершить публичную smoke-проверку, затем пересоздать `lead-worker` с записанным неизменяемым образом целевого слота и проверить его состояние; если замена worker завершится неудачно, восстановить прежний маршрут и прежний образ worker. В `rollback-slot.sh` безопасно выполнить обратную последовательность. Хранить состояние образа worker в существующем защищённом каталоге развёртывания.
 
 ```bash
 previous_worker_image="$(recorded_image "$previous")"
@@ -1124,11 +1124,11 @@ if ! docker compose -f "$COMPOSE_FILE" up -d --no-deps lead-worker || ! verify_w
 fi
 ```
 
-- [ ] **Step 5: Add CI gates and operator documentation**
+- [ ] **Шаг 5: Добавить проверки CI и документацию для оператора**
 
-CI keeps fake/local adapters: it runs unit/contract tests without real credentials, builds the image, and uses in-process fake ClamAV/CRM/SMTP/S3 adapters for integration tests; it never sets a real CRM endpoint. Document exact variables, private-bucket policy, Timeweb endpoint, ClamAV sizing, SMTP setup, consent version changes, worker status, manual-action diagnosis, daily retention, and the explicit no-mutation readiness rule.
+В CI использовать тестовые и локальные адаптеры: запускать модульные и контрактные тесты без реальных учётных данных, собирать образ и применять работающие внутри процесса заглушки ClamAV, CRM, SMTP и S3 для интеграционных тестов; реальный endpoint CRM в CI не задавать. Документировать точный набор переменных, политику приватного бакета, endpoint Timeweb, ресурсы ClamAV, настройку SMTP, изменение версии согласия, состояние worker, диагностику ручных действий, ежедневную очистку и явное правило отсутствия изменений данных при проверке готовности.
 
-Create `tests/fixtures/deploy-leads.env` with test-only `.invalid` endpoints and immutable-looking fixture images so Compose rendering is reproducible:
+Создать `tests/fixtures/deploy-leads.env` с предназначенными только для тестов endpoint на домене `.invalid` и похожими на неизменяемые тестовыми образами, чтобы результат рендеринга Compose был воспроизводимым:
 
 ```dotenv
 BLUE_IMAGE=ghcr.io/example/kordevteam:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -1165,7 +1165,7 @@ SMTP_FROM=team@korotkov.dev
 LEAD_EMAIL_TO=team@korotkov.dev
 ```
 
-Production variables to document are:
+Документировать следующие production-переменные:
 
 ```text
 LEAD_CONSENT_VERSION LEAD_HASH_KEY LEAD_TEMP_ROOT
@@ -1177,9 +1177,9 @@ SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASSWORD SMTP_FROM
 LEAD_EMAIL_TO WORKER_IMAGE CLAMAV_IMAGE
 ```
 
-- [ ] **Step 6: Pass topology, script, image, and Compose tests**
+- [ ] **Шаг 6: Добиться прохождения тестов топологии, скриптов, образа и Compose**
 
-Run:
+Запустить:
 
 ```bash
 node --test tests/deploy/leads.test.mjs tests/deploy/image.test.mjs tests/deploy/scripts.test.mjs
@@ -1189,9 +1189,9 @@ docker compose --env-file tests/fixtures/deploy-leads.env -f deploy/docker-compo
 bash -n scripts/deploy-common.sh scripts/deploy-slot.sh scripts/switch-slot.sh scripts/rollback-slot.sh
 ```
 
-Expected: every command exits `0`; production Compose contains one private worker and no newly exposed ports.
+Ожидается: каждая команда завершается с кодом `0`; production Compose содержит один приватный worker и не открывает новых портов.
 
-- [ ] **Step 7: Commit the runtime and deployment slice**
+- [ ] **Шаг 7: Зафиксировать коммитом изменения runtime и развёртывания**
 
 ```bash
 git add Dockerfile docker-compose.yml deploy/docker-compose.team.yml scripts/deploy-common.sh scripts/deploy-slot.sh scripts/switch-slot.sh scripts/rollback-slot.sh tests/deploy/image.test.mjs tests/deploy/leads.test.mjs tests/deploy/scripts.test.mjs tests/postgresCompose.test.ts tests/fixtures/deploy-leads.env .github/workflows/docker-build.yml server/.env.example server/README.md deploy/README.md
@@ -1200,21 +1200,21 @@ git commit -m "feat(deploy): operate durable lead delivery"
 
 ---
 
-### Task 12: Run the complete local release gate and record evidence
+### Задача 12: Выполнить полную локальную проверку релиза и зафиксировать результаты
 
-**Files:**
+**Файлы:**
 
-- Create: `tests/leads/endToEnd.test.ts`
-- Modify only if the integration test reveals a defect in a file owned by Tasks 1–11.
+- Создать: `tests/leads/endToEnd.test.ts`
+- Изменять остальные файлы только в том случае, если интеграционный тест выявит дефект в файле из задач 1–11.
 
-**Interfaces:**
+**Интерфейсы:**
 
-- Consumes: every prior task.
-- Produces: fresh evidence that the whole site, migration, form, worker, and deployment topology work together without contacting production services.
+- Использует: результаты всех предыдущих задач.
+- Создаёт: актуальные подтверждения того, что весь сайт, миграция, форма, worker и топология развёртывания работают совместно без обращения к production-сервисам.
 
-- [ ] **Step 1: Start clean test infrastructure and apply migrations**
+- [ ] **Шаг 1: Запустить чистую тестовую инфраструктуру и применить миграции**
 
-Run:
+Запустить:
 
 ```bash
 docker compose up -d postgres
@@ -1222,11 +1222,11 @@ DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev yarn db:migrate
 DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn db:check
 ```
 
-Expected: PostgreSQL is healthy, migrations complete, and Drizzle check exits `0`.
+Ожидается: PostgreSQL исправен, миграции завершены, проверка Drizzle завершается с кодом `0`.
 
-- [ ] **Step 2: Run static and automated verification**
+- [ ] **Шаг 2: Выполнить статические и автоматизированные проверки**
 
-Run:
+Запустить:
 
 ```bash
 yarn typecheck
@@ -1234,11 +1234,11 @@ TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tes
 yarn build
 ```
 
-Expected: typecheck, every existing/new test, and production build pass with zero failures. The only permitted skip is a test explicitly guarded by an unavailable platform tool; PostgreSQL integration tests must run, not skip.
+Ожидается: проверка типов, все существующие и новые тесты, а также production-сборка проходят без ошибок. Пропуск разрешён только для теста, явно защищённого проверкой недоступного платформенного инструмента; интеграционные тесты PostgreSQL должны выполняться, а не пропускаться.
 
-- [ ] **Step 3: Add and run the fake-dependency end-to-end test**
+- [ ] **Шаг 3: Добавить и запустить сквозной тест с тестовыми зависимостями**
 
-In `tests/leads/endToEnd.test.ts`, start Express with the real lead router/service/repository against the test database and inject recording ClamAV, private store, CRM, and SMTP adapters. Submit one no-file lead and one clean-file lead, retry the first request with its original browser key, run worker batches until no job remains, and assert:
+В `tests/leads/endToEnd.test.ts` запустить Express с настоящими маршрутизатором, сервисом и репозиторием заявок на тестовой базе данных и внедрить записывающие адаптеры ClamAV, приватного хранилища, CRM и SMTP. Отправить одну заявку без файла и одну заявку с безопасным файлом, повторить первый запрос с исходным ключом браузера, запускать пакеты worker до полного завершения заданий и проверить:
 
 ```ts
 test("two accepted leads deliver once to both channels", async () => {
@@ -1252,25 +1252,25 @@ test("two accepted leads deliver once to both channels", async () => {
 });
 ```
 
-Verify in PostgreSQL and mock capture:
+Проверить в PostgreSQL и записях тестовых адаптеров:
 
 ```text
-2 leads
-4 outbox jobs
-2 CRM tasks, with the replay creating no third task
-2 email messages
-1 private attachment object
-0 pending/retry jobs
-0 contact values or secrets in runtime logs
+2 заявки
+4 задания outbox
+2 задачи CRM; повторный запрос не создаёт третью задачу
+2 email-сообщения
+1 приватный объект вложения
+0 ожидающих или повторяемых заданий
+0 контактных данных или секретов в журналах runtime
 ```
 
-Run: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/leads/endToEnd.test.ts`
+Запустить: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/leads/endToEnd.test.ts`
 
-Expected: one integration test passes with the exact counts above and no external network call.
+Ожидается: один интеграционный тест проходит с точными количествами, указанными выше, без внешних сетевых запросов.
 
-- [ ] **Step 4: Exercise failure and recovery**
+- [ ] **Шаг 4: Проверить сбой и восстановление**
 
-Add a second test in the same file. Make the recording CRM adapter return a retryable `500`, confirm public submission still returns `201`, create a new worker instance with an expired lease, restore CRM `201`, and confirm both recorded attempts used the same lead UUID and attachment checksum while the fake CRM contains one logical task. Make fake S3 deletion fail during retention, confirm the database row remains, restore deletion, advance the injected clock 30 days, and confirm object-before-row deletion.
+Добавить второй тест в тот же файл. Настроить записывающий адаптер CRM на возврат допускающей повтор ошибки `500`, убедиться, что публичная отправка всё равно возвращает `201`, создать новый экземпляр worker с истёкшей арендой, восстановить ответ CRM `201` и подтвердить, что обе записанные попытки использовали одинаковые UUID заявки и контрольную сумму вложения, а тестовая CRM содержит одну логическую задачу. Имитировать сбой удаления из S3 во время очистки и убедиться, что строка базы данных сохраняется; восстановить удаление, перевести внедрённые часы на 30 дней вперёд и подтвердить, что объект удаляется раньше строки.
 
 ```ts
 test("accepted work survives vendor failure, worker restart, and retention retry", async () => {
@@ -1290,13 +1290,13 @@ test("accepted work survives vendor failure, worker restart, and retention retry
 });
 ```
 
-Run: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/leads/endToEnd.test.ts`
+Запустить: `TEST_DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test tests/leads/endToEnd.test.ts`
 
-Expected: both end-to-end tests pass.
+Ожидается: оба сквозных теста проходят.
 
-- [ ] **Step 5: Run crawler and deployment regression gates**
+- [ ] **Шаг 5: Запустить регрессионные проверки краулера и развёртывания**
 
-Run:
+Запустить:
 
 ```bash
 DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev yarn content:migrate --batch-id "lead-intake-verification"
@@ -1311,9 +1311,9 @@ node --test tests/deploy/*.test.mjs tests/ciReleaseGate.test.mjs
 git diff --check
 ```
 
-Expected: crawler reports zero route/SEO violations, the temporary runtime is stopped, deployment tests pass, and `git diff --check` prints no errors.
+Ожидается: краулер не сообщает о нарушениях маршрутов и SEO, временный runtime остановлен, тесты развёртывания проходят, а `git diff --check` не выводит ошибок.
 
-- [ ] **Step 6: Commit the end-to-end verification test and any proven fixes**
+- [ ] **Шаг 6: Зафиксировать коммитом сквозной проверочный тест и подтверждённые исправления**
 
 ```bash
 git add tests/leads/endToEnd.test.ts
@@ -1322,10 +1322,10 @@ git diff --cached --check
 git commit -m "test(leads): verify durable delivery recovery"
 ```
 
-Before the second `git add`, inspect `git status --short` and include only files changed to correct failures demonstrated in Steps 2–5; do not stage unrelated owner work.
+Перед вторым `git add` проверить `git status --short` и включить только файлы, изменённые для исправления сбоев, подтверждённых на шагах 2–5; не добавлять в индекс несвязанные изменения владельца репозитория.
 
-- [ ] **Step 7: Review scope and repository state**
+- [ ] **Шаг 7: Проверить состав изменений и состояние репозитория**
 
-Run: `git status --short && git log --oneline --decorate -12`
+Запустить: `git status --short && git log --oneline --decorate -12`
 
-Expected: no uncommitted files remain, commits are the focused slices above, and there is no merge/push/deploy commit. Confirm no real CRM/SMTP/S3 request appears in logs or test configuration.
+Ожидается: незакоммиченных файлов нет, история состоит из перечисленных выше сфокусированных коммитов, коммиты слияния, push или развёртывания отсутствуют. Подтвердить, что в журналах и тестовой конфигурации нет реальных запросов к CRM, SMTP или S3.
