@@ -100,6 +100,10 @@ function metadataFields(input: Record<string, string>, keys: readonly string[]):
     const value = input[key];
     if (typeof value === "string" && Buffer.byteLength(value) <= 255 && !/[\u0000-\u001f\u007f]/.test(value) && !/\bBearer\s/i.test(value)) {
       result[key] = value;
+      // JSON escaping counts toward the cap. PostgreSQL also inserts spaces
+      // after colons/commas; two extra bytes per field conservatively cover them.
+      const serializedBytes = Buffer.byteLength(JSON.stringify(result)) + 2 * Object.keys(result).length;
+      if (serializedBytes > 4096) delete result[key];
     }
   }
   return result;

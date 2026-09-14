@@ -251,3 +251,29 @@ databaseTest("arbitrary vendor and scan metadata never become persisted credenti
   assert.equal(rows.find((row) => row.id === crm.id)!.lastErrorCode, "delivery_error");
   assert.deepEqual((await db.select().from(leadAttachments))[0].scanMetadata, { engine: "ClamAV", result: "clean" });
 });
+
+databaseTest("escaped receipt fields stay within PostgreSQL's total metadata cap and complete delivery", async () => {
+  const { db, repository } = await fixture();
+  await repository.accept(command());
+  const [job] = await repository.claimDueJobs("owner", 1, 120_000);
+  const escapedValue = '"\\'.repeat(127) + "\\";
+  const responseMetadata = Object.fromEntries([
+    "requestId", "taskId", "taskCode", "taskStatus", "dueDate", "replayed", "rateLimit", "rateRemaining", "messageId",
+  ].map((key) => [key, escapedValue]));
+
+  assert.equal(await repository.markDelivered({
+    jobId: job.id, ownerId: "owner", attemptCount: job.attemptCount, responseMetadata,
+  }), true);
+
+  const [stored] = await db.select({
+    metadata: leadDeliveryJobs.responseMetadata,
+    bytes: sql<number>`octet_length(${leadDeliveryJobs.responseMetadata}::text)`,
+    status: leadDeliveryJobs.status,
+    leaseOwner: leadDeliveryJobs.leaseOwner,
+  }).from(leadDeliveryJobs).where(eq(leadDeliveryJobs.id, job.id));
+  assert.ok(stored.bytes <= 4096, `PostgreSQL metadata occupies ${stored.bytes} bytes`);
+  assert.ok(Object.keys(stored.metadata).length > 0);
+  assert.ok(Object.values(stored.metadata).every((value) => value === escapedValue));
+  assert.equal(stored.status, "delivered");
+  assert.equal(stored.leaseOwner, null);
+});
