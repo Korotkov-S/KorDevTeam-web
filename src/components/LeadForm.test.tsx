@@ -82,6 +82,9 @@ test("renders labelled native fields with the approved attachment formats", () =
     screen.getByLabelText("Файл (необязательно)").getAttribute("accept"),
     ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png",
   );
+  const fileHint = screen.getByText(/PDF, DOC, DOCX/);
+  assert.equal(fileHint.id, "lead-file-hint");
+  assert.equal(screen.getByLabelText("Файл (необязательно)").getAttribute("aria-describedby"), fileHint.id);
   assert.equal(screen.getByLabelText(/согласен/i).getAttribute("name"), "consent");
   assert.match(screen.getByText("Ответим в течение рабочего дня").textContent ?? "", /рабочего дня/);
   assert.ok(screen.getByText("Пн–Пт, 09:00–18:00 по Москве"));
@@ -181,6 +184,35 @@ test("reuses an idempotency key only for an unchanged retry and resets it after 
   fireEvent.click(button);
   await waitFor(() => assert.equal(keys.length, 3));
   assert.notEqual(keys[2], keys[1]);
+});
+
+test("uses a new idempotency key when normalized pagePath changes between retries", async () => {
+  const attempts: Array<{ key: string; pagePath: FormDataEntryValue | null }> = [];
+  installUuidSequence(
+    "10000000-0000-4000-8000-000000000001",
+    "10000000-0000-4000-8000-000000000002",
+  );
+  globalThis.fetch = async (_input, init) => {
+    const body = init?.body as FormData;
+    attempts.push({
+      key: new Headers(init?.headers).get("Idempotency-Key") ?? "",
+      pagePath: body.get("pagePath"),
+    });
+    throw new TypeError("network unavailable");
+  };
+  const view = render(<LeadForm pagePath="/services/old/" />);
+  fillRequiredFields();
+  const button = screen.getByRole("button", { name: "Отправить заявку" });
+
+  fireEvent.click(button);
+  await screen.findByText("Не удалось отправить заявку. Попробуйте ещё раз.");
+  view.rerender(<LeadForm pagePath="/services/new/" />);
+  fireEvent.click(button);
+  await waitFor(() => assert.equal(attempts.length, 2));
+
+  assert.equal(attempts[0].pagePath, "/services/old/");
+  assert.equal(attempts[1].pagePath, "/services/new/");
+  assert.notEqual(attempts[0].key, attempts[1].key);
 });
 
 test("uses a new idempotency key after file changes and after a successful submission", async () => {

@@ -7,15 +7,18 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { collectTypeScriptTestFiles } from "./run-ts-tests.mjs";
 
-test("collectTypeScriptTestFiles skips absent optional roots", async (t) => {
+test("collectTypeScriptTestFiles finds test.ts and test.tsx but ignores ordinary TSX", async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), "kordev-ts-tests-"));
   t.after(() => rm(root, { force: true, recursive: true }));
 
   await mkdir(path.join(root, "src", "nested"), { recursive: true });
   await writeFile(path.join(root, "src", "nested", "theme.test.ts"), "");
+  await writeFile(path.join(root, "src", "nested", "form.test.tsx"), "");
+  await writeFile(path.join(root, "src", "nested", "page.tsx"), "");
 
   const files = collectTypeScriptTestFiles(root, ["tests", "src"]);
   assert.deepEqual(files.map((file) => path.relative(root, file)), [
+    path.join("src", "nested", "form.test.tsx"),
     path.join("src", "nested", "theme.test.ts"),
   ]);
 });

@@ -36,13 +36,18 @@ const emptyFields: FormFields = {
   website: "",
 };
 
-function submissionSnapshot(fields: FormFields, file: File | null): string {
+function normalizeSnapshotText(value: string): string {
+  return value.replace(/\r\n?/g, "\n").trim();
+}
+
+function submissionSnapshot(fields: FormFields, file: File | null, normalizedPagePath: string): string {
   return JSON.stringify({
     name: fields.name.trim(),
     phone: fields.phone.trim(),
     description: fields.description.trim(),
     consent: fields.consent,
     website: fields.website,
+    pagePath: normalizedPagePath,
     file: file
       ? { name: file.name, size: file.size, lastModified: file.lastModified }
       : null,
@@ -104,7 +109,8 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
       return;
     }
 
-    const snapshot = submissionSnapshot(fields, file);
+    const normalizedPagePath = normalizeSnapshotText(pagePath);
+    const snapshot = submissionSnapshot(fields, file, normalizedPagePath);
     const submission = retryRef.current?.snapshot === snapshot
       ? retryRef.current
       : { key: crypto.randomUUID(), snapshot };
@@ -116,7 +122,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
     formData.append("description", fields.description.trim());
     formData.append("consent", "accepted");
     formData.append("website", fields.website);
-    formData.append("pagePath", pagePath);
+    formData.append("pagePath", normalizedPagePath);
     if (file) formData.append("file", file, file.name);
 
     inFlightRef.current = true;
@@ -220,12 +226,13 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
           name="file"
           type="file"
           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+          aria-describedby="lead-file-hint"
           onChange={(event) => {
             setFile(event.currentTarget.files?.[0] ?? null);
             onFileChange();
           }}
         />
-        <p className="mt-1 text-xs text-muted-foreground">{t("contact.form.fileHint")}</p>
+        <p id="lead-file-hint" className="mt-1 text-xs text-muted-foreground">{t("contact.form.fileHint")}</p>
       </div>
 
       <div className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">

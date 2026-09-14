@@ -11,7 +11,7 @@ function collectFrom(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
       const entryPath = path.join(directory, entry.name);
       if (entry.isDirectory()) return collectFrom(entryPath);
-      return entry.isFile() && entry.name.endsWith(".test.ts") ? [entryPath] : [];
+      return entry.isFile() && /\.test\.tsx?$/.test(entry.name) ? [entryPath] : [];
     });
   } catch (error) {
     if (error?.code === "ENOENT") return [];
