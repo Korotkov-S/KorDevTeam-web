@@ -112,6 +112,7 @@
     "db:check": "drizzle-kit check",
     "lead:worker": "node server/lead-worker.mjs",
     "lead:worker:check": "node server/lead-worker.mjs --check",
+    "lead:retention": "node server/lead-retention.mjs",
     "content:migrate": "tsx scripts/migrate-content-to-postgres.ts",
     "content:verify": "tsx scripts/verify-content-migration.ts",
     "seo:crawl": "tsx scripts/seo-crawl.ts"

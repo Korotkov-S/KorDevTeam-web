@@ -14,6 +14,7 @@ export interface PrivateAttachmentStore {
   putFile(input: { objectKey: string; path: string; contentType: string }): Promise<void>;
   materialize(input: { objectKey: string; tempRoot: string; signal?: AbortSignal }): Promise<{ path: string; dispose(): Promise<void> }>;
   delete(objectKey: string): Promise<void>;
+  deleteForRetention(objectKey: string): Promise<"deleted" | "missing">;
   listOlderThan(cutoff: Date): AsyncIterable<{ key: string; lastModified: Date }>;
 }
 
@@ -114,6 +115,12 @@ export function createPrivateAttachmentStore(
   const checkKey = (key: string) => {
     if (!key.startsWith(prefix) || key.length <= prefix.length) throw new LeadError("storage_unavailable");
   };
+  const deleteObject = async (objectKey: string): Promise<void> => {
+    checkKey(objectKey);
+    const signal = operationSignal(undefined, operationTimeoutMs);
+    try { await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey }), { abortSignal: signal }); }
+    catch (error) { throw storageError(error); }
+  };
   return {
     async putFile({ objectKey, path, contentType }) {
       checkKey(objectKey);
@@ -156,10 +163,14 @@ export function createPrivateAttachmentStore(
       } catch (error) { await dispose(); throw storageError(error); }
     },
     async delete(objectKey) {
-      checkKey(objectKey);
-      const signal = operationSignal(undefined, operationTimeoutMs);
-      try { await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey }), { abortSignal: signal }); }
-      catch (error) { throw storageError(error); }
+      await deleteObject(objectKey);
+    },
+    async deleteForRetention(objectKey) {
+      try { await deleteObject(objectKey); return "deleted"; }
+      catch (error) {
+        if (error instanceof MissingPrivateObjectError) return "missing";
+        throw error;
+      }
     },
     async *listOlderThan(cutoff) {
       let token: string | undefined;
