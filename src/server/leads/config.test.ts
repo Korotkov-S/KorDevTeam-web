@@ -42,9 +42,11 @@ test("rejects incomplete or unsafe lead configuration with stable errors", () =>
   const missingHash = { ...productionEnvironment, LEAD_HASH_KEY: "" };
   const shortHash = { ...productionEnvironment, LEAD_HASH_KEY: Buffer.alloc(31).toString("base64") };
   const invalidEndpoint = { ...productionEnvironment, CRM_INTAKE_ENDPOINT: "http://crm.example.invalid/api/v1/board-intake/public-id/requests" };
+  const queryEndpoint = { ...productionEnvironment, CRM_INTAKE_ENDPOINT: "https://crm.example.invalid/api/v1/board-intake/public-id/requests?unexpected=value" };
+  const fragmentEndpoint = { ...productionEnvironment, CRM_INTAKE_ENDPOINT: "https://crm.example.invalid/api/v1/board-intake/public-id/requests#unexpected" };
   const wrongRecipient = { ...productionEnvironment, LEAD_EMAIL_TO: "other@example.invalid" };
 
-  for (const environment of [missingHash, shortHash, invalidEndpoint, wrongRecipient]) {
+  for (const environment of [missingHash, shortHash, invalidEndpoint, queryEndpoint, fragmentEndpoint, wrongRecipient]) {
     assert.throws(() => readLeadWorkerConfig(environment), /lead_config_invalid/);
   }
 });

@@ -85,7 +85,7 @@ export function assertLeadWebConfig(environment: LeadEnvironment): void {
 
 export function readLeadWorkerConfig(environment: LeadEnvironment): LeadWorkerConfig {
   const endpoint = httpsUrl(required(environment, "CRM_INTAKE_ENDPOINT"));
-  if (!/^\/api\/v1\/board-intake\/[^/]+\/requests$/.test(endpoint.pathname)) configError();
+  if (endpoint.search || endpoint.hash || !/^\/api\/v1\/board-intake\/[^/]+\/requests$/.test(endpoint.pathname)) configError();
   const secureValue = required(environment, "SMTP_SECURE");
   if (secureValue !== "true" && secureValue !== "false") configError();
   const to = required(environment, "LEAD_EMAIL_TO");
