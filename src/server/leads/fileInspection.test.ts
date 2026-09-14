@@ -338,3 +338,21 @@ test("PDF permits header-like text inside literal strings and length-bounded str
   const rebased = pdfFixture(false, { baseOffset: pdf.length }).bytes;
   await assert.rejects(inspect(Buffer.concat([pdf, rebased]), "pdf"), { code: "unsafe_file" });
 });
+
+test("incremental PDF resolves each historical stream length in its own revision", async () => {
+  const base = pdfFixture(false, { stream: "%a\n", indirectLength: true });
+  const stream = "4 0 obj\n<< /Length 5 0 R >>\nstream\n%abcde\n\nendstream\nendobj\n";
+  const length = "5 0 obj\n7\nendobj\n";
+  const streamOffset = base.bytes.length, lengthOffset = streamOffset + stream.length, xref = lengthOffset + length.length;
+  const revision = `xref\n4 2\n${String(streamOffset).padStart(10, "0")} 00000 n \n${String(lengthOffset).padStart(10, "0")} 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R /Prev ${base.xref} >>\nstartxref\n${xref}\n%%EOF\n`;
+  const bytes = Buffer.concat([base.bytes, Buffer.from(stream + length + revision)]);
+  assert.equal((await inspect(bytes, "pdf")).mediaType, types.pdf);
+  const wrongCurrentLength = Buffer.concat([base.bytes, Buffer.from(stream + length.replace("\n7\n", "\n3\n") + revision)]);
+  await assert.rejects(inspect(wrongCurrentLength, "pdf"), { code: "unsafe_file" });
+
+  // Updating only /Length must not make the still-current original stream
+  // borrow its earlier length and bypass validation of the newest view.
+  const lengthOnlyXref = base.bytes.length + length.length;
+  const lengthOnlyRevision = `xref\n5 1\n${String(base.bytes.length).padStart(10, "0")} 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R /Prev ${base.xref} >>\nstartxref\n${lengthOnlyXref}\n%%EOF\n`;
+  await assert.rejects(inspect(Buffer.concat([base.bytes, Buffer.from(length + lengthOnlyRevision)]), "pdf"), { code: "unsafe_file" });
+});

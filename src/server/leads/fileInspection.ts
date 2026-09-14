@@ -121,11 +121,15 @@ async function pdf(reader: Reader) {
   const terminal = /startxref\s+(\d+)\s+%%EOF[\t\n\f\r ]*$/.exec(tail);
   if (!terminal) unsafe();
   let xref = Number(terminal[1]), latest = true, root: PdfReference | undefined;
-  const visited = new Set<number>(), objects = new Map<number, { offset: number; generation: number } | null>();
-  const objectOffsets = new Set<number>(), spans: { start: number; end: number }[] = [{ start: 0, end: header[0].length }];
+  type ObjectLocation = { offset: number; generation: number } | null;
+  const visited = new Set<number>(), objects = new Map<number, ObjectLocation>();
+  const revisions: Map<number, ObjectLocation>[] = [];
+  const objectOffsets = new Map<number, { id: number; revision: number }>(), spans: { start: number; end: number }[] = [{ start: 0, end: header[0].length }];
   while (true) {
     if (!Number.isSafeInteger(xref) || xref < 8 || xref >= reader.size || visited.has(xref) || visited.size >= 64) unsafe();
     visited.add(xref);
+    const revision = revisions.length, entries = new Map<number, ObjectLocation>();
+    revisions.push(entries);
     const syntax = new PdfSyntax((await reader.at(xref, Math.min(65_536, reader.size - xref))).toString("latin1"));
     // Xref/object streams and hybrid references are deliberately unsupported.
     if (syntax.token() !== "xref") unsafe();
@@ -143,9 +147,11 @@ async function pdf(reader: Reader) {
           const header = (await reader.at(offset, Math.min(64, reader.size - offset))).toString("latin1");
           const match = /^(\d+)\s+(\d+)\s+obj\b/.exec(header);
           if (!match || Number(match[1]) !== id || Number(match[2]) !== generation) unsafe();
-          objectOffsets.add(offset);
+          if (!objectOffsets.has(offset)) objectOffsets.set(offset, { id, revision });
         }
-        if (!objects.has(id)) objects.set(id, flag === "n" ? { offset, generation } : null);
+        const location = flag === "n" ? { offset, generation } : null;
+        entries.set(id, location);
+        if (!objects.has(id)) objects.set(id, location);
       }
     }
     const trailer = syntax.value();
@@ -171,17 +177,26 @@ async function pdf(reader: Reader) {
     syntax.token(); syntax.token(); syntax.token();
     return syntax;
   };
-  for (const offset of objectOffsets) {
+  const indirectLength = async (reference: PdfReference, revision: number) => {
+    // Maps are newest-first: a historical view starts at its revision and
+    // inherits only earlier entries. A free entry must shadow earlier values.
+    const target = revisions.slice(revision).find((entries) => entries.has(reference.id))?.get(reference.id);
+    if (!target || target.generation !== reference.generation) unsafe();
+    const indirect = await objectSyntax(target.offset), length = indirect.value();
+    if (indirect.token() !== "endobj") unsafe();
+    return length;
+  };
+  for (const [offset, { id, revision }] of objectOffsets) {
     const syntax = await objectSyntax(offset), value = syntax.value(), ending = syntax.token();
     if (ending === "endobj") { spans.push({ start: offset, end: offset + syntax.position }); continue; }
     if (ending !== "stream" || !(value instanceof Map)) unsafe();
     let length = value.get("/Length");
     if (typeof length !== "number") {
-      const reference = pdfReference(length), target = objects.get(reference.id);
-      if (!target || target.generation !== reference.generation) unsafe();
-      const indirect = await objectSyntax(target.offset);
-      length = indirect.value();
-      if (indirect.token() !== "endobj") unsafe();
+      const reference = pdfReference(length);
+      length = await indirectLength(reference, revision);
+      // An unchanged stream still used by the latest document must also be
+      // consistent with its latest /Length reference, not only its old view.
+      if (revision > 0 && objects.get(id)?.offset === offset && await indirectLength(reference, 0) !== length) unsafe();
     }
     const eol = /^(?:\r\n|\n|\r)/.exec(syntax.text.slice(syntax.position));
     if (typeof length !== "number" || !Number.isSafeInteger(length) || length < 0 || !eol) unsafe();
