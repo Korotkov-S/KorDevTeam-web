@@ -17,13 +17,15 @@ function fixture(t) {
   writeFileSync(route, `# current-slot: blue\n# previous-slot: none\n# current-image: ${oldImage}\nhttp:\n  routers:\n    kordevteam:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [websecure]\n      tls:\n        certResolver: letsencrypt\n        domains:\n          - main: example.com\n            sans: [www.example.com]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n    kordevteam-http:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [web]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n  middlewares:\n    kordevteam-slot:\n      headers:\n        customResponseHeaders:\n          X-Kordev-Slot: blue\n  services:\n    kordevteam-active:\n      loadBalancer:\n        servers:\n          - url: http://kordevteam-blue:3001\n`);
   writeFileSync(path.join(dir, 'state/slots/blue'), oldImage + '\n');
   writeFileSync(path.join(dir, 'state/slots/green'), image + '\n');
+  writeFileSync(path.join(dir, 'state/worker-image'), oldImage + '\n', { mode: 0o600 });
   function stub(name, body) { writeFileSync(path.join(dir, 'bin', name), '#!/bin/bash\nset -eu\n' + body, { mode: 0o755 }); }
-  stub('docker', 'printf "%s\\n" "$*" >> "$TEST_DIR/commands"\nif [[ "$1" == inspect ]]; then if [[ "$*" == *blue* ]]; then printf "%s\\n" "$OLD_IMAGE"; else printf "%s\\n" "$TARGET_IMAGE"; fi; fi\n');
-  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
+  stub('docker', 'printf "WORKER_IMAGE=%s %s\\n" "${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/commands"\nprintf "docker WORKER_IMAGE=%s %s\\n" "${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_CANDIDATE_CHECK:-0}" == 1 && "$*" == *"run --rm --no-deps lead-worker node server/lead-worker.mjs --check"* && "${WORKER_IMAGE:-}" == "$TARGET_IMAGE" ]]; then exit 1; fi\nif [[ -n "${FAIL_WORKER_IMAGE:-}" && "$*" == *"up -d --no-deps lead-worker"* && "${WORKER_IMAGE:-}" == "$FAIL_WORKER_IMAGE" ]]; then exit 1; fi\nif [[ "$1" == inspect ]]; then\n  if [[ "$*" == *"{{.Config.Image}}"* ]]; then if [[ "$*" == *lead-worker* ]]; then printf "%s\\n" "${WORKER_IMAGE:-$OLD_IMAGE}"; elif [[ "$*" == *blue* ]]; then printf "%s\\n" "$OLD_IMAGE"; else printf "%s\\n" "$TARGET_IMAGE"; fi\n  elif [[ "$*" == *"{{.State.Health.Status}}"* ]]; then printf "healthy\\n"; fi\nfi\n');
+  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nprintf "curl %s\\n" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir,
     DEPLOY_STATE_DIR: `${dir}/state`, TRAEFIK_DYNAMIC_FILE: route, PUBLIC_ORIGIN: 'https://example.com',
     TARGET_IMAGE: image, OLD_IMAGE: oldImage, READINESS_ATTEMPTS: '1', READINESS_DELAY: '0',
-    PRODUCTION_HOST: 'example.com', LOG_ARCHIVE_DIR: `${dir}/logs`, REAL_NODE: process.execPath };
+    PRODUCTION_HOST: 'example.com', LOG_ARCHIVE_DIR: `${dir}/logs`, REAL_NODE: process.execPath,
+    CLAMAV_IMAGE: `clamav/clamav@sha256:${'c'.repeat(64)}` };
   return { dir, route, env, stub, run: (name, args = [], extra = {}) => spawnSync('bash', [path.join(root, 'scripts', `${name}.sh`), ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8' }) };
 }
 
@@ -130,9 +132,81 @@ test('inactive deploy backs up and migrates before replacement, records verified
   assert.equal(readFileSync(`${f.dir}/state/slots/green`, 'utf8').trim(), image);
   const commands = readFileSync(`${f.dir}/commands`, 'utf8');
   assert.ok(commands.indexOf('backup') < commands.indexOf('migrate-production.mjs'));
+  assert.ok(commands.indexOf('migrate-production.mjs') < commands.indexOf('run --rm --no-deps lead-worker node server/lead-worker.mjs --check'));
+  assert.match(commands, new RegExp(`WORKER_IMAGE=${image.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} compose .* run --rm --no-deps lead-worker node server/lead-worker.mjs --check`));
   assert.ok(commands.indexOf('migrate-production.mjs') < commands.indexOf('up -d --no-deps kordevteam-green'));
   assert.ok(commands.includes('archive-logs'));
   assert.doesNotMatch(commands, /up .*kordevteam-blue/);
+});
+test('failed candidate worker check leaves active route, worker and slot record untouched', t => {
+  const f = fixture(t); const before = readFileSync(f.route); const workerBefore = readFileSync(`${f.dir}/state/worker-image`);
+  f.stub('node', 'if [[ "$1" == *postgres-backup.mjs ]]; then exit 0; elif [[ "$1" == *archive-web-logs.mjs ]]; then exit 0; else exec "$REAL_NODE" "$@"; fi\n');
+  const result = f.run('deploy-slot', ['green', image], { FAIL_CANDIDATE_CHECK: '1' });
+  assert.notEqual(result.status, 0);
+  assert.deepEqual(readFileSync(f.route), before);
+  assert.deepEqual(readFileSync(`${f.dir}/state/worker-image`), workerBefore);
+  const commands = readFileSync(`${f.dir}/commands`, 'utf8');
+  assert.doesNotMatch(commands, /up -d --no-deps kordevteam-green/);
+  assert.doesNotMatch(commands, /up -d --no-deps lead-worker/);
+});
+
+test('successful switch activates worker only after public smoke and records target image', t => {
+  const f = fixture(t);
+  const result = f.run('switch-slot', ['green']); assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(`${f.dir}/state/worker-image`, 'utf8').trim(), image);
+  assert.equal(statSync(`${f.dir}/state/worker-image`).mode & 0o777, 0o600);
+  const events = readFileSync(`${f.dir}/events`, 'utf8');
+  const publicReady = events.indexOf('curl --fail --silent --show-error --max-time 10 --dump-header - --output /dev/null https://example.com/api/health/ready');
+  const workerUp = events.indexOf(`docker WORKER_IMAGE=${image} compose`);
+  assert.ok(publicReady >= 0 && workerUp > publicReady, events);
+  assert.match(events, /up -d --no-deps lead-worker/);
+});
+
+test('public smoke failure never replaces the previous worker', t => {
+  const f = fixture(t);
+  const result = f.run('switch-slot', ['green'], { FAIL_PUBLIC: '1' });
+  assert.notEqual(result.status, 0);
+  assert.equal(readFileSync(`${f.dir}/state/worker-image`, 'utf8').trim(), oldImage);
+  const commands = existsSync(`${f.dir}/commands`) ? readFileSync(`${f.dir}/commands`, 'utf8') : '';
+  assert.doesNotMatch(commands, /up -d --no-deps lead-worker/);
+});
+
+test('failed worker activation restores exact previous route and previous worker image', t => {
+  const f = fixture(t); const before = readFileSync(f.route);
+  const result = f.run('switch-slot', ['green'], { FAIL_WORKER_IMAGE: image });
+  assert.notEqual(result.status, 0); assert.match(result.stderr, /worker.*restor/i);
+  assert.deepEqual(readFileSync(f.route), before);
+  assert.equal(readFileSync(`${f.dir}/state/worker-image`, 'utf8').trim(), oldImage);
+  const commands = readFileSync(`${f.dir}/commands`, 'utf8');
+  const failed = commands.indexOf(`WORKER_IMAGE=${image} compose`);
+  const restored = commands.indexOf(`WORKER_IMAGE=${oldImage} compose`, failed + 1);
+  assert.ok(failed >= 0 && restored > failed, commands);
+});
+
+test('rollback synchronizes worker to the restored slot image', t => {
+  const f = fixture(t);
+  assert.equal(f.run('switch-slot', ['green']).status, 0);
+  const result = f.run('rollback-slot'); assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(`${f.dir}/state/worker-image`, 'utf8').trim(), oldImage);
+  const commands = readFileSync(`${f.dir}/commands`, 'utf8');
+  assert.match(commands, new RegExp(`WORKER_IMAGE=${oldImage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} compose .* up -d --no-deps lead-worker`));
+});
+test('failed rollback worker activation restores the pre-rollback route and worker', t => {
+  const f = fixture(t);
+  assert.equal(f.run('switch-slot', ['green']).status, 0);
+  const before = readFileSync(f.route);
+  const result = f.run('rollback-slot', [], { FAIL_WORKER_IMAGE: oldImage });
+  assert.notEqual(result.status, 0); assert.match(result.stderr, /rollback worker.*restor/i);
+  assert.deepEqual(readFileSync(f.route), before);
+  assert.equal(readFileSync(`${f.dir}/state/worker-image`, 'utf8').trim(), image);
+});
+test('symlinked worker image state fails closed before routing changes', t => {
+  const f = fixture(t); const before = readFileSync(f.route);
+  const real = `${f.dir}/state/worker-image-real`;
+  writeFileSync(real, oldImage + '\n'); rmSync(`${f.dir}/state/worker-image`); symlinkSync(real, `${f.dir}/state/worker-image`);
+  const result = f.run('switch-slot', ['green']);
+  assert.notEqual(result.status, 0);
+  assert.deepEqual(readFileSync(f.route), before);
 });
 test('backup failure prevents migrations, replacement and slot record update', t => {
   const f = fixture(t); const before = readFileSync(f.route, 'utf8');

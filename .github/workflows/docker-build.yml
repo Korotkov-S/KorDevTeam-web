@@ -24,6 +24,27 @@ jobs:
     env:
       DATABASE_URL: postgresql://kordev_ci:kordev_ci@127.0.0.1:5432/kordev_ci
       TEST_DATABASE_URL: postgresql://kordev_ci:kordev_ci@127.0.0.1:5432/kordev_test
+      LEAD_CONSENT_VERSION: ci-test-only
+      LEAD_HASH_KEY: ZmFrZS1vbmx5LTMyaXRlLWhhc2gta2V5LWZvci1jaS10ZXN0cyE=
+      LEAD_TEMP_ROOT: /tmp/kordev-leads
+      LEAD_S3_ENDPOINT: https://s3.example.invalid
+      LEAD_S3_REGION: test-1
+      LEAD_S3_BUCKET: private-test
+      LEAD_S3_ACCESS_KEY_ID: fixture-access
+      LEAD_S3_SECRET_ACCESS_KEY: fixture-secret
+      LEAD_S3_PREFIX: leads/
+      LEAD_S3_SSE: AES256
+      CLAMAV_HOST: clamav.example.invalid
+      CLAMAV_PORT: 3310
+      CRM_INTAKE_ENDPOINT: https://crm.example.invalid/api/v1/board-intake/brd_ci/requests
+      CRM_INTAKE_TOKEN: fixture-board-token
+      SMTP_HOST: smtp.example.invalid
+      SMTP_PORT: 465
+      SMTP_SECURE: true
+      SMTP_USER: fixture-user
+      SMTP_PASSWORD: fixture-password
+      SMTP_FROM: team@korotkov.dev
+      LEAD_EMAIL_TO: team@korotkov.dev
     services:
       postgres:
         image: postgres:16-alpine
@@ -67,6 +88,14 @@ jobs:
 
       - name: Typecheck
         run: yarn typecheck
+
+      - name: Verify systemd retention unit
+        run: |
+          sudo useradd --system --no-create-home kordevteam || true
+          sudo install -d /etc/kordevteam /opt/kordevteam
+          sudo touch /etc/kordevteam/operations.env
+          sudo ln -s "$GITHUB_WORKSPACE" /opt/kordevteam/current
+          systemd-analyze verify deploy/systemd/kordevteam-lead-retention.service deploy/systemd/kordevteam-lead-retention.timer
 
       - name: Test
         run: yarn test

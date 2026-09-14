@@ -46,6 +46,16 @@ NODE_ENV=production PORT=3001 CONTENT_DIST_ROOT=dist node server/index.js
 
 ## API Endpoints
 
+## Заявки с сайта и worker
+
+`POST /api/leads` принимает форму, проверяет вложение через ClamAV, сохраняет заявку и задания доставки в PostgreSQL. Долгоживущий процесс запускается отдельно командой `yarn lead:worker`; безопасная проверка конфигурации и подключения к БД — `yarn lead:worker:check`. Проверка `--check` выполняет только структурную валидацию переменных и `SELECT 1`: она не забирает задания, не вызывает CRM/SMTP/S3/ClamAV и не изменяет данные.
+
+Web-процессу нужны `LEAD_CONSENT_VERSION`, `LEAD_HASH_KEY`, `LEAD_TEMP_ROOT`, все `LEAD_S3_*`, `CLAMAV_HOST` и `CLAMAV_PORT`. Только worker дополнительно получает `CRM_INTAKE_ENDPOINT`, `CRM_INTAKE_TOKEN`, все `SMTP_*` и `LEAD_EMAIL_TO`. Полный пример находится в `server/.env.example`. Не передавайте эти значения в клиентский bundle и не используйте для приватных вложений публичные `S3_*` credentials медиафайлов.
+
+`LEAD_S3_BUCKET` должен быть отдельным приватным бакетом без публичной раздачи объектов; для Timeweb используется endpoint `https://s3.twcstorage.ru`, регион из настроек бакета и обязательное `LEAD_S3_SSE=AES256`. При изменении опубликованного текста согласия увеличьте `LEAD_CONSENT_VERSION`, чтобы каждая новая заявка сохраняла точную принятую версию.
+
+SMTP-настройки должны принадлежать адресу отправителя `SMTP_FROM`; получатель первой версии фиксирован как `team@korotkov.dev`. Реальный `CRM_INTAKE_ENDPOINT` имеет вид `https://<host>/api/v1/board-intake/<public-id>/requests`. Значения на `.invalid` предназначены только для локальных/CI-тестов и не должны попадать в production.
+
 ### Health Check
 ```
 GET /api/health

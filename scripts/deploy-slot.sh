@@ -17,6 +17,9 @@ docker compose -f "$COMPOSE_FILE" pull "kordevteam-$target"
 BACKUP_REASON=pre-release bash "$SCRIPT_DIR/backup-postgres.sh"
 docker compose -f "$COMPOSE_FILE" run --rm --no-deps "kordevteam-$target" node scripts/migrate-production.mjs
 bash "$SCRIPT_DIR/archive-web-logs.sh" "${LOG_ARCHIVE_DIR:?Provide explicit LOG_ARCHIVE_DIR}"
+if ! WORKER_IMAGE="$image" docker compose -f "$COMPOSE_FILE" run --rm --no-deps lead-worker node server/lead-worker.mjs --check; then
+  fail 'Candidate lead worker configuration/readiness check failed; active route and worker unchanged'
+fi
 docker compose -f "$COMPOSE_FILE" up -d --no-deps "kordevteam-$target"
 ready=0
 for ((attempt=0; attempt<${READINESS_ATTEMPTS:-30}; attempt++)); do

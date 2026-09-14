@@ -9,7 +9,7 @@ rollback_snapshot_locked() {
   printf 'Rollback restored exact previous configuration for %s.\n' "$target"
 }
 rollback_locked() {
-  local target previous expected
+  local target previous expected current_worker_image target_worker_image snapshot restore_worker_ok
   target="$(previous_slot)"; previous="$(current_slot)"
   [[ "$target" != "$previous" ]] || fail 'Invalid previous slot record'
   expected="$(sed -n 's/^# previous-image: //p' "$TRAEFIK_DYNAMIC_FILE")"
@@ -17,8 +17,30 @@ rollback_locked() {
   [[ "$(recorded_image "$target")" == "$expected" ]] || fail 'Previous image has been replaced; redeploy the recorded previous image before rollback'
   [[ "${PUBLIC_ORIGIN:-}" =~ ^https://[a-zA-Z0-9.-]+(:[0-9]+)?$ ]] || fail 'PUBLIC_ORIGIN must be an explicit HTTPS origin'
   verify_slot "$target"
+  current_worker_image="$(recorded_worker_image)"
+  [[ "$current_worker_image" == "$(recorded_image "$previous")" ]] || fail 'Worker image state disagrees with current slot'
+  target_worker_image="$(recorded_image "$target")"
+  snapshot="$DEPLOY_STATE_DIR/operation.lock/previous-route.yml"
+  node "$SCRIPT_DIR/release-files.mjs" copy-route "$TRAEFIK_DYNAMIC_FILE" "$snapshot"
   write_route "$target" "$previous"
-  public_smoke || fail 'Rollback route restored but public smoke failed; operator intervention required'
+  if ! public_smoke; then
+    rollback_snapshot_locked "$snapshot"
+    fail 'Rollback public smoke failed; original route and worker retained'
+  fi
+  if ! activate_worker "$target_worker_image"; then
+    restore_worker_ok=0
+    if activate_worker "$current_worker_image"; then restore_worker_ok=1; fi
+    rollback_snapshot_locked "$snapshot"
+    [[ "$restore_worker_ok" == 1 ]] || fail 'Rollback worker activation failed; original route restored but worker needs operator intervention'
+    fail 'Rollback worker activation failed; original route and worker restored'
+  fi
+  if ! record_worker_image "$target_worker_image"; then
+    restore_worker_ok=0
+    if activate_worker "$current_worker_image"; then restore_worker_ok=1; fi
+    rollback_snapshot_locked "$snapshot"
+    [[ "$restore_worker_ok" == 1 ]] || fail 'Rollback worker state failed; original route restored but worker needs operator intervention'
+    fail 'Rollback worker state failed; original route and worker restored'
+  fi
   printf 'Rollback restored %s.\n' "$target"
 }
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

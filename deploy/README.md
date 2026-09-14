@@ -6,7 +6,7 @@ These files are a deployment toolkit, not an installed production environment. N
 
 Build an immutable image with `docker build --target production --build-arg RELEASE_SHA=<40-character-commit> -t <registry/image>:<same-commit> .` from a clean checkout at that commit. Node is pinned to 22.22.0 and the existing React Router/Vite pins are unchanged. The runtime includes SSR client/server output, PostgreSQL migrations and production dependencies, and runs as UID 1000. Build tooling and local SQLite data/secrets are excluded from production. The separate `content-migration` target includes locked full dependencies and the sanitized Russian migration sources. `/api/health` is liveness; `/api/health/ready` executes `SELECT 1` through the same Drizzle singleton as SSR and returns only `ready` or `not_ready`.
 
-For the local rehearsal: `docker compose up -d --wait postgres`, `docker compose build`, `docker compose run --rm --no-deps kordevteam-blue node scripts/migrate-production.mjs`, then `docker compose up -d kordevteam-blue`. PostgreSQL is shared, with development-only credentials and the existing test database initializer. Readiness is `http://127.0.0.1:8081/api/health/ready`; green uses 8082. Both web ports and the local PostgreSQL port are loopback-only. Local image tag `kordevteam:local` is deliberately rejected by production release scripts.
+For the local rehearsal: `docker compose up -d --wait postgres clamav`, `docker compose build`, `docker compose run --rm --no-deps kordevteam-blue node scripts/migrate-production.mjs`, then `docker compose up -d kordevteam-blue lead-worker`. PostgreSQL is shared, with development-only credentials and the existing test database initializer. Readiness is `http://127.0.0.1:8081/api/health/ready`; green uses 8082. Only web slots publish loopback ports; PostgreSQL, ClamAV and the worker publish no host ports. Local development pins `clamav/clamav:1.4.3`; production must use a reviewed digest. Local image tag `kordevteam:local` is deliberately rejected by production release scripts.
 
 ## Host preparation
 
@@ -15,6 +15,39 @@ The operator provisions Node 22.22, Bash, Docker Compose, curl, PostgreSQL 16 cl
 Create resolved, non-symlink directories `/var/lib/kordevteam/deploy`, `/etc/traefik/dynamic`, `/var/log/kordevteam`, and an explicit releases directory. Keep the deploy directory empty for first installation; bootstrap creates `slots/blue` only after verification. Restrict state/log directories to the operations account. Configure the existing Traefik to watch the entire dynamic directory (a file-only bind mount does not follow atomic inode replacement), with entrypoints `web` (80) and `websecure` (443), resolver `letsencrypt`, and the external `traefik` network. PostgreSQL lives only on the internal backend network; both colors reach the same database and use the same secret/S3 configuration.
 
 Set `PRODUCTION_HOST`, `PUBLIC_ORIGIN` (HTTPS origin without trailing slash), `DEPLOY_STATE_DIR`, `TRAEFIK_DYNAMIC_FILE`, `LOG_ARCHIVE_DIR`, and optionally `COMPOSE_FILE`/`TRAEFIK_NETWORK`. Set the production Compose variables `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `BLUE_IMAGE`, `GREEN_IMAGE`, `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_TOKEN`, and application S3 settings. All three admin values must be nonempty secrets: Basic UI login uses the user/password pair, while automation may use the Bearer token. There are no fallback credentials. An immutable image reference must have a complete SHA-256 digest or an exact 40-character commit tag.
+
+### Production-параметры заявок
+
+В приватном `/etc/kordevteam/operations.env` обязательны:
+
+```text
+LEAD_CONSENT_VERSION LEAD_HASH_KEY LEAD_TEMP_ROOT
+LEAD_S3_ENDPOINT LEAD_S3_REGION LEAD_S3_BUCKET LEAD_S3_ACCESS_KEY_ID
+LEAD_S3_SECRET_ACCESS_KEY LEAD_S3_PREFIX LEAD_S3_SSE
+CLAMAV_HOST CLAMAV_PORT
+CRM_INTAKE_ENDPOINT CRM_INTAKE_TOKEN
+SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASSWORD SMTP_FROM
+LEAD_EMAIL_TO WORKER_IMAGE CLAMAV_IMAGE
+```
+
+`WORKER_IMAGE` должен совпадать с активным неизменяемым web-образом; `CLAMAV_IMAGE` принимается только как digest `@sha256:<64 hex>`. Приватные `LEAD_S3_*` не совпадают с публичными `S3_*`: бакет вложений закрыт от anonymous/public access, endpoint Timeweb — `https://s3.twcstorage.ru`, серверное шифрование — `AES256`. Настройте lifecycle как дополнительную защиту, но штатное удаление копий выполняет приложение.
+
+ClamAV подключён только к `backend`, не публикует 3310 и хранит базы сигнатур в `kordevteam_clamav_signatures`. Планируйте не менее 1.5 ГиБ RAM и 1.5 CPU, следите за обновлением сигнатур и healthcheck. Worker не подключён к proxy и не публикует порт: `backend` используется для БД/ClamAV, отдельная bridge-сеть `egress` — только для исходящих CRM/SMTP/Timeweb S3 соединений. Ограничьте исходящие назначения host firewall/сетевой политикой до фактических endpoint.
+
+Перед первым обычным blue/green-релизом после bootstrap один раз запустите ClamAV и worker с уже проверенным активным образом и создайте защищённую запись состояния:
+
+```bash
+umask 077
+active="$(sed -n 's/^# current-slot: //p' "$TRAEFIK_DYNAMIC_FILE")"
+active_image="$(sed -n 's/^# current-image: //p' "$TRAEFIK_DYNAMIC_FILE")"
+printf '%s\n' "$active_image" > "$DEPLOY_STATE_DIR/worker-image"
+export WORKER_IMAGE="$active_image"
+docker compose -f deploy/docker-compose.team.yml up -d clamav
+docker compose -f deploy/docker-compose.team.yml up -d --no-deps lead-worker
+docker compose -f deploy/docker-compose.team.yml exec -T lead-worker node server/lead-worker.mjs --check
+```
+
+Сверьте `docker inspect --format '{{.Config.Image}} {{.State.Health.Status}}' kordevteam-lead-worker` с mode-0600 файлом `$DEPLOY_STATE_DIR/worker-image`. Не исправляйте этот файл вручную во время релиза.
 
 ## First installation: reviewed Russian content before traffic
 
@@ -69,9 +102,11 @@ The HTTPS router requests a certificate covering both canonical and `www` names 
 
 ## Deploy, switch and rollback
 
-`bash scripts/deploy-slot.sh green <immutable-image-ref>` acquires the host operation lock, rejects the active color, pulls only the inactive image, requires a successfully encrypted/uploaded pre-release snapshot, and runs migrations under a PostgreSQL advisory lock on the exact same connection that executes the migrations. Only backward-compatible expand migrations are permitted with a shared database: application rollback does not undo schema changes. The script archives both web containers' logs before replacement, starts only the inactive service, and verifies readiness, representative rendered catalogs and the dynamic sitemap before recording its image. It never changes the active route.
+`bash scripts/deploy-slot.sh green <immutable-image-ref>` acquires the host operation lock, rejects the active color, pulls only the inactive image, requires a successfully encrypted/uploaded pre-release snapshot, and runs migrations under a PostgreSQL advisory lock on the exact same connection that executes the migrations. Only backward-compatible expand migrations are permitted with a shared database: application rollback does not undo schema changes. После миграции кандидат обязательно выполняет `node server/lead-worker.mjs --check`; эта проверка только валидирует конфигурацию и делает `SELECT 1`, не забирая задания и не меняя данные. The script archives both web containers' logs before replacement, starts only the inactive service, and verifies readiness, representative rendered catalogs and the dynamic sitemap before recording its image. It never changes the active route or running worker.
 
-After reviewing checks, run `bash scripts/switch-slot.sh green`. Both target and previous containers must match their recorded immutable images and pass local smoke. The complete Traefik YAML, including current/previous colors and image refs, is fsynced and renamed atomically. Public checks wait for the matching `X-Kordev-Slot` response header and rendered pages. A failure runs the same guarded rollback routine while keeping the operation lock. `bash scripts/rollback-slot.sh` separately restores the previously recorded image/color only after verification. A redeployed previous color must first be redeployed with its recorded historical image. This prevents an accidental roll-forward masquerading as rollback.
+After reviewing checks, run `bash scripts/switch-slot.sh green`. Both target and previous containers must match their recorded immutable images and pass local smoke. The complete Traefik YAML, including current/previous colors and image refs, is fsynced and renamed atomically. Public checks wait for the matching `X-Kordev-Slot` response header and rendered pages. Только после успешного public smoke единственный worker пересоздаётся на образе целевого слота, проверяется healthcheck и атомарно записывается в `$DEPLOY_STATE_DIR/worker-image`. Public smoke failure не трогает worker. Ошибка активации worker восстанавливает точные прежние байты маршрута и прежний worker; standalone rollback выполняет симметричную последовательность. `bash scripts/rollback-slot.sh` separately restores the previously recorded image/color only after verification. A redeployed previous color must first be redeployed with its recorded historical image. This prevents an accidental roll-forward masquerading as rollback.
+
+Для диагностики используйте `docker compose -f deploy/docker-compose.team.yml ps lead-worker`, `docker logs kordevteam-lead-worker` и защищённые таблицы outbox. Задания в состоянии `manual_action` не перезапускайте вслепую: сопоставьте `lead_id`, канал, код/класс последней ошибки и результат в CRM/почте, затем примите ручное решение без повторного создания клиентской заявки. Ежедневное удаление локальных и S3-копий старше 30 дней запускает `kordevteam-lead-retention.timer`; включите timer, проверяйте `systemctl status`/journal и уведомления о сбоях.
 
 The lock directory prevents concurrent deploy/switch/rollback. After an interrupted process, inspect routing/container state before removing a stale `operation.lock`. The route file is the single authority for active/previous state; do not maintain a separate independently updated pointer. A crash after atomic rename leaves a complete route and history, but requires an operator to run public smoke/rollback. Failures of the rollback target or public route are reported and require operator intervention.
 

@@ -25,7 +25,7 @@ test('production image packages SSR, migrations and production dependencies unde
   assert.match(dockerfile, /health\/ready/);
   assert.match(dockerfile, /ENV .*CONTENT_CACHE_TTL_SECONDS=0(?:\s|$)/m);
 });
-test('local topology has shared loopback PostgreSQL and distinct blue green ports', () => {
+test('local topology has private shared PostgreSQL and distinct blue green ports', () => {
   const r = spawnSync('docker', ['compose', 'config', '--format', 'json'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const { services } = JSON.parse(r.stdout);
@@ -38,33 +38,27 @@ test('local topology has shared loopback PostgreSQL and distinct blue green port
     assert.equal(service.logging.options['max-file'], '30');
   }
   assert.deepEqual(Object.keys(services).filter(s => s.includes('postgres')), ['postgres']);
+  assert.equal(services.postgres.ports, undefined);
 });
 test('production compose resolves both immutable slots without a public database port', () => {
-  const ref = 'ghcr.io/example/team:' + 'a'.repeat(40);
-  const r = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.team.yml', 'config', '--format', 'json'], {
-    encoding: 'utf8', env: { ...process.env, BLUE_IMAGE: ref, GREEN_IMAGE: ref,
-      DATABASE_URL: 'postgresql://user:fixture@postgres/team', POSTGRES_PASSWORD: 'fixture', POSTGRES_USER: 'user', POSTGRES_DB: 'team',
-      ADMIN_USER: 'owner', ADMIN_PASSWORD: 'admin-password', ADMIN_TOKEN: 'admin-token' },
-  });
+  const ref = 'ghcr.io/example/kordevteam:' + 'a'.repeat(40);
+  const r = spawnSync('docker', ['compose', '--env-file', 'tests/fixtures/deploy-leads.env', '-f', 'deploy/docker-compose.team.yml', 'config', '--format', 'json'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const { services } = JSON.parse(r.stdout);
   assert.equal(services.postgres.ports, undefined);
   assert.equal(services['kordevteam-blue'].image, ref);
-  assert.equal(services['kordevteam-green'].image, ref);
+  assert.equal(services['kordevteam-green'].image, 'ghcr.io/example/kordevteam:' + 'b'.repeat(40));
   assert.equal(services['kordevteam-blue'].environment.DATABASE_URL, services['kordevteam-green'].environment.DATABASE_URL);
   for (const color of ['blue', 'green']) {
     assert.equal(services[`kordevteam-${color}`].environment.NODE_ENV, 'production');
     assert.equal(services[`kordevteam-${color}`].environment.CONTENT_CACHE_TTL_SECONDS, '0');
     assert.equal(services[`kordevteam-${color}`].environment.ADMIN_USER, 'owner');
-    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_PASSWORD, 'admin-password');
-    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_TOKEN, 'admin-token');
+    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_PASSWORD, 'fixture-admin-password');
+    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_TOKEN, 'fixture-admin-token');
   }
 });
 test('production compose refuses missing admin secrets', () => {
-  const ref = 'ghcr.io/example/team:' + 'a'.repeat(40);
-  const base = { ...process.env, BLUE_IMAGE: ref, GREEN_IMAGE: ref,
-    DATABASE_URL: 'postgresql://user:fixture@postgres/team', POSTGRES_PASSWORD: 'fixture', POSTGRES_USER: 'user', POSTGRES_DB: 'team',
-    ADMIN_USER: 'owner', ADMIN_PASSWORD: 'admin-password', ADMIN_TOKEN: 'admin-token' };
+  const base = { ...process.env, ...Object.fromEntries(readFileSync('tests/fixtures/deploy-leads.env', 'utf8').trim().split('\n').map(line => line.split(/=(.*)/s).slice(0, 2))) };
   for (const key of ['ADMIN_USER', 'ADMIN_PASSWORD', 'ADMIN_TOKEN']) {
     const result = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.team.yml', 'config'], {
       encoding: 'utf8', env: { ...base, [key]: '' },

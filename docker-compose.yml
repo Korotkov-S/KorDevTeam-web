@@ -1,15 +1,32 @@
-x-web: &web
+x-app: &app
   image: kordevteam:local
   build:
     context: .
     target: production
     args:
       RELEASE_SHA: ${RELEASE_SHA:-local-rehearsal}
+x-lead-web-environment: &lead-web-environment
+  LEAD_CONSENT_VERSION: ${LEAD_CONSENT_VERSION:-2026-09-14}
+  LEAD_HASH_KEY: ${LEAD_HASH_KEY:-ZmFrZS1vbmx5LTMyaXRlLWhhc2gta2V5LWZvci1jb21wb3NlLXRlc3Rz}
+  LEAD_TEMP_ROOT: ${LEAD_TEMP_ROOT:-/tmp/kordev-leads}
+  LEAD_S3_ENDPOINT: ${LEAD_S3_ENDPOINT:-https://s3.example.invalid}
+  LEAD_S3_REGION: ${LEAD_S3_REGION:-ru-1}
+  LEAD_S3_BUCKET: ${LEAD_S3_BUCKET:-kordev-private-local}
+  LEAD_S3_ACCESS_KEY_ID: ${LEAD_S3_ACCESS_KEY_ID:-local-access}
+  LEAD_S3_SECRET_ACCESS_KEY: ${LEAD_S3_SECRET_ACCESS_KEY:-local-secret}
+  LEAD_S3_PREFIX: ${LEAD_S3_PREFIX:-leads/}
+  LEAD_S3_SSE: ${LEAD_S3_SSE:-AES256}
+  CLAMAV_HOST: clamav
+  CLAMAV_PORT: "3310"
+x-web: &web
+  <<: *app
   environment:
+    <<: *lead-web-environment
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
     DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
+  tmpfs: ["/tmp:size=96m,mode=1777"]
   depends_on:
     postgres:
       condition: service_healthy
@@ -23,8 +40,6 @@ x-web: &web
 services:
   postgres:
     image: postgres:16-alpine
-    ports:
-      - "127.0.0.1:5433:5432"
     environment:
       # Development-only credentials; production config requires secrets.
       POSTGRES_USER: kordev
@@ -38,17 +53,84 @@ services:
     volumes:
       - kordevteam_postgres:/var/lib/postgresql/data
       - ./deploy/postgres/init/001-test-database.sql:/docker-entrypoint-initdb.d/001-test-database.sql:ro
+    networks: [backend]
+  clamav:
+    image: clamav/clamav:1.4.3
+    restart: unless-stopped
+    networks: [backend]
+    volumes:
+      - clamav_signatures:/var/lib/clamav
+    healthcheck:
+      test: [CMD-SHELL, "clamdscan --ping 1 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "30"
+  lead-worker:
+    <<: *app
+    container_name: kordevteam-lead-worker
+    command: [node, server/lead-worker.mjs]
+    restart: unless-stopped
+    environment:
+      <<: *lead-web-environment
+      NODE_ENV: production
+      DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
+      CRM_INTAKE_ENDPOINT: ${CRM_INTAKE_ENDPOINT:-https://crm.example.invalid/api/v1/board-intake/brd_local/requests}
+      CRM_INTAKE_TOKEN: ${CRM_INTAKE_TOKEN:-local-board-token}
+      SMTP_HOST: ${SMTP_HOST:-smtp.example.invalid}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_USER: ${SMTP_USER:-local-user}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-local-password}
+      SMTP_FROM: ${SMTP_FROM:-team@korotkov.dev}
+      LEAD_EMAIL_TO: team@korotkov.dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    networks: [backend, egress]
+    tmpfs: ["/tmp:size=96m,mode=1777"]
+    healthcheck:
+      test: [CMD, node, server/lead-worker.mjs, --check]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "30"
   kordevteam-blue:
     <<: *web
     container_name: kordevteam-blue
     ports:
       - "127.0.0.1:8081:3001"
+    networks: [backend, egress]
   kordevteam-green:
     <<: *web
     container_name: kordevteam-green
     ports:
       - "127.0.0.1:8082:3001"
+    networks: [backend, egress]
 
 volumes:
   kordevteam_postgres:
     name: kordevteam_postgres
+  clamav_signatures:
+    name: kordevteam_clamav_signatures
+networks:
+  backend:
+    name: kordevteam_backend
+    internal: true
+  egress:
+    name: kordevteam_egress

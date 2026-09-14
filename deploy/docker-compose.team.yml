@@ -4,10 +4,24 @@ x-logging: &logging
   options:
     max-size: 20m
     max-file: "30"
+x-lead-web-environment: &lead-web-environment
+  LEAD_CONSENT_VERSION: ${LEAD_CONSENT_VERSION:?Provide LEAD_CONSENT_VERSION}
+  LEAD_HASH_KEY: ${LEAD_HASH_KEY:?Provide LEAD_HASH_KEY}
+  LEAD_TEMP_ROOT: ${LEAD_TEMP_ROOT:?Provide LEAD_TEMP_ROOT}
+  LEAD_S3_ENDPOINT: ${LEAD_S3_ENDPOINT:?Provide private LEAD_S3_ENDPOINT}
+  LEAD_S3_REGION: ${LEAD_S3_REGION:?Provide LEAD_S3_REGION}
+  LEAD_S3_BUCKET: ${LEAD_S3_BUCKET:?Provide private LEAD_S3_BUCKET}
+  LEAD_S3_ACCESS_KEY_ID: ${LEAD_S3_ACCESS_KEY_ID:?Provide LEAD_S3_ACCESS_KEY_ID}
+  LEAD_S3_SECRET_ACCESS_KEY: ${LEAD_S3_SECRET_ACCESS_KEY:?Provide LEAD_S3_SECRET_ACCESS_KEY}
+  LEAD_S3_PREFIX: ${LEAD_S3_PREFIX:?Provide LEAD_S3_PREFIX}
+  LEAD_S3_SSE: ${LEAD_S3_SSE:?Provide LEAD_S3_SSE}
+  CLAMAV_HOST: ${CLAMAV_HOST:?Provide CLAMAV_HOST}
+  CLAMAV_PORT: ${CLAMAV_PORT:?Provide CLAMAV_PORT}
 x-web: &web
   restart: unless-stopped
   init: true
   environment:
+    <<: *lead-web-environment
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
@@ -24,6 +38,7 @@ x-web: &web
     S3_SECRET_KEY: ${S3_SECRET_KEY:-}
     S3_FORCE_PATH_STYLE: "1"
   networks: [backend, proxy]
+  tmpfs: ["/tmp:size=96m,mode=1777"]
   logging: *logging
   security_opt: [no-new-privileges:true]
   cap_drop: [ALL]
@@ -58,6 +73,58 @@ services:
       - postgres:/var/lib/postgresql/data
     networks: [backend]
     logging: *logging
+  clamav:
+    image: ${CLAMAV_IMAGE:?Provide immutable CLAMAV_IMAGE digest}
+    restart: unless-stopped
+    init: true
+    networks: [backend]
+    volumes:
+      - clamav-signatures:/var/lib/clamav
+    healthcheck:
+      test: [CMD-SHELL, "clamdscan --ping 1 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    mem_limit: 1536m
+    cpus: 1.5
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging: *logging
+  lead-worker:
+    image: ${WORKER_IMAGE:?Provide immutable WORKER_IMAGE}
+    container_name: kordevteam-lead-worker
+    command: [node, server/lead-worker.mjs]
+    restart: unless-stopped
+    init: true
+    environment:
+      <<: *lead-web-environment
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
+      CRM_INTAKE_ENDPOINT: ${CRM_INTAKE_ENDPOINT:?Provide CRM_INTAKE_ENDPOINT}
+      CRM_INTAKE_TOKEN: ${CRM_INTAKE_TOKEN:?Provide CRM_INTAKE_TOKEN}
+      SMTP_HOST: ${SMTP_HOST:?Provide SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:?Provide SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE:?Provide SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER:?Provide SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?Provide SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:?Provide SMTP_FROM}
+      LEAD_EMAIL_TO: ${LEAD_EMAIL_TO:?Provide LEAD_EMAIL_TO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    networks: [backend, egress]
+    tmpfs: ["/tmp:size=96m,mode=1777"]
+    healthcheck:
+      test: [CMD, node, server/lead-worker.mjs, --check]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging: *logging
   kordevteam-blue:
     <<: *web
     image: ${BLUE_IMAGE:?Provide immutable BLUE_IMAGE}
@@ -72,9 +139,12 @@ services:
 networks:
   backend:
     internal: true
+  egress: {}
   proxy:
     external: true
     name: ${TRAEFIK_NETWORK:-traefik}
 volumes:
   postgres:
     name: kordevteam_postgres
+  clamav-signatures:
+    name: kordevteam_clamav_signatures

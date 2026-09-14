@@ -11,11 +11,15 @@ slot_valid() { [[ "${1:-}" == blue || "${1:-}" == green ]] || fail 'Invalid slot
 image_valid() {
   [[ "${1:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*(@sha256:[a-f0-9]{64}|:[a-f0-9]{40})$ ]] || fail 'An immutable image digest or exact 40-character commit tag is required';
 }
+digest_image_valid() {
+  [[ "${1:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*@sha256:[a-f0-9]{64}$ ]] || fail 'CLAMAV_IMAGE must be an immutable image digest';
+}
 safe_path() {
   node "$SCRIPT_DIR/release-files.mjs" validate-path "$1" || fail 'Unsafe deployment path';
 }
 state_init() {
   safe_path "$DEPLOY_STATE_DIR"; safe_path "$TRAEFIK_DYNAMIC_FILE"
+  digest_image_valid "${CLAMAV_IMAGE:-}"
   [[ -f "$TRAEFIK_DYNAMIC_FILE" ]] || fail 'Active route file is required'
   mkdir -p -- "$DEPLOY_STATE_DIR/slots"
 }
@@ -39,6 +43,18 @@ recorded_image() {
   safe_path "$record"; [[ -f "$record" ]] || fail 'Missing recorded slot image'
   value="$(< "$record")"; image_valid "$value"; printf '%s' "$value"
 }
+worker_record_path() { printf '%s' "$DEPLOY_STATE_DIR/worker-image"; }
+recorded_worker_image() {
+  local record value
+  record="$(worker_record_path)"; safe_path "$record"
+  [[ -f "$record" && ! -L "$record" ]] || fail 'Missing recorded worker image'
+  value="$(< "$record")"; image_valid "$value"; printf '%s' "$value"
+}
+record_worker_image() {
+  local image="$1" record
+  image_valid "$image"; record="$(worker_record_path)"
+  node "$SCRIPT_DIR/release-files.mjs" record "$record" "$image"
+}
 slot_origin() {
   if [[ "$1" == blue ]]; then printf 'http://127.0.0.1:8081'; else printf 'http://127.0.0.1:8082'; fi
 }
@@ -60,6 +76,27 @@ verify_slot() {
   [[ "$actual" == "$expected" ]] || fail 'Target container image does not match recorded image'
   smoke "$(slot_origin "$target")" || fail 'Target readiness/SSR smoke failed'
 }
+worker_matches() {
+  local expected="$1" actual health
+  actual="$(docker inspect --format '{{.Config.Image}}' kordevteam-lead-worker 2>/dev/null)" || return 1
+  [[ "$actual" == "$expected" ]] || return 1
+  health="$(docker inspect --format '{{.State.Health.Status}}' kordevteam-lead-worker 2>/dev/null)" || return 1
+  [[ "$health" == healthy ]]
+}
+verify_worker() {
+  local expected="$1" attempt
+  image_valid "$expected"
+  for ((attempt=0; attempt<${READINESS_ATTEMPTS:-30}; attempt++)); do
+    if worker_matches "$expected"; then return 0; fi
+    sleep "${READINESS_DELAY:-2}"
+  done
+  return 1
+}
+activate_worker() {
+  local image="$1"
+  image_valid "$image"; export WORKER_IMAGE="$image"
+  docker compose -f "$COMPOSE_FILE" up -d --no-deps lead-worker && verify_worker "$image"
+}
 validate_route_state() {
   node "$SCRIPT_DIR/release-files.mjs" validate-route "${1:-$TRAEFIK_DYNAMIC_FILE}" "$DEPLOY_STATE_DIR" "${PRODUCTION_HOST:-}" "${PUBLIC_ORIGIN:-}"
 }
@@ -70,10 +107,14 @@ public_slot_matches() {
   [[ "$value" == "$1" ]]
 }
 verify_active() {
-  local active
+  local active worker_image
   active="$(validate_route_state)"
   verify_slot "$active"
   public_slot_matches "$active" || fail 'Public slot disagrees with active route state'
+  worker_image="$(recorded_worker_image)"
+  [[ "$worker_image" == "$(recorded_image "$active")" ]] || fail 'Worker image state disagrees with active slot image'
+  export WORKER_IMAGE="$worker_image"
+  verify_worker "$worker_image" || fail 'Active lead worker is not healthy or does not match its recorded image'
 }
 write_route() {
   node "$SCRIPT_DIR/release-files.mjs" route "$TRAEFIK_DYNAMIC_FILE" "$1" "$2" "${PRODUCTION_HOST:?PRODUCTION_HOST is required}" "$(recorded_image "$1")" "$(recorded_image "$2")"
