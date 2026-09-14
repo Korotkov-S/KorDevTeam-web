@@ -8,6 +8,7 @@ export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
 export { createLeadRouter } from "./server/leads/http";
+export { checkLeadWorkerReady, createLeadWorker } from "./server/leads/worker";
 
 export async function checkApplicationReady(): Promise<void> {
   await checkDatabaseReady();
