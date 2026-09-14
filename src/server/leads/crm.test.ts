@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { sendToCrm, type DeliveryEnvelope } from "./crm";
-import { classifyDeliveryFailure, type DeliveryDecision } from "./retry";
+import { classifyDeliveryFailure, DeliveryFailure, type DeliveryDecision } from "./retry";
 
 const envelope: DeliveryEnvelope = {
   leadId: "a0e36e21-e11c-48d8-a087-90ca2205059d", jobId: "a80f079b-df33-4f66-9eac-b6f4cb3266a5",
@@ -78,13 +78,43 @@ test("sends exact multipart bytes to the vendor path with stable identities on r
 test("omits empty description and attachment, never sets multipart Content-Type or follows redirects", async () => {
   const receipt = await sendToCrm({ ...envelope, description: null }, config, async (url, init) => {
     assert.equal(String(url), config.endpoint.href);
-    assert.equal(init?.method, "POST"); assert.equal(init?.redirect, "error");
+    assert.equal(init?.method, "POST"); assert.equal(init?.redirect, "manual");
     assert.equal(new Headers(init?.headers).has("Content-Type"), false);
     assert.ok(init?.signal instanceof AbortSignal);
     assert.deepEqual([...((init?.body) as FormData).keys()].sort(), ["name", "phone"]);
     return success();
   });
   assert.deepEqual(receipt, { requestId, taskId: 42, taskCode: "WEB-42", taskStatus: "new", dueDate: "2026-09-14 23:59:00", replayed: false, rateLimit: null, rateRemaining: null });
+});
+
+test("real HTTP 302 is manual action and never sends the lead to the redirect target", async () => {
+  const requestedPaths: string[] = [];
+  const server = createServer((req, res) => {
+    requestedPaths.push(req.url!);
+    req.resume();
+    if (req.url === "/api/v1/board-intake/board-1/requests") {
+      res.writeHead(302, { Location: "/redirect-target" });
+      res.end();
+    } else {
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(body()));
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const port = (server.address() as { port: number }).port;
+    const crmConfig = { ...config, endpoint: new URL(`http://127.0.0.1:${port}/api/v1/board-intake/board-1/requests`) };
+    await assert.rejects(() => sendToCrm(envelope, crmConfig), (error) => {
+      assert.ok(error instanceof DeliveryFailure);
+      assert.deepEqual(requestedPaths, ["/api/v1/board-intake/board-1/requests"]);
+      assert.deepEqual(classifyDeliveryFailure("crm", error), { kind: "manual_action", code: "crm_unexpected_status" });
+      return true;
+    });
+    assert.equal(requestedPaths.includes("/redirect-target"), false);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 
 test("accepts null body request_id and arbitrary status, independently of optional trace header", async () => {

@@ -76,7 +76,7 @@ export async function sendToCrm(envelope: DeliveryEnvelope, config: LeadWorkerCo
   let response: Response;
   try {
     response = await fetchImpl(config.endpoint, {
-      method: "POST", redirect: "error",
+      method: "POST", redirect: "manual",
       headers: { Authorization: `Bearer ${config.token}`, "Idempotency-Key": envelope.leadId, "X-Request-Id": envelope.jobId },
       body: form, signal: AbortSignal.timeout(15_000),
     });
