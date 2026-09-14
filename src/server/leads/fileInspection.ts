@@ -115,12 +115,14 @@ const pdfReference = (value: PdfValue | undefined): PdfReference => {
 };
 
 async function pdf(reader: Reader) {
-  if (!/^%PDF-[12]\.\d[\r\n]/.test((await reader.at(0, Math.min(16, reader.size))).toString("latin1"))) unsafe();
+  const header = /^%PDF-[12]\.\d[\r\n]/.exec((await reader.at(0, Math.min(16, reader.size))).toString("latin1"));
+  if (!header) unsafe();
   const tail = (await reader.at(Math.max(0, reader.size - 1024), Math.min(1024, reader.size))).toString("latin1");
   const terminal = /startxref\s+(\d+)\s+%%EOF[\t\n\f\r ]*$/.exec(tail);
   if (!terminal) unsafe();
   let xref = Number(terminal[1]), latest = true, root: PdfReference | undefined;
   const visited = new Set<number>(), objects = new Map<number, { offset: number; generation: number } | null>();
+  const objectOffsets = new Set<number>(), spans: { start: number; end: number }[] = [{ start: 0, end: header[0].length }];
   while (true) {
     if (!Number.isSafeInteger(xref) || xref < 8 || xref >= reader.size || visited.has(xref) || visited.size >= 64) unsafe();
     visited.add(xref);
@@ -141,6 +143,7 @@ async function pdf(reader: Reader) {
           const header = (await reader.at(offset, Math.min(64, reader.size - offset))).toString("latin1");
           const match = /^(\d+)\s+(\d+)\s+obj\b/.exec(header);
           if (!match || Number(match[1]) !== id || Number(match[2]) !== generation) unsafe();
+          objectOffsets.add(offset);
         }
         if (!objects.has(id)) objects.set(id, flag === "n" ? { offset, generation } : null);
       }
@@ -151,6 +154,7 @@ async function pdf(reader: Reader) {
     const ending = /^\s*startxref\s+(\d+)\s+%%EOF(?=\s|$)/.exec(syntax.text.slice(syntax.position));
     if (!ending || Number(ending[1]) !== xref) unsafe();
     const end = xref + syntax.position + ending[0].length;
+    spans.push({ start: xref, end });
     if (latest && (reader.size - end > 1024 || !/^[\t\n\f\r ]*$/.test((await reader.at(end, reader.size - end)).toString("latin1")))) unsafe();
     latest = false;
     const previous = trailer.get("/Prev");
@@ -159,15 +163,53 @@ async function pdf(reader: Reader) {
     xref = previous;
   }
   if (!root) unsafe();
-  // A second file header cannot be an incremental revision. Scan in bounded
-  // windows, retaining only the four-byte signature overlap.
-  let suffix = "";
-  for (let offset = 0; offset < reader.size; offset += 65_536) {
-    const text = suffix + (await reader.at(offset, Math.min(65_536, reader.size - offset))).toString("latin1");
-    const found = text.indexOf("%PDF-", offset === 0 ? 1 : 0);
-    if (found >= 0) unsafe();
-    suffix = text.slice(-4);
+  // Validate object boundaries rather than searching payload bytes for magic.
+  // Strings are consumed by the syntax parser; stream bytes are skipped only
+  // using a validated /Length, so literal/binary payloads may contain %PDF-.
+  const objectSyntax = async (offset: number) => {
+    const syntax = new PdfSyntax((await reader.at(offset, Math.min(65_536, reader.size - offset))).toString("latin1"));
+    syntax.token(); syntax.token(); syntax.token();
+    return syntax;
+  };
+  for (const offset of objectOffsets) {
+    const syntax = await objectSyntax(offset), value = syntax.value(), ending = syntax.token();
+    if (ending === "endobj") { spans.push({ start: offset, end: offset + syntax.position }); continue; }
+    if (ending !== "stream" || !(value instanceof Map)) unsafe();
+    let length = value.get("/Length");
+    if (typeof length !== "number") {
+      const reference = pdfReference(length), target = objects.get(reference.id);
+      if (!target || target.generation !== reference.generation) unsafe();
+      const indirect = await objectSyntax(target.offset);
+      length = indirect.value();
+      if (indirect.token() !== "endobj") unsafe();
+    }
+    const eol = /^(?:\r\n|\n|\r)/.exec(syntax.text.slice(syntax.position));
+    if (typeof length !== "number" || !Number.isSafeInteger(length) || length < 0 || !eol) unsafe();
+    const dataEnd = offset + syntax.position + eol[0].length + length;
+    if (dataEnd >= reader.size) unsafe();
+    const after = new PdfSyntax((await reader.at(dataEnd, Math.min(65_536, reader.size - dataEnd))).toString("latin1"));
+    if (after.token() !== "endstream" || after.token() !== "endobj") unsafe();
+    spans.push({ start: offset, end: dataEnd + after.position });
   }
+  const gap = async (start: number, end: number) => {
+    let comment = false, prefix = "";
+    for (let offset = start; offset < end; offset += 65_536) {
+      const bytes = await reader.at(offset, Math.min(65_536, end - offset));
+      for (const byte of bytes) {
+        if (comment) {
+          if (byte === 10 || byte === 13) { comment = false; continue; }
+          if (prefix.length < 5) { prefix += String.fromCharCode(byte); if (prefix === "%PDF-") unsafe(); }
+        } else if (byte === 37) { comment = true; prefix = "%"; }
+        else if (![0,9,10,12,13,32].includes(byte)) unsafe();
+      }
+    }
+  };
+  let end = 0;
+  for (const span of spans.sort((first, second) => first.start - second.start)) {
+    if (span.start < end || span.end < span.start) unsafe();
+    await gap(end, span.start); end = span.end;
+  }
+  await gap(end, reader.size);
   const dictionary = async (reference: PdfReference) => {
     const object = objects.get(reference.id);
     if (!object || object.generation !== reference.generation) unsafe();
@@ -229,26 +271,55 @@ async function jpeg(reader: Reader) {
     return cache[offset - start];
   };
   if (await byte(0) !== 255 || await byte(1) !== 216) unsafe();
-  let offset = 2, scan = false, frame = false, sawScan = false;
+  let offset = 2, scan = false, frame = false, sawScan = false, entropyBytes = 0, frameMarker = 0;
   const components = new Set<number>();
+  const quantization = new Set<number>(), huffman = new Set<number>(), componentQuantization = new Map<number, number>();
   while (offset < reader.size) {
-    if (await byte(offset++) !== 255) { if (scan) continue; unsafe(); }
+    if (await byte(offset++) !== 255) { if (scan) { entropyBytes++; continue; } unsafe(); }
     let marker = await byte(offset++);
     while (marker === 255) marker = await byte(offset++);
-    if (scan && (marker === 0 || (marker >= 0xd0 && marker <= 0xd7))) continue;
+    if (scan && marker === 0) { entropyBytes++; continue; }
+    if (scan && marker >= 0xd0 && marker <= 0xd7) continue;
+    if (scan && !entropyBytes) unsafe();
     scan = false;
     if (marker === 0xd9) { if (!frame || !sawScan || offset !== reader.size) unsafe(); return; }
     if (marker === 0 || marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7)) unsafe();
     const length = (await byte(offset)) * 256 + await byte(offset + 1);
     if (length < 2 || offset + length > reader.size) unsafe();
+    if (marker === 0xdb) {
+      const info = await reader.at(offset, length);
+      for (let cursor = 2; cursor < info.length;) {
+        const table = info[cursor++], precision = table >> 4, id = table & 15;
+        if (precision > 1 || id > 3 || cursor + 64 * (precision + 1) > info.length) unsafe();
+        for (let i = 0; i < 64; i++) {
+          const value = precision ? info.readUInt16BE(cursor) : info[cursor];
+          if (!value) unsafe();
+          cursor += precision + 1;
+        }
+        quantization.add(id);
+      }
+    }
+    if (marker === 0xc4) {
+      const info = await reader.at(offset, length);
+      for (let cursor = 2; cursor < info.length;) {
+        const table = info[cursor++];
+        if ((table >> 4) > 1 || (table & 15) > 3 || cursor + 16 > info.length) unsafe();
+        let count = 0, slots = 1;
+        for (let i = 0; i < 16; i++) { const codes = info[cursor++]; count += codes; slots = slots * 2 - codes; if (slots < 0) unsafe(); }
+        if (!count || count > 256 || cursor + count > info.length) unsafe();
+        cursor += count; huffman.add(table);
+      }
+    }
     if ([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker)) {
-      if (frame || length < 8) unsafe();
+      if (frame || length < 8 || ![0xc0,0xc1,0xc2].includes(marker)) unsafe();
+      frameMarker = marker;
       const info = await reader.at(offset, length), count = info[7];
       if (![8,12,16].includes(info[2]) || !info.readUInt16BE(3) || !info.readUInt16BE(5) || !count || count > 4 || length !== 8 + 3 * count) unsafe();
       for (let i = 0; i < count; i++) {
         const id = info[8 + 3 * i], sampling = info[9 + 3 * i];
         if (components.has(id) || !(sampling >> 4) || (sampling >> 4) > 4 || !(sampling & 15) || (sampling & 15) > 4 || info[10 + 3 * i] > 3) unsafe();
         components.add(id);
+        componentQuantization.set(id, info[10 + 3 * i]);
       }
       frame = true;
     }
@@ -256,12 +327,16 @@ async function jpeg(reader: Reader) {
       if (!frame || length < 6) unsafe();
       const info = await reader.at(offset, length), count = info[2], seen = new Set<number>();
       if (!count || count > components.size || length !== 6 + 2 * count) unsafe();
+      const spectralStart = info[length - 3], spectralEnd = info[length - 2], approximation = info[length - 1];
+      if (spectralStart > spectralEnd || spectralEnd > 63 || frameMarker !== 0xc2 && (spectralStart !== 0 || spectralEnd !== 63 || approximation !== 0)) unsafe();
       for (let i = 0; i < count; i++) {
-        const id = info[3 + 2 * i];
-        if (!components.has(id) || seen.has(id)) unsafe();
+        const id = info[3 + 2 * i], tables = info[4 + 2 * i];
+        if (!components.has(id) || seen.has(id) || !quantization.has(componentQuantization.get(id)!)) unsafe();
+        if (spectralStart === 0 && !(approximation >> 4) && !huffman.has(tables >> 4)) unsafe();
+        if (spectralEnd > 0 && !huffman.has(0x10 | (tables & 15))) unsafe();
         seen.add(id);
       }
-      scan = true; sawScan = true;
+      scan = true; sawScan = true; entropyBytes = 0;
     }
     offset += length;
   }
@@ -286,6 +361,7 @@ function inspectXml(bytes: Buffer, visit: (element: XmlElement) => void) {
   while (offset < xml.length) {
     if (xml[offset] !== "<") {
       const end = xml.indexOf("<", offset), text = xml.slice(offset, end < 0 ? xml.length : end);
+      if (text.includes("]]>")) unsafe();
       entities(text);
       if (!stack.length && text.trim()) unsafe();
       offset += text.length; continue;
@@ -405,7 +481,10 @@ async function ooxml(reader: Reader, path: string, expected: string) {
             if (tag === 1) {
               if (zip64 || size < 16) unsafe();
               zip64 = true;
-              uncompressed = Number(extra.readBigUInt64LE(offset)); compressed = Number(extra.readBigUInt64LE(offset + 8));
+              const rawSize = Number(extra.readBigUInt64LE(offset)), packedSize = Number(extra.readBigUInt64LE(offset + 8));
+              if (uncompressed !== 0xffffffff && uncompressed !== rawSize || compressed !== 0xffffffff && compressed !== packedSize) unsafe();
+              if (uncompressed === 0xffffffff) uncompressed = rawSize;
+              if (compressed === 0xffffffff) compressed = packedSize;
             }
             offset += size;
           }

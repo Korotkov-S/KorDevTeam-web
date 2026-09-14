@@ -6,14 +6,19 @@ import { join } from "node:path";
 import test from "node:test";
 import { inspectAttachment } from "./fileInspection";
 
-function pdfFixture(encrypt = false) {
+function pdfFixture(encrypt = false, options: { catalogSuffix?: string; stream?: string; indirectLength?: boolean; baseOffset?: number } = {}) {
   let text = "%PDF-1.7\n";
   const offsets = [0];
-  for (const [id, object] of [[1, "<< /Type /Catalog /Pages 2 0 R >>"], [2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"], [3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 72] >>"]] as const) {
-    offsets.push(text.length); text += `${id} 0 obj\n${object}\nendobj\n`;
+  const objects = [`<< /Type /Catalog /Pages 2 0 R ${options.catalogSuffix ?? ""} >>`, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 72]${options.stream === undefined ? "" : " /Contents 4 0 R"} >>`];
+  if (options.stream !== undefined) {
+    objects.push(`<< /Length ${options.indirectLength ? "5 0 R" : Buffer.byteLength(options.stream)} >>\nstream\n${options.stream}\nendstream`);
+    if (options.indirectLength) objects.push(String(Buffer.byteLength(options.stream)));
   }
-  const xref = text.length;
-  text += `xref\n0 4\n0000000000 65535 f \n${offsets.slice(1).map((at) => `${String(at).padStart(10, "0")} 00000 n \n`).join("")}trailer\n<< /Size 4 /Root 1 0 R${encrypt ? " /Encrypt 4 0 R" : ""} >>\nstartxref\n${xref}\n%%EOF\n`;
+  for (const [index, object] of objects.entries()) {
+    offsets.push(text.length + (options.baseOffset ?? 0)); text += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = text.length + (options.baseOffset ?? 0);
+  text += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((at) => `${String(at).padStart(10, "0")} 00000 n \n`).join("")}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${encrypt ? " /Encrypt 4 0 R" : ""} >>\nstartxref\n${xref}\n%%EOF\n`;
   return { bytes: Buffer.from(text), xref };
 }
 const pdf = pdfFixture().bytes;
@@ -116,6 +121,14 @@ test("ZIP descriptors and ZIP64 sizes are validated without rejecting valid vari
   const conflictingDescriptor = zip(["[Content_Types].xml", "word/document.xml"], 8);
   conflictingDescriptor.writeUInt32LE(123, 14);
   await assert.rejects(inspect(conflictingDescriptor, "docx"), { code: "unsafe_file" });
+});
+
+test("ZIP64 extra sizes cannot overwrite conflicting non-sentinel local sizes", async () => {
+  for (const fieldOffset of [18, 22]) {
+    const bytes = zip(["[Content_Types].xml", "word/document.xml"], 0, true);
+    bytes.writeUInt32LE(fieldOffset === 18 ? 123 : 456, fieldOffset);
+    await assert.rejects(inspect(bytes, "docx"), { code: "unsafe_file" });
+  }
 });
 
 test("rejects extension, MIME and magic mismatches", async () => {
@@ -247,6 +260,19 @@ test("JPEG requires nonzero frame dimensions and consistent frame/scan component
   }
 });
 
+test("JPEG requires referenced quantization/Huffman tables and nonempty scan entropy", async () => {
+  const frame = jpeg.indexOf(Buffer.from([255,192])), huffman = jpeg.indexOf(Buffer.from([255,196])), scan = jpeg.indexOf(Buffer.from([255,218]));
+  const frameAndEmptyScan = Buffer.concat([jpeg.subarray(0, 2), jpeg.subarray(frame, huffman), jpeg.subarray(scan, -3), jpeg.subarray(-2)]);
+  const missingQuantization = Buffer.concat([jpeg.subarray(0, 2), jpeg.subarray(frame)]);
+  const missingHuffman = Buffer.concat([jpeg.subarray(0, huffman), jpeg.subarray(scan)]);
+  const emptyEntropy = Buffer.concat([jpeg.subarray(0, -3), jpeg.subarray(-2)]);
+  const wrongTables = Buffer.from(jpeg); wrongTables[scan + 6] = 0x11;
+  for (const bytes of [frameAndEmptyScan, missingQuantization, missingHuffman, emptyEntropy, wrongTables]) {
+    await assert.rejects(inspect(bytes, "jpg"), { code: "unsafe_file" });
+  }
+  assert.equal((await inspect(jpeg, "jpg")).mediaType, types.jpg);
+});
+
 test("legacy Word and Excel reject encrypted or fabricated document streams", async () => {
   const doc = await readFile("tests/fixtures/leads/clean.doc"), xls = await readFile("tests/fixtures/leads/clean.xls");
   for (const flags of [0x0100, 0x8100]) {
@@ -275,6 +301,12 @@ test("OOXML requires valid namespace-qualified XML, main content types and packa
   await assert.rejects(inspect(zip(["[Content_Types].xml", "xl/workbook.xml"], 0, false, { "xl/workbook.xml": '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets/></workbook>' }), "xlsx"), { code: "unsafe_file" });
 });
 
+test("OOXML rejects a raw CDATA terminator in otherwise valid element text", async () => {
+  const document = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>unsafe ]]&gt;</w:t></w:r></w:p></w:body></w:document>';
+  assert.equal((await inspect(zip(["[Content_Types].xml", "word/document.xml"], 0, false, { "word/document.xml": document }), "docx")).mediaType, types.docx);
+  await assert.rejects(inspect(zip(["[Content_Types].xml", "word/document.xml"], 0, false, { "word/document.xml": document.replace("]]&gt;", "]]>") }), "docx"), { code: "unsafe_file" });
+});
+
 test("PDF requires objects and a valid cross-reference/root and rejects encryption", async () => {
   for (const bytes of [Buffer.from("%PDF-1.7\n%%EOF\n"), pdfFixture(true).bytes, Buffer.from(pdf.toString().replace("/Type /Catalog", "/Type /Missing")), Buffer.from(pdf.toString().replace(/startxref\n\d+/, "startxref\n1"))]) {
     await assert.rejects(inspect(bytes, "pdf"), { code: "unsafe_file" });
@@ -292,4 +324,17 @@ test("accepts a valid incremental PDF while rejecting detached or cyclic revisio
   await assert.rejects(inspect(Buffer.from(bytes.toString().replace(`/Prev ${base.xref}`, `/Prev ${xref}`)), "pdf"), { code: "unsafe_file" });
   await assert.rejects(inspect(Buffer.concat([pdf, pdf]), "pdf"), { code: "unsafe_file" });
   await assert.rejects(inspect(Buffer.concat([bytes, Buffer.from("PK\x03\x04payload")]), "pdf"), { code: "unsafe_file" });
+});
+
+test("PDF permits header-like text inside literal strings and length-bounded streams", async () => {
+  const literal = pdfFixture(false, { catalogSuffix: "/Note (a %PDF- marker and \\(escaped\\) parentheses)" }).bytes;
+  assert.equal((await inspect(literal, "pdf")).mediaType, types.pdf);
+  const streamed = pdfFixture(false, { stream: `q\n%${" ".repeat(70_000)}%PDF-1.7\nQ\n` }).bytes;
+  assert.equal((await inspect(streamed, "pdf")).mediaType, types.pdf);
+  assert.equal((await inspect(pdfFixture(false, { stream: "q\n%PDF-1.7\nQ\n", indirectLength: true }).bytes, "pdf")).mediaType, types.pdf);
+  // Independently locate the length field instead of relying on fixture size.
+  const lengthMatch = /\/Length (\d+)/.exec(streamed.toString())!;
+  await assert.rejects(inspect(Buffer.from(streamed.toString().replace(lengthMatch[0], `/Length ${"0".repeat(lengthMatch[1].length)}`)), "pdf"), { code: "unsafe_file" });
+  const rebased = pdfFixture(false, { baseOffset: pdf.length }).bytes;
+  await assert.rejects(inspect(Buffer.concat([pdf, rebased]), "pdf"), { code: "unsafe_file" });
 });
