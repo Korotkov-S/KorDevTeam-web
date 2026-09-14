@@ -5,8 +5,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 
-const tableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
-const migrationHistory = [{ hash: createHash('sha256').update(readFileSync('drizzle/0000_content_foundation.sql')).digest('hex'), created_at: '1789122602054' }];
+const tableCounts = { 'drizzle.__drizzle_migrations': '2', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
+const migrationHistory = [
+  { hash: createHash('sha256').update(readFileSync('drizzle/0000_content_foundation.sql')).digest('hex'), created_at: '1789122602054' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0001_lead_intake.sql')).digest('hex'), created_at: '1789370977706' },
+];
 function inventoryQuery(sql) {
   if (sql.includes('pg_catalog.pg_class')) return { rows: Object.keys(tableCounts).map(name => ({ schema: name.split('.')[0], name: name.split('.')[1] })) };
   if (sql.includes('GROUP BY status')) return { rows: [{ status: 'draft', count: '3' }, { status: 'published', count: '2' }] };
@@ -142,7 +145,7 @@ test('restore verifies dump, existing migration history, schema and published co
   assert.deepEqual(evidence.afterMigrations.publishedCounts, { article: 2 });
   assert.deepEqual(evidence.beforeMigrations.migrations, migrationHistory);
   assert.deepEqual(evidence.afterMigrations.migrations, migrationHistory);
-  assert.equal(evidence.afterMigrations.lastMigrationHash, migrationHistory[0].hash);
+  assert.equal(evidence.afterMigrations.lastMigrationHash, migrationHistory.at(-1).hash);
   assert.equal(evidence.toolingSha, 'a'.repeat(40));
   assert.doesNotMatch(JSON.stringify(evidence), /supersecret|postgresql|s3:\/\/|twcstorage|fixture\/key/);
 
