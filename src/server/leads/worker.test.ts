@@ -251,6 +251,31 @@ test("long-running worker stops after the current batch and never claims again",
   assert.equal(f.states.get(job("email").id), "delivered");
 });
 
+test("shutdown aborts hanging materialization, stops heartbeat and exits after recording retry", async () => {
+  const attachmentJob = job("email", 1, true);
+  const f = fixture([attachmentJob]);
+  const controller = new AbortController();
+  let receivedSignal: AbortSignal | undefined, renewals = 0;
+  f.options.heartbeatIntervalMs = 1;
+  f.options.repository.renewLease = async () => { renewals += 1; return true; };
+  f.options.store = {
+    async materialize(input) {
+      receivedSignal = input.signal;
+      return new Promise((_resolve, reject) => input.signal?.addEventListener("abort", () => reject(new Error("private S3 wait")), { once: true }));
+    },
+  };
+  const running = runLeadWorker({ ...f.options, signal: controller.signal, pollIntervalMs: 1 });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  controller.abort();
+  await running;
+  const renewalsAtExit = renewals;
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(receivedSignal, controller.signal);
+  assert.equal(f.states.get(attachmentJob.id), "retry");
+  assert.equal(renewals, renewalsAtExit, "heartbeat must stop before worker exits");
+  assert.equal(f.claims, 1);
+});
+
 test("worker readiness validates configuration and database only", async () => {
   const events: string[] = [];
   await checkLeadWorkerReady({

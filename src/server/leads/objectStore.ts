@@ -1,4 +1,5 @@
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import { lstat, readdir, realpath, unlink as unlinkFile } from "node:fs/promises";
@@ -11,7 +12,7 @@ import { LeadError } from "./errors";
 
 export interface PrivateAttachmentStore {
   putFile(input: { objectKey: string; path: string; contentType: string }): Promise<void>;
-  materialize(input: { objectKey: string; tempRoot: string }): Promise<{ path: string; dispose(): Promise<void> }>;
+  materialize(input: { objectKey: string; tempRoot: string; signal?: AbortSignal }): Promise<{ path: string; dispose(): Promise<void> }>;
   delete(objectKey: string): Promise<void>;
   listOlderThan(cutoff: Date): AsyncIterable<{ key: string; lastModified: Date }>;
 }
@@ -22,7 +23,9 @@ export class MissingPrivateObjectError extends LeadError {
 }
 
 type PrivateFileOperations = { unlink(path: string): Promise<void> };
+type PrivateStoreRuntimeOptions = Partial<PrivateFileOperations> & { operationTimeoutMs?: number };
 const defaultFileOperations: PrivateFileOperations = { unlink: unlinkFile };
+const DEFAULT_OPERATION_TIMEOUT_MS = 45_000;
 const materializedName = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.attachment$/i;
 
 async function validatedTempRoot(tempRoot: string): Promise<string> {
@@ -71,15 +74,33 @@ function storageError(error: unknown): LeadError {
     ? new MissingPrivateObjectError() : new LeadError("storage_unavailable");
 }
 
+export function createPrivateS3Client(config: LeadS3Config): S3Client {
+  return new S3Client({
+    endpoint: config.endpoint.href, region: config.region, forcePathStyle: true,
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+    requestHandler: new NodeHttpHandler({
+      connectionTimeout: 5_000,
+      socketTimeout: 30_000,
+      requestTimeout: DEFAULT_OPERATION_TIMEOUT_MS,
+      throwOnRequestTimeout: true,
+    }),
+  });
+}
+
+function operationSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
 export function createPrivateAttachmentStore(
   config: LeadS3Config,
   injectedClient?: Pick<S3Client, "send">,
-  fileOperations: PrivateFileOperations = defaultFileOperations,
+  runtime: PrivateStoreRuntimeOptions = {},
 ): PrivateAttachmentStore {
-  const client = injectedClient ?? new S3Client({
-    endpoint: config.endpoint.href, region: config.region, forcePathStyle: true,
-    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
-  });
+  const client = injectedClient ?? createPrivateS3Client(config);
+  const fileOperations: PrivateFileOperations = { unlink: runtime.unlink ?? defaultFileOperations.unlink };
+  const operationTimeoutMs = runtime.operationTimeoutMs ?? DEFAULT_OPERATION_TIMEOUT_MS;
+  if (!Number.isInteger(operationTimeoutMs) || operationTimeoutMs < 1 || operationTimeoutMs >= 120_000) throw new LeadError("storage_unavailable");
   const prefix = `${config.prefix.replace(/\/+$/, "")}/`;
   const checkKey = (key: string) => {
     if (!key.startsWith(prefix) || key.length <= prefix.length) throw new LeadError("storage_unavailable");
@@ -87,6 +108,7 @@ export function createPrivateAttachmentStore(
   return {
     async putFile({ objectKey, path, contentType }) {
       checkKey(objectKey);
+      const signal = operationSignal(undefined, operationTimeoutMs);
       const body = createReadStream(path);
       // Install the handler immediately, including when a client fails before
       // consuming the stream. Real SDK consumption also sees the read error.
@@ -96,13 +118,14 @@ export function createPrivateAttachmentStore(
         await client.send(new PutObjectCommand({
           Bucket: config.bucket, Key: objectKey, Body: body, ContentType: contentType,
           CacheControl: "private, no-store", ServerSideEncryption: config.serverSideEncryption,
-        }));
+        }), { abortSignal: signal });
         if (readError) throw readError;
       } catch (error) { throw storageError(error); }
       finally { body.destroy(); }
     },
-    async materialize({ objectKey, tempRoot }) {
+    async materialize({ objectKey, tempRoot, signal: callerSignal }) {
       checkKey(objectKey);
+      const signal = operationSignal(callerSignal, operationTimeoutMs);
       let path: string | undefined;
       let disposal: Promise<void> | undefined;
       const dispose = () => disposal ??= (async () => {
@@ -110,7 +133,7 @@ export function createPrivateAttachmentStore(
       })();
       try {
         const root = await validatedTempRoot(tempRoot);
-        const result = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }));
+        const result = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }), { abortSignal: signal });
         if (!(result.Body instanceof Readable)) throw new LeadError("storage_unavailable");
         path = join(root, `${randomUUID()}.attachment`);
         let bytes = 0;
@@ -118,21 +141,23 @@ export function createPrivateAttachmentStore(
           bytes += chunk.length;
           callback(bytes > MAX_FILE_BYTES ? new LeadError("storage_unavailable") : null, chunk);
         } });
-        await pipeline(result.Body, bound, createWriteStream(path, { flags: "wx", mode: 0o600 }));
+        await pipeline(result.Body, bound, createWriteStream(path, { flags: "wx", mode: 0o600 }), { signal });
         if (!bytes) throw new LeadError("storage_unavailable");
         return { path, dispose };
       } catch (error) { await dispose(); throw storageError(error); }
     },
     async delete(objectKey) {
       checkKey(objectKey);
-      try { await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey })); }
+      const signal = operationSignal(undefined, operationTimeoutMs);
+      try { await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey }), { abortSignal: signal }); }
       catch (error) { throw storageError(error); }
     },
     async *listOlderThan(cutoff) {
       let token: string | undefined;
       try {
         do {
-          const page = await client.send(new ListObjectsV2Command({ Bucket: config.bucket, Prefix: prefix, ...(token ? { ContinuationToken: token } : {}) }));
+          const signal = operationSignal(undefined, operationTimeoutMs);
+          const page = await client.send(new ListObjectsV2Command({ Bucket: config.bucket, Prefix: prefix, ...(token ? { ContinuationToken: token } : {}) }), { abortSignal: signal });
           for (const object of page.Contents ?? []) {
             if (object.Key?.startsWith(prefix) && object.Key.length > prefix.length && object.LastModified && object.LastModified < cutoff) {
               yield { key: object.Key, lastModified: object.LastModified };

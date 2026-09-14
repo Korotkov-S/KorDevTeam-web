@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Readable } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { LeadS3Config } from "./config";
-import { createPrivateAttachmentStore, MissingPrivateObjectError, sweepMaterializedAttachments } from "./objectStore";
+import { createPrivateAttachmentStore, createPrivateS3Client, MissingPrivateObjectError, sweepMaterializedAttachments } from "./objectStore";
 
 const config: LeadS3Config = { endpoint: new URL("https://private.invalid"), region: "lead-region", bucket: "private-leads", accessKeyId: "lead-only", secretAccessKey: "private-secret", prefix: "intake/private/", serverSideEncryption: "AES256" };
 function client(send: (command: any) => Promise<any>): Pick<S3Client, "send"> { return { send: send as S3Client["send"] }; }
@@ -108,6 +108,54 @@ test("the dedicated SDK client signs and addresses requests with only the lead c
   await store.delete("intake/private/key");
   assert.equal(captured?.url?.split("?")[0], "/private-leads/intake/private/key");
   assert.match(captured?.authorization ?? "", /Credential=lead-only\/\d{8}\/lead-region\/s3\/aws4_request/);
+});
+
+test("production S3 client has explicit connection, idle and hard request timeouts below the lease", async () => {
+  const client = createPrivateS3Client(config);
+  try {
+    const handler = client.config.requestHandler;
+    assert.equal(typeof (handler as { httpHandlerConfigs?: unknown }).httpHandlerConfigs, "function");
+    const resolved = await (handler as unknown as { configProvider: Promise<Record<string, unknown>> }).configProvider;
+    assert.deepEqual({
+      connectionTimeout: resolved.connectionTimeout,
+      socketTimeout: resolved.socketTimeout,
+      requestTimeout: resolved.requestTimeout,
+      throwOnRequestTimeout: resolved.throwOnRequestTimeout,
+    }, {
+      connectionTimeout: 5_000,
+      socketTimeout: 30_000,
+      requestTimeout: 45_000,
+      throwOnRequestTimeout: true,
+    });
+  } finally { client.destroy(); }
+});
+
+test("hanging S3 send is aborted by the injected hard operation timeout", async t => {
+  const tempRoot = await root(t);
+  let observedSignal: AbortSignal | undefined;
+  const store = createPrivateAttachmentStore(config, {
+    send: ((_command: unknown, options?: { abortSignal?: AbortSignal }) => new Promise((_resolve, reject) => {
+      observedSignal = options?.abortSignal;
+      options?.abortSignal?.addEventListener("abort", () => reject(new Error("private timeout cause")), { once: true });
+    })) as S3Client["send"],
+  }, { operationTimeoutMs: 5 });
+  await assert.rejects(store.materialize({ objectKey: "intake/private/key", tempRoot }), /^LeadError: storage_unavailable$/);
+  assert.equal(observedSignal?.aborted, true);
+  assert.deepEqual(await readdir(tempRoot), []);
+});
+
+test("abort interrupts a trickling materialized download and removes its partial file", async t => {
+  const tempRoot = await root(t);
+  const body = new PassThrough();
+  body.write("partial private bytes");
+  const controller = new AbortController();
+  const store = createPrivateAttachmentStore(config, client(async () => ({ Body: body })), { operationTimeoutMs: 60_000 });
+  const materializing = store.materialize({ objectKey: "intake/private/key", tempRoot, signal: controller.signal });
+  await new Promise(resolve => setImmediate(resolve));
+  controller.abort();
+  await assert.rejects(materializing, /^LeadError: storage_unavailable$/);
+  assert.equal(body.destroyed, true);
+  assert.deepEqual(await readdir(tempRoot), []);
 });
 
 test("confirmed missing objects propagate for delivery and deletion; generic 404 is not confirmed missing", async t => {

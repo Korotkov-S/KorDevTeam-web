@@ -60,7 +60,11 @@ test("real Nodemailer composition keeps deterministic Message-ID and text withou
 test("SMTP factory maps backend credentials, disables debug logging and does not connect on construction", () => {
   const transport = createLeadEmailTransport(config);
   try {
-    assert.deepEqual(transport.options, { host: "smtp.example.invalid", port: 465, secure: true, auth: { user: "fixture-user", pass: "fixture-password" }, logger: false, debug: false });
+    assert.deepEqual(transport.options, {
+      host: "smtp.example.invalid", port: 465, secure: true,
+      auth: { user: "fixture-user", pass: "fixture-password" }, logger: false, debug: false,
+      connectionTimeout: 5_000, greetingTimeout: 10_000, socketTimeout: 45_000, dnsTimeout: 5_000,
+    });
   } finally { transport.close(); }
 });
 

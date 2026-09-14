@@ -191,7 +191,7 @@ async function processClaimedJob(job: ClaimedJob, options: WorkerOptions): Promi
 
     if (job.attachment) {
       try {
-        materialized = await options.store.materialize({ objectKey: job.attachment.objectKey, tempRoot: options.tempRoot });
+        materialized = await options.store.materialize({ objectKey: job.attachment.objectKey, tempRoot: options.tempRoot, signal: options.signal });
       } catch (error) {
         await stopHeartbeat();
         if (error instanceof MissingPrivateObjectError) {
