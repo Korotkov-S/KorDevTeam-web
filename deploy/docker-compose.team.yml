@@ -77,7 +77,10 @@ services:
     image: ${CLAMAV_IMAGE:?Provide immutable CLAMAV_IMAGE digest}
     restart: unless-stopped
     init: true
-    networks: [backend]
+    networks:
+      backend: {}
+      egress:
+        gw_priority: 1
     volumes:
       - clamav-signatures:/var/lib/clamav
     healthcheck:

@@ -34,7 +34,8 @@ test('production topology has one private lead worker and internal ClamAV', () =
   assert.deepEqual(worker.cap_drop, ['ALL']);
 
   assert.equal(services.clamav.ports, undefined);
-  assert.deepEqual(services.clamav.networks, { backend: null });
+  assert.deepEqual(services.clamav.networks, { backend: {}, egress: { gw_priority: 1 } });
+  assert.equal(services.clamav.networks.proxy, undefined);
   assert.deepEqual(services.clamav.cap_add, ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETGID', 'SETUID']);
   assert.deepEqual(services.clamav.cap_drop, ['ALL']);
   assert.equal(services.clamav.image, `clamav/clamav@sha256:${'c'.repeat(64)}`);
@@ -85,7 +86,7 @@ test('local topology uses one private worker, internal ClamAV and no database ho
   for (const name of ['lead-worker', 'clamav', 'postgres']) assert.equal(services[name].ports, undefined);
   assert.deepEqual(services['lead-worker'].command, ['node', 'server/lead-worker.mjs']);
   assert.deepEqual(services['lead-worker'].networks, { backend: {}, egress: { gw_priority: 1 } });
-  assert.deepEqual(services.clamav.networks, { backend: null });
+  assert.deepEqual(services.clamav.networks, { backend: {}, egress: { gw_priority: 1 } });
   assert.deepEqual(services.clamav.cap_add, ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETGID', 'SETUID']);
   assert.deepEqual(services.clamav.cap_drop, ['ALL']);
   assert.equal(services['lead-worker'].networks.egress.gw_priority, 1);
