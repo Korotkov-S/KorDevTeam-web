@@ -24,7 +24,8 @@ import { runWorkerBatch, type WorkerOptions } from "../../src/server/leads/worke
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const integrationTest = TEST_DATABASE_URL ? test : test.skip;
-const CONTACTS_OR_SECRETS = /Анна|Борис|7999\d{7}|crm-test-token|smtp-test-password|private-access|private-secret/i;
+const CONTACT_NAMES_OR_SECRETS = /Анна|Борис|crm-test-token|smtp-test-password|private-access|private-secret/i;
+const CONTACT_PHONE_DIGITS = ["79991112233", "79992223344"];
 
 type MutableClock = { now(): Date; advance(milliseconds: number): void };
 type FormInput = {
@@ -35,6 +36,7 @@ type FormInput = {
 };
 type Submission = { status: number; leadId: string };
 type CrmAttempt = { idempotencyKey: string; attachmentSha256: string | null };
+type EmailAttempt = EmailReceipt & { leadId: string };
 
 const noFileForm: FormInput = {
   name: "Анна",
@@ -136,11 +138,11 @@ class RecordingCrm {
 }
 
 class RecordingEmail {
-  readonly messages: EmailReceipt[] = [];
+  readonly messages: EmailAttempt[] = [];
 
   async send(envelope: DeliveryEnvelope): Promise<EmailReceipt> {
     const receipt = { messageId: `<lead-${envelope.leadId}@example.test>` };
-    this.messages.push(receipt);
+    this.messages.push({ ...receipt, leadId: envelope.leadId });
     return receipt;
   }
 }
@@ -267,7 +269,14 @@ async function createFixture(t: TestContext) {
         dueJobs: jobRows.filter(job => ["pending", "processing", "retry"].includes(job.status)).length,
       };
     },
-    logsContainContactsOrSecrets: () => CONTACTS_OR_SECRETS.test(JSON.stringify(logs)),
+    deliveryJobs: () => db.select({ leadId: leadDeliveryJobs.leadId, channel: leadDeliveryJobs.channel, status: leadDeliveryJobs.status })
+      .from(leadDeliveryJobs),
+    abandonDueJobs: (ownerId: string) => repository.claimDueJobs(ownerId, 10, 120_000),
+    logsContainContactsOrSecrets() {
+      const serialized = JSON.stringify(logs);
+      const digits = serialized.replace(/\D/g, "");
+      return CONTACT_NAMES_OR_SECRETS.test(serialized) || CONTACT_PHONE_DIGITS.some(phone => digits.includes(phone));
+    },
     async attachmentChecksum(leadId: string) {
       const [attachment] = await db.select({ checksum: leadAttachments.checksum }).from(leadAttachments)
         .where(eq(leadAttachments.leadId, leadId));
@@ -311,6 +320,14 @@ integrationTest("two accepted leads deliver once to both channels", async t => {
   });
   assert.equal(fixture.crm.attempts.length, 2);
   assert.equal(fixture.clamav.paths.length, 1);
+  const deliveryJobs = await fixture.deliveryJobs();
+  assert.deepEqual(deliveryJobs.map(job => job.status).sort(), ["delivered", "delivered", "delivered", "delivered"]);
+  assert.deepEqual(deliveryJobs.map(job => `${job.leadId}:${job.channel}`).sort(), [
+    `${first.leadId}:crm`, `${first.leadId}:email`, `${second.leadId}:crm`, `${second.leadId}:email`,
+  ].sort());
+  assert.deepEqual(fixture.email.messages.map(message => message.leadId).sort(), [
+    first.leadId, second.leadId,
+  ].sort());
   assert.equal(fixture.logsContainContactsOrSecrets(), false);
 });
 
@@ -333,7 +350,15 @@ integrationTest("accepted work survives vendor failure, worker restart, and rete
   await fixture.worker.runBatch();
   assert.equal(await fixture.dueJobCount(accepted.leadId), 1);
 
-  fixture.clock.advance(121_000);
+  fixture.clock.advance(1_000);
+  const crashOwner = randomUUID();
+  const abandoned = await fixture.abandonDueJobs(crashOwner);
+  assert.equal(abandoned.length, 1);
+  assert.equal(abandoned[0].channel, "crm");
+  assert.equal(await fixture.newWorker().runBatch(), 0);
+  assert.equal(fixture.crm.attempts.length, 1);
+
+  fixture.clock.advance(120_001);
   fixture.crm.recover();
   await fixture.newWorker().runBatch();
   assert.equal(new Set(fixture.crm.attempts.map(attempt => attempt.idempotencyKey)).size, 1);
