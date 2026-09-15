@@ -14,12 +14,16 @@ image_valid() {
 digest_image_valid() {
   [[ "${1:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*@sha256:[a-f0-9]{64}$ ]] || fail 'CLAMAV_IMAGE must be an immutable image digest';
 }
+lead_temp_root_valid() {
+  [[ "${LEAD_TEMP_ROOT:-}" == /tmp/kordev-leads ]] || fail 'LEAD_TEMP_ROOT must be the dedicated /tmp/kordev-leads mount'
+}
 safe_path() {
   node "$SCRIPT_DIR/release-files.mjs" validate-path "$1" || fail 'Unsafe deployment path';
 }
 state_init() {
   safe_path "$DEPLOY_STATE_DIR"; safe_path "$TRAEFIK_DYNAMIC_FILE"
   digest_image_valid "${CLAMAV_IMAGE:-}"
+  lead_temp_root_valid
   [[ -f "$TRAEFIK_DYNAMIC_FILE" ]] || fail 'Active route file is required'
   mkdir -p -- "$DEPLOY_STATE_DIR/slots"
 }
@@ -123,6 +127,11 @@ activate_worker() {
 }
 validate_route_state() {
   node "$SCRIPT_DIR/release-files.mjs" validate-route "${1:-$TRAEFIK_DYNAMIC_FILE}" "$DEPLOY_STATE_DIR" "${PRODUCTION_HOST:-}" "${PUBLIC_ORIGIN:-}"
+}
+validate_release_gate() {
+  local slot="$1" image
+  image="$(recorded_image "$slot")"
+  node "$SCRIPT_DIR/release-boundary.mjs" validate "$DEPLOY_STATE_DIR" "$slot" "$image" "$REPO_ROOT/src/routes/legal.tsx" "${LEAD_CONSENT_VERSION:?LEAD_CONSENT_VERSION is required}" || fail 'Release approval evidence is missing, malformed, stale or mismatched'
 }
 public_slot_matches() {
   local headers value

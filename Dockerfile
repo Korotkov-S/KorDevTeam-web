@@ -49,9 +49,11 @@ COPY --from=build --chown=node:node /app/build/server /app/build/server
 COPY --from=build --chown=node:node /app/server /app/server
 COPY --from=build --chown=node:node /app/drizzle /app/drizzle
 COPY --from=build --chown=node:node /app/scripts/migrate-production.mjs /app/scripts/migrate-production.mjs
+COPY --from=build --chown=node:node /app/scripts/runtime-entrypoint.sh /app/scripts/runtime-entrypoint.sh
 RUN test -f /app/server/lead-worker.mjs && test -f /app/server/lead-retention.mjs
-RUN mkdir -p /app/server/data && chown node:node /app/server/data
+RUN mkdir -p /app/server/data /tmp/kordev-leads && chown node:node /app/server/data /tmp/kordev-leads && chmod 0700 /tmp/kordev-leads /app/scripts/runtime-entrypoint.sh
 USER node
 EXPOSE 3001
 HEALTHCHECK --interval=10s --timeout=8s --start-period=20s --retries=6 CMD node -e "fetch('http://127.0.0.1:3001/api/health/ready',{signal:AbortSignal.timeout(6000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+ENTRYPOINT ["/app/scripts/runtime-entrypoint.sh"]
 CMD ["node", "server/runtime.mjs"]

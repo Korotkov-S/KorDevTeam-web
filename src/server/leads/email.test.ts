@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createServer } from "node:net";
 import { test } from "node:test";
 import nodemailer, { type SendMailOptions } from "nodemailer";
 import { createLeadEmailTransport, sendLeadEmail } from "./email";
@@ -63,9 +64,49 @@ test("SMTP factory maps backend credentials, disables debug logging and does not
     assert.deepEqual(transport.options, {
       host: "smtp.example.invalid", port: 465, secure: true,
       auth: { user: "fixture-user", pass: "fixture-password" }, logger: false, debug: false,
+      requireTLS: true,
       connectionTimeout: 5_000, greetingTimeout: 10_000, socketTimeout: 45_000, dnsTimeout: 5_000,
     });
   } finally { transport.close(); }
+});
+
+test("port 587 transport refuses plaintext SMTP when STARTTLS is unavailable", async t => {
+  let transcript = "";
+  const server = createServer(socket => {
+    socket.setEncoding("utf8");
+    socket.write("220 localhost ESMTP ready\r\n");
+    let pending = "";
+    socket.on("data", chunk => {
+      transcript += chunk;
+      pending += chunk;
+      while (pending.includes("\r\n")) {
+        const boundary = pending.indexOf("\r\n");
+        const command = pending.slice(0, boundary);
+        pending = pending.slice(boundary + 2);
+        if (/^EHLO /i.test(command)) socket.write("250-localhost\r\n250 AUTH PLAIN\r\n");
+        else if (/^STARTTLS$/i.test(command)) socket.write("454 TLS unavailable\r\n");
+        else socket.write("500 command refused\r\n");
+      }
+    });
+  });
+  server.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  t.after(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const transport = createLeadEmailTransport({ ...config, host: "127.0.0.1", port: address.port, secure: false });
+  t.after(() => transport.close());
+
+  await assert.rejects(transport.sendMail({ from: config.from, to: config.to, text: "safe" }), error => {
+    assert.equal((error as NodeJS.ErrnoException).code, "ETLS");
+    return true;
+  });
+  assert.match(transcript, /^EHLO /m);
+  assert.match(transcript, /^STARTTLS$/m);
+  assert.doesNotMatch(transcript, /^AUTH |^MAIL FROM:/m);
 });
 
 test("SMTP transient failures retry and permanent/configuration failures are sanitized", async () => {

@@ -213,6 +213,7 @@ async function createFixture(t: TestContext) {
   const retentionRepository = {
     findExpiredLeads: repository.findExpiredLeads,
     attachmentKeyExists: repository.attachmentKeyExists,
+    deleteExpiredRateLimits: repository.deleteExpiredRateLimits,
     async deleteLeadAfterObject(leadId: string) {
       const [attachment] = await db.select({ objectKey: leadAttachments.objectKey })
         .from(leadAttachments).where(eq(leadAttachments.leadId, leadId));

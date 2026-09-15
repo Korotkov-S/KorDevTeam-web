@@ -1,32 +1,41 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, symlinkSync, utimesSync, rmSync, statSync, realpathSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, symlinkSync, utimesSync, rmSync, statSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 const root = process.cwd();
 const image = `ghcr.io/example/team:${'a'.repeat(40)}`;
 const oldImage = `ghcr.io/example/team:${'b'.repeat(40)}`;
-const scripts = ['deploy-slot', 'switch-slot', 'rollback-slot', 'run-lead-retention', 'backup-postgres', 'restore-postgres', 'prune-releases'];
+const scripts = ['deploy-slot', 'switch-slot', 'rollback-slot', 'release-gate', 'validate-runtime-compose', 'run-lead-retention', 'backup-postgres', 'restore-postgres', 'prune-releases'];
+const privacyPolicySha256 = createHash('sha256').update(readFileSync('src/routes/legal.tsx')).digest('hex');
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'kordev-deploy-')));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  for (const name of ['bin', 'state/slots', 'traefik', 'releases', 'logs']) mkdirSync(path.join(dir, name), { recursive: true });
+  for (const name of ['bin', 'state/slots', 'state/release-gates', 'traefik', 'releases', 'logs']) mkdirSync(path.join(dir, name), { recursive: true });
   const route = path.join(dir, 'traefik/kordevteam-dynamic.yml');
   writeFileSync(route, `# current-slot: blue\n# previous-slot: none\n# current-image: ${oldImage}\nhttp:\n  routers:\n    kordevteam:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [websecure]\n      tls:\n        certResolver: letsencrypt\n        domains:\n          - main: example.com\n            sans: [www.example.com]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n    kordevteam-http:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [web]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n  middlewares:\n    kordevteam-slot:\n      headers:\n        customResponseHeaders:\n          X-Kordev-Slot: blue\n  services:\n    kordevteam-active:\n      loadBalancer:\n        servers:\n          - url: http://kordevteam-blue:3001\n`);
   writeFileSync(path.join(dir, 'state/slots/blue'), oldImage + '\n');
   writeFileSync(path.join(dir, 'state/slots/green'), image + '\n');
   writeFileSync(path.join(dir, 'state/worker-image'), oldImage + '\n', { mode: 0o600 });
+  chmodSync(path.join(dir, 'state/release-gates'), 0o700);
+  const gate = path.join(dir, 'state/release-gates/green.json');
+  const writeGate = (overrides = {}) => writeFileSync(gate, JSON.stringify({ version: 1, slot: 'green', image,
+    privacyPolicySha256, leadId: '11111111-1111-4111-8111-111111111111', consentVersion: '2026-09-14',
+    slotRecordMtimeMs: statSync(path.join(dir, 'state/slots/green')).mtimeMs, createdAt: new Date().toISOString(), ...overrides }) + '\n', { mode: 0o600 });
+  writeGate();
   function stub(name, body) { writeFileSync(path.join(dir, 'bin', name), '#!/bin/bash\nset -eu\n' + body, { mode: 0o755 }); }
   stub('docker', 'printf "WORKER_IMAGE=%s %s\\n" "${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/commands"\nprintf "docker WORKER_IMAGE=%s %s\\n" "${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_CANDIDATE_CHECK:-0}" == 1 && "$*" == *"run --rm --no-deps lead-worker node server/lead-worker.mjs --check"* && "${WORKER_IMAGE:-}" == "$TARGET_IMAGE" ]]; then exit 1; fi\nif [[ -n "${FAIL_WORKER_IMAGE:-}" && "$*" == *"up -d --no-deps lead-worker"* && "${WORKER_IMAGE:-}" == "$FAIL_WORKER_IMAGE" ]]; then exit 1; fi\nif [[ "$1" == inspect ]]; then\n  if [[ "$*" == *"{{.Config.Image}}"* ]]; then if [[ "$*" == *lead-worker* ]]; then printf "%s\\n" "${WORKER_IMAGE:-$OLD_IMAGE}"; elif [[ "$*" == *blue* ]]; then printf "%s\\n" "$OLD_IMAGE"; else printf "%s\\n" "$TARGET_IMAGE"; fi\n  elif [[ "$*" == *"{{.State.Health.Status}}"* ]]; then printf "healthy\\n"; fi\nfi\n');
-  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nprintf "curl %s\\n" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
+  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nprintf "curl %s\\n" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *api/leads* ]]; then printf \'{"leadId":"22222222-2222-4222-8222-222222222222","status":"accepted"}\'; elif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir,
     DEPLOY_STATE_DIR: `${dir}/state`, TRAEFIK_DYNAMIC_FILE: route, PUBLIC_ORIGIN: 'https://example.com',
     TARGET_IMAGE: image, OLD_IMAGE: oldImage, READINESS_ATTEMPTS: '1', READINESS_DELAY: '0',
     PRODUCTION_HOST: 'example.com', LOG_ARCHIVE_DIR: `${dir}/logs`, REAL_NODE: process.execPath,
-    CLAMAV_IMAGE: `clamav/clamav@sha256:${'c'.repeat(64)}` };
-  return { dir, route, env, stub, run: (name, args = [], extra = {}) => spawnSync('bash', [path.join(root, 'scripts', `${name}.sh`), ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8' }) };
+    CLAMAV_IMAGE: `clamav/clamav@sha256:${'c'.repeat(64)}`, LEAD_TEMP_ROOT: '/tmp/kordev-leads',
+    LEAD_CONSENT_VERSION: '2026-09-14', PRIVACY_POLICY_SHA256: privacyPolicySha256 };
+  return { dir, route, gate, writeGate, env, stub, run: (name, args = [], extra = {}) => spawnSync('bash', [path.join(root, 'scripts', `${name}.sh`), ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8' }) };
 }
 
 test('release scripts exist and have valid Bash syntax', () => {
@@ -57,6 +66,49 @@ test('unhealthy target cannot alter route or state', t => {
   const r = f.run('switch-slot', ['green'], { FAIL_LOCAL: '1' });
   assert.notEqual(r.status, 0); assert.match(r.stderr, /health|ready|smoke/i);
   assert.equal(readFileSync(f.route, 'utf8'), before);
+});
+
+test('release gate requires reviewed privacy digest and explicit persistent test-lead opt-in', t => {
+  const f = fixture(t); rmSync(f.gate);
+  let result = f.run('release-gate', ['green'], { RELEASE_FORM_SMOKE_OPT_IN: '' });
+  assert.notEqual(result.status, 0);
+  assert.equal(existsSync(`${f.dir}/requests`), false);
+  result = f.run('release-gate', ['green'], { RELEASE_FORM_SMOKE_OPT_IN: 'persist-clearly-marked-test-lead' });
+  assert.equal(result.status, 0, result.stderr);
+  const requests = readFileSync(`${f.dir}/requests`, 'utf8');
+  assert.match(requests, /api\/leads/);
+  assert.match(requests, /РЕЛИЗНЫЙ ТЕСТ — НЕ ОБРАБАТЫВАТЬ/);
+  assert.equal(statSync(f.gate).mode & 0o777, 0o600);
+  const evidence = JSON.parse(readFileSync(f.gate, 'utf8'));
+  assert.equal(evidence.image, image);
+  assert.equal(evidence.privacyPolicySha256, privacyPolicySha256);
+  assert.equal(evidence.leadId, '22222222-2222-4222-8222-222222222222');
+});
+
+test('release gate rejects an unreviewed privacy digest before persisting a test lead', t => {
+  const f = fixture(t); rmSync(f.gate);
+  const result = f.run('release-gate', ['green'], { RELEASE_FORM_SMOKE_OPT_IN: 'persist-clearly-marked-test-lead', PRIVACY_POLICY_SHA256: 'f'.repeat(64) });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /privacy|policy|digest/i);
+  assert.equal(existsSync(`${f.dir}/requests`), false);
+});
+
+test('switch fails closed on missing, malformed, stale, exposed, symlinked or image-mismatched release evidence', async t => {
+  for (const kind of ['missing', 'malformed', 'stale', 'mode', 'directory-mode', 'symlink', 'image']) await t.test(kind, t => {
+    const f = fixture(t);
+    if (kind === 'missing') rmSync(f.gate);
+    if (kind === 'malformed') writeFileSync(f.gate, '{no}\n', { mode: 0o600 });
+    if (kind === 'stale') f.writeGate({ createdAt: new Date(Date.now() - 3_700_000).toISOString() });
+    if (kind === 'mode') { rmSync(f.gate); writeFileSync(f.gate, '{}\n', { mode: 0o644 }); }
+    if (kind === 'directory-mode') chmodSync(path.dirname(f.gate), 0o755);
+    if (kind === 'symlink') { const target = `${f.gate}.real`; writeFileSync(target, '{}\n', { mode: 0o600 }); rmSync(f.gate); symlinkSync(target, f.gate); }
+    if (kind === 'image') f.writeGate({ image: oldImage });
+    const before = readFileSync(f.route);
+    const result = f.run('switch-slot', ['green']);
+    assert.notEqual(result.status, 0, `${kind} evidence must fail`);
+    assert.match(result.stderr, /release|evidence|approval|privacy/i);
+    assert.deepEqual(readFileSync(f.route), before);
+  });
 });
 test('healthy switch atomically replaces route, records both slots and rollback restores previous', t => {
   const f = fixture(t); const inode = statSync(f.route).ino;

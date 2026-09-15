@@ -20,6 +20,7 @@ x-lead-web-environment: &lead-web-environment
 x-web: &web
   restart: unless-stopped
   init: true
+  read_only: true
   environment:
     <<: *lead-web-environment
     NODE_ENV: production
@@ -37,8 +38,14 @@ x-web: &web
     S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
     S3_SECRET_KEY: ${S3_SECRET_KEY:-}
     S3_FORCE_PATH_STYLE: "1"
-  networks: [backend, proxy]
-  tmpfs: ["/tmp:size=96m,mode=1777"]
+  networks:
+    backend: {}
+    egress:
+      gw_priority: 1
+    proxy: {}
+  tmpfs:
+    - "/tmp:size=96m,mode=1777"
+    - "${LEAD_TEMP_ROOT:?Provide LEAD_TEMP_ROOT}:size=96m,mode=0700,uid=1000,gid=1000"
   logging: *logging
   security_opt: [no-new-privileges:true]
   cap_drop: [ALL]
@@ -101,6 +108,7 @@ services:
     command: [node, server/lead-worker.mjs]
     restart: unless-stopped
     init: true
+    read_only: true
     environment:
       <<: *lead-web-environment
       NODE_ENV: production
@@ -123,7 +131,9 @@ services:
       backend: {}
       egress:
         gw_priority: 1
-    tmpfs: ["/tmp:size=96m,mode=1777"]
+    tmpfs:
+      - "/tmp:size=96m,mode=1777"
+      - "${LEAD_TEMP_ROOT:?Provide LEAD_TEMP_ROOT}:size=96m,mode=0700,uid=1000,gid=1000"
     healthcheck:
       test: [CMD, node, server/lead-worker.mjs, --check]
       interval: 30s

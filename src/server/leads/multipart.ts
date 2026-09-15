@@ -1,7 +1,7 @@
 import busboy from "busboy";
 import { createHash, randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { lstat, realpath, unlink } from "node:fs/promises";
+import { lstat, readdir, realpath, truncate as truncateFile, unlink as unlinkFile } from "node:fs/promises";
 import type { IncomingHttpHeaders } from "node:http";
 import { isAbsolute, join, parse } from "node:path";
 import { Readable, Transform } from "node:stream";
@@ -15,12 +15,79 @@ export type ParsedLeadMultipart = {
   dispose(): Promise<void>;
 };
 
+export class FatalMultipartCleanupError extends Error {
+  readonly code = "lead_multipart_cleanup_failed" as const;
+  constructor() {
+    super("lead_multipart_cleanup_failed");
+    Object.defineProperty(this, "name", { value: "FatalMultipartCleanupError", configurable: true });
+  }
+}
+
+type MultipartFileOperations = { unlink(path: string): Promise<void>; truncate(path: string, length: number): Promise<void> };
+type MultipartRuntimeOptions = Partial<MultipartFileOperations>;
+const defaultFileOperations: MultipartFileOperations = { unlink: unlinkFile, truncate: truncateFile };
+const stagedUploadName = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.upload$/i;
+const MAX_SWEEP_FILES = 100;
+
 const fieldLengths: Record<string, number> = {
   name: 255, phone: 50, description: MAX_DESCRIPTION_LENGTH, consent: 8, website: 500,
   pagePath: 500, referrer: 500, utmSource: 500, utmMedium: 500, utmCampaign: 500, utmContent: 500, utmTerm: 500,
 };
 
-export async function parseLeadMultipart(request: Readable & { headers: IncomingHttpHeaders }, tempRoot: string): Promise<ParsedLeadMultipart> {
+async function validatedTempRoot(tempRoot: string, invalid: () => Error = () => new LeadError("storage_unavailable")): Promise<string> {
+  if (!isAbsolute(tempRoot)) throw invalid();
+  const info = await lstat(tempRoot);
+  const root = await realpath(tempRoot);
+  if (!info.isDirectory() || info.isSymbolicLink() || root === parse(root).root || (info.mode & 0o022) !== 0 ||
+      (process.getuid && info.uid !== process.getuid())) throw invalid();
+  return root;
+}
+
+async function unlinkWithRetry(path: string, operations: MultipartFileOperations): Promise<void> {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try { await operations.unlink(path); return; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      if (attempt === 3) {
+        // If the directory entry is temporarily busy, remove the sensitive
+        // payload before escalating the fatal cleanup failure.
+        try { await operations.truncate(path, 0); } catch { /* fatal error below remains sanitized */ }
+        throw new FatalMultipartCleanupError();
+      }
+    }
+  }
+}
+
+export async function sweepStagedUploads(
+  tempRoot: string,
+  cutoff: Date,
+  runtime: MultipartRuntimeOptions = {},
+): Promise<number> {
+  if (!Number.isFinite(+cutoff)) throw new LeadError("storage_unavailable");
+  let root: string;
+  try { root = await validatedTempRoot(tempRoot); }
+  catch { throw new LeadError("storage_unavailable"); }
+  const operations: MultipartFileOperations = { ...defaultFileOperations, ...runtime };
+  let removed = 0;
+  for (const name of await readdir(root)) {
+    if (removed >= MAX_SWEEP_FILES || !stagedUploadName.test(name)) continue;
+    const path = join(root, name);
+    let info;
+    try { info = await lstat(path); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw new LeadError("storage_unavailable"); }
+    if (!info.isFile() || info.isSymbolicLink() || info.mtime >= cutoff) continue;
+    await unlinkWithRetry(path, operations);
+    removed += 1;
+  }
+  return removed;
+}
+
+export async function parseLeadMultipart(
+  request: Readable & { headers: IncomingHttpHeaders },
+  tempRoot: string,
+  runtime: MultipartRuntimeOptions = {},
+): Promise<ParsedLeadMultipart> {
+  const operations: MultipartFileOperations = { ...defaultFileOperations, ...runtime };
   const invalid = () => new LeadError("validation_error");
   if (!/^multipart\/form-data(?:;|$)/i.test(request.headers["content-type"] ?? "")) throw invalid();
   const length = request.headers["content-length"];
@@ -29,10 +96,7 @@ export async function parseLeadMultipart(request: Readable & { headers: Incoming
 
   let root: string;
   try {
-    if (!isAbsolute(tempRoot)) throw invalid();
-    const info = await lstat(tempRoot);
-    root = await realpath(tempRoot);
-    if (!info.isDirectory() || info.isSymbolicLink() || root === parse(root).root || (info.mode & 0o022) !== 0 || (process.getuid && info.uid !== process.getuid())) throw invalid();
+    root = await validatedTempRoot(tempRoot, invalid);
   } catch { throw new LeadError("storage_unavailable"); }
 
   let parser: ReturnType<typeof busboy>;
@@ -56,7 +120,7 @@ export async function parseLeadMultipart(request: Readable & { headers: Incoming
   const dispose = () => disposal ??= (async () => {
     await Promise.all(writes);
     await Promise.all(paths.map(async (path) => {
-      try { await unlink(path); } catch (cause) { if ((cause as NodeJS.ErrnoException).code !== "ENOENT") throw cause; }
+      await unlinkWithRetry(path, operations);
     }));
   })();
   const fail = (cause: LeadError) => {

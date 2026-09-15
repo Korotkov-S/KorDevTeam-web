@@ -12,6 +12,7 @@ verify_active
 verify_slot "$target"
 # Verify rollback remains possible before changing traffic.
 verify_slot "$previous"
+validate_release_gate "$target"
 previous_worker_image="$(recorded_worker_image)"
 [[ "$previous_worker_image" == "$(recorded_image "$previous")" ]] || fail 'Previous worker image does not match active slot'
 snapshot="$DEPLOY_STATE_DIR/operation.lock/previous-route.yml"

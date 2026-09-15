@@ -20,13 +20,20 @@ x-lead-web-environment: &lead-web-environment
   CLAMAV_PORT: "3310"
 x-web: &web
   <<: *app
+  read_only: true
   environment:
     <<: *lead-web-environment
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
     DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
-  tmpfs: ["/tmp:size=96m,mode=1777"]
+  tmpfs:
+    - "/tmp:size=96m,mode=1777"
+    - "${LEAD_TEMP_ROOT:-/tmp/kordev-leads}:size=96m,mode=0700,uid=1000,gid=1000"
+  networks:
+    backend: {}
+    egress:
+      gw_priority: 1
   depends_on:
     postgres:
       condition: service_healthy
@@ -82,6 +89,7 @@ services:
     container_name: kordevteam-lead-worker
     command: [node, server/lead-worker.mjs]
     restart: unless-stopped
+    read_only: true
     environment:
       <<: *lead-web-environment
       NODE_ENV: production
@@ -104,7 +112,9 @@ services:
       backend: {}
       egress:
         gw_priority: 1
-    tmpfs: ["/tmp:size=96m,mode=1777"]
+    tmpfs:
+      - "/tmp:size=96m,mode=1777"
+      - "${LEAD_TEMP_ROOT:-/tmp/kordev-leads}:size=96m,mode=0700,uid=1000,gid=1000"
     healthcheck:
       test: [CMD, node, server/lead-worker.mjs, --check]
       interval: 30s
@@ -122,13 +132,11 @@ services:
     container_name: kordevteam-blue
     ports:
       - "127.0.0.1:8081:3001"
-    networks: [backend, egress]
   kordevteam-green:
     <<: *web
     container_name: kordevteam-green
     ports:
       - "127.0.0.1:8082:3001"
-    networks: [backend, egress]
 
 volumes:
   kordevteam_postgres:

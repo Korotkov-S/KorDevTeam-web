@@ -5,7 +5,7 @@ import { getDb } from "../db/client";
 import { ClamAvScanner } from "./clamav";
 import { readLeadWebConfig } from "./config";
 import { LeadError, leadErrorStatuses, type LeadErrorCode } from "./errors";
-import { parseLeadMultipart } from "./multipart";
+import { parseLeadMultipart, sweepStagedUploads } from "./multipart";
 import { createPrivateAttachmentStore } from "./objectStore";
 import { createLeadRepository } from "./repository";
 import { createLeadService, type LeadServiceDependencies } from "./service";
@@ -24,7 +24,10 @@ const messages: Record<LeadErrorCode, string> = {
 };
 
 type LeadLog = { request_id: string; status: number; code: LeadErrorCode | "accepted" | "replayed" | "ignored"; duration_ms: number };
-export type LeadRouterOverrides = Partial<LeadServiceDependencies> & { log?: (record: LeadLog) => void };
+export type LeadRouterOverrides = Partial<LeadServiceDependencies> & {
+  log?: (record: LeadLog) => void;
+  sweepUploads?: typeof sweepStagedUploads;
+};
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const retryAfter = (seconds = 60) => Number.isFinite(seconds) ? Math.max(1, Math.min(3_600, Math.ceil(seconds))) : 60;
@@ -34,7 +37,7 @@ export function createLeadRouter(overrides: LeadRouterOverrides = {}): Router {
   const router = Router();
   const production = process.env.NODE_ENV === "production";
   const log = overrides.log ?? ((record: LeadLog) => console.info(JSON.stringify(record)));
-  let configured: { tempRoot: string; service: ReturnType<typeof createLeadService> } | undefined;
+  let configured: { tempRoot: string; service: ReturnType<typeof createLeadService>; startupSweep: Promise<number> } | undefined;
   const dependencies = () => {
     if (!configured) {
       const config = overrides.config ?? readLeadWebConfig(process.env);
@@ -45,7 +48,11 @@ export function createLeadRouter(overrides: LeadRouterOverrides = {}): Router {
         objectStore: overrides.objectStore ?? createPrivateAttachmentStore(config.s3),
         inspect: overrides.inspect,
       });
-      configured = { tempRoot: config.tempRoot, service };
+      configured = {
+        tempRoot: config.tempRoot,
+        service,
+        startupSweep: (overrides.sweepUploads ?? sweepStagedUploads)(config.tempRoot, new Date(Date.now() - 2 * 60 * 60_000)),
+      };
     }
     return configured;
   };
@@ -75,7 +82,8 @@ export function createLeadRouter(overrides: LeadRouterOverrides = {}): Router {
       if (req.get("origin") !== expectedOrigin || (site !== undefined && site !== "same-origin")) return fail("validation_error", 403);
       const submissionKey = req.get("idempotency-key");
       if (!submissionKey || !uuid.test(submissionKey)) return fail("validation_error");
-      const { tempRoot, service } = dependencies();
+      const { tempRoot, service, startupSweep } = dependencies();
+      await startupSweep;
       // The parser destroys its input on rejection. Isolate that destruction from
       // the HTTP socket so an in-flight upload still receives the safe 400/413.
       const body = Object.assign(new PassThrough(), { headers: req.headers });

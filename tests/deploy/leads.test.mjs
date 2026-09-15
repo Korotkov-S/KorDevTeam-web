@@ -55,6 +55,10 @@ test('production web and worker receive private server-side lead settings with b
     const service = services[name];
     for (const key of webLeadKeys) assert.ok(service.environment[key], `${name} misses ${key}`);
     assert.ok(service.tmpfs.some(entry => entry.includes('/tmp') && (entry.includes('96m') || entry.includes('100663296')) && entry.includes('mode=1777')), `${name} needs a 96 MiB tmpfs`);
+    assert.ok(service.tmpfs.some(entry => entry.startsWith('/tmp/kordev-leads:') && entry.includes('mode=0700') && entry.includes('uid=1000') && entry.includes('gid=1000')), `${name} needs a private lead temp tmpfs owned by uid 1000`);
+    assert.equal(service.read_only, true, `${name} root filesystem must be read-only`);
+    const expectedNetworks = name === 'lead-worker' ? { backend: {}, egress: { gw_priority: 1 } } : { backend: {}, egress: { gw_priority: 1 }, proxy: {} };
+    assert.deepEqual(service.networks, expectedNetworks, `${name} needs internal DB and explicit outbound S3 routing`);
     assert.equal(service.logging.options['max-size'], '20m');
     assert.equal(service.logging.options['max-file'], '30');
   }
@@ -93,6 +97,22 @@ test('local topology uses one private worker, internal ClamAV and no database ho
   assert.ok(services.postgres.networks.backend !== undefined);
   assert.deepEqual(services['lead-worker'].healthcheck.test, ['CMD', 'node', 'server/lead-worker.mjs', '--check']);
   assert.match(services.clamav.image, /^clamav\/clamav:[0-9]+\.[0-9]+\.[0-9]+$/);
+  for (const name of ['kordevteam-blue', 'kordevteam-green', 'lead-worker']) {
+    assert.equal(services[name].read_only, true);
+    assert.deepEqual(services[name].networks, { backend: {}, egress: { gw_priority: 1 } });
+    assert.ok(services[name].tmpfs.some(entry => entry.startsWith('/tmp/kordev-leads:') && entry.includes('mode=0700') && entry.includes('uid=1000') && entry.includes('gid=1000')));
+  }
+});
+
+test('compose rejects an unsafe lead temp mount target', () => {
+  const values = Object.fromEntries(readFileSync(fixture, 'utf8').trim().split('\n').map(line => line.split(/=(.*)/s).slice(0, 2)));
+  for (const target of ['/', '/tmp', '/app', 'relative/path']) {
+    const result = spawnSync('bash', ['scripts/validate-runtime-compose.sh'], {
+      encoding: 'utf8', env: { ...process.env, ...values, LEAD_TEMP_ROOT: target },
+    });
+    assert.notEqual(result.status, 0, target);
+    assert.match(result.stderr, /LEAD_TEMP_ROOT|temp root/i);
+  }
 });
 
 test('lead retention systemd unit is structurally verifiable on Linux CI', { skip: process.platform !== 'linux' || process.env.CI !== 'true' }, () => {

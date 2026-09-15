@@ -24,6 +24,14 @@ test('production image packages SSR, migrations and production dependencies unde
   assert.match(dockerfile, /server\/runtime\.mjs/);
   assert.match(dockerfile, /health\/ready/);
   assert.match(dockerfile, /ENV .*CONTENT_CACHE_TTL_SECONDS=0(?:\s|$)/m);
+  assert.match(dockerfile, /ENTRYPOINT \["\/app\/scripts\/runtime-entrypoint\.sh"\]/);
+});
+
+test('runtime entrypoint rejects redirected or incorrectly-owned private lead temp roots', () => {
+  const script = readFileSync('scripts/runtime-entrypoint.sh', 'utf8');
+  assert.match(script, /LEAD_TEMP_ROOT.*\/tmp\/kordev-leads/);
+  assert.match(script, /stat .*%u.*%a|stat.*-c/);
+  assert.match(script, /1000:700/);
 });
 test('local topology has private shared PostgreSQL and distinct blue green ports', () => {
   const r = spawnSync('docker', ['compose', 'config', '--format', 'json'], { encoding: 'utf8' });

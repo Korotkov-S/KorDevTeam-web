@@ -204,9 +204,19 @@ async function processClaimedJob(job: ClaimedJob, options: WorkerOptions): Promi
         return;
       }
     }
+    if (job.channel === "crm" && +options.clock.now() >= +job.acceptedAt + CRM_CUTOFF_MS) {
+      await stopHeartbeat();
+      await requireLease(options.repository.markManualAction({ ...claim, code: "crm_idempotency_window_expired" }));
+      return;
+    }
     const deliveryEnvelope = envelope(job, materialized?.path ?? null);
     const providerAttemptCount = await options.repository.beginProviderAttempt(claim);
     if (providerAttemptCount === null) throw new Error("lead_lease_lost");
+    if (job.channel === "crm" && +options.clock.now() >= +job.acceptedAt + CRM_CUTOFF_MS) {
+      await stopHeartbeat();
+      await requireLease(options.repository.markManualAction({ ...claim, code: "crm_idempotency_window_expired" }));
+      return;
+    }
     if (job.channel === "crm") {
       let receipt: CrmReceipt;
       try { receipt = await options.crm(deliveryEnvelope); }

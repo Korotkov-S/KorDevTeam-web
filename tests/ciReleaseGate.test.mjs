@@ -21,6 +21,9 @@ test("read-only validation gates a separate trusted main publisher", () => {
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.deepEqual(workflow.on.pull_request.branches, ["main"]);
   assert.equal(workflow.on.workflow_dispatch.inputs.image_ref.required, true);
+  assert.equal(workflow.on.workflow_dispatch.inputs.privacy_policy_sha256.required, true);
+  assert.equal(workflow.on.workflow_dispatch.inputs.persist_test_lead.type, "boolean");
+  assert.equal(workflow.on.workflow_dispatch.inputs.persist_test_lead.default, false);
 
   const validation = workflow.jobs.validate;
   assert.ok(validation, "validate job must exist");
@@ -50,6 +53,15 @@ test("read-only validation gates a separate trusted main publisher", () => {
   assert.match(clamavSmoke.run, /docker compose up -d --wait clamav/);
   assert.match(clamavSmoke.run, /docker compose port clamav 3310/);
   assert.match(clamavSmoke.run, /docker compose rm -s -f clamav/);
+  const runtimeSmoke = steps.find(step => step.name === "Smoke-test read-only production lead runtime");
+  assert.ok(runtimeSmoke);
+  assert.match(runtimeSmoke.run, /docker compose build/);
+  assert.match(runtimeSmoke.run, /docker compose up -d --wait postgres clamav/);
+  assert.match(runtimeSmoke.run, /server\/lead-worker\.mjs --check/);
+  assert.match(runtimeSmoke.run, /restart_count/);
+  assert.match(runtimeSmoke.run, /api\/leads/);
+  assert.match(runtimeSmoke.run, /РЕЛИЗНЫЙ ТЕСТ/);
+  assert.doesNotMatch(runtimeSmoke.run, /CRM_INTAKE_ENDPOINT=.*(?:krasotula|kordev\.team)|SMTP_HOST=.*korotkov|LEAD_S3_ENDPOINT=.*timeweb/i);
 
   const publisher = workflow.jobs["publish-image"];
   assert.ok(publisher, "publish-image job must exist");
@@ -81,13 +93,18 @@ test("production deployment is dispatch-only, protected, digest-exact and uses T
   const validate = job.steps.find(step => step.name === "Validate immutable production image");
   assert.match(validate.run, /\^ghcr\\\.io\/.+@sha256:\[0-9a-f\]\{64\}\$/);
   const remote = job.steps.find(step => /ssh-action@v1$/.test(step.uses));
-  assert.equal(remote.with.envs, "IMAGE_REF");
+  assert.match(remote.with.envs, /IMAGE_REF/);
+  assert.match(remote.with.envs, /PRIVACY_POLICY_SHA256/);
+  assert.match(remote.with.envs, /PERSIST_TEST_LEAD/);
   const script = remote.with.script;
   assert.match(script, /^bash -se /, "remote orchestration must run under Bash");
   const deploy = script.indexOf("scripts/deploy-slot.sh");
+  const releaseGate = script.indexOf("scripts/release-gate.sh");
   const switchSlot = script.indexOf("scripts/switch-slot.sh");
   const prune = script.indexOf("scripts/prune-releases.sh");
-  assert.ok(deploy >= 0 && deploy < switchSlot && switchSlot < prune, "deploy, switch and prune must be explicit and ordered");
+  assert.ok(deploy >= 0 && deploy < releaseGate && releaseGate < switchSlot && switchSlot < prune, "deploy, release gate, switch and prune must be explicit and ordered");
+  assert.match(script, /persist-clearly-marked-test-lead/);
+  assert.match(script, /PERSIST_TEST_LEAD.*true/);
   assert.match(script, /current-slot/);
   assert.doesNotMatch(script, /backup-postgres\.sh/, "deploy-slot owns the pre-release backup gate");
   assert.doesNotMatch(script, /docker compose (?:up|pull|restart)|docker (?:system|volume) prune/);
@@ -156,6 +173,7 @@ test("operator runbook covers approval, exact switching, rollback and public evi
     "current-slot",
     "deploy-slot.sh",
     "switch-slot.sh",
+    "release-gate.sh",
     "rollback-slot.sh",
     "restore-postgres.sh",
     "sitemap.xml",
@@ -167,6 +185,9 @@ test("operator runbook covers approval, exact switching, rollback and public evi
   assert.match(source, /SSH_HOST[^\n]+SSH_USER[^\n]+SSH_KEY[^\n]+production[^\n]+environment secrets/i);
   assert.match(source, /restore-drill[^\n]+environment|read-only S3/i);
   assert.match(source, /least[- ]privilege|scoped policy/i);
+  assert.match(source, /privacy_policy_sha256/i);
+  assert.match(source, /persist_test_lead/i);
+  assert.match(source, /mode-`?0600`?.*evidence/i);
   assert.match(source, /never[^\n]+production SSH key/i);
   assert.match(source, /restore-drill[^\n]+deployment branch rule[^\n]+main/i);
   assert.match(source, /PRODUCTION_DATABASE_NAME[^\n]+non-secret[^\n]+environment variable/i);

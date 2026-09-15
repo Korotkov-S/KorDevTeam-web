@@ -42,7 +42,7 @@ The public response must be ready and its `X-Kordev-Slot` header must equal `cur
 
 Open the successful **Validate and publish immutable image** run for the intended `main` commit. Copy `release-image-ref.txt` from the `release-image-<commit>` artifact and compare it with the exact reference and digest in the job summary. Confirm that the commit passed typecheck, tests, application build, built-runtime SEO crawl, and Docker build.
 
-To proceed, open **Run workflow**, paste that complete `@sha256:` reference into `image_ref`, and start it. If GitHub presents **Review deployments**, compare the input again and choose **Approve and deploy**. Choose **Reject**, cancel the waiting run, or do not start `workflow_dispatch` when any evidence is missing. Approval authorizes the job to deploy/check the inactive slot, explicitly run `switch-slot.sh` (whose guarded switch includes the public smoke test), and then prune only eligible release directories.
+To proceed, review the exact checked-out `src/routes/legal.tsx` and calculate `sha256sum src/routes/legal.tsx`. Open **Run workflow**, paste the image reference into `image_ref`, paste that owner-reviewed digest into `privacy_policy_sha256`, and explicitly enable `persist_test_lead`. The opt-in authorizes one clearly marked no-file test lead to be stored through the inactive slot; it may create ordinary outbox work and must be ignored/removed by the operator as a release test. If GitHub presents **Review deployments**, compare the inputs again and choose **Approve and deploy**. Choose **Reject**, cancel the waiting run, or do not start `workflow_dispatch` when any evidence is missing. Approval authorizes the job to deploy/check the inactive slot, run the evidence gate, explicitly run `switch-slot.sh`, and then prune only eligible release directories.
 
 For an operator rehearsal, the exact sequence run over SSH is:
 
@@ -56,11 +56,14 @@ IMAGE_REF='ghcr.io/<owner>/<repository>@sha256:<64 lowercase hex>'
 current="$(sed -n 's/^# current-slot: //p' "$TRAEFIK_DYNAMIC_FILE")"
 case "$current" in blue) inactive=green ;; green) inactive=blue ;; *) exit 1 ;; esac
 bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF"
+PRIVACY_POLICY_SHA256='<reviewed SHA-256 of src/routes/legal.tsx>' \
+  RELEASE_FORM_SMOKE_OPT_IN=persist-clearly-marked-test-lead \
+  bash scripts/release-gate.sh "$inactive"
 bash scripts/switch-slot.sh "$inactive"
 bash scripts/prune-releases.sh "$RELEASES_DIR"
 ```
 
-`deploy-slot.sh` performs the required encrypted pre-release backup before migrations, runs migrations, starts only the inactive service, and checks its health/SSR routes. Do not run Compose pull/up/restart commands as a release substitute. `switch-slot.sh` validates both exact recorded images, changes the Traefik route atomically, checks `X-Kordev-Slot` and public SSR pages, and automatically restores the previous route if public smoke fails.
+`deploy-slot.sh` performs the required encrypted pre-release backup before migrations, runs migrations, starts only the inactive service, and checks its health/SSR routes. `release-gate.sh` rechecks readiness under the release lock, confirms the supplied digest is exactly the deployed `src/routes/legal.tsx`, performs the explicitly authorized persistent inactive-slot form smoke, and only after acceptance writes private mode-`0600` evidence bound to the candidate image and slot record. Evidence expires after one hour; missing, malformed, stale, symlinked, overly permissive, policy-mismatched, or image-mismatched evidence blocks `switch-slot.sh` before routing changes. Do not run Compose pull/up/restart commands as a release substitute. `switch-slot.sh` then validates both exact recorded images, changes the Traefik route atomically, checks `X-Kordev-Slot` and public SSR pages, and automatically restores the previous route if public smoke fails.
 
 ## Verify production and canonical redirects
 

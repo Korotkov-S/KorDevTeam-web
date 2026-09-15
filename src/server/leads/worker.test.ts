@@ -115,6 +115,51 @@ test("CRM cutoff skips delivery and the twelfth transient SMTP failure becomes m
   assert.ok(f.events.some(value => value.includes("email_attempts_exhausted")));
 });
 
+test("CRM crossing the exact cutoff during attachment materialization stops before provider attempt", async () => {
+  const exactCutoff = new Date("2026-09-14T10:10:00.000Z");
+  let currentTime = new Date("2026-09-14T10:09:59.999Z");
+  const crmJob = { ...job("crm", 1, true), acceptedAt: new Date("2026-09-13T10:15:00.000Z") };
+  const f = fixture([crmJob]);
+  f.options.clock = { now: () => currentTime };
+  f.options.store = { async materialize() {
+    f.events.push("materialize");
+    currentTime = exactCutoff;
+    return { path: "/private/materialized", async dispose() { f.events.push("dispose"); } };
+  } };
+  let crmCalls = 0;
+  f.options.crm = async () => { crmCalls += 1; return {} as never; };
+
+  await runWorkerBatch(f.options);
+
+  assert.equal(f.states.get(crmJob.id), "manual_action");
+  assert.equal(crmCalls, 0);
+  assert.equal(f.events.some(event => event.startsWith("provider:")), false);
+  assert.ok(f.events.includes(`manual:${crmJob.id}:crm_idempotency_window_expired`));
+  assert.ok(f.events.includes("dispose"));
+});
+
+test("CRM crossing the exact cutoff during provider-attempt persistence stops before vendor call", async () => {
+  const exactCutoff = new Date("2026-09-14T10:10:00.000Z");
+  let currentTime = new Date("2026-09-14T10:09:59.999Z");
+  const crmJob = { ...job("crm"), acceptedAt: new Date("2026-09-13T10:15:00.000Z") };
+  const f = fixture([crmJob]);
+  f.options.clock = { now: () => currentTime };
+  f.options.repository.beginProviderAttempt = async command => {
+    f.events.push(`provider:${command.jobId}`);
+    currentTime = exactCutoff;
+    return 1;
+  };
+  let crmCalls = 0;
+  f.options.crm = async () => { crmCalls += 1; return {} as never; };
+
+  await runWorkerBatch(f.options);
+
+  assert.equal(f.states.get(crmJob.id), "manual_action");
+  assert.equal(crmCalls, 0);
+  assert.ok(f.events.includes(`provider:${crmJob.id}`));
+  assert.ok(f.events.includes(`manual:${crmJob.id}:crm_idempotency_window_expired`));
+});
+
 test("materialized attachment is disposed after both successful and failed delivery", async () => {
   const crmJob = job("crm", 1, true), emailJob = job("email", 1, true);
   const f = fixture([crmJob, emailJob]);

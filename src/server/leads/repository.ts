@@ -56,6 +56,7 @@ export interface LeadRepository {
   reserveCrmTokenAttempt(tokenHash: string): Promise<RateDecision>;
   syncCrmTokenBudget(tokenHash: string, rateLimit: number, rateRemaining: number): Promise<void>;
   findExpiredLeads(limit: number): Promise<ExpiredLead[]>;
+  deleteExpiredRateLimits(limit: number): Promise<number>;
   attachmentKeyExists(key: string): Promise<boolean>;
   /** Caller must successfully delete the private object before deleting its row. */
   deleteLeadAfterObject(id: string): Promise<boolean>;
@@ -279,6 +280,25 @@ export function createLeadRepository(db: Database, clock: LeadClock): LeadReposi
       return db.select({ id: leads.id, objectKey: leadAttachments.objectKey }).from(leads)
         .leftJoin(leadAttachments, eq(leadAttachments.leadId, leads.id)).where(lte(leads.expiresAt, clock.now()))
         .orderBy(asc(leads.expiresAt), asc(leads.id)).limit(limit);
+    },
+    async deleteExpiredRateLimits(limit) {
+      assertBatchLimit(limit);
+      const now = clock.now();
+      const result = await db.execute(sql`
+        with expired as (
+          select ctid
+          from lead_rate_limits
+          where expires_at <= ${now.toISOString()}
+          order by expires_at, kind, subject_hash, window_started_at
+          limit ${limit}
+          for update skip locked
+        )
+        delete from lead_rate_limits as bucket
+        using expired
+        where bucket.ctid = expired.ctid
+        returning 1
+      `);
+      return result.rows.length;
     },
     async attachmentKeyExists(key) {
       return (await db.select({ id: leadAttachments.id }).from(leadAttachments).where(eq(leadAttachments.objectKey, key)).limit(1)).length > 0;

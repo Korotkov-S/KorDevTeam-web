@@ -8,6 +8,7 @@ export type RetentionReport = {
   deletedLeads: number;
   deletedObjects: number;
   deletedOrphans: number;
+  deletedRateLimits: number;
   failures: number;
 };
 
@@ -18,11 +19,12 @@ export type RetentionLogRecord = {
   deletedLeads?: number;
   deletedObjects?: number;
   deletedOrphans?: number;
+  deletedRateLimits?: number;
   failures?: number;
 };
 
 export type RetentionOptions = {
-  repository: Pick<LeadRepository, "findExpiredLeads" | "attachmentKeyExists" | "deleteLeadAfterObject">;
+  repository: Pick<LeadRepository, "findExpiredLeads" | "attachmentKeyExists" | "deleteLeadAfterObject" | "deleteExpiredRateLimits">;
   store: Pick<PrivateAttachmentStore, "deleteForRetention" | "listOlderThan">;
   clock: { now(): Date };
   limit?: number;
@@ -71,11 +73,11 @@ async function deleteOrphans(options: RetentionOptions, report: RetentionReport,
   try {
     for await (const object of options.store.listOlderThan(cutoff)) {
       if (!(object.lastModified < cutoff)) continue;
+      actions += 1;
       let referenced: boolean;
       try { referenced = await options.repository.attachmentKeyExists(object.key); }
-      catch { failed(report, options, "repository_error"); actions += 1; if (actions >= limit) break; continue; }
-      if (referenced) continue;
-      actions += 1;
+      catch { failed(report, options, "repository_error"); if (actions >= limit) break; continue; }
+      if (referenced) { if (actions >= limit) break; continue; }
       try {
         if (await options.store.deleteForRetention(object.key) === "deleted") report.deletedOrphans += 1;
       } catch (error) {
@@ -88,13 +90,22 @@ async function deleteOrphans(options: RetentionOptions, report: RetentionReport,
   }
 }
 
+async function deleteExpiredRateLimits(options: RetentionOptions, report: RetentionReport, limit: number): Promise<void> {
+  try {
+    report.deletedRateLimits = await options.repository.deleteExpiredRateLimits(limit);
+  } catch {
+    failed(report, options, "repository_error");
+  }
+}
+
 export async function runLeadRetention(options: RetentionOptions): Promise<RetentionReport> {
   const limit = batchLimit(options.limit);
   const now = options.clock.now();
   if (!Number.isFinite(+now)) throw new Error("lead_retention_clock_invalid");
-  const report: RetentionReport = { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, failures: 0 };
+  const report: RetentionReport = { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 0 };
   await deleteExpiredLeads(options, report, limit);
   await deleteOrphans(options, report, limit, new Date(+now - ORPHAN_MINIMUM_AGE_MS));
+  await deleteExpiredRateLimits(options, report, limit);
   options.logger?.write({ event: "lead_retention_completed", ...report });
   return report;
 }

@@ -256,6 +256,27 @@ databaseTest("retention finds bounded expired leads and deletes rows only after 
   assert.deepEqual(await repository.findExpiredLeads(1), [{ id: second.response.leadId, objectKey: null }]);
 });
 
+databaseTest("retention deletes only a bounded batch of expired rate-limit buckets and keeps live buckets", async () => {
+  const { db, repository } = await fixture();
+  const expiredAt = new Date("2026-09-14T08:59:59.000Z");
+  const liveAt = new Date("2026-09-14T09:00:01.000Z");
+  await db.insert(leadRateLimits).values([
+    { kind: "ip", subjectHash: "1".repeat(64), windowStartedAt: new Date("2026-09-14T08:00:00.000Z"), count: 1, expiresAt: expiredAt },
+    { kind: "phone", subjectHash: "2".repeat(64), windowStartedAt: new Date("2026-09-14T08:00:00.000Z"), count: 1, expiresAt: expiredAt },
+    { kind: "crm_token", subjectHash: "3".repeat(64), windowStartedAt: new Date("2026-09-14T08:00:00.000Z"), count: 1, expiresAt: expiredAt },
+    { kind: "ip", subjectHash: "4".repeat(64), windowStartedAt: new Date("2026-09-14T08:00:00.000Z"), count: 1, expiresAt: liveAt },
+  ]);
+
+  assert.equal(await repository.deleteExpiredRateLimits(2), 2);
+  let remaining = await db.select().from(leadRateLimits);
+  assert.equal(remaining.length, 2);
+  assert.ok(remaining.some(bucket => bucket.subjectHash === "4".repeat(64)));
+
+  assert.equal(await repository.deleteExpiredRateLimits(2), 1);
+  remaining = await db.select().from(leadRateLimits);
+  assert.deepEqual(remaining.map(bucket => bucket.subjectHash), ["4".repeat(64)]);
+});
+
 databaseTest("invalid lease and batch bounds are rejected before claiming work", async () => {
   const { repository } = await fixture();
   await repository.accept(command());
@@ -263,6 +284,7 @@ databaseTest("invalid lease and batch bounds are rejected before claiming work",
   for (const limit of [0, -1, 1001, 1.5]) {
     await assert.rejects(() => repository.claimDueJobs("owner", limit, 120_000));
     await assert.rejects(() => repository.findExpiredLeads(limit));
+    await assert.rejects(() => repository.deleteExpiredRateLimits(limit));
   }
   assert.equal((await repository.claimDueJobs("owner", 1, 1000)).length, 1);
 });

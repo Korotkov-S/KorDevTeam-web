@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmod, mkdtemp, readdir, realpath, rm, stat, symlink } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, realpath, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import test, { type TestContext } from "node:test";
 import { MAX_FILE_BYTES, MAX_MULTIPART_BYTES } from "./contracts";
-import { parseLeadMultipart } from "./multipart";
+import { FatalMultipartCleanupError, parseLeadMultipart, sweepStagedUploads } from "./multipart";
 
 const boundary = "test-boundary";
 const fileHeader = (name = "file", filename = "../../a.pdf") => Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="${filename}"\r\nContent-Type: application/pdf\r\n\r\n`);
@@ -33,6 +33,61 @@ test("streams one attachment into a private unpredictable file and disposes idem
   assert.ok(!parsed.attachment!.path.endsWith("a.pdf"));
   await Promise.all([parsed.dispose(), parsed.dispose()]);
   assert.deepEqual(await readdir(path), []);
+});
+
+test("multipart disposer retries unlink a bounded number of times", async (t) => {
+  const path = await root(t);
+  let attempts = 0;
+  const parsed = await parseLeadMultipart(request([fileHeader(), Buffer.from("private"), end]), path, {
+    async unlink(target) {
+      attempts += 1;
+      if (attempts < 3) throw Object.assign(new Error("busy private path"), { code: "EBUSY" });
+      await unlink(target);
+    },
+  });
+  await parsed.dispose();
+  assert.equal(attempts, 3);
+  assert.deepEqual(await readdir(path), []);
+});
+
+test("exhausted multipart cleanup fails with a sanitized fatal error", async (t) => {
+  const path = await root(t);
+  let attempts = 0;
+  const parsed = await parseLeadMultipart(request([fileHeader(), Buffer.from("private"), end]), path, {
+    async unlink() { attempts += 1; throw Object.assign(new Error("private path cause"), { code: "EBUSY" }); },
+  });
+  await assert.rejects(parsed.dispose(), error => {
+    assert.ok(error instanceof FatalMultipartCleanupError);
+    assert.equal(error.message, "lead_multipart_cleanup_failed");
+    assert.equal(error.cause, undefined);
+    assert.deepEqual(Object.keys(error), ["code"]);
+    assert.doesNotMatch(String(error), /private|lead-multipart|upload/i);
+    return true;
+  });
+  assert.equal(attempts, 3);
+  assert.equal((await stat(parsed.attachment!.path)).size, 0, "raw upload bytes must not remain after unlink exhaustion");
+});
+
+test("staged upload sweep removes only old owned regular files with bounded retry", async (t) => {
+  const tempRoot = await root(t);
+  const old = join(tempRoot, "11111111-2222-4333-8444-555555555555.upload");
+  const recent = join(tempRoot, "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.upload");
+  const foreign = join(tempRoot, "foreign.upload");
+  const target = join(tempRoot, "target");
+  const link = join(tempRoot, "99999999-8888-4777-8666-555555555555.upload");
+  await Promise.all([writeFile(old, "old"), writeFile(recent, "recent"), writeFile(foreign, "foreign"), writeFile(target, "target")]);
+  await symlink(target, link);
+  await utimes(old, new Date(1), new Date(1));
+  let attempts = 0;
+  assert.equal(await sweepStagedUploads(tempRoot, new Date(1000), {
+    async unlink(path) {
+      attempts += 1;
+      if (attempts === 1) throw Object.assign(new Error("busy"), { code: "EBUSY" });
+      await unlink(path);
+    },
+  }), 1);
+  assert.equal(attempts, 2);
+  assert.deepEqual((await readdir(tempRoot)).sort(), [recent, foreign, target, link].map(value => value.split("/").at(-1)!).sort());
 });
 
 for (const size of [MAX_FILE_BYTES, MAX_FILE_BYTES + 1]) {

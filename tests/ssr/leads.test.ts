@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
@@ -14,6 +14,7 @@ import { resetTestDatabase } from "../../src/server/db/testDatabase";
 import { leads, leadDeliveryJobs } from "../../src/server/db/schema";
 import { readLeadWebConfig } from "../../src/server/leads/config";
 import { LeadError, type LeadErrorCode } from "../../src/server/leads/errors";
+import type { LeadRouterOverrides } from "../../src/server/leads/http";
 import type { LeadServiceDependencies } from "../../src/server/leads/service";
 import { startTestRuntime } from "./support/runtime";
 
@@ -51,7 +52,7 @@ async function errorResponse(response: Response, status: number, code: LeadError
   return body;
 }
 
-async function local(t: TestContext, overrides: Partial<LeadServiceDependencies> = {}, production = false, trust = "1") {
+async function local(t: TestContext, overrides: LeadRouterOverrides = {}, production = false, trust = "1") {
   // A missing bundle export is the expected initial RED, before importing the new source module.
   const build = await import("../../build/server/index.js");
   assert.equal(typeof build.entry.module.createLeadRouter, "function");
@@ -127,6 +128,24 @@ test("router receives untouched multipart and rejects JSON before the shared par
   const response = await f.post(); assert.equal(response.status, 201); headers(response);
   await errorResponse(await f.post({ "Content-Type": "application/json" }, "{not-json"), 400, "validation_error");
   await errorResponse(await f.post({}, multipart({ consent: "no" })), 400, "validation_error");
+});
+
+test("web intake sweeps only stale owned uploads before its first accepted request", async t => {
+  const f = await local(t);
+  const old = path.join(f.tempRoot, "11111111-2222-4333-8444-555555555555.upload");
+  const recent = path.join(f.tempRoot, "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.upload");
+  const foreign = path.join(f.tempRoot, "foreign.upload");
+  await Promise.all([writeFile(old, "old private bytes"), writeFile(recent, "active private bytes"), writeFile(foreign, "foreign")]);
+  await utimes(old, new Date(1), new Date(1));
+
+  assert.equal((await f.post()).status, 201);
+  assert.deepEqual((await readdir(f.tempRoot)).sort(), ["aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.upload", "foreign.upload"]);
+});
+
+test("web intake fails closed and sanitizes an unavailable startup sweep", async t => {
+  const f = await local(t, { sweepUploads: async () => { throw new Error(sensitive); } });
+  await errorResponse(await f.post(), 503, "service_unavailable");
+  assert.doesNotMatch(JSON.stringify(f.logs), /SELECT|private|password|secret|79991234567/);
 });
 
 test("rejects missing, malformed, duplicate-shaped and non-UUID keys before service work", async t => {
