@@ -20,7 +20,6 @@ x-lead-web-environment: &lead-web-environment
   CLAMAV_PORT: "3310"
 x-web: &web
   <<: *app
-  read_only: true
   environment:
     <<: *lead-web-environment
     NODE_ENV: production

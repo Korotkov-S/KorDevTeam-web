@@ -53,7 +53,7 @@ test("read-only validation gates a separate trusted main publisher", () => {
   assert.match(clamavSmoke.run, /docker compose up -d --wait clamav/);
   assert.match(clamavSmoke.run, /docker compose port clamav 3310/);
   assert.match(clamavSmoke.run, /docker compose rm -s -f clamav/);
-  const runtimeSmoke = steps.find(step => step.name === "Smoke-test read-only production lead runtime");
+  const runtimeSmoke = steps.find(step => step.name === "Smoke-test production lead runtime");
   assert.ok(runtimeSmoke);
   assert.match(runtimeSmoke.run, /docker compose build/);
   assert.match(runtimeSmoke.run, /docker compose up -d --wait postgres clamav/);

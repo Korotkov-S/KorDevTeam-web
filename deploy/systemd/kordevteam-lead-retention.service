@@ -10,5 +10,7 @@ User=kordevteam
 WorkingDirectory=/opt/kordevteam/current
 EnvironmentFile=/etc/kordevteam/operations.env
 ExecStart=/bin/bash /opt/kordevteam/current/scripts/run-lead-retention.sh
+Restart=on-failure
+RestartSec=5m
 UMask=0077
 NoNewPrivileges=true

@@ -44,7 +44,7 @@ export type ExpiredLead = { id: string; objectKey: string | null };
 
 export interface LeadRepository {
   findBySubmissionKey(submissionKey: string): Promise<StoredLead | null>;
-  consumeIpAttempt(ipHash: string): Promise<RateDecision>;
+  consumeIpAttempt(ipHash: string, globalHash: string): Promise<RateDecision>;
   accept(command: AcceptCommand): Promise<AcceptDecision>;
   claimDueJobs(ownerId: string, limit: number, leaseMs: number): Promise<ClaimedJob[]>;
   markDelivered(command: DeliveredCommand): Promise<boolean>;
@@ -71,9 +71,16 @@ const ratePolicies = {
   phone: { limit: 3, windowMs: 60 * 60_000 },
   crm_token: { limit: 20, windowMs: 60_000 },
 } as const;
+const globalIntakePolicy = { limit: 1_000, windowMs: 60 * 60_000 } as const;
 
-async function consumeBucket(db: Database | Transaction, kind: keyof typeof ratePolicies, subjectHash: string, now: Date): Promise<RateDecision> {
-  const { limit, windowMs } = ratePolicies[kind];
+async function consumeBucket(
+  db: Database | Transaction,
+  kind: keyof typeof ratePolicies,
+  subjectHash: string,
+  now: Date,
+  policy: { limit: number; windowMs: number } = ratePolicies[kind],
+): Promise<RateDecision> {
+  const { limit, windowMs } = policy;
   const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
   const windowEnd = new Date(windowStart.getTime() + windowMs);
   const result = await db.execute(sql`
@@ -146,7 +153,13 @@ export function createLeadRepository(db: Database, clock: LeadClock): LeadReposi
       const [lead] = await db.select(storedLeadColumns).from(leads).where(eq(leads.submissionKey, submissionKey)).limit(1);
       return lead ?? null;
     },
-    consumeIpAttempt(ipHash) { return consumeBucket(db, "ip", ipHash, clock.now()); },
+    consumeIpAttempt(ipHash, globalHash) {
+      return db.transaction(async tx => {
+        const now = clock.now();
+        const global = await consumeBucket(tx, "ip", globalHash, now, globalIntakePolicy);
+        return global.kind === "rate_limited" ? global : consumeBucket(tx, "ip", ipHash, now);
+      });
+    },
     reserveCrmTokenAttempt(tokenHash) { return consumeBucket(db, "crm_token", tokenHash, clock.now()); },
     async syncCrmTokenBudget(tokenHash, rateLimit, rateRemaining) {
       assertCrmRateLimit(tokenHash, rateLimit, rateRemaining);

@@ -14,7 +14,7 @@ type FixtureOptions = {
   deleteResults?: Record<string, "deleted" | "missing" | Error>;
   references?: Record<string, boolean | Error>;
   rowResults?: Record<string, boolean | Error>;
-  rateLimitResult?: number | Error;
+  rateLimitResult?: number | Error | Array<number | Error>;
 };
 
 function retentionFixture(events: string[] = [], options: FixtureOptions = {}) {
@@ -40,7 +40,8 @@ function retentionFixture(events: string[] = [], options: FixtureOptions = {}) {
     },
     async deleteExpiredRateLimits(limit) {
       events.push(`repository.delete-rate-limits:${limit}`);
-      const result = options.rateLimitResult ?? 0;
+      const configured = options.rateLimitResult;
+      const result = Array.isArray(configured) ? (configured.shift() ?? 0) : (configured ?? 0);
       if (result instanceof Error) throw result;
       return result;
     },
@@ -70,7 +71,7 @@ test("never deletes the row before its private object", async () => {
   const events: string[] = [];
   const report = await runLeadRetention(retentionFixture(events));
   assert.deepEqual(events, ["store.delete:private/a.pdf", "repository.delete:lead-a", "repository.delete-rate-limits:100"]);
-  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 1, deletedOrphans: 0, deletedRateLimits: 0, failures: 0 });
+  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 1, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 0 });
 });
 
 test("storage failure preserves its row and does not stop later leads", async () => {
@@ -82,7 +83,7 @@ test("storage failure preserves its row and does not stop later leads", async ()
   const report = await runLeadRetention(fixture);
   assert.deepEqual(fixture.deletedLeadIds, ["lead-b"]);
   assert.deepEqual(events, ["store.delete:private/a.pdf", "repository.delete:lead-b", "repository.delete-rate-limits:100"]);
-  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 1 });
+  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 1 });
 });
 
 test("confirmed missing object permits the expired row deletion", async () => {
@@ -92,14 +93,14 @@ test("confirmed missing object permits the expired row deletion", async () => {
   });
   const report = await runLeadRetention(fixture);
   assert.deepEqual(events, ["store.delete:private/a.pdf", "repository.delete:lead-a", "repository.delete-rate-limits:100"]);
-  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 0 });
+  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 0 });
 });
 
 test("lead without an attachment is deleted directly", async () => {
   const events: string[] = [];
   const report = await runLeadRetention(retentionFixture(events, { expired: [{ id: "lead-a", objectKey: null }] }));
   assert.deepEqual(events, ["repository.delete:lead-a", "repository.delete-rate-limits:100"]);
-  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 0 });
+  assert.deepEqual(report, { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 0 });
 });
 
 test("one run requests at most 100 expired rows and uses a strict two-hour orphan cutoff", async () => {
@@ -135,7 +136,7 @@ test("orphan sweep keeps recent and referenced objects and deletes only old unre
     "store.delete:private/orphan",
     "repository.delete-rate-limits:100",
   ]);
-  assert.deepEqual(report, { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 1, deletedRateLimits: 0, failures: 0 });
+  assert.deepEqual(report, { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 1, deletedRateLimits: 0, rateLimitBacklog: false, failures: 0 });
 });
 
 test("orphan inspection is bounded even when every old object is still referenced", async () => {
@@ -150,7 +151,7 @@ test("orphan inspection is bounded even when every old object is still reference
   assert.equal(events.filter(event => event.startsWith("repository.exists:")).length, 100);
   assert.equal(events.includes("repository.exists:private/referenced-100"), false);
   assert.equal(events.at(-1), "repository.delete-rate-limits:100");
-  assert.deepEqual(report, { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 0 });
+  assert.deepEqual(report, { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 0 });
 });
 
 test("orphan failures are isolated and logging never includes keys or dependency errors", async () => {
@@ -166,7 +167,7 @@ test("orphan failures are isolated and logging never includes keys or dependency
     deleteResults: { "private/delete-secret": new Error("storage credentials") },
   });
   const report = await runLeadRetention({ ...fixture, logger: { write(record) { records.push(record); } } });
-  assert.deepEqual(report, { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 1, deletedRateLimits: 0, failures: 2 });
+  assert.deepEqual(report, { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 1, deletedRateLimits: 0, rateLimitBacklog: false, failures: 2 });
   const serialized = JSON.stringify(records);
   assert.doesNotMatch(serialized, /lookup-secret|delete-secret|database password|storage credentials/);
   assert.match(serialized, /lead_retention_completed/);
@@ -176,7 +177,7 @@ test("expired rate-limit cleanup is bounded, counted and isolated without loggin
   const records: unknown[] = [];
   const success = retentionFixture([], { expired: [], rateLimitResult: 7 });
   assert.deepEqual(await runLeadRetention({ ...success, limit: 9, logger: { write(record) { records.push(record); } } }), {
-    deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 7, failures: 0,
+    deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 7, rateLimitBacklog: false, failures: 0,
   });
   assert.equal(success.calls.limit, 9);
   assert.match(JSON.stringify(records), /"deletedRateLimits":7/);
@@ -184,9 +185,21 @@ test("expired rate-limit cleanup is bounded, counted and isolated without loggin
   const failedRecords: unknown[] = [];
   const failure = retentionFixture([], { expired: [], rateLimitResult: new Error("bucket-secret deadbeef") });
   assert.deepEqual(await runLeadRetention({ ...failure, logger: { write(record) { failedRecords.push(record); } } }), {
-    deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 1,
+    deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 1,
   });
   assert.doesNotMatch(JSON.stringify(failedRecords), /bucket-secret|deadbeef/);
+});
+
+test("expired rate-limit cleanup drains bounded batches and flags a capped backlog", async () => {
+  const drained = retentionFixture([], { expired: [], rateLimitResult: [9, 9, 2] });
+  const drainedReport = await runLeadRetention({ ...drained, limit: 9, rateLimitDeleteCeiling: 27 });
+  assert.equal(drainedReport.deletedRateLimits, 20);
+  assert.equal(drainedReport.rateLimitBacklog, false);
+
+  const capped = retentionFixture([], { expired: [], rateLimitResult: [9, 9, 9] });
+  const cappedReport = await runLeadRetention({ ...capped, limit: 9, rateLimitDeleteCeiling: 18 });
+  assert.equal(cappedReport.deletedRateLimits, 18);
+  assert.equal(cappedReport.rateLimitBacklog, true);
 });
 
 test("private store reports confirmed NoSuchKey only to retention", async () => {
@@ -200,25 +213,36 @@ test("private store reports confirmed NoSuchKey only to retention", async () => 
   await assert.rejects(store.delete("private/missing"), MissingPrivateObjectError);
 });
 
-test("retention command runs one bounded batch and succeeds only without failures", async () => {
+test("retention command drains bounded batches and succeeds only without failures or backlog", async () => {
   const requested: unknown[] = [];
   const lines: string[] = [];
-  const report = { deletedLeads: 2, deletedObjects: 1, deletedOrphans: 3, deletedRateLimits: 4, failures: 0 };
+  const report = { deletedLeads: 2, deletedObjects: 1, deletedOrphans: 3, deletedRateLimits: 4, rateLimitBacklog: false, failures: 0 };
   const exitCode = await runLeadRetentionCommand(async () => ({
     entry: { module: { async runLeadRetention(options: unknown) { requested.push(options); return report; } } },
   }), { info(line: string) { lines.push(line); }, error(line: string) { lines.push(line); } });
   assert.equal(exitCode, 0);
   assert.deepEqual(requested, [{ limit: 100 }]);
-  assert.deepEqual(lines, ["Lead retention completed: leads=2 objects=1 orphans=3 rate_limits=4 failures=0"]);
+  assert.deepEqual(lines, ["Lead retention completed: leads=2 objects=1 orphans=3 rate_limits=4 rate_backlog=false failures=0"]);
 });
 
 test("retention command returns a nonzero exit code when any item failed", async () => {
   const lines: string[] = [];
   const exitCode = await runLeadRetentionCommand(async () => ({
     entry: { module: { async runLeadRetention() {
-      return { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 1 };
+      return { deletedLeads: 1, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 1 };
     } } },
   }), { info(line: string) { lines.push(line); }, error(line: string) { lines.push(line); } });
   assert.equal(exitCode, 1);
-  assert.deepEqual(lines, ["Lead retention failed: leads=1 objects=0 orphans=0 rate_limits=0 failures=1"]);
+  assert.deepEqual(lines, ["Lead retention failed: leads=1 objects=0 orphans=0 rate_limits=0 rate_backlog=false failures=1"]);
+});
+
+test("retention command returns a nonzero exit code while a bounded backlog remains", async () => {
+  const lines: string[] = [];
+  const exitCode = await runLeadRetentionCommand(async () => ({
+    entry: { module: { async runLeadRetention() {
+      return { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 100_000, rateLimitBacklog: true, failures: 0 };
+    } } },
+  }), { info(line: string) { lines.push(line); }, error(line: string) { lines.push(line); } });
+  assert.equal(exitCode, 1);
+  assert.match(lines[0], /rate_backlog=true/);
 });

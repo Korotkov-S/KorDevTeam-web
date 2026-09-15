@@ -18,7 +18,12 @@ function fixture(options: { existing?: StoredLead; rate?: RateDecision; result?:
   const step = (name: string) => { events.push(name); if (options.fail === name) throw new Error("private dependency details"); };
   const input: LeadServiceInput = { fields: { name: " Jane ", phone: "+1 23456", consent: "accepted" }, context: { pagePath: "/contact" }, submissionKey: "12345678-1234-4234-8234-123456789abc", requestIp: "192.0.2.17", attachment: { path: "/stage/file", originalName: "file.pdf", declaredMime: "application/pdf", byteSize: 10, sha256: "a".repeat(64) }, dispose: async () => { events.push("temp.dispose"); if (options.disposeFails) throw new Error("private temp path"); } };
   const service = createLeadService({ config, repository: {
-    consumeIpAttempt: async hash => { step("ip"); assert.match(hash, /^[a-f0-9]{64}$/); assert.notEqual(hash, input.requestIp); return options.rate ?? { kind: "allowed" }; },
+    consumeIpAttempt: async (hash, globalHash) => {
+      step("ip");
+      assert.match(hash, /^[a-f0-9]{64}$/); assert.notEqual(hash, input.requestIp);
+      assert.match(globalHash, /^[a-f0-9]{64}$/); assert.notEqual(globalHash, hash);
+      return options.rate ?? { kind: "allowed" };
+    },
     findBySubmissionKey: async key => { step("find"); assert.equal(key, input.submissionKey); return options.existing ?? null; },
     accept: async command => { step("repository.accept"); commands.push(command); return options.result ?? { kind: "accepted", response }; },
   }, inspect: async staged => { step("inspect"); return { ...staged, originalName: "safe.pdf", mediaType: "application/pdf" }; },

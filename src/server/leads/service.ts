@@ -47,7 +47,7 @@ export function createLeadService({ config, repository, scanner, objectStore, in
         const context = normalizeLeadContext(input.context);
         if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(input.submissionKey)) throw new LeadError("validation_error");
         const ipHash = subjectHash(config.hashKey, "ip", input.requestIp);
-        const rate = await repository.consumeIpAttempt(ipHash);
+        const rate = await repository.consumeIpAttempt(ipHash, subjectHash(config.hashKey, "global", "kordev.team"));
         if (rate.kind === "rate_limited") return rate;
         const existing = await repository.findBySubmissionKey(input.submissionKey);
         const consentVersion = existing?.consentVersion ?? config.consentVersion;

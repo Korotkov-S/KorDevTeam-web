@@ -128,7 +128,7 @@ The outbox transaction creates exactly one CRM and one email job. Job payloads a
 
 ### `lead_rate_limits`
 
-Rate-limit buckets store only HMAC subject hashes, window start, count, and expiration. The initial limits are five non-honeypot submission attempts per 30 minutes per IP hash and three accepted attempts per hour per phone hash. Honeypot hits do not consume rate-limit quota or vendor calls and receive the `202` response defined above.
+Rate-limit buckets store only HMAC subject hashes, window start, count, and expiration. The initial limits are five non-honeypot submission attempts per 30 minutes per IP hash, three accepted attempts per hour per phone hash, and a safety ceiling of 1000 valid intake attempts per hour across the public endpoint. The global HMAC bucket is consumed atomically before the per-IP bucket so the number of unique subject buckets has an enforced upper bound. Honeypot hits do not consume rate-limit quota or vendor calls and receive the `202` response defined above.
 
 ## 6. Attachment safety and storage
 

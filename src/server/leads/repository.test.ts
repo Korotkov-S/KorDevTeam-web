@@ -93,14 +93,29 @@ databaseTest("failure inserting the second outbox job rolls back lead, attachmen
 databaseTest("concurrent IP attempts admit five and return the exact remaining fixed window", async () => {
   const { db, repository, advance } = await fixture();
   advance(10_500);
-  const decisions = await Promise.all(Array.from({ length: 12 }, () => repository.consumeIpAttempt("a".repeat(64))));
+  const decisions = await Promise.all(Array.from({ length: 12 }, () => repository.consumeIpAttempt("a".repeat(64), "0".repeat(64))));
   assert.equal(decisions.filter((r) => r.kind === "allowed").length, 5);
   assert.deepEqual(decisions.filter((r) => r.kind === "rate_limited"), Array(7).fill({ kind: "rate_limited", retryAfterSeconds: 1790 }));
-  assert.equal((await db.select().from(leadRateLimits))[0].count, 5);
+  const ipBucket = (await db.select().from(leadRateLimits)).find(bucket => bucket.subjectHash === "a".repeat(64));
+  assert.equal(ipBucket?.count, 5);
   advance(1_789_000);
-  assert.deepEqual(await repository.consumeIpAttempt("a".repeat(64)), { kind: "rate_limited", retryAfterSeconds: 1 });
+  assert.deepEqual(await repository.consumeIpAttempt("a".repeat(64), "0".repeat(64)), { kind: "rate_limited", retryAfterSeconds: 1 });
   advance(500);
-  assert.deepEqual(await repository.consumeIpAttempt("a".repeat(64)), { kind: "allowed" });
+  assert.deepEqual(await repository.consumeIpAttempt("a".repeat(64), "0".repeat(64)), { kind: "allowed" });
+});
+
+databaseTest("a global hourly ceiling bounds unique IP bucket creation", async () => {
+  const { db, repository, advance } = await fixture();
+  for (let index = 1; index <= 1_000; index += 1) {
+    const hash = index.toString(16).padStart(64, "0");
+    assert.deepEqual(await repository.consumeIpAttempt(hash, "0".repeat(64)), { kind: "allowed" });
+  }
+  assert.deepEqual(await repository.consumeIpAttempt("f".repeat(64), "0".repeat(64)), {
+    kind: "rate_limited", retryAfterSeconds: 3_600,
+  });
+  assert.equal((await db.select().from(leadRateLimits)).length, 1_001, "one global bucket plus at most 1000 unique IP buckets");
+  advance(3_600_000);
+  assert.deepEqual(await repository.consumeIpAttempt("f".repeat(64), "0".repeat(64)), { kind: "allowed" });
 });
 
 databaseTest("eight new concurrent phone submissions admit three; replay still works at quota", async () => {

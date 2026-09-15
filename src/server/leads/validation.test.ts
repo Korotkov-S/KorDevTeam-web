@@ -57,4 +57,5 @@ test("fingerprints are canonical and HMAC domains are separated", () => {
   assert.equal(requestFingerprint(first), requestFingerprint(reordered));
   assert.match(requestFingerprint(first), /^[a-f0-9]{64}$/);
   assert.notEqual(subjectHash("secret", "ip", "79991112233"), subjectHash("secret", "phone", "79991112233"));
+  assert.notEqual(subjectHash("secret", "ip", "79991112233"), subjectHash("secret", "global", "kordev.team"));
 });

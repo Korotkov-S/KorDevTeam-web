@@ -103,7 +103,7 @@ export function requestFingerprint(input: FingerprintInput): string {
   return createHash("sha256").update(canonicalJson(input), "utf8").digest("hex");
 }
 
-export function subjectHash(secret: string, kind: "ip" | "phone" | "crm_token", value: string): string {
+export function subjectHash(secret: string, kind: "ip" | "phone" | "crm_token" | "global", value: string): string {
   return createHmac("sha256", secret).update(`kordev-leads:${kind}:`, "utf8").update(value, "utf8").digest("hex");
 }
 

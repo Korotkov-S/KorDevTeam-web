@@ -20,7 +20,6 @@ x-lead-web-environment: &lead-web-environment
 x-web: &web
   restart: unless-stopped
   init: true
-  read_only: true
   environment:
     <<: *lead-web-environment
     NODE_ENV: production

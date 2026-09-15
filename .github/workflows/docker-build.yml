@@ -104,7 +104,7 @@ jobs:
           published="$(docker compose port clamav 3310 2>/dev/null || true)"
           test -z "$published"
 
-      - name: Smoke-test read-only production lead runtime
+      - name: Smoke-test production lead runtime
         run: |
           set -euo pipefail
           cleanup() { docker compose down -v --remove-orphans; }

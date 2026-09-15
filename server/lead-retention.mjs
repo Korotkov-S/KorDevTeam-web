@@ -5,8 +5,8 @@ const loadProductionBuild = () => import("../build/server/index.js");
 export async function runLeadRetentionCommand(loadBuild = loadProductionBuild, logger = console) {
   const build = await loadBuild();
   const report = await build.entry.module.runLeadRetention({ limit: 100 });
-  const summary = `leads=${report.deletedLeads} objects=${report.deletedObjects} orphans=${report.deletedOrphans} rate_limits=${report.deletedRateLimits} failures=${report.failures}`;
-  if (report.failures > 0) {
+  const summary = `leads=${report.deletedLeads} objects=${report.deletedObjects} orphans=${report.deletedOrphans} rate_limits=${report.deletedRateLimits} rate_backlog=${report.rateLimitBacklog} failures=${report.failures}`;
+  if (report.failures > 0 || report.rateLimitBacklog) {
     logger.error(`Lead retention failed: ${summary}`);
     return 1;
   }

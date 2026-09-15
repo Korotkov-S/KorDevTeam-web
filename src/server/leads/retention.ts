@@ -2,6 +2,8 @@ import { MissingPrivateObjectError, type PrivateAttachmentStore } from "./object
 import type { LeadRepository } from "./repository";
 
 const DEFAULT_LIMIT = 100;
+const DEFAULT_RATE_LIMIT_DELETE_CEILING = 100_000;
+const DEFAULT_RATE_LIMIT_DURATION_MS = 30_000;
 const ORPHAN_MINIMUM_AGE_MS = 2 * 60 * 60_000;
 
 export type RetentionReport = {
@@ -9,6 +11,7 @@ export type RetentionReport = {
   deletedObjects: number;
   deletedOrphans: number;
   deletedRateLimits: number;
+  rateLimitBacklog: boolean;
   failures: number;
 };
 
@@ -20,6 +23,7 @@ export type RetentionLogRecord = {
   deletedObjects?: number;
   deletedOrphans?: number;
   deletedRateLimits?: number;
+  rateLimitBacklog?: boolean;
   failures?: number;
 };
 
@@ -28,6 +32,9 @@ export type RetentionOptions = {
   store: Pick<PrivateAttachmentStore, "deleteForRetention" | "listOlderThan">;
   clock: { now(): Date };
   limit?: number;
+  rateLimitDeleteCeiling?: number;
+  rateLimitDurationMs?: number;
+  wallClock?: { now(): number };
   logger?: { write(record: RetentionLogRecord): void };
 };
 
@@ -91,8 +98,22 @@ async function deleteOrphans(options: RetentionOptions, report: RetentionReport,
 }
 
 async function deleteExpiredRateLimits(options: RetentionOptions, report: RetentionReport, limit: number): Promise<void> {
+  const ceiling = options.rateLimitDeleteCeiling ?? DEFAULT_RATE_LIMIT_DELETE_CEILING;
+  const durationMs = options.rateLimitDurationMs ?? DEFAULT_RATE_LIMIT_DURATION_MS;
+  if (!Number.isInteger(ceiling) || ceiling < limit || ceiling > DEFAULT_RATE_LIMIT_DELETE_CEILING ||
+      !Number.isInteger(durationMs) || durationMs < 1 || durationMs > DEFAULT_RATE_LIMIT_DURATION_MS) {
+    throw new Error("lead_retention_rate_limit_budget_invalid");
+  }
+  const wallClock = options.wallClock ?? { now: Date.now };
+  const startedAt = wallClock.now();
   try {
-    report.deletedRateLimits = await options.repository.deleteExpiredRateLimits(limit);
+    while (report.deletedRateLimits < ceiling && wallClock.now() - startedAt < durationMs) {
+      const batchSize = Math.min(limit, ceiling - report.deletedRateLimits);
+      const deleted = await options.repository.deleteExpiredRateLimits(batchSize);
+      report.deletedRateLimits += deleted;
+      if (deleted < batchSize) return;
+    }
+    report.rateLimitBacklog = true;
   } catch {
     failed(report, options, "repository_error");
   }
@@ -102,7 +123,7 @@ export async function runLeadRetention(options: RetentionOptions): Promise<Reten
   const limit = batchLimit(options.limit);
   const now = options.clock.now();
   if (!Number.isFinite(+now)) throw new Error("lead_retention_clock_invalid");
-  const report: RetentionReport = { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, failures: 0 };
+  const report: RetentionReport = { deletedLeads: 0, deletedObjects: 0, deletedOrphans: 0, deletedRateLimits: 0, rateLimitBacklog: false, failures: 0 };
   await deleteExpiredLeads(options, report, limit);
   await deleteOrphans(options, report, limit, new Date(+now - ORPHAN_MINIMUM_AGE_MS));
   await deleteExpiredRateLimits(options, report, limit);
