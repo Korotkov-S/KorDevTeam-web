@@ -196,7 +196,7 @@ git commit -m "feat(admin): add secure credential bootstrap"
 - `createAuthService(db, config, clock?)` предоставляет `login`, `authenticate`, `logout`, `changePassword`, `csrfToken`.
 - `requireAdmin(request): Promise<AdminPrincipal>` и `requireAdminMutation(request, formData): Promise<AdminPrincipal>` образуют route guard.
 
-- [ ] **Шаг 1: написать падающие тесты с PostgreSQL**
+- [x] **Шаг 1: написать падающие тесты с PostgreSQL**
 
 ```ts
 test("session expires exactly twelve hours after login", async () => {
@@ -213,17 +213,17 @@ test("a csrf mismatch rejects mutation", async () => {
 });
 ```
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `TEST_DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev_test node --import tsx --test src/server/auth/repository.test.ts src/server/auth/service.test.ts src/server/auth/request.test.ts`
 
 Ожидается: новые сервисы отсутствуют.
 
-- [ ] **Шаг 3: реализовать session token и buckets**
+- [x] **Шаг 3: реализовать session token и buckets**
 
 Сырой token и CSRF token генерируются 32 случайными байтами. В БД сохраняется HMAC-SHA-256. Окна: 5 неудач/15 минут по IP и login, 50/15 минут global; cleanup удаляет максимум 500 истёкших строк. Ошибка входа всегда `admin_login_invalid`.
 
-- [ ] **Шаг 4: реализовать request guards**
+- [x] **Шаг 4: реализовать request guards**
 
 ```ts
 export type AdminPrincipal = {
@@ -237,11 +237,11 @@ export type AdminPrincipal = {
 
 Mutation guard проверяет cookie, `Origin`, `Sec-Fetch-Site`, HTTP-метод и hidden `_csrf` либо `X-CSRF-Token`. Safe return path разрешает только нормализованные пути с префиксом `/admin/`.
 
-- [ ] **Шаг 5: подтвердить GREEN**
+- [x] **Шаг 5: подтвердить GREEN**
 
 Выполнить целевой тест из шага 2; ожидается PASS без warning.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/server/auth
