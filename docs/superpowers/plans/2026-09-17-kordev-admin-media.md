@@ -623,7 +623,7 @@ test("renders a media uuid as immutable CDN srcset", () => {
 
 Выполнить целевой тест из шага 2 и существующие route/SEO тесты; ожидается PASS.
 
-- [ ] **Шаг 5: зафиксировать задачу**
+- [x] **Шаг 5: зафиксировать задачу**
 
 ```bash
 git add src/server/media/presentation.ts src/server/media/presentation.test.ts src/server/content/presentation.ts src/server/content/presentation.test.ts src/components/MarkdownContent.tsx src/components/MarkdownContent.test.tsx
@@ -650,7 +650,7 @@ git commit -m "feat(media): render postgres media references"
 - `applyMediaMigration(report, db, service)` принимает только неизменённый report checksum и идемпотентно применяет media mapping.
 - Scripts: `media:migrate --dry-run --report <path>`, `media:migrate --apply --report <path>`, `media:verify --report <path>`.
 
-- [ ] **Шаг 1: написать падающие fixture-тесты**
+- [x] **Шаг 1: написать падающие fixture-тесты**
 
 ```ts
 test("dry-run never mutates database, s3 or source files", async () => {
@@ -663,21 +663,21 @@ test("dry-run never mutates database, s3 or source files", async () => {
 
 Добавить tests для duplicates, missing, unreadable, external URL, path traversal, changed report checksum, resume и exact counts/revisions/relations.
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `TEST_DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev_test node --import tsx --test src/server/media/migration.test.ts scripts/migrate-media-to-s3.test.ts`
 
 Ожидается: migration modules отсутствуют.
 
-- [ ] **Шаг 3: реализовать deterministic discovery/report**
+- [x] **Шаг 3: реализовать deterministic discovery/report**
 
 Сканировать PostgreSQL `body_md`, payload и OG refs, затем русские legacy SQLite/Markdown/JSON только для сверки. Локальный путь после `realpath` обязан оставаться внутри allowlisted roots `public/`, `src/assets/`, `src/blog/`, `server/data/`; network fetch внешних URL не выполняется.
 
-- [ ] **Шаг 4: реализовать идемпотентный apply/verify**
+- [x] **Шаг 4: реализовать идемпотентный apply/verify**
 
 Apply создаёт S3 объекты через media service, затем транзакционно переписывает Markdown в `media:<uuid>`, payload в UUID и заполняет refs. В `site_settings` сохраняется batch manifest. Verify сравнивает counts, revisions, relations, local references и S3 HEAD/checksum.
 
-- [ ] **Шаг 5: подтвердить GREEN**
+- [x] **Шаг 5: подтвердить GREEN**
 
 Выполнить целевой тест из шага 2, `yarn typecheck` и dry-run на текущем checkout; ожидается PASS и JSON report без изменений данных.
 
