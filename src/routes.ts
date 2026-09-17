@@ -10,6 +10,7 @@ export default [
   route("admin/login/", "routes/admin/login.tsx"),
   layout("routes/admin/layout.tsx", [
     route("admin/", "routes/admin/index.tsx"),
+    route("admin/media/", "routes/admin/media.tsx"),
     route("admin/logout/", "routes/admin/logout.tsx"),
   ]),
   route("services/", "routes/catalog.tsx", { id: "services" }),

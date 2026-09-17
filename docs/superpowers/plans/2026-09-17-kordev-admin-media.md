@@ -411,7 +411,7 @@ git commit -m "feat(media): add validated s3 image pipeline"
 - `upload` возвращает существующий asset при `(checksum, public, processingVersion=1)` и удаляет временный объект всегда.
 - Media action принимает multipart field `image`, `_csrf`, `expectedVersion` для metadata edits.
 
-- [ ] **Шаг 1: написать падающие consistency-тесты**
+- [x] **Шаг 1: написать падающие consistency-тесты**
 
 ```ts
 test("database failure removes only newly-created final objects", async () => {
@@ -424,21 +424,21 @@ test("database failure removes only newly-created final objects", async () => {
 
 Добавить тесты dedupe, temp cleanup, запрета удаления referenced asset, 409 metadata conflict и 24-часового orphan safety window.
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `TEST_DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev_test node --import tsx --test src/server/media/repository.test.ts src/server/media/service.test.ts src/routes/admin/media.test.tsx`
 
 Ожидается: repository/service/route отсутствуют.
 
-- [ ] **Шаг 3: реализовать порядок temp → final → DB → cleanup**
+- [x] **Шаг 3: реализовать порядок temp → final → DB → cleanup**
 
 Каждый `putFinal` сообщает `created | existed`. Компенсация удаляет только `created` keys после повторной DB-проверки отсутствия asset. `deleteUnused` блокирует строку media asset и проверяет `content_media_refs` и `content_entries.og_media_id` перед удалением.
 
-- [ ] **Шаг 4: реализовать медиатеку и sweep CLI**
+- [x] **Шаг 4: реализовать медиатеку и sweep CLI**
 
 Экран показывает thumbnail, dimensions, size, alt/decorative, usage count, upload и delete. Все actions используют session/CSRF/version. Добавить script `media:sweep` без автоматического запуска в production на этом этапе.
 
-- [ ] **Шаг 5: подтвердить GREEN**
+- [x] **Шаг 5: подтвердить GREEN**
 
 Выполнить целевой тест из шага 2 и `yarn typecheck`; ожидается PASS.
 

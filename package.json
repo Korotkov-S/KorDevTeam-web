@@ -117,7 +117,8 @@
     "content:migrate": "tsx scripts/migrate-content-to-postgres.ts",
     "content:verify": "tsx scripts/verify-content-migration.ts",
     "seo:crawl": "tsx scripts/seo-crawl.ts",
-    "admin:create": "tsx scripts/create-admin.ts"
+    "admin:create": "tsx scripts/create-admin.ts",
+    "media:sweep": "tsx scripts/sweep-public-media.ts"
   },
   "packageManager": "yarn@3.8.7"
 }
