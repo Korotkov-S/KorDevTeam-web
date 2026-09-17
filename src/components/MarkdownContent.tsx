@@ -1,8 +1,9 @@
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 
 import { cn } from "./ui/utils";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import type { MediaPresentationMap } from "../server/media/presentation";
 
 const DEFAULT_FALLBACK_IMAGE_SRC = "/opengraphlogo.jpeg";
 
@@ -101,21 +102,50 @@ const markdownComponents = {
 
 type MarkdownContentProps = {
   markdown: string;
+  media?: MediaPresentationMap;
   proseClassName?: string;
 } & Omit<React.ComponentProps<"div">, "children">;
 
 export function MarkdownContent({
   markdown,
+  media = {},
   proseClassName,
   className,
   ...divProps
 }: MarkdownContentProps) {
+  const components = {
+    ...markdownComponents,
+    img: ({ node, ...props }: any) => {
+      const rawSrc = typeof props.src === "string" ? props.src.trim() : "";
+      const match = rawSrc.match(/^media:([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+      const resolved = match ? media[match[1].toLowerCase()] : undefined;
+      if (match && !resolved) return null;
+      return (
+        <ImageWithFallback
+          {...props}
+          src={resolved?.src ?? (rawSrc || DEFAULT_FALLBACK_IMAGE_SRC)}
+          srcSet={resolved?.srcSet || undefined}
+          sizes={resolved?.sizes}
+          width={resolved?.width ?? props.width}
+          height={resolved?.height ?? props.height}
+          alt={resolved ? resolved.alt : typeof props.alt === "string" ? props.alt : ""}
+          loading={props.loading ?? "lazy"}
+          decoding={props.decoding ?? "async"}
+          fallbackSrc={DEFAULT_FALLBACK_IMAGE_SRC}
+          className={cn("max-w-full h-auto rounded-xl border border-border/50 my-6", props.className)}
+        />
+      );
+    },
+  };
   return (
     <div
       className={cn("prose prose-invert prose-lg max-w-none", proseClassName, className)}
       {...divProps}
     >
-      <ReactMarkdown components={markdownComponents}>{markdown}</ReactMarkdown>
+      <ReactMarkdown
+        components={components}
+        urlTransform={(url) => /^media:[0-9a-f-]{36}$/i.test(url) ? url : defaultUrlTransform(url)}
+      >{markdown}</ReactMarkdown>
     </div>
   );
 }

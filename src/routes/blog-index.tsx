@@ -4,12 +4,15 @@ import { listPublishedEntries } from "../server/content/service";
 import { articleCard } from "../server/content/presentation";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import type { RouteSeoInput } from "../server/seo/metadata";
+import { getEntryMediaMaps } from "../server/media/presentation";
 export { headers } from "../server/http/cacheHeaders";
 export { meta } from "./home";
 
 export async function loader() {
   const seo: RouteSeoInput = { pathname: "/blog/", title: "Блог", description: "Статьи KorDevTeam про разработку веб-сервисов, CRM, мобильных приложений, автоматизацию бизнеса, интеграции и кейсы команды.", indexable: true, kind: "page" };
-  return data({ seo, posts: (await listPublishedEntries("article")).map(articleCard) }, { headers: documentHeaders });
+  const entries = await listPublishedEntries("article");
+  const media = await getEntryMediaMaps(entries.map(entry => entry.id));
+  return data({ seo, posts: entries.map(entry => articleCard(entry, media[entry.id])) }, { headers: documentHeaders });
 }
 export default function BlogIndex() {
   const value = useLoaderData<typeof loader>();

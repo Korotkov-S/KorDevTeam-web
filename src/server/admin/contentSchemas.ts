@@ -53,11 +53,15 @@ export function parseAdminContentCommand(input: unknown): AdminContentCommand {
     if (relationKeys.has(key)) throw new Error("content_validation_error");
     relationKeys.add(key);
   }
+  const mediaRefs = [...admin.data.mediaRefs];
+  if (content.ogMediaId && !mediaRefs.some(ref => ref.mediaId === content.ogMediaId && ref.fieldPath === "ogMediaId")) {
+    mediaRefs.push({ mediaId: content.ogMediaId, fieldPath: "ogMediaId" });
+  }
   const mediaKeys = new Set<string>();
-  for (const ref of admin.data.mediaRefs) {
+  for (const ref of mediaRefs) {
     const key = `${ref.mediaId}:${ref.fieldPath}`;
     if (mediaKeys.has(key)) throw new Error("content_validation_error");
     mediaKeys.add(key);
   }
-  return { ...content, ...admin.data };
+  return { ...content, ...admin.data, mediaRefs };
 }

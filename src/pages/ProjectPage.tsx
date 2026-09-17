@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { ArrowLeft, ExternalLink, Github } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { MediaPresentationMap } from "../server/media/presentation";
 
 export type Project = {
   id: string;
@@ -17,6 +18,7 @@ export type Project = {
   features: string[];
   demoUrl?: string;
   githubUrl?: string;
+  media?: MediaPresentationMap;
 };
 
 
@@ -82,7 +84,7 @@ export function ProjectPage({ project }: { project: Project }) {
                 <h2 className="text-xl font-semibold mb-4">
                   {t("projectPage.projectDescription")}
                 </h2>
-                <MarkdownContent markdown={stripFirstMarkdownHeading(project.fullDescription)} />
+                <MarkdownContent markdown={stripFirstMarkdownHeading(project.fullDescription)} media={project.media} />
               </CardContent>
             </Card>
 

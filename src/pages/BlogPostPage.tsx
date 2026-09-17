@@ -12,6 +12,7 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "../components/ui/carousel";
+import type { MediaPresentationMap } from "../server/media/presentation";
 
 interface BlogPostMeta {
   title: string;
@@ -122,7 +123,7 @@ function PostImageCarousel({
 
 export type ArticlePresentation = {
   title: string; excerpt: string; bodyMd: string; publishedAt?: string; updatedAt?: string;
-  readTime: string; tags: string[]; coverUrl: string; imageUrls: string[];
+  readTime: string; tags: string[]; coverUrl: string; imageUrls: string[]; media?: MediaPresentationMap;
 };
 export function BlogPostPage({ article }: { article: ArticlePresentation }) {
   const { slug } = useParams<{ slug: string }>();
@@ -231,7 +232,7 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
             ) : null}
 
             {/* Article Content */}
-            <MarkdownContent markdown={content} itemProp="articleBody" />
+            <MarkdownContent markdown={content} media={article.media} itemProp="articleBody" />
 
             {/* Back to Blog Button */}
             <div className="mt-12 pt-8 border-t border-border relative" style={{ zIndex: 99999 }}>

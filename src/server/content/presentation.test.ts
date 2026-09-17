@@ -6,7 +6,7 @@ import { StaticRouter } from "react-router";
 import { load } from "cheerio";
 import "../../i18n";
 import { Blog } from "../../components/Blog";
-import { articleCard } from "./presentation";
+import { articleCard, articlePresentation } from "./presentation";
 import type { ContentEntry } from "./service";
 
 function entry(id: string, title: string, publishedAt: string): ContentEntry {
@@ -37,4 +37,16 @@ test("PostgreSQL article timestamps render newest first with Russian dates and m
     ["2025-01-19T15:00:00.000Z", "2025-01-19T08:00:00.000Z", "2024-12-01T10:00:00.000Z"]);
   assert.match($("article time").first().text(), /^19 января 2025/);
   assert.doesNotMatch($("article time").text(), /T\d\d:|\.000Z/);
+});
+
+test("article payload media identifiers resolve only through the supplied media map", () => {
+  const mediaId = "00000000-0000-4000-8000-000000000001";
+  const media = { [mediaId]: { id: mediaId, src: "https://cdn.example/cover.webp", srcSet: "", sizes: "100vw", alt: "", decorative: true, width: 1200, height: 630 } };
+  const value = { ...entry("media-entry", "Материал", "2026-09-17T08:00:00.000Z"), payload: { coverUrl: mediaId, imageUrls: [mediaId, "https://legacy.example/image.jpg"] } };
+
+  const article = articlePresentation(value, media);
+
+  assert.equal(article.coverUrl, "https://cdn.example/cover.webp");
+  assert.deepEqual(article.imageUrls, ["https://cdn.example/cover.webp", "https://legacy.example/image.jpg"]);
+  assert.equal(articlePresentation({ ...value, payload: { coverUrl: "00000000-0000-4000-8000-000000000099" } }, media).coverUrl, "");
 });

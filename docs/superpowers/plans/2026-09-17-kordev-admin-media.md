@@ -572,7 +572,7 @@ route("admin/settings/", "routes/admin/settings.tsx"),
 
 Ожидается: PASS.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/routes.ts src/routes/admin src/components/admin src/styles/index.css
@@ -598,7 +598,7 @@ git commit -m "feat(admin): add content editor and settings ui"
 - Markdown URL `media:<uuid>` разрешается только через переданный SSR media map; неизвестный UUID не превращается во внешний URL.
 - Payload media UUID разрешаются presentation-слоем, а не UI-компонентами.
 
-- [ ] **Шаг 1: написать падающие presentation-тесты**
+- [x] **Шаг 1: написать падающие presentation-тесты**
 
 ```ts
 test("renders a media uuid as immutable CDN srcset", () => {
@@ -609,17 +609,17 @@ test("renders a media uuid as immutable CDN srcset", () => {
 });
 ```
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --import tsx --test src/server/media/presentation.test.ts src/server/content/presentation.test.ts src/components/MarkdownContent.test.tsx`
 
 Ожидается: `media:` остаётся неразрешённым.
 
-- [ ] **Шаг 3: реализовать server-side media map и безопасный renderer**
+- [x] **Шаг 3: реализовать server-side media map и безопасный renderer**
 
 Публичные loaders получают media assets одним batch query по `content_media_refs`; N+1 запрещён. Renderer не принимает произвольный URL из UUID-поля и экранирует alt.
 
-- [ ] **Шаг 4: подтвердить GREEN и SEO SSR**
+- [x] **Шаг 4: подтвердить GREEN и SEO SSR**
 
 Выполнить целевой тест из шага 2 и существующие route/SEO тесты; ожидается PASS.
 

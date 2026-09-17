@@ -42,7 +42,11 @@ export function readPublicMediaConfig(environment: MediaEnvironment): PublicMedi
     accessKeyId: required(environment, "PUBLIC_MEDIA_S3_ACCESS_KEY_ID"),
     secretAccessKey: required(environment, "PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY"),
     prefix,
-    publicBaseUrl: httpsUrl(required(environment, "PUBLIC_MEDIA_BASE_URL"), true),
+    publicBaseUrl: readPublicMediaBaseUrl(environment),
     serverSideEncryption,
   };
+}
+
+export function readPublicMediaBaseUrl(environment: MediaEnvironment): URL {
+  return httpsUrl(required(environment, "PUBLIC_MEDIA_BASE_URL"), true);
 }
