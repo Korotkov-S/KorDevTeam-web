@@ -341,7 +341,7 @@ git commit -m "feat(admin): add protected ssr route shell"
 - `mediaObjectKeys(checksum, mime, widths)` создаёт `media/v1/<prefix>/<digest>/...`.
 - `PublicMediaStore` предоставляет `putTemporary`, `putFinal`, `head`, `delete`, `listOlderThan`.
 
-- [ ] **Шаг 1: написать падающие тесты форматов и ключей**
+- [x] **Шаг 1: написать падающие тесты форматов и ключей**
 
 ```ts
 test("does not upscale a 900px source", async () => {
@@ -356,19 +356,19 @@ test("key never contains the original filename", () => {
 
 Добавить отказ для GIF/SVG, spoofed MIME, 20 MiB+, 40 MP+ и битого файла.
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --import tsx --test src/server/media/config.test.ts src/server/media/inspect.test.ts src/server/media/keys.test.ts src/server/media/store.test.ts`
 
 Ожидается: media modules отсутствуют.
 
-- [ ] **Шаг 3: установить Sharp**
+- [x] **Шаг 3: установить Sharp**
 
 Выполнить: `yarn add sharp`
 
 Зафиксировать точную версию в lockfile; Puppeteer download остаётся отключённым существующей Docker-конфигурацией.
 
-- [ ] **Шаг 4: реализовать проверки и S3-адаптер**
+- [x] **Шаг 4: реализовать проверки и S3-адаптер**
 
 ```ts
 export const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
@@ -378,11 +378,11 @@ export const MEDIA_WIDTHS = [640, 1280, 1920] as const;
 
 Sharp читает metadata с ограничением пикселей, применяет autorotate, удаляет лишние metadata и создаёт WebP. S3 операции имеют abort timeout, финальные объекты получают `public, max-age=31536000, immutable`, временные — `private, no-store`.
 
-- [ ] **Шаг 5: подтвердить GREEN**
+- [x] **Шаг 5: подтвердить GREEN**
 
 Выполнить целевой тест из шага 2 и `yarn typecheck`; ожидается PASS.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add package.json yarn.lock src/server/media
