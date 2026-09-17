@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, test } from "node:test";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { createDb } from "../db/client";
-import { adminUsers, contentEntries, contentRelations, contentRevisions } from "../db/schema";
+import { adminUsers, contentEntries, contentMediaRefs, contentRelations, contentRevisions, mediaAssets } from "../db/schema";
 import { resetTestDatabase } from "../db/testDatabase";
 import { ContentCache } from "./cache";
 import { createContentService } from "./service";
@@ -84,10 +84,31 @@ databaseTest("revisions retain the full pre-change snapshot and restore advances
   assert.equal((await service.getPublishedEntry("service", draft.slug))?.version, 4);
   const revisions = await db.select().from(contentRevisions).where(eq(contentRevisions.entryId, draft.id));
   assert.deepEqual(revisions.map(r => r.version).sort(), [1, 2, 3]);
-  assert.deepEqual(revisions.find(r => r.version === 1)?.snapshot, JSON.parse(JSON.stringify(draft)));
+  assert.deepEqual((revisions.find(r => r.version === 1)?.snapshot as { entry: unknown }).entry, JSON.parse(JSON.stringify(draft)));
   assert.equal(revisions[0].adminUserId, adminId);
   await assert.rejects(service.restoreRevision(draft.id, 1, 3, adminId), /content_version_conflict/);
   await assert.rejects(service.restoreRevision(draft.id, 99, 4, adminId), /content_revision_not_found/);
+});
+
+databaseTest("public content writes include relations and media refs in revision snapshots", async () => {
+  const service = createContentService(db);
+  const source = await service.saveDraft(draftCommand(), adminId);
+  const target = await service.saveDraft(draftCommand(), adminId);
+  const [media] = await db.insert(mediaAssets).values({
+    objectKey: `media/v1/${randomUUID()}/original.png`, visibility: "public", mimeType: "image/png",
+    byteSize: 10, checksum: randomUUID().replaceAll("-", "").padEnd(64, "0"), width: 2, height: 2,
+    altText: "Схема", decorative: false, createdBy: adminId,
+  }).returning();
+  await db.insert(contentRelations).values({ sourceId: source.id, targetId: target.id, type: "related_service", sortOrder: 2 });
+  await db.insert(contentMediaRefs).values({ entryId: source.id, mediaId: media.id, fieldPath: "bodyMd:0" });
+
+  await service.publishEntry(source.id, 1, adminId);
+
+  const [revision] = await db.select().from(contentRevisions).where(eq(contentRevisions.entryId, source.id));
+  const snapshot = revision.snapshot as { entry: { id: string }; relations: unknown[]; mediaRefs: unknown[] };
+  assert.equal(snapshot.entry.id, source.id);
+  assert.equal(snapshot.relations.length, 1);
+  assert.equal(snapshot.mediaRefs.length, 1);
 });
 
 databaseTest("unpublish removes cached public reads and republish preserves first publication time", async () => {
@@ -121,7 +142,9 @@ databaseTest("hard delete rejects stale versions and cascades revisions and both
   assert.equal(await service.getPublishedEntry("service", draft.slug), null);
   assert.equal((await service.listPublishedEntries("service")).some(e => e.id === draft.id), false);
   assert.equal((await db.select().from(contentRevisions).where(eq(contentRevisions.entryId, draft.id))).length, 0);
-  assert.equal((await db.select().from(contentRelations)).length, 0);
+  assert.equal((await db.select().from(contentRelations).where(or(
+    eq(contentRelations.sourceId, draft.id), eq(contentRelations.targetId, draft.id),
+  ))).length, 0);
 });
 
 databaseTest("writes invalidate old/new slugs, lists, relationship lists and sitemaps only on commit", async () => {

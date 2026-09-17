@@ -6,6 +6,14 @@ import { parseContentCommand, validateIdentity, validatePublication, type Conten
 export type { ContentEntry, ContentKind, ContentService, SaveContentCommand, ServicePayload } from "./types";
 
 const caches = new WeakMap<ContentDatabase, ContentCache>();
+const registeredCaches = new Set<ContentCache>();
+
+export function invalidateAllContentCaches(): void {
+  for (const cache of registeredCaches) {
+    cache.invalidate(["sitemaps"], ["entry:", "list:", "relations:", "sitemaps:"]);
+  }
+}
+
 function sharedCache(db: ContentDatabase): ContentCache {
   let cache = caches.get(db);
   if (!cache) { cache = new ContentCache(); caches.set(db, cache); }
@@ -13,6 +21,7 @@ function sharedCache(db: ContentDatabase): ContentCache {
 }
 
 export function createContentService(db: ContentDatabase, cache = sharedCache(db)): ContentService {
+  registeredCaches.add(cache);
   const repository = createContentRepository(db);
   function invalidate(result: WriteResult) {
     const entries = [result.before, result.after].filter(entry => entry !== undefined);

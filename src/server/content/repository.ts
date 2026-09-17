@@ -1,6 +1,6 @@
 import { and, asc, eq, or, sql } from "drizzle-orm";
 import type { createDb } from "../db/client";
-import { contentEntries, contentRelations, contentRevisions, siteSettings } from "../db/schema";
+import { contentEntries, contentMediaRefs, contentRelations, contentRevisions, siteSettings } from "../db/schema";
 import { parseContentCommand, validatePublication } from "./types";
 import { matchesImportedEntry, migrationKey, type MigrationRecord } from "./migration";
 import type { ContentEntry, ContentKind, ValidatedContentCommand } from "./types";
@@ -8,6 +8,31 @@ import type { ContentEntry, ContentKind, ValidatedContentCommand } from "./types
 export type ContentDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<ContentDatabase["transaction"]>[0]>[0];
 export type WriteResult = { before?: ContentEntry; after?: ContentEntry; relatedSourceIds: string[]; relatedKinds: ContentKind[] };
+type RevisionState = {
+  entry: ContentEntry;
+  relations: Array<{ targetId: string; type: typeof contentRelations.$inferSelect.type; sortOrder: number }>;
+  mediaRefs: Array<{ mediaId: string; fieldPath: string }>;
+};
+
+async function revisionState(tx: Transaction, entry: ContentEntry): Promise<RevisionState> {
+  const relations = await tx.select({
+    targetId: contentRelations.targetId, type: contentRelations.type, sortOrder: contentRelations.sortOrder,
+  }).from(contentRelations).where(eq(contentRelations.sourceId, entry.id)).orderBy(asc(contentRelations.sortOrder));
+  const mediaRefs = await tx.select({
+    mediaId: contentMediaRefs.mediaId, fieldPath: contentMediaRefs.fieldPath,
+  }).from(contentMediaRefs).where(eq(contentMediaRefs.entryId, entry.id)).orderBy(asc(contentMediaRefs.fieldPath));
+  return { entry, relations, mediaRefs };
+}
+
+function decodedEntry(snapshot: Record<string, unknown>): ContentEntry {
+  const value = snapshot.entry && typeof snapshot.entry === "object" && !Array.isArray(snapshot.entry)
+    ? snapshot.entry as Record<string, unknown> : snapshot;
+  return { ...value,
+    createdAt: new Date(value.createdAt as string),
+    updatedAt: new Date(value.updatedAt as string),
+    publishedAt: value.publishedAt ? new Date(value.publishedAt as string) : null,
+  } as ContentEntry;
+}
 
 async function references(tx: Transaction, id: string) {
   const rows = await tx.select({ sourceId: contentRelations.sourceId, kind: contentEntries.kind })
@@ -50,7 +75,10 @@ export function createContentRepository(db: ContentDatabase) {
             const historical = Object.fromEntries(Object.entries(timestamps).map(([key, value]) => [key, new Date(value)]));
             // Migration-only exception: preserve source history; ordinary publication still uses first publish time.
             const [draft] = await tx.insert(contentEntries).values({ ...command, ...historical, publishedAt: null, status: "draft" }).returning();
-            await tx.insert(contentRevisions).values({ entryId: draft.id, version: 1, snapshot: draft });
+            await tx.insert(contentRevisions).values({
+              entryId: draft.id, version: 1,
+              snapshot: { entry: draft, relations: [], mediaRefs: [] },
+            });
             [entry] = await tx.update(contentEntries).set({ status: "published", version: 2,
               publishedAt: timestamps.publishedAt ? new Date(timestamps.publishedAt) : new Date(),
               updatedAt: timestamps.updatedAt ? new Date(timestamps.updatedAt) : new Date() })
@@ -90,23 +118,41 @@ export function createContentRepository(db: ContentDatabase) {
         if (!before) throw new Error("content_not_found");
         if (before.version !== expectedVersion) throw new Error("content_version_conflict");
         let revision: ContentEntry | undefined;
+        let restoredState: Omit<RevisionState, "entry"> | undefined;
         if (revisionVersion !== undefined) {
           const [row] = await tx.select().from(contentRevisions).where(and(
             eq(contentRevisions.entryId, id), eq(contentRevisions.version, revisionVersion),
           ));
           if (!row) throw new Error("content_revision_not_found");
           // JSON snapshots serialize timestamps; restore them before validation/use.
-          revision = { ...row.snapshot,
-            createdAt: new Date(row.snapshot.createdAt as string),
-            updatedAt: new Date(row.snapshot.updatedAt as string),
-            publishedAt: row.snapshot.publishedAt ? new Date(row.snapshot.publishedAt as string) : null,
-          } as ContentEntry;
+          revision = decodedEntry(row.snapshot);
+          const currentState = await revisionState(tx, before);
+          restoredState = {
+            relations: Array.isArray(row.snapshot.relations)
+              ? row.snapshot.relations as RevisionState["relations"] : currentState.relations,
+            mediaRefs: Array.isArray(row.snapshot.mediaRefs)
+              ? row.snapshot.mediaRefs as RevisionState["mediaRefs"] : currentState.mediaRefs,
+          };
         }
         const fields = change(before, revision);
-        await tx.insert(contentRevisions).values({ entryId: id, version: before.version, snapshot: before, adminUserId: actorId });
+        const snapshot = await revisionState(tx, before);
+        await tx.insert(contentRevisions).values({
+          entryId: id, version: before.version,
+          snapshot: snapshot as unknown as Record<string, unknown>, adminUserId: actorId,
+        });
         const [after] = await tx.update(contentEntries).set({ ...fields, version: before.version + 1, updatedAt: new Date() })
           .where(and(eq(contentEntries.id, id), eq(contentEntries.version, expectedVersion))).returning();
         if (!after) throw new Error("content_version_conflict");
+        if (restoredState) {
+          await tx.delete(contentRelations).where(eq(contentRelations.sourceId, id));
+          await tx.delete(contentMediaRefs).where(eq(contentMediaRefs.entryId, id));
+          if (restoredState.relations.length) await tx.insert(contentRelations).values(
+            restoredState.relations.map(relation => ({ sourceId: id, ...relation })),
+          );
+          if (restoredState.mediaRefs.length) await tx.insert(contentMediaRefs).values(
+            restoredState.mediaRefs.map(ref => ({ entryId: id, ...ref })),
+          );
+        }
         return { before, after, ...await references(tx, id) };
       });
     },

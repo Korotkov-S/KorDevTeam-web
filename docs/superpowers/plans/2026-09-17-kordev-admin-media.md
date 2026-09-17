@@ -442,7 +442,7 @@ test("database failure removes only newly-created final objects", async () => {
 
 Выполнить целевой тест из шага 2 и `yarn typecheck`; ожидается PASS.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/server/media src/routes/admin/media.tsx src/routes/admin/media.test.tsx src/routes.ts scripts/sweep-public-media.ts package.json
@@ -471,7 +471,7 @@ git commit -m "feat(admin): add transactional media library"
 - `createAdminContentService(db)` предоставляет `list`, `getEditorData`, `save`, `unpublish`, `restore`, `hardDelete`, `preview`, `listSettings`, `saveSetting`.
 - Любая содержательная запись создаёт revision snapshot `{ entry, relations, mediaRefs }` в той же транзакции.
 
-- [ ] **Шаг 1: написать падающие транзакционные тесты**
+- [x] **Шаг 1: написать падающие транзакционные тесты**
 
 ```ts
 test("save atomically writes entry, relations, media refs and revision", async () => {
@@ -485,21 +485,21 @@ test("save atomically writes entry, relations, media refs and revision", async (
 
 Добавить отдельные тесты 409, unique slug, publish validation, unpublish, restore-as-new-version, cascade delete, settings version и cache/sitemap invalidation.
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `TEST_DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev_test node --import tsx --test src/server/admin/contentSchemas.test.ts src/server/admin/contentRepository.test.ts src/server/admin/contentService.test.ts src/server/content/service.test.ts`
 
 Ожидается: admin content modules отсутствуют либо revision snapshot не включает relations/media refs.
 
-- [ ] **Шаг 3: реализовать строгий парсинг формы**
+- [x] **Шаг 3: реализовать строгий парсинг формы**
 
 Relation item: `{ targetId: uuid, type: relationType, sortOrder: nonnegative int }`. Media ref: `{ mediaId: uuid, fieldPath: nonempty max 300 }`. Payload остаётся kind-specific и проходит существующую Zod-схему. Publish повторно валидирует итоговую запись после применения формы.
 
-- [ ] **Шаг 4: реализовать repository transaction и cache invalidation**
+- [x] **Шаг 4: реализовать repository transaction и cache invalidation**
 
 При update сначала `SELECT ... FOR UPDATE`, затем сравнение версии. Синхронизация relations/refs, revision insert и entry update выполняются одной транзакцией. Restore читает snapshot и создаёт следующую версию; история не удаляется.
 
-- [ ] **Шаг 5: подтвердить GREEN**
+- [x] **Шаг 5: подтвердить GREEN**
 
 Выполнить целевой тест из шага 2 и `yarn typecheck`; ожидается PASS.
 
