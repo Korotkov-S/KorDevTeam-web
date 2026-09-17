@@ -11,6 +11,11 @@ export default [
   layout("routes/admin/layout.tsx", [
     route("admin/", "routes/admin/index.tsx"),
     route("admin/media/", "routes/admin/media.tsx"),
+    route("admin/content/:kind/", "routes/admin/content-list.tsx"),
+    route("admin/content/:kind/preview/", "routes/admin/content-preview.tsx"),
+    route("admin/content/:kind/new/", "routes/admin/content-editor.tsx", { id: "admin-content-new" }),
+    route("admin/content/:kind/:id/", "routes/admin/content-editor.tsx", { id: "admin-content-edit" }),
+    route("admin/settings/", "routes/admin/settings.tsx"),
     route("admin/logout/", "routes/admin/logout.tsx"),
   ]),
   route("services/", "routes/catalog.tsx", { id: "services" }),

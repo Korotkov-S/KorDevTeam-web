@@ -503,7 +503,7 @@ Relation item: `{ targetId: uuid, type: relationType, sortOrder: nonnegative int
 
 Выполнить целевой тест из шага 2 и `yarn typecheck`; ожидается PASS.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/server/admin src/server/content
@@ -534,7 +534,7 @@ git commit -m "feat(admin): add revisioned content editing service"
 - Preview action принимает текущую форму, не пишет БД и возвращает presentation model.
 - Settings action принимает `key`, JSON-compatible structured value, `_csrf`, `expectedVersion`.
 
-- [ ] **Шаг 1: написать падающие route/component-тесты**
+- [x] **Шаг 1: написать падающие route/component-тесты**
 
 ```tsx
 test("409 keeps submitted text and shows the current server version", async () => {
@@ -546,13 +546,13 @@ test("409 keeps submitted text and shows the current server version", async () =
 
 Добавить тесты всех intents, invalid kind 404, draft filtering, server validation errors, preview without writes, typed delete confirmation и unsaved changes guard.
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --import tsx --test src/routes/admin/content-routes.test.tsx`
 
 Ожидается: route modules отсутствуют.
 
-- [ ] **Шаг 3: зарегистрировать маршруты и реализовать loaders/actions**
+- [x] **Шаг 3: зарегистрировать маршруты и реализовать loaders/actions**
 
 ```ts
 route("admin/content/:kind/", "routes/admin/content-list.tsx"),
@@ -562,11 +562,11 @@ route("admin/content/:kind/preview/", "routes/admin/content-preview.tsx"),
 route("admin/settings/", "routes/admin/settings.tsx"),
 ```
 
-- [ ] **Шаг 4: собрать доступный интерфейс**
+- [x] **Шаг 4: собрать доступный интерфейс**
 
 Редактор содержит вкладки «Контент», «SEO», «Связи», «Предпросмотр», «История»; отдельные кнопки draft/publish; inline errors плюс summary; MediaPicker использует UUID. Все control имеют label, focus state и keyboard operation. Unsaved guard использует React Router blocker и `beforeunload` только при реальном dirty state.
 
-- [ ] **Шаг 5: подтвердить GREEN и build**
+- [x] **Шаг 5: подтвердить GREEN и build**
 
 Выполнить: `node --import tsx --test src/routes/admin/content-routes.test.tsx && yarn typecheck && DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev yarn build`
 

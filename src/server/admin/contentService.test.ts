@@ -40,7 +40,9 @@ databaseTest("service publishes, unpublishes, restores and versions settings", a
   assert.equal(invalidations, 4);
 
   assert.equal(await service.hardDelete(draft.id, 4), true);
+  assert.equal(invalidations, 5);
   assert.equal(await service.hardDelete(draft.id, 4), false);
+  assert.equal(invalidations, 5);
 });
 
 databaseTest("publication rejects incomplete content without changing its version", async () => {

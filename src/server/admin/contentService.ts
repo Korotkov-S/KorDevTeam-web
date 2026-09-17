@@ -34,9 +34,11 @@ export function createAdminContentService(db: AdminContentDatabase, invalidate: 
       validateIdentity(actorId);
       return changed(repository.restore(id, revisionVersion, expectedVersion, actorId));
     },
-    hardDelete(id: string, expectedVersion: number) {
+    async hardDelete(id: string, expectedVersion: number) {
       validateIdentity(id, expectedVersion);
-      return repository.hardDelete(id, expectedVersion);
+      const deleted = await repository.hardDelete(id, expectedVersion);
+      if (deleted) invalidate();
+      return deleted;
     },
     preview(input: unknown) {
       const command = parseAdminContentCommand(input);
