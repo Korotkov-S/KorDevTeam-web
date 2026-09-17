@@ -38,6 +38,13 @@ test('application readiness awaits SELECT 1 and only structurally validates web 
     CLAMAV_HOST: 'unreachable.invalid', CLAMAV_PORT: '3310',
     LEAD_S3_ENDPOINT: 'https://unreachable.invalid', LEAD_S3_REGION: 'private', LEAD_S3_BUCKET: 'private',
     LEAD_S3_ACCESS_KEY_ID: 'key', LEAD_S3_SECRET_ACCESS_KEY: 'secret', LEAD_S3_PREFIX: 'private/', LEAD_S3_SSE: 'AES256',
+    ADMIN_SESSION_HMAC_KEY: Buffer.alloc(32, 1).toString('base64'),
+    ADMIN_RATE_LIMIT_HMAC_KEY: Buffer.alloc(32, 2).toString('base64'),
+    ADMIN_TRUSTED_ORIGIN: 'https://kordev.team',
+    PUBLIC_MEDIA_S3_ENDPOINT: 'https://s3.example.invalid', PUBLIC_MEDIA_S3_REGION: 'test-1',
+    PUBLIC_MEDIA_S3_BUCKET: 'public-test', PUBLIC_MEDIA_S3_ACCESS_KEY_ID: 'key',
+    PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY: 'secret', PUBLIC_MEDIA_S3_PREFIX: 'media',
+    PUBLIC_MEDIA_BASE_URL: 'https://cdn.example.invalid/', PUBLIC_MEDIA_S3_SSE: 'AES256',
   };
   for (const [name, value] of Object.entries(environment)) {
     const old = process.env[name]; process.env[name] = value;

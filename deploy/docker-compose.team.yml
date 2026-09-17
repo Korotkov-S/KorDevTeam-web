@@ -17,26 +17,29 @@ x-lead-web-environment: &lead-web-environment
   LEAD_S3_SSE: ${LEAD_S3_SSE:?Provide LEAD_S3_SSE}
   CLAMAV_HOST: ${CLAMAV_HOST:?Provide CLAMAV_HOST}
   CLAMAV_PORT: ${CLAMAV_PORT:?Provide CLAMAV_PORT}
+x-admin-media-environment: &admin-media-environment
+  ADMIN_SESSION_HMAC_KEY: ${ADMIN_SESSION_HMAC_KEY:?Provide ADMIN_SESSION_HMAC_KEY}
+  ADMIN_RATE_LIMIT_HMAC_KEY: ${ADMIN_RATE_LIMIT_HMAC_KEY:?Provide ADMIN_RATE_LIMIT_HMAC_KEY}
+  ADMIN_TRUSTED_ORIGIN: ${ADMIN_TRUSTED_ORIGIN:?Provide ADMIN_TRUSTED_ORIGIN}
+  PUBLIC_MEDIA_S3_ENDPOINT: ${PUBLIC_MEDIA_S3_ENDPOINT:?Provide PUBLIC_MEDIA_S3_ENDPOINT}
+  PUBLIC_MEDIA_S3_REGION: ${PUBLIC_MEDIA_S3_REGION:?Provide PUBLIC_MEDIA_S3_REGION}
+  PUBLIC_MEDIA_S3_BUCKET: ${PUBLIC_MEDIA_S3_BUCKET:?Provide PUBLIC_MEDIA_S3_BUCKET}
+  PUBLIC_MEDIA_S3_ACCESS_KEY_ID: ${PUBLIC_MEDIA_S3_ACCESS_KEY_ID:?Provide PUBLIC_MEDIA_S3_ACCESS_KEY_ID}
+  PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY: ${PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY:?Provide PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY}
+  PUBLIC_MEDIA_S3_PREFIX: ${PUBLIC_MEDIA_S3_PREFIX:?Provide PUBLIC_MEDIA_S3_PREFIX}
+  PUBLIC_MEDIA_BASE_URL: ${PUBLIC_MEDIA_BASE_URL:?Provide PUBLIC_MEDIA_BASE_URL}
+  PUBLIC_MEDIA_S3_SSE: ${PUBLIC_MEDIA_S3_SSE:?Provide PUBLIC_MEDIA_S3_SSE}
 x-web: &web
   restart: unless-stopped
   init: true
   environment:
-    <<: *lead-web-environment
+    <<: [*lead-web-environment, *admin-media-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
     TRUST_PROXY_HOPS: "1"
     DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
-    ADMIN_USER: ${ADMIN_USER:?Provide ADMIN_USER}
-    ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Provide ADMIN_PASSWORD}
-    ADMIN_TOKEN: ${ADMIN_TOKEN:?Provide ADMIN_TOKEN}
-    S3_ENDPOINT: ${S3_ENDPOINT:-https://s3.twcstorage.ru}
-    S3_REGION: ${S3_REGION:-ru-1}
-    S3_BUCKET: ${S3_BUCKET:-}
-    S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-}
-    S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
-    S3_SECRET_KEY: ${S3_SECRET_KEY:-}
-    S3_FORCE_PATH_STYLE: "1"
+  read_only: true
   networks:
     backend: {}
     egress:
@@ -59,6 +62,20 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
     networks: [backend]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  media-migration:
+    image: ${MEDIA_MIGRATION_IMAGE:-kordevteam-media:unconfigured}
+    profiles: [media-migration]
+    environment:
+      <<: *admin-media-environment
+      DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
+    networks:
+      backend: {}
+      egress:
+        gw_priority: 1
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]

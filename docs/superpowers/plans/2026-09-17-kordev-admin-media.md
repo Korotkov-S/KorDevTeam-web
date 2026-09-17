@@ -681,7 +681,7 @@ Apply создаёт S3 объекты через media service, затем тр
 
 Выполнить целевой тест из шага 2, `yarn typecheck` и dry-run на текущем checkout; ожидается PASS и JSON report без изменений данных.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/server/media/migration.ts src/server/media/migration.test.ts scripts/migrate-media-to-s3.ts scripts/verify-media-migration.ts scripts/migrate-media-to-s3.test.ts package.json Dockerfile
@@ -710,7 +710,7 @@ git commit -m "feat(media): add resumable legacy migration"
 - Read-only legacy admin endpoints не монтируются новым runtime.
 - Runtime получает `ADMIN_SESSION_HMAC_KEY`, `ADMIN_RATE_LIMIT_HMAC_KEY`, `ADMIN_TRUSTED_ORIGIN` и `PUBLIC_MEDIA_S3_*` только через environment/secrets.
 
-- [ ] **Шаг 1: написать падающий regression-тест legacy writes**
+- [x] **Шаг 1: написать падающий regression-тест legacy writes**
 
 ```js
 test("legacy admin writes are gone without touching sqlite", async () => {
@@ -721,21 +721,21 @@ test("legacy admin writes are gone without touching sqlite", async () => {
 });
 ```
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --test server/routes/legacy-admin-tombstones.test.js tests/runtimeApiComposition.test.mjs`
 
 Ожидается: старый handler доступен или tombstone отсутствует.
 
-- [ ] **Шаг 3: смонтировать tombstones и убрать legacy routers**
+- [x] **Шаг 3: смонтировать tombstones и убрать legacy routers**
 
 Tombstone принимает только перечисленные legacy paths/mutating methods и отвечает JSON `{ "error": "legacy_admin_gone" }`. Он не читает body и не вызывает SQL.js/bootstrap. Public legacy redirect `/project/:slug/` сохраняется.
 
-- [ ] **Шаг 4: добавить конфигурацию runtime/CI/Compose**
+- [x] **Шаг 4: добавить конфигурацию runtime/CI/Compose**
 
 CI использует только fixture secrets. Compose config должен проходить без печати реальных значений. Production secrets не добавляются в git.
 
-- [ ] **Шаг 5: подтвердить GREEN и Compose parsing**
+- [x] **Шаг 5: подтвердить GREEN и Compose parsing**
 
 Выполнить: `node --test server/routes/legacy-admin-tombstones.test.js tests/runtimeApiComposition.test.mjs && docker compose config --quiet && docker compose -f docker-compose.team.yml config --quiet`
 

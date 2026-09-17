@@ -56,8 +56,7 @@ test('production web and worker receive private server-side lead settings with b
     for (const key of webLeadKeys) assert.ok(service.environment[key], `${name} misses ${key}`);
     assert.ok(service.tmpfs.some(entry => entry.includes('/tmp') && (entry.includes('96m') || entry.includes('100663296')) && entry.includes('mode=1777')), `${name} needs a 96 MiB tmpfs`);
     assert.ok(service.tmpfs.some(entry => entry.startsWith('/tmp/kordev-leads:') && entry.includes('mode=0700') && entry.includes('uid=1000') && entry.includes('gid=1000')), `${name} needs a private lead temp tmpfs owned by uid 1000`);
-    assert.equal(service.read_only, name === 'lead-worker' ? true : undefined,
-      `${name} must preserve the legacy editor's writable web filesystem while keeping the worker read-only`);
+    assert.equal(service.read_only, true, `${name} must use a read-only root filesystem`);
     const expectedNetworks = name === 'lead-worker' ? { backend: {}, egress: { gw_priority: 1 } } : { backend: {}, egress: { gw_priority: 1 }, proxy: {} };
     assert.deepEqual(service.networks, expectedNetworks, `${name} needs internal DB and explicit outbound S3 routing`);
     assert.equal(service.logging.options['max-size'], '20m');
@@ -99,7 +98,7 @@ test('local topology uses one private worker, internal ClamAV and no database ho
   assert.deepEqual(services['lead-worker'].healthcheck.test, ['CMD', 'node', 'server/lead-worker.mjs', '--check']);
   assert.match(services.clamav.image, /^clamav\/clamav:[0-9]+\.[0-9]+\.[0-9]+$/);
   for (const name of ['kordevteam-blue', 'kordevteam-green', 'lead-worker']) {
-    assert.equal(services[name].read_only, name === 'lead-worker' ? true : undefined);
+    assert.equal(services[name].read_only, true);
     assert.deepEqual(services[name].networks, { backend: {}, egress: { gw_priority: 1 } });
     assert.ok(services[name].tmpfs.some(entry => entry.startsWith('/tmp/kordev-leads:') && entry.includes('mode=0700') && entry.includes('uid=1000') && entry.includes('gid=1000')));
   }

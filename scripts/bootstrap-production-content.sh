@@ -8,7 +8,7 @@ mode="$1"; release="$2"; web_image="$3"; tool_image="$4"; reports="$5"
 image_valid "$web_image"; image_valid "$tool_image"
 for command in node git docker curl; do command -v "$command" >/dev/null || fail "Missing tool: $command"; done
 [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$release" && -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all)" ]] || fail 'Clean exact checkout required'
-for secret in DATABASE_URL POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB ADMIN_USER ADMIN_PASSWORD ADMIN_TOKEN; do [[ -n "${!secret:-}" ]] || fail "Missing required setting: $secret"; done
+for secret in DATABASE_URL POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB ADMIN_SESSION_HMAC_KEY ADMIN_RATE_LIMIT_HMAC_KEY ADMIN_TRUSTED_ORIGIN PUBLIC_MEDIA_S3_ENDPOINT PUBLIC_MEDIA_S3_REGION PUBLIC_MEDIA_S3_BUCKET PUBLIC_MEDIA_S3_ACCESS_KEY_ID PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY PUBLIC_MEDIA_S3_PREFIX PUBLIC_MEDIA_BASE_URL PUBLIC_MEDIA_S3_SSE; do [[ -n "${!secret:-}" ]] || fail "Missing required setting: $secret"; done
 node "$SCRIPT_DIR/bootstrap-content-check.mjs" url
 node "$SCRIPT_DIR/bootstrap-content-check.mjs" paths "$DEPLOY_STATE_DIR" "$TRAEFIK_DYNAMIC_FILE" "$reports" "$REPO_ROOT"
 batch="first-$release"

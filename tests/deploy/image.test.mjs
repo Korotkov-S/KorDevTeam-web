@@ -60,14 +60,19 @@ test('production compose resolves both immutable slots without a public database
   for (const color of ['blue', 'green']) {
     assert.equal(services[`kordevteam-${color}`].environment.NODE_ENV, 'production');
     assert.equal(services[`kordevteam-${color}`].environment.CONTENT_CACHE_TTL_SECONDS, '0');
-    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_USER, 'owner');
-    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_PASSWORD, 'fixture-admin-password');
-    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_TOKEN, 'fixture-admin-token');
+    assert.ok(services[`kordevteam-${color}`].environment.ADMIN_SESSION_HMAC_KEY);
+    assert.ok(services[`kordevteam-${color}`].environment.ADMIN_RATE_LIMIT_HMAC_KEY);
+    assert.equal(services[`kordevteam-${color}`].environment.ADMIN_TRUSTED_ORIGIN, 'https://kordev.team');
+    assert.equal(services[`kordevteam-${color}`].environment.PUBLIC_MEDIA_S3_BUCKET, 'kordev-public-fixture');
+    assert.equal(services[`kordevteam-${color}`].read_only, true);
   }
 });
 test('production compose refuses missing admin secrets', () => {
   const base = { ...process.env, ...Object.fromEntries(readFileSync('tests/fixtures/deploy-leads.env', 'utf8').trim().split('\n').map(line => line.split(/=(.*)/s).slice(0, 2))) };
-  for (const key of ['ADMIN_USER', 'ADMIN_PASSWORD', 'ADMIN_TOKEN']) {
+  for (const key of ['ADMIN_SESSION_HMAC_KEY', 'ADMIN_RATE_LIMIT_HMAC_KEY', 'ADMIN_TRUSTED_ORIGIN',
+    'PUBLIC_MEDIA_S3_ENDPOINT', 'PUBLIC_MEDIA_S3_REGION', 'PUBLIC_MEDIA_S3_BUCKET',
+    'PUBLIC_MEDIA_S3_ACCESS_KEY_ID', 'PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY', 'PUBLIC_MEDIA_S3_PREFIX',
+    'PUBLIC_MEDIA_BASE_URL', 'PUBLIC_MEDIA_S3_SSE']) {
     const result = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.team.yml', 'config'], {
       encoding: 'utf8', env: { ...base, [key]: '' },
     });

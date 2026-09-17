@@ -6,7 +6,6 @@ import { configureProxy } from "./proxy.mjs";
 
 const require = createRequire(import.meta.url);
 const { createApiApp } = require("./api-app.js");
-const { bootstrapFromLegacyContentIfEmpty } = require("./db/bootstrap.js");
 
 const app = express();
 const build = await import("../build/server/index.js");
@@ -55,15 +54,6 @@ app.use(
 );
 
 async function start() {
-  try {
-    const result = await bootstrapFromLegacyContentIfEmpty();
-    if (process.env.NODE_ENV !== "test") {
-      console.log("[sqlite] bootstrap:", JSON.stringify(result));
-    }
-  } catch (error) {
-    console.warn("[sqlite] bootstrap failed:", error?.message || error);
-  }
-
   const port = Number(process.env.PORT || 3001);
   app.listen(port, () => {
     console.log(`API and SSR runtime listening on http://localhost:${port}`);

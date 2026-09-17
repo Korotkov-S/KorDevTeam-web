@@ -18,14 +18,27 @@ x-lead-web-environment: &lead-web-environment
   LEAD_S3_SSE: ${LEAD_S3_SSE:-AES256}
   CLAMAV_HOST: clamav
   CLAMAV_PORT: "3310"
+x-admin-media-environment: &admin-media-environment
+  ADMIN_SESSION_HMAC_KEY: ${ADMIN_SESSION_HMAC_KEY:-YWRtaW4tc2Vzc2lvbi1maXh0dXJlLWtleS0zMi1ieXRlcy1sb2NhbCE=}
+  ADMIN_RATE_LIMIT_HMAC_KEY: ${ADMIN_RATE_LIMIT_HMAC_KEY:-YWRtaW4tcmF0ZS1saW1pdC1maXh0dXJlLWtleS0zMi1ieXRlcyE=}
+  ADMIN_TRUSTED_ORIGIN: ${ADMIN_TRUSTED_ORIGIN:-https://kordev.team}
+  PUBLIC_MEDIA_S3_ENDPOINT: ${PUBLIC_MEDIA_S3_ENDPOINT:-https://s3.example.invalid}
+  PUBLIC_MEDIA_S3_REGION: ${PUBLIC_MEDIA_S3_REGION:-ru-1}
+  PUBLIC_MEDIA_S3_BUCKET: ${PUBLIC_MEDIA_S3_BUCKET:-kordev-public-local}
+  PUBLIC_MEDIA_S3_ACCESS_KEY_ID: ${PUBLIC_MEDIA_S3_ACCESS_KEY_ID:-fixture-access}
+  PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY: ${PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY:-fixture-secret}
+  PUBLIC_MEDIA_S3_PREFIX: ${PUBLIC_MEDIA_S3_PREFIX:-media}
+  PUBLIC_MEDIA_BASE_URL: ${PUBLIC_MEDIA_BASE_URL:-https://cdn.example.invalid/}
+  PUBLIC_MEDIA_S3_SSE: ${PUBLIC_MEDIA_S3_SSE:-AES256}
 x-web: &web
   <<: *app
   environment:
-    <<: *lead-web-environment
+    <<: [*lead-web-environment, *admin-media-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
     DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
+  read_only: true
   tmpfs:
     - "/tmp:size=96m,mode=1777"
     - "${LEAD_TEMP_ROOT:-/tmp/kordev-leads}:size=96m,mode=0700,uid=1000,gid=1000"

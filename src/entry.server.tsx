@@ -7,6 +7,8 @@ import { assertLeadWebConfig, readLeadWebConfig } from "./server/leads/config";
 import { createPrivateAttachmentStore } from "./server/leads/objectStore";
 import { createLeadRepository } from "./server/leads/repository";
 import { runLeadRetention as executeLeadRetention, type RetentionReport } from "./server/leads/retention";
+import { readAdminAuthConfig } from "./server/auth/config";
+import { readPublicMediaConfig } from "./server/media/config";
 export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
@@ -28,6 +30,8 @@ export async function runLeadRetention(options: { limit?: number } = {}): Promis
 export async function checkApplicationReady(): Promise<void> {
   await checkDatabaseReady();
   assertLeadWebConfig(process.env);
+  readAdminAuthConfig(process.env);
+  readPublicMediaConfig(process.env);
 }
 
 export default function handleRequest(

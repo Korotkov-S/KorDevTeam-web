@@ -1,12 +1,8 @@
 const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
-const postsRouter = require("./routes/posts");
 const krasotulyaCrmRouter = require("./routes/krasotulyaCrm");
-const contentRouter = require("./routes/content");
-const projectsRouter = require("./routes/projects");
-const adminRouter = require("./routes/admin");
-const mediaRouter = require("./routes/media");
+const { createLegacyAdminTombstones } = require("./routes/legacy-admin-tombstones");
 
 dotenv.config();
 
@@ -25,6 +21,8 @@ function allowCorsOrigin(origin, callback) {
 function createApiApp({ checkReady, leadRouter } = {}) {
   const api = express.Router();
 
+  // Retired file/SQLite write endpoints fail before body parsers or legacy modules run.
+  api.use(createLegacyAdminTombstones());
   if (leadRouter) api.use("/api/leads", leadRouter);
   api.use(cors({ origin: allowCorsOrigin }));
   api.use(express.json({ limit: process.env.JSON_LIMIT || "25mb" }));
@@ -40,12 +38,7 @@ function createApiApp({ checkReady, leadRouter } = {}) {
     next();
   });
 
-  api.use("/api/posts", postsRouter);
   api.use("/api/krasotulya-crm", krasotulyaCrmRouter);
-  api.use("/api/content", contentRouter);
-  api.use("/api/projects", projectsRouter);
-  api.use("/api/admin", adminRouter);
-  api.use("/api/media", mediaRouter);
 
   api.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
