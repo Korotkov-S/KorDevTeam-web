@@ -39,8 +39,9 @@ export default function handleRequest(
 ) {
   return new Promise<Response>((resolve, reject) => {
     let shellRendered = false;
+    const nonce = request.headers.get("x-kordev-csp-nonce") ?? undefined;
     const { pipe } = renderToPipeableStream(
-      <ServerRouter context={routerContext} url={request.url} />,
+      <ServerRouter context={routerContext} url={request.url} nonce={nonce} />,
       {
         onAllReady() {
           shellRendered = true;

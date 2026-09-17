@@ -8,13 +8,18 @@ import {
   ScrollRestoration,
   useRouteError,
   useRouteLoaderData,
+  useLocation,
   data,
+  type HeadersArgs,
+  type LoaderFunctionArgs,
   type MetaFunction,
 } from "react-router";
 import { MotionConfig } from "motion/react";
 import { buildRouteMeta } from "./server/seo/metadata";
 import { documentHeaders } from "./server/http/cacheHeaders";
 import { chunkRecoveryScript } from "./lib/chunkRecovery";
+import { isAdminPath } from "./lib/adminPath";
+import { adminHeaders, requestCspNonce } from "./routes/admin/headers";
 import "./i18n";
 import { Footer } from "./components/Footer";
 import { FloatingButtons } from "./components/FloatingButtons";
@@ -23,14 +28,19 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import "./styles/index.css";
 
 declare const __RELEASE_SHA__: string;
-export function loader() { return data({ releaseSha: __RELEASE_SHA__ }, { headers: documentHeaders }); }
-export { headers } from "./server/http/cacheHeaders";
+export function loader({ request }: LoaderFunctionArgs) {
+  const admin = isAdminPath(new URL(request.url).pathname);
+  const cspNonce = admin ? requestCspNonce(request) : null;
+  return data({ releaseSha: __RELEASE_SHA__, cspNonce }, { headers: admin ? adminHeaders(cspNonce) : documentHeaders });
+}
+export function headers({ loaderHeaders }: HeadersArgs) { return loaderHeaders; }
 export const meta: MetaFunction = ({ error, location }) => buildRouteMeta({ pathname: location.pathname,
   title: isRouteErrorResponse(error) && error.status === 404 ? "Страница не найдена" : "Не удалось загрузить страницу",
   description: "Вернитесь на главную страницу или попробуйте обновить страницу позже.", indexable: false, kind: "page" });
 
 export function Layout({ children }: { children: ReactNode }) {
   const rootData = useRouteLoaderData<typeof loader>("root");
+  const nonce = rootData?.cspNonce ?? undefined;
   useEffect(() => { document.documentElement.dataset.hydrated = "true"; }, []);
   return (
     <html lang="ru">
@@ -38,20 +48,22 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
-        <Links />
-        {rootData?.releaseSha && <script dangerouslySetInnerHTML={{ __html: chunkRecoveryScript(rootData.releaseSha) }} />}
+        <Links nonce={nonce} />
+        {rootData?.releaseSha && <script nonce={nonce} dangerouslySetInnerHTML={{ __html: chunkRecoveryScript(rootData.releaseSha) }} />}
         <noscript><style dangerouslySetInnerHTML={{ __html: `[style*="opacity:0"], [style*="opacity: 0"] { opacity: 1 !important; transform: none !important; }` }} /></noscript>
       </head>
       <body>
         <MotionConfig reducedMotion="user"><ThemeProvider>{children}</ThemeProvider></MotionConfig>
-        <ScrollRestoration />
-        <Scripts />
+        <ScrollRestoration nonce={nonce} />
+        <Scripts nonce={nonce} />
       </body>
     </html>
   );
 }
 
 export default function App() {
+  const location = useLocation();
+  if (isAdminPath(location.pathname)) return <Outlet />;
   return (
     <div
       className="min-h-screen bg-background text-foreground overflow-hidden"

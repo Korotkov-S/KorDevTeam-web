@@ -1,5 +1,6 @@
 import express from "express";
 import { createRequestHandler } from "@react-router/express";
+import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import { configureProxy } from "./proxy.mjs";
 
@@ -11,6 +12,13 @@ const app = express();
 const build = await import("../build/server/index.js");
 app.disable("x-powered-by");
 configureProxy(app);
+app.use((req, _res, next) => {
+  delete req.headers["x-kordev-client-ip"];
+  delete req.headers["x-kordev-csp-nonce"];
+  req.headers["x-kordev-client-ip"] = req.ip ?? req.socket.remoteAddress ?? "";
+  req.headers["x-kordev-csp-nonce"] = randomBytes(16).toString("base64url");
+  next();
+});
 app.use((req, res, next) => {
   if (req.secure) res.set("Strict-Transport-Security", "max-age=31536000");
   next();

@@ -270,7 +270,7 @@ git commit -m "feat(admin): add database sessions and csrf guards"
 - Protected layout loader возвращает только `{ login, csrfToken, expiresAt }`.
 - Login action выставляет cookie и принимает только безопасный `returnTo`; logout action отзывает текущую сессию.
 
-- [ ] **Шаг 1: написать падающие route-тесты**
+- [x] **Шаг 1: написать падающие route-тесты**
 
 ```tsx
 test("admin responses are private and non-indexable", async () => {
@@ -282,13 +282,13 @@ test("admin responses are private and non-indexable", async () => {
 
 Добавить тесты 302 для гостя, одинакового текста ошибок входа, безопасного return path и отсутствия Header/Footer сайта на admin-route.
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --import tsx --test src/routes/admin/routes.test.tsx`
 
 Ожидается: admin route modules отсутствуют.
 
-- [ ] **Шаг 3: зарегистрировать отдельную route-ветку**
+- [x] **Шаг 3: зарегистрировать отдельную route-ветку**
 
 ```ts
 route("admin/login/", "routes/admin/login.tsx"),
@@ -300,17 +300,17 @@ layout("routes/admin/layout.tsx", [
 
 В `root.tsx` при пути `/admin/` рендерить только `<Outlet />`, не публичные Header/Footer/FloatingButtons.
 
-- [ ] **Шаг 4: реализовать доступный login и shell**
+- [x] **Шаг 4: реализовать доступный login и shell**
 
 Форма имеет видимые label, autocomplete `username`/`current-password`, focus summary при ошибке и кнопку без клиентского хранения credentials. Shell предоставляет desktop sidebar и mobile drawer, доступные клавиатурой.
 
-- [ ] **Шаг 5: подтвердить GREEN, typecheck и SSR build**
+- [x] **Шаг 5: подтвердить GREEN, typecheck и SSR build**
 
 Выполнить: `node --import tsx --test src/routes/admin/routes.test.tsx && yarn typecheck && DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev yarn build`
 
 Ожидается: PASS.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/routes.ts src/root.tsx src/routes/admin src/styles/index.css

@@ -1,4 +1,4 @@
-import { index, route, type RouteConfig } from "@react-router/dev/routes";
+import { index, layout, route, type RouteConfig } from "@react-router/dev/routes";
 
 export default [
   index("routes/home.tsx"),
@@ -7,6 +7,11 @@ export default [
   route("sitemap-pages.xml", "routes/sitemap-pages.xml.ts"),
   route("sitemap-blog.xml", "routes/sitemap-blog.xml.ts"),
   route("robots.txt", "routes/robots.txt.ts"),
+  route("admin/login/", "routes/admin/login.tsx"),
+  layout("routes/admin/layout.tsx", [
+    route("admin/", "routes/admin/index.tsx"),
+    route("admin/logout/", "routes/admin/logout.tsx"),
+  ]),
   route("services/", "routes/catalog.tsx", { id: "services" }),
   route("cases/", "routes/catalog.tsx", { id: "cases" }),
   route("services/:slug/", "routes/content-page.tsx", { id: "service-detail" }),
