@@ -39,7 +39,7 @@
 - Добавляет `media_assets.processingVersion`, `media_assets.version`, `media_assets.decorative`, `site_settings.version`.
 - Экспортирует Drizzle objects `adminSessions`, `adminAuthLimits`, `contentMediaRefs` для последующих сервисов.
 
-- [ ] **Шаг 1: написать падающие проверки схемы**
+- [x] **Шаг 1: написать падающие проверки схемы**
 
 ```ts
 test("admin schema exposes versioned sessions and media references", () => {
@@ -51,13 +51,13 @@ test("admin schema exposes versioned sessions and media references", () => {
 });
 ```
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --import tsx --test src/server/db/schema.test.ts`
 
 Ожидается: импорт новых Drizzle objects или новых колонок отсутствует.
 
-- [ ] **Шаг 3: добавить enum, таблицы, индексы и constraints**
+- [x] **Шаг 3: добавить enum, таблицы, индексы и constraints**
 
 ```ts
 export const adminAuthLimitKind = pgEnum("admin_auth_limit_kind", ["ip", "login", "global"]);
@@ -76,19 +76,19 @@ export const adminSessions = pgTable("admin_sessions", {
 
 Для `content_media_refs` использовать PK `(entry_id, media_id, field_path)`, `onDelete: cascade` для entry и `onDelete: restrict` для media. Для auth-limit использовать уникальность `(kind, subject_hash, window_started_at)` и индекс срока очистки. Добавить положительные check constraints для всех версий.
 
-- [ ] **Шаг 4: сгенерировать и проверить миграцию**
+- [x] **Шаг 4: сгенерировать и проверить миграцию**
 
 Выполнить: `yarn db:generate --name admin_media`
 
 Переименовать сгенерированный SQL в следующий последовательный файл только если Drizzle выбрал другое безопасное имя; не редактировать старые миграции.
 
-- [ ] **Шаг 5: подтвердить GREEN на чистой тестовой БД**
+- [x] **Шаг 5: подтвердить GREEN на чистой тестовой БД**
 
 Выполнить: `TEST_DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev_test node --import tsx --test src/server/db/schema.test.ts src/server/db/testDatabase.test.ts`
 
 Ожидается: PASS, миграции поднимаются с нуля.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/server/db/schema.ts src/server/db/schema.test.ts src/server/db/testDatabase.test.ts drizzle

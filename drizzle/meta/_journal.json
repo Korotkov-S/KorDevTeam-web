@@ -22,6 +22,13 @@
       "when": 1789387439441,
       "tag": "0002_lead_delivery_resilience",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789631643667,
+      "tag": "0003_admin_media",
+      "breakpoints": true
     }
   ]
 }

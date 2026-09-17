@@ -36,6 +36,7 @@ export const leadDeliveryStatus = pgEnum("lead_delivery_status", [
   "manual_action",
 ]);
 export const leadRateLimitKind = pgEnum("lead_rate_limit_kind", ["ip", "phone", "crm_token"]);
+export const adminAuthLimitKind = pgEnum("admin_auth_limit_kind", ["ip", "login", "global"]);
 
 export const adminUsers = pgTable(
   "admin_users",
@@ -49,6 +50,48 @@ export const adminUsers = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("admin_users_login_uq").on(table.login)],
+);
+
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    csrfHash: varchar("csrf_hash", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("admin_sessions_token_hash_uq").on(table.tokenHash),
+    index("admin_sessions_admin_user_id_idx").on(table.adminUserId),
+    index("admin_sessions_expires_at_idx").on(table.expiresAt),
+    check("admin_sessions_token_hash_sha256", sql`${table.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("admin_sessions_csrf_hash_sha256", sql`${table.csrfHash} ~ '^[0-9a-f]{64}$'`),
+    check("admin_sessions_expires_after_creation", sql`${table.expiresAt} > ${table.createdAt}`),
+  ],
+);
+
+export const adminAuthLimits = pgTable(
+  "admin_auth_limits",
+  {
+    kind: adminAuthLimitKind("kind").notNull(),
+    subjectHash: varchar("subject_hash", { length: 64 }).notNull(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.kind, table.subjectHash, table.windowStartedAt] }),
+    index("admin_auth_limits_expires_at_idx").on(table.expiresAt),
+    check("admin_auth_limits_subject_hash_sha256", sql`${table.subjectHash} ~ '^[0-9a-f]{64}$'`),
+    check("admin_auth_limits_count_non_negative", sql`${table.count} >= 0`),
+    check("admin_auth_limits_expires_after_window", sql`${table.expiresAt} > ${table.windowStartedAt}`),
+  ],
 );
 
 export const contentEntries = pgTable(
@@ -130,15 +173,44 @@ export const mediaAssets = pgTable(
     height: integer("height"),
     variants: jsonb("variants").$type<Record<string, unknown>>().notNull().default({}),
     altText: text("alt_text").notNull().default(""),
+    decorative: boolean("decorative").notNull().default(false),
+    processingVersion: integer("processing_version").notNull().default(1),
+    version: integer("version").notNull().default(1),
     createdBy: uuid("created_by").references(() => adminUsers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("media_assets_object_key_uq").on(table.objectKey),
+    uniqueIndex("media_assets_checksum_visibility_processing_uq").on(
+      table.checksum,
+      table.visibility,
+      table.processingVersion,
+    ),
     check("media_assets_byte_size_positive", sql`${table.byteSize} > 0`),
     check("media_assets_width_positive", sql`${table.width} IS NULL OR ${table.width} > 0`),
     check("media_assets_height_positive", sql`${table.height} IS NULL OR ${table.height} > 0`),
+    check("media_assets_processing_version_positive", sql`${table.processingVersion} > 0`),
+    check("media_assets_version_positive", sql`${table.version} > 0`),
+  ],
+);
+
+export const contentMediaRefs = pgTable(
+  "content_media_refs",
+  {
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => contentEntries.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    fieldPath: varchar("field_path", { length: 300 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.entryId, table.mediaId, table.fieldPath] }),
+    index("content_media_refs_media_id_idx").on(table.mediaId),
+    check("content_media_refs_field_path_nonempty", sql`length(${table.fieldPath}) > 0`),
   ],
 );
 
@@ -165,10 +237,14 @@ export const siteSettings = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     key: varchar("key", { length: 120 }).notNull(),
     value: jsonb("value").$type<Record<string, unknown>>().notNull().default({}),
+    version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("site_settings_key_uq").on(table.key)],
+  (table) => [
+    uniqueIndex("site_settings_key_uq").on(table.key),
+    check("site_settings_version_positive", sql`${table.version} > 0`),
+  ],
 );
 
 export const leads = pgTable(
@@ -285,7 +361,10 @@ export const leadRateLimits = pgTable(
 
 export const schema = {
   adminUsers,
+  adminSessions,
+  adminAuthLimits,
   contentEntries,
+  contentMediaRefs,
   contentRelations,
   contentRevisions,
   mediaAssets,
