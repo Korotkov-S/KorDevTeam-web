@@ -118,7 +118,7 @@ git commit -m "feat(admin): add session and media schema"
 - `createAdminCookie(token)` и `clearAdminCookie()` возвращают готовые `Set-Cookie` значения.
 - CLI `yarn admin:create` читает логин и пароль через stdin/TTY и вызывает `createAdminUser(db, input)` без передачи пароля в argv.
 
-- [ ] **Шаг 1: написать падающие unit-тесты**
+- [x] **Шаг 1: написать падающие unit-тесты**
 
 ```ts
 test("rejects a short admin password", async () => {
@@ -133,13 +133,13 @@ test("creates a host-only secure cookie", () => {
 });
 ```
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --import tsx --test src/server/auth/config.test.ts src/server/auth/password.test.ts src/server/auth/cookie.test.ts scripts/create-admin.test.ts`
 
 Ожидается: новые модули отсутствуют.
 
-- [ ] **Шаг 3: реализовать строгую конфигурацию и криптографию**
+- [x] **Шаг 3: реализовать строгую конфигурацию и криптографию**
 
 ```ts
 export type AdminAuthConfig = {
@@ -152,7 +152,7 @@ export type AdminAuthConfig = {
 
 Использовать `node:crypto` `randomBytes`, `scrypt`/`promisify`, `timingSafeEqual`. Digest и salt хранить base64; malformed record возвращает `false`, не раскрывая причину.
 
-- [ ] **Шаг 4: реализовать bootstrap без argv-секрета**
+- [x] **Шаг 4: реализовать bootstrap без argv-секрета**
 
 ```json
 {
@@ -164,13 +164,13 @@ export type AdminAuthConfig = {
 
 CLI отказывает в пустом логине, дубликате и неинтерактивном запуске без безопасного stdin. Логи не содержат пароль или digest.
 
-- [ ] **Шаг 5: подтвердить GREEN и отсутствие секретов в выводе**
+- [x] **Шаг 5: подтвердить GREEN и отсутствие секретов в выводе**
 
 Выполнить: `node --import tsx --test src/server/auth/config.test.ts src/server/auth/password.test.ts src/server/auth/cookie.test.ts scripts/create-admin.test.ts`
 
 Ожидается: PASS.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add src/server/auth scripts/create-admin.ts scripts/create-admin.test.ts package.json
