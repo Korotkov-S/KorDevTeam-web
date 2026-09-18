@@ -3,7 +3,7 @@ import { ContentCache } from "./cache";
 import { createContentRepository, type ContentDatabase, type WriteResult } from "./repository";
 import { parseContentCommand, validateIdentity, validatePublication, type ContentService } from "./types";
 
-export type { ContentEntry, ContentKind, ContentService, SaveContentCommand, ServicePayload } from "./types";
+export type { ContentEntry, ContentKind, ContentService, RelationType, SaveContentCommand, ServicePayload } from "./types";
 
 const caches = new WeakMap<ContentDatabase, ContentCache>();
 const registeredCaches = new Set<ContentCache>();
@@ -38,6 +38,7 @@ export function createContentService(db: ContentDatabase, cache = sharedCache(db
   return {
     getPublishedEntry: (kind, slug) => cache.read(`entry:${kind}:${slug}`, () => repository.getPublishedEntry(kind, slug), entry => entry !== null),
     listPublishedEntries: kind => cache.read(`list:${kind}`, () => repository.listPublishedEntries(kind)),
+    listPublishedRelations: (sourceId, type) => cache.read(`relations:${sourceId}:${type}`, () => repository.listPublishedRelations(sourceId, type)),
     async saveDraft(command, actorId) {
       validateIdentity(actorId);
       const parsed = parseContentCommand(command);
@@ -89,6 +90,7 @@ let service: ContentService | undefined;
 function getService() { return service ??= createContentService(getDb()); }
 export const getPublishedEntry: ContentService["getPublishedEntry"] = (...args) => getService().getPublishedEntry(...args);
 export const listPublishedEntries: ContentService["listPublishedEntries"] = (...args) => getService().listPublishedEntries(...args);
+export const listPublishedRelations: ContentService["listPublishedRelations"] = (...args) => getService().listPublishedRelations(...args);
 export const saveDraft: ContentService["saveDraft"] = (...args) => getService().saveDraft(...args);
 export const publishEntry: ContentService["publishEntry"] = (...args) => getService().publishEntry(...args);
 export const unpublishEntry: ContentService["unpublishEntry"] = (...args) => getService().unpublishEntry(...args);

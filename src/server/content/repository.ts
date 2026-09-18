@@ -3,7 +3,8 @@ import type { createDb } from "../db/client";
 import { contentEntries, contentMediaRefs, contentRelations, contentRevisions, siteSettings } from "../db/schema";
 import { parseContentCommand, validatePublication } from "./types";
 import { matchesImportedEntry, migrationKey, type MigrationRecord } from "./migration";
-import type { ContentEntry, ContentKind, ValidatedContentCommand } from "./types";
+import { listPublishedRelations } from "./relations";
+import type { ContentEntry, ContentKind, RelationType, ValidatedContentCommand } from "./types";
 
 export type ContentDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<ContentDatabase["transaction"]>[0]>[0];
@@ -100,6 +101,9 @@ export function createContentRepository(db: ContentDatabase) {
     listPublishedEntries(kind: ContentKind) {
       return db.select().from(contentEntries).where(and(eq(contentEntries.kind, kind), eq(contentEntries.status, "published")))
         .orderBy(asc(contentEntries.slug));
+    },
+    listPublishedRelations(sourceId: string, type: RelationType) {
+      return listPublishedRelations(db, sourceId, type);
     },
     async insert(command: ValidatedContentCommand): Promise<WriteResult> {
       return db.transaction(async tx => {
