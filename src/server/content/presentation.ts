@@ -14,6 +14,67 @@ function mediaUrl(value: string, media: MediaPresentationMap): string {
   return value;
 }
 
+export type LegacyCaseContent = {
+  bodyMd: string;
+  image: string;
+  technologies: string[];
+  features: string[];
+  demoUrl?: string;
+  githubUrl?: string;
+  problem: string | null;
+  constraints: string[];
+  solution: string | null;
+  architecture: string | null;
+  integrations: string[];
+  team: string[];
+  testimonial: string | null;
+};
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function legacyCaseContent(entry: ContentEntry, media: MediaPresentationMap = {}): LegacyCaseContent {
+  let body = entry.bodyMd;
+  const image = body.match(/!\[[^\]]*\]\(([^\s)]+)[^)]*\)/)?.[1] || "";
+  if (image) body = body.replace(/!\[[^\]]*\]\([^)]*\)/, "");
+  const takeSection = (label: string) => {
+    const pattern = new RegExp(`(?:^|\\n)##\\s+${escapeRegex(label)}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|$)`, "i");
+    const match = body.match(pattern);
+    if (!match) return null;
+    body = body.replace(pattern, "\n");
+    return match[1].trim() || null;
+  };
+  const takeList = (label: string) => {
+    const section = takeSection(label);
+    if (!section) return [];
+    const items = section.split("\n").map(line => line.match(/^\s*[-*]\s+(.+)$/)?.[1]?.trim()).filter((value): value is string => Boolean(value));
+    if (items.length) return items;
+    body += `\n\n## ${label}\n\n${section}`;
+    return [];
+  };
+  const takeLink = (label: string) => {
+    const pattern = new RegExp(`\\[${escapeRegex(label)}\\]\\(([^)]+)\\)`);
+    const match = body.match(pattern);
+    if (match) body = body.replace(pattern, "");
+    return match?.[1]?.trim() || undefined;
+  };
+  const demoUrl = takeLink("Сайт проекта");
+  const githubUrl = takeLink("Исходный код");
+  const problem = takeSection("Задача");
+  const constraints = takeList("Ограничения");
+  const solution = takeSection("Решение");
+  const architecture = takeSection("Архитектура");
+  const integrations = takeList("Интеграции");
+  const team = takeList("Команда");
+  const testimonial = takeSection("Отзыв клиента");
+  const technologies = takeList("Технологии");
+  const features = takeList("Возможности");
+  body = body.replace(/^\s*#{1,6}\s+.+\s*$/m, "").replace(/\n{3,}/g, "\n\n").trim();
+  return { bodyMd: body, image: mediaUrl(image, media), technologies, features, demoUrl, githubUrl,
+    problem, constraints, solution, architecture, integrations, team, testimonial };
+}
+
 export function articlePresentation(entry: ContentEntry, media: MediaPresentationMap = {}): ArticlePresentation {
   return { title: text(entry.payload.h1) || entry.title, excerpt: entry.excerpt, bodyMd: entry.bodyMd,
     publishedAt: entry.publishedAt?.toISOString(), updatedAt: entry.updatedAt.toISOString(),
@@ -27,30 +88,10 @@ export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {
 }
 
 export function casePresentation(entry: ContentEntry, media: MediaPresentationMap = {}): Project {
-  // Task 4 preserves legacy case presentation fields in Markdown. Decode only
-  // those labelled sections; the public service remains the sole data source.
-  let body = entry.bodyMd;
-  const image = body.match(/!\[[^\]]*\]\(([^\s)]+)[^)]*\)/)?.[1] || "";
-  if (image) body = body.replace(/!\[[^\]]*\]\([^)]*\)/, "");
-  const takeList = (label: string) => {
-    const pattern = new RegExp(`(?:^|\\n)## ${label}\\s*\\n((?:\\s*[-*] [^\\n]+\\n?)+)`);
-    const match = body.match(pattern);
-    if (!match) return [];
-    body = body.replace(pattern, "\n");
-    return match[1].split("\n").map(line => line.replace(/^\s*[-*] /, "").trim()).filter(Boolean);
-  };
-  const takeLink = (label: string) => {
-    const pattern = new RegExp(`\\[${label}\\]\\(([^)]+)\\)`);
-    const match = body.match(pattern);
-    if (match) body = body.replace(pattern, "");
-    return match?.[1];
-  };
-  const technologies = takeList("Технологии");
-  const features = takeList("Возможности");
-  const demoUrl = takeLink("Сайт проекта");
-  const githubUrl = takeLink("Исходный код");
+  const legacy = legacyCaseContent(entry, media);
   return { id: entry.slug, title: text(entry.payload.h1) || entry.title, description: entry.excerpt,
-    fullDescription: body.trim(), image: mediaUrl(image, media), technologies, features, demoUrl, githubUrl, media };
+    fullDescription: legacy.bodyMd, image: legacy.image, technologies: legacy.technologies, features: legacy.features,
+    demoUrl: legacy.demoUrl, githubUrl: legacy.githubUrl, media };
 }
 
 export function entrySeo(entry: ContentEntry, pathname: string, media: MediaPresentationMap = {}): RouteSeoInput {

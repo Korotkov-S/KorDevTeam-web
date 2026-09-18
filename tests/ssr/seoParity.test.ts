@@ -5,7 +5,9 @@ import { randomUUID } from "node:crypto";
 import puppeteer from "puppeteer";
 import { resetTestDatabase } from "../../src/server/db/testDatabase";
 import { createDb } from "../../src/server/db/client";
+import { contentEntries, contentRelations } from "../../src/server/db/schema";
 import { createContentService } from "../../src/server/content/service";
+import { and, eq } from "drizzle-orm";
 import { importLegacyContent } from "../../scripts/migrate-content-to-postgres";
 import { startTestRuntime } from "./support/runtime";
 import { seoSnapshot } from "./support/seoSnapshot";
@@ -17,6 +19,11 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
   await resetTestDatabase(databaseUrl);
   await importLegacyContent({ db: createDb(databaseUrl), batchId: "ssr-parity" });
   await seedHomeServices(databaseUrl);
+  const db = createDb(databaseUrl);
+  const [fixtureCase] = await db.select({ id: contentEntries.id }).from(contentEntries).where(and(eq(contentEntries.kind, "case"), eq(contentEntries.slug, "web-site")));
+  const [fixtureService] = await db.select({ id: contentEntries.id }).from(contentEntries).where(and(eq(contentEntries.kind, "service"), eq(contentEntries.slug, "web-services")));
+  assert.ok(fixtureCase && fixtureService);
+  await db.insert(contentRelations).values({ sourceId: fixtureCase.id, targetId: fixtureService.id, type: "related_service" });
   const service = createContentService(createDb(databaseUrl));
   for (const kind of ["article", "case"] as const) {
     await service.saveDraft({ kind, slug: "not-published", title: "Закрытый черновик", bodyMd: "PRIVATE_DRAFT_SENTINEL" }, randomUUID());
@@ -33,7 +40,7 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
     "/services/integrations/",
     "/services/ai-automation/",
   ];
-  for (const pathname of ["/", "/services/", ...serviceDetailPaths, "/blog/", "/blog/business-automation/", "/cases/web-site/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/"]) {
+  for (const pathname of ["/", "/services/", ...serviceDetailPaths, "/blog/", "/blog/business-automation/", "/cases/", "/cases/web-site/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/"]) {
     await t.test(pathname, async () => {
       const response = await fetch(`${runtime.origin}${pathname}`);
       assert.equal(response.status, 200);
@@ -85,6 +92,13 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
       }
       if (pathname.includes("business-automation") || pathname.includes("web-site")) {
         assert.ok((await noJs.$eval("article", el => el.textContent))!.trim().length > 300);
+      }
+      if (pathname === "/cases/") {
+        assert.ok(await noJs.$('a[href="/cases/web-site/"]'));
+      }
+      if (pathname === "/cases/web-site/") {
+        assert.ok(await noJs.$('a[href="/services/web-services/"]'));
+        assert.ok(await noJs.$('form input[name="pagePath"][value="/cases/web-site/"]'));
       }
       if (serviceDetailPaths.includes(pathname)) {
         assert.ok((await noJs.$eval("article", el => el.textContent))!.trim().length > 300);

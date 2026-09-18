@@ -11,6 +11,7 @@ import type {
   ServiceCardView,
   ServicePageView,
 } from "./types";
+import { legacyCaseContent } from "./presentation";
 
 const ctaTypes = new Set<CtaType>(["form", "telegram", "email", "phone"]);
 
@@ -138,24 +139,42 @@ export function commercialCasePage(
   relatedServices: ContentEntry[] = [],
   relatedCases: ContentEntry[] = [],
 ): CommercialCaseView {
+  const legacy = legacyCaseContent(entry, media);
   const screenshots = strings(entry.payload.screenshots)
     .map(id => asset(id, media))
     .filter((value): value is ResolvedMediaAsset => value !== null);
+  if (!screenshots.length && legacy.image) screenshots.push({
+    id: `legacy:${entry.id}`,
+    src: legacy.image,
+    srcSet: "",
+    sizes: "(max-width: 768px) 100vw, 960px",
+    alt: entryTitle(entry),
+    decorative: false,
+    width: null,
+    height: null,
+  });
+  const constraints = strings(entry.payload.constraints);
+  const integrations = strings(entry.payload.integrations);
+  const team = strings(entry.payload.team);
   return {
     slug: entry.slug,
     h1: entryTitle(entry),
     summary: text(entry.excerpt) ?? "",
-    problem: text(entry.payload.problem),
-    constraints: strings(entry.payload.constraints),
-    solution: text(entry.payload.solution),
-    architecture: text(entry.payload.architecture),
-    integrations: strings(entry.payload.integrations),
+    problem: text(entry.payload.problem) ?? legacy.problem,
+    constraints: constraints.length ? constraints : legacy.constraints,
+    solution: text(entry.payload.solution) ?? legacy.solution,
+    architecture: text(entry.payload.architecture) ?? legacy.architecture,
+    integrations: integrations.length ? integrations : legacy.integrations,
+    technologies: legacy.technologies,
+    features: legacy.features,
     stages: blocks(entry.payload.stages),
-    team: strings(entry.payload.team),
+    team: team.length ? team : legacy.team,
     screenshots,
     results: blocks(entry.payload.results),
-    testimonial: text(entry.payload.testimonial),
-    bodyMd: text(entry.bodyMd) ?? "",
+    testimonial: text(entry.payload.testimonial) ?? legacy.testimonial,
+    bodyMd: legacy.bodyMd,
+    demoUrl: text(entry.payload.demoUrl) ?? legacy.demoUrl ?? null,
+    githubUrl: text(entry.payload.githubUrl) ?? legacy.githubUrl ?? null,
     relatedServices: relatedServices.filter(entry => isPublished(entry) && entry.kind === "service").map(serviceCard),
     relatedCases: relatedCases.filter(entry => isPublished(entry) && entry.kind === "case").map(entry => caseCard(entry, media)),
     cta: caseCta(entry),
