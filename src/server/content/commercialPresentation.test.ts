@@ -80,6 +80,23 @@ test("legacy case removes the first markdown heading when its normalized text ma
   assert.equal(legacy.bodyMd, "Описание проекта без повторения заголовка страницы.");
 });
 
+test("legacy case removes a matching title heading by position without changing earlier inline text", () => {
+  const entry = {
+    ...caseFixture(),
+    bodyMd: [
+      "В описании упоминается # Кейс как название страницы.",
+      "",
+      "# Кейс",
+      "Описание проекта без повторения заголовка страницы.",
+    ].join("\n"),
+  };
+
+  const legacy = legacyCaseContent(entry);
+
+  assert.match(legacy.bodyMd, /^В описании упоминается # Кейс как название страницы\.$/m);
+  assert.doesNotMatch(legacy.bodyMd, /^# Кейс$/m);
+});
+
 test("legacy case preserves the first markdown heading when its normalized text differs from the entry title", () => {
   const entry = {
     ...caseFixture(),

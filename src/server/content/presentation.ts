@@ -45,7 +45,10 @@ function normalizeHeadingText(value: string): string {
 function removeMatchingTitleHeading(body: string, title: string): string {
   const firstHeading = body.match(/^ {0,3}#{1,6}[ \t]+(.+?)(?:[ \t]+#+[ \t]*)?$/m);
   if (!firstHeading || normalizeHeadingText(firstHeading[1]) !== normalizeHeadingText(title)) return body;
-  return body.replace(firstHeading[0], "");
+  const headingStart = firstHeading.index;
+  if (headingStart === undefined) return body;
+  const headingEnd = headingStart + firstHeading[0].length;
+  return body.slice(0, headingStart) + body.slice(headingEnd);
 }
 
 export function legacyCaseContent(entry: ContentEntry, media: MediaPresentationMap = {}): LegacyCaseContent {
