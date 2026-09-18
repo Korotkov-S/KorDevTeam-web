@@ -18,7 +18,7 @@ const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), input:not([disabled
 export function PublicHeader(): React.JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const mobileNavigationRef = useRef<HTMLElement>(null);
+  const mobileNavigationRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = () => {
     setIsMenuOpen(false);
@@ -100,14 +100,15 @@ export function PublicHeader(): React.JSX.Element {
       </div>
 
       {isMenuOpen && (
-        <nav
+        <div
           ref={mobileNavigationRef}
           id="public-mobile-navigation"
+          role="dialog"
           aria-label="Мобильная навигация"
           aria-modal="true"
           className="border-t border-[color:color-mix(in_srgb,var(--public-ink)_12%,transparent)] bg-[var(--public-surface)] px-5 py-6 lg:hidden"
         >
-          <div className="mx-auto flex max-w-7xl flex-col gap-4">
+          <nav aria-label="Мобильная навигация" className="mx-auto flex max-w-7xl flex-col gap-4">
             {PUBLIC_NAV_ITEMS.map(({ label, to }) => (
               <Link key={to} to={to} className="py-2 text-lg font-semibold" onClick={closeMenu}>
                 {label}
@@ -117,8 +118,8 @@ export function PublicHeader(): React.JSX.Element {
               <ThemeToggle />
               <CtaLink to="/#contact">Обсудить проект</CtaLink>
             </div>
-          </div>
-        </nav>
+          </nav>
+        </div>
       )}
     </header>
   );

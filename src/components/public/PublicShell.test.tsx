@@ -24,7 +24,7 @@ Object.assign(globalThis, {
 });
 
 const require = createRequire(import.meta.url);
-const { cleanup, fireEvent, render, screen } = require("@testing-library/react");
+const { cleanup, fireEvent, render, screen, within } = require("@testing-library/react");
 
 test("public shell exposes canonical navigation and restores focus after closing the mobile menu", () => {
   render(<MemoryRouter><PublicHeader /></MemoryRouter>);
@@ -32,7 +32,9 @@ test("public shell exposes canonical navigation and restores focus after closing
   assert.equal(screen.getByRole("link", { name: "Кейсы" }).getAttribute("href"), "/cases/");
   const trigger = screen.getByRole("button", { name: "Открыть меню" });
   fireEvent.click(trigger);
-  assert.equal(screen.getByRole("navigation", { name: "Мобильная навигация" }).getAttribute("aria-modal"), "true");
+  const dialog = screen.getByRole("dialog", { name: "Мобильная навигация" });
+  assert.equal(dialog.getAttribute("aria-modal"), "true");
+  assert.ok(within(dialog).getByRole("navigation", { name: "Мобильная навигация" }));
   fireEvent.keyDown(document, { key: "Escape" });
   assert.equal(document.activeElement, trigger);
 
