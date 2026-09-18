@@ -58,6 +58,20 @@ function asset(value: unknown, media: MediaPresentationMap): ResolvedMediaAsset 
   return media[id] ?? (id.startsWith("media:") ? media[id.slice(6)] ?? null : null);
 }
 
+function legacyImageAsset(entry: ContentEntry, image: string, media: MediaPresentationMap): ResolvedMediaAsset | null {
+  if (!image) return null;
+  return Object.values(media).find(candidate => candidate.src === image) ?? {
+    id: `legacy:${entry.id}`,
+    src: image,
+    srcSet: "",
+    sizes: "(max-width: 768px) 100vw, 960px",
+    alt: entryTitle(entry),
+    decorative: false,
+    width: null,
+    height: null,
+  };
+}
+
 function entryTitle(entry: ContentEntry): string {
   return text(entry.payload.h1) ?? text(entry.title) ?? "";
 }
@@ -73,13 +87,15 @@ export function serviceCard(entry: ContentEntry): ServiceCardView {
 export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}): CaseCardView {
   const screenshots = strings(entry.payload.screenshots);
   const results = blocks(entry.payload.results);
+  const image = screenshots.map(id => asset(id, media)).find((value): value is ResolvedMediaAsset => value !== null)
+    ?? asset(entry.ogMediaId, media)
+    ?? legacyImageAsset(entry, legacyCaseContent(entry, media).image, media);
   return {
     slug: entry.slug,
     title: entryTitle(entry),
     summary: text(entry.excerpt) ?? "",
     result: results[0]?.title ?? null,
-    image: screenshots.map(id => asset(id, media)).find((value): value is ResolvedMediaAsset => value !== null)
-      ?? asset(entry.ogMediaId, media),
+    image,
     tags: [],
   };
 }
@@ -143,16 +159,8 @@ export function commercialCasePage(
   const screenshots = strings(entry.payload.screenshots)
     .map(id => asset(id, media))
     .filter((value): value is ResolvedMediaAsset => value !== null);
-  if (!screenshots.length && legacy.image) screenshots.push({
-    id: `legacy:${entry.id}`,
-    src: legacy.image,
-    srcSet: "",
-    sizes: "(max-width: 768px) 100vw, 960px",
-    alt: entryTitle(entry),
-    decorative: false,
-    width: null,
-    height: null,
-  });
+  const legacyImage = legacyImageAsset(entry, legacy.image, media);
+  if (!screenshots.length && legacyImage) screenshots.push(legacyImage);
   const constraints = strings(entry.payload.constraints);
   const integrations = strings(entry.payload.integrations);
   const team = strings(entry.payload.team);

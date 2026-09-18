@@ -70,7 +70,7 @@ export function legacyCaseContent(entry: ContentEntry, media: MediaPresentationM
   const testimonial = takeSection("Отзыв клиента");
   const technologies = takeList("Технологии");
   const features = takeList("Возможности");
-  body = body.replace(/^\s*#{1,6}\s+.+\s*$/m, "").replace(/\n{3,}/g, "\n\n").trim();
+  body = body.replace(/\n{3,}/g, "\n\n").trim();
   return { bodyMd: body, image: mediaUrl(image, media), technologies, features, demoUrl, githubUrl,
     problem, constraints, solution, architecture, integrations, team, testimonial };
 }

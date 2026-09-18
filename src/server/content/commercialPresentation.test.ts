@@ -44,6 +44,44 @@ test("case card never invents an impact metric", () => {
   assert.doesNotMatch(JSON.stringify(view), /95%|8 недель|83%/);
 });
 
+test("case card falls back to the migrated legacy body image", () => {
+  const mediaId = "00000000-0000-4000-8000-000000000099";
+  const entry = {
+    ...caseFixture(),
+    bodyMd: `![Интерфейс кейса](media:${mediaId})`,
+  };
+  const image = {
+    id: mediaId,
+    src: "/media/case-cover.webp",
+    srcSet: "/media/case-cover.webp 1280w",
+    sizes: "(max-width: 768px) 100vw, 960px",
+    alt: "Интерфейс кейса",
+    decorative: false,
+    width: 1280,
+    height: 720,
+  };
+
+  assert.deepEqual(caseCard(entry, { [mediaId]: image }).image, image);
+});
+
+test("commercial case preserves the first meaningful markdown heading", () => {
+  const entry = {
+    ...caseFixture(),
+    bodyMd: [
+      "## Контекст проекта",
+      "Клиенту была нужна единая рабочая среда.",
+      "",
+      "## Решение",
+      "Мы собрали её в одном приложении.",
+    ].join("\n"),
+  };
+
+  const view = commercialCasePage(entry);
+
+  assert.match(view.bodyMd, /^## Контекст проекта/m);
+  assert.match(view.bodyMd, /Клиенту была нужна единая рабочая среда\./);
+});
+
 test("commercial case filters blank fields and draft related entries", () => {
   const draftService = { ...serviceFixture(), status: "draft" as const };
   const page = commercialCasePage(caseFixture({
