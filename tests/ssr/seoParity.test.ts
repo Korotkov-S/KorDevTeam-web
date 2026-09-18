@@ -25,7 +25,15 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
   t.after(runtime.close);
   const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
   t.after(() => browser.close());
-  for (const pathname of ["/", "/blog/", "/blog/business-automation/", "/cases/web-site/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/"]) {
+  const serviceDetailPaths = [
+    "/services/business-process-automation/",
+    "/services/crm-development/",
+    "/services/web-services/",
+    "/services/mobile-app-development/",
+    "/services/integrations/",
+    "/services/ai-automation/",
+  ];
+  for (const pathname of ["/", "/services/", ...serviceDetailPaths, "/blog/", "/blog/business-automation/", "/cases/web-site/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/"]) {
     await t.test(pathname, async () => {
       const response = await fetch(`${runtime.origin}${pathname}`);
       assert.equal(response.status, 200);
@@ -77,6 +85,10 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
       }
       if (pathname.includes("business-automation") || pathname.includes("web-site")) {
         assert.ok((await noJs.$eval("article", el => el.textContent))!.trim().length > 300);
+      }
+      if (serviceDetailPaths.includes(pathname)) {
+        assert.ok((await noJs.$eval("article", el => el.textContent))!.trim().length > 300);
+        assert.ok(await noJs.$('form input[name="pagePath"]'));
       }
       await noJs.close();
     });

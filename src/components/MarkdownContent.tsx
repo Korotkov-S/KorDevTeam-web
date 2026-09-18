@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 
 import { cn } from "./ui/utils";
