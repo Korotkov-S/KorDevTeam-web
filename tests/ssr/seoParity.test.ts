@@ -9,12 +9,14 @@ import { createContentService } from "../../src/server/content/service";
 import { importLegacyContent } from "../../scripts/migrate-content-to-postgres";
 import { startTestRuntime } from "./support/runtime";
 import { seoSnapshot } from "./support/seoSnapshot";
+import { seedHomeServices } from "./support/homeFixtures";
 
 test("published pages preserve SEO and meaningful visible HTML through hydration and without JavaScript", { timeout: 120_000 }, async t => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
   await resetTestDatabase(databaseUrl);
   await importLegacyContent({ db: createDb(databaseUrl), batchId: "ssr-parity" });
+  await seedHomeServices(databaseUrl);
   const service = createContentService(createDb(databaseUrl));
   for (const kind of ["article", "case"] as const) {
     await service.saveDraft({ kind, slug: "not-published", title: "Закрытый черновик", bodyMd: "PRIVATE_DRAFT_SENTINEL" }, randomUUID());
@@ -62,8 +64,15 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
         return el.getBoundingClientRect().height > 0 && !el.classList.contains("sr-only");
       }), true);
       if (pathname === "/") {
-        for (const id of ["projects", "services", "technologies", "blog", "contact"]) {
+        for (const id of ["home-hero", "proof", "cases", "services", "krasotula", "process", "insights", "contact"]) {
           assert.ok((await noJs.$eval(`#${id}`, el => el.textContent))!.trim().length > 40);
+          assert.equal(await noJs.$eval(`#${id}`, el => {
+            for (let node: Element | null = el; node; node = node.parentElement) {
+              const style = getComputedStyle(node);
+              if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+            }
+            return el.getBoundingClientRect().height > 0;
+          }), true);
         }
       }
       if (pathname.includes("business-automation") || pathname.includes("web-site")) {
@@ -72,16 +81,17 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
       await noJs.close();
     });
   }
-  await t.test("mobile keeps ordinary animation; reduced motion and stored light theme are honored", async () => {
+  await t.test("mobile avoids infinite animation; reduced motion and stored light theme are honored", async () => {
     const page = await browser.newPage();
     await page.setViewport({ width: 390, height: 844 });
     await page.evaluateOnNewDocument(() => localStorage.setItem("theme", "light"));
     await page.goto(runtime.origin, { waitUntil: "networkidle2" });
     await page.waitForFunction(() => document.documentElement.dataset.hydrated === "true");
     assert.equal(await page.$eval("html", element => element.classList.contains("dark")), false);
-    assert.notEqual(await page.$eval(".animate-blob", element => getComputedStyle(element).animationName), "none");
+    assert.equal(await page.$$eval("main *", elements => elements.some(element => getComputedStyle(element).animationIterationCount === "infinite")), false);
     await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
-    assert.equal(await page.$eval(".animate-blob", element => getComputedStyle(element).animationName), "none");
+    assert.equal(await page.$$eval("main *", elements => elements.some(element => getComputedStyle(element).animationIterationCount === "infinite")), false);
+    assert.equal(await page.$eval("#home-hero h1", element => getComputedStyle(element).opacity), "1");
     await page.close();
   });
   const missing = await fetch(`${runtime.origin}/blog/not-published/`);
