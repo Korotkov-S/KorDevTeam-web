@@ -46,7 +46,10 @@ test("home omits empty content categories while retaining its contact form", () 
   assert.equal(document.querySelector('input[name="pagePath"]')?.getAttribute("value"), "/");
   assert.ok(screen.getByRole("link", { name: "team@korotkov.dev" }));
   assert.ok(screen.getByRole("link", { name: "Telegram" }));
-  assert.equal(screen.getByRole("link", { name: "MAX — Геннадий Коротков" }).getAttribute("href"), "https://max.ru/u/f9LHodD0cOJpymJqsmOnWwFeDCCZGy15ba7H_HhajC8Vnm6U12_ZrsEX8uY");
+  const maxContact = screen.getByRole("link", { name: "Геннадий Коротков", exact: true });
+  assert.equal(maxContact.getAttribute("href"), "https://max.ru/u/f9LHodD0cOJpymJqsmOnWwFeDCCZGy15ba7H_HhajC8Vnm6U12_ZrsEX8uY");
+  assert.equal(maxContact.getAttribute("target"), "_blank");
+  for (const rel of ["noopener", "noreferrer"]) assert.ok(maxContact.relList.contains(rel));
   assert.ok(screen.getByText("Ответим в течение рабочего дня"));
   assert.ok(screen.getByText("Пн–Пт, 09:00–18:00 по Москве"));
 });
