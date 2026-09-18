@@ -18,6 +18,6 @@ export async function listPublishedRelations(
       eq(contentRelations.type, type),
       eq(contentEntries.status, "published"),
     ))
-    .orderBy(asc(contentRelations.sortOrder), asc(contentEntries.updatedAt));
+    .orderBy(asc(contentRelations.sortOrder), asc(contentEntries.updatedAt), asc(contentEntries.id));
   return rows.map(row => row.entry);
 }
