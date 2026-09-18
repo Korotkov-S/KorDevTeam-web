@@ -12,6 +12,7 @@ export function LeadCtaSection({ pagePath, title = "Расскажите о ва
         <div className="mt-8 flex flex-col items-start gap-4 text-lg font-medium text-[var(--public-blue)]">
           <a href="mailto:team@korotkov.dev" className="underline underline-offset-4">team@korotkov.dev</a>
           <a href="https://telegram.me/ideamen51" className="underline underline-offset-4">Telegram</a>
+          <a href="https://max.ru/u/f9LHodD0cOJpymJqsmOnWwFeDCCZGy15ba7H_HhajC8Vnm6U12_ZrsEX8uY" className="underline underline-offset-4">MAX — Геннадий Коротков</a>
         </div>
       </div>
       <div className="rounded-[var(--public-radius-card)] border border-border bg-card p-6 sm:p-8"><LeadForm pagePath={pagePath} /></div>
