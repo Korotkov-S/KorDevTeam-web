@@ -39,6 +39,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --public-surface: #F7F8FC;
+  --public-ink: #0B1020;
+  --public-subtle: #5B6477;
+  --public-blue: #2563EB;
+  --public-violet: #7C3AED;
+  --public-green: #0F9F6E;
+  --public-orange: #F97316;
+  --public-radius-card: 1.5rem;
 }
 
 .dark {
@@ -76,6 +84,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --public-surface: #111827;
+  --public-ink: #F8FAFC;
+  --public-subtle: #A7B0C0;
+  --public-blue: #60A5FA;
+  --public-violet: #A78BFA;
+  --public-green: #34D399;
+  --public-orange: #FB923C;
+  --public-radius-card: 1.5rem;
 }
 
 @theme inline {
@@ -126,13 +142,6 @@
 
   body {
     @apply bg-background text-foreground;
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
-
-  /* Плавные переходы для всех элементов при смене темы */
-  * {
-    transition: background-color 0.3s ease, border-color 0.3s ease,
-      color 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
   }
 }
 
@@ -193,4 +202,13 @@
 
 html {
   font-size: var(--font-size);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
