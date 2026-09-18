@@ -12,7 +12,11 @@ interface ThemeContextType {
   setTheme: (theme: Theme) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextType>({
+  theme: DEFAULT_THEME,
+  toggleTheme: () => undefined,
+  setTheme: () => undefined,
+});
 
 export function getInitialTheme(): Theme {
   return DEFAULT_THEME;
@@ -73,9 +77,5 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider");
-  }
-  return context;
+  return useContext(ThemeContext);
 }

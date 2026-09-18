@@ -21,9 +21,8 @@ import { chunkRecoveryScript } from "./lib/chunkRecovery";
 import { isAdminPath } from "./lib/adminPath";
 import { adminHeaders, requestCspNonce } from "./routes/admin/headers";
 import "./i18n";
-import { Footer } from "./components/Footer";
-import { FloatingButtons } from "./components/FloatingButtons";
-import { Header } from "./components/Header";
+import { PublicFooter } from "./components/public/PublicFooter";
+import { PublicHeader } from "./components/public/PublicHeader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./styles/index.css";
 
@@ -65,24 +64,12 @@ export default function App() {
   const location = useLocation();
   if (isAdminPath(location.pathname)) return <Outlet />;
   return (
-    <div
-      className="min-h-screen bg-background text-foreground overflow-hidden"
-      style={{ maxWidth: "100vw" }}
-    >
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background" />
-        <div className="absolute top-0 -left-48 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl animate-blob" />
-        <div className="absolute top-0 -right-48 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-48 left-1/2 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl animate-blob animation-delay-4000" />
-      </div>
-      <div className="relative z-10">
-        <Header />
-        <main>
-          <Outlet />
-        </main>
-        <Footer />
-        <FloatingButtons />
-      </div>
+    <div className="min-h-screen bg-[var(--public-surface)] text-[var(--public-ink)]">
+      <PublicHeader />
+      <main id="main-content">
+        <Outlet />
+      </main>
+      <PublicFooter />
     </div>
   );
 }
