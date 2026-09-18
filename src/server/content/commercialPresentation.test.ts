@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { caseCard, commercialCasePage, servicePage } from "./commercialPresentation";
+import { legacyCaseContent } from "./presentation";
 import type { ContentEntry } from "./types";
 
 function serviceFixture(payload: Record<string, unknown> = {}): ContentEntry {
@@ -64,7 +65,22 @@ test("case card falls back to the migrated legacy body image", () => {
   assert.deepEqual(caseCard(entry, { [mediaId]: image }).image, image);
 });
 
-test("commercial case preserves the first meaningful markdown heading", () => {
+test("legacy case removes the first markdown heading when its normalized text matches the entry title", () => {
+  const entry = {
+    ...caseFixture({ h1: "  Кейс   для CRM  " }),
+    bodyMd: [
+      "# кейс для crm",
+      "Описание проекта без повторения заголовка страницы.",
+    ].join("\n"),
+  };
+
+  const legacy = legacyCaseContent(entry);
+
+  assert.doesNotMatch(legacy.bodyMd, /^#\s+кейс для crm$/im);
+  assert.equal(legacy.bodyMd, "Описание проекта без повторения заголовка страницы.");
+});
+
+test("legacy case preserves the first markdown heading when its normalized text differs from the entry title", () => {
   const entry = {
     ...caseFixture(),
     bodyMd: [
@@ -76,10 +92,10 @@ test("commercial case preserves the first meaningful markdown heading", () => {
     ].join("\n"),
   };
 
-  const view = commercialCasePage(entry);
+  const legacy = legacyCaseContent(entry);
 
-  assert.match(view.bodyMd, /^## Контекст проекта/m);
-  assert.match(view.bodyMd, /Клиенту была нужна единая рабочая среда\./);
+  assert.match(legacy.bodyMd, /^## Контекст проекта/m);
+  assert.match(legacy.bodyMd, /Клиенту была нужна единая рабочая среда\./);
 });
 
 test("commercial case filters blank fields and draft related entries", () => {

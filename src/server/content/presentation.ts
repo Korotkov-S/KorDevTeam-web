@@ -34,6 +34,20 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function entryTitle(entry: ContentEntry): string {
+  return text(entry.payload.h1).trim() || entry.title.trim();
+}
+
+function normalizeHeadingText(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function removeMatchingTitleHeading(body: string, title: string): string {
+  const firstHeading = body.match(/^ {0,3}#{1,6}[ \t]+(.+?)(?:[ \t]+#+[ \t]*)?$/m);
+  if (!firstHeading || normalizeHeadingText(firstHeading[1]) !== normalizeHeadingText(title)) return body;
+  return body.replace(firstHeading[0], "");
+}
+
 export function legacyCaseContent(entry: ContentEntry, media: MediaPresentationMap = {}): LegacyCaseContent {
   let body = entry.bodyMd;
   const image = body.match(/!\[[^\]]*\]\(([^\s)]+)[^)]*\)/)?.[1] || "";
@@ -70,7 +84,7 @@ export function legacyCaseContent(entry: ContentEntry, media: MediaPresentationM
   const testimonial = takeSection("Отзыв клиента");
   const technologies = takeList("Технологии");
   const features = takeList("Возможности");
-  body = body.replace(/\n{3,}/g, "\n\n").trim();
+  body = removeMatchingTitleHeading(body, entryTitle(entry)).replace(/\n{3,}/g, "\n\n").trim();
   return { bodyMd: body, image: mediaUrl(image, media), technologies, features, demoUrl, githubUrl,
     problem, constraints, solution, architecture, integrations, team, testimonial };
 }
