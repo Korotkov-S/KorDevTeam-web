@@ -1,6 +1,8 @@
 import express from "express";
 import { createRequestHandler } from "@react-router/express";
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { createServer as createHttpsServer } from "node:https";
 import { createRequire } from "node:module";
 import { configureProxy } from "./proxy.mjs";
 
@@ -55,8 +57,15 @@ app.use(
 
 async function start() {
   const port = Number(process.env.PORT || 3001);
-  app.listen(port, () => {
-    console.log(`API and SSR runtime listening on http://localhost:${port}`);
+  const testTls = process.env.NODE_ENV === "test" && process.env.TEST_TLS_KEY_PATH && process.env.TEST_TLS_CERT_PATH;
+  const server = testTls
+    ? createHttpsServer({
+        key: readFileSync(process.env.TEST_TLS_KEY_PATH),
+        cert: readFileSync(process.env.TEST_TLS_CERT_PATH),
+      }, app)
+    : app;
+  server.listen(port, () => {
+    console.log(`API and SSR runtime listening on ${testTls ? "https" : "http"}://localhost:${port}`);
   });
 }
 

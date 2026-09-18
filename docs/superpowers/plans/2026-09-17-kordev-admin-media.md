@@ -741,7 +741,7 @@ CI использует только fixture secrets. Compose config долже�
 
 Ожидается: PASS.
 
-- [ ] **Шаг 6: зафиксировать задачу**
+- [x] **Шаг 6: зафиксировать задачу**
 
 ```bash
 git add server .github/workflows/docker-build.yml docker-compose.yml docker-compose.team.yml deploy/env/operations.env.example tests/runtimeApiComposition.test.mjs
@@ -766,7 +766,7 @@ git commit -m "feat(admin): retire legacy write endpoints"
 - Security test проверяет headers, гостевой доступ, CSRF, expired session, return-path и отсутствие секретов в HTML.
 - Runbook фиксирует dry-run, reviewed report checksum, backup, inactive-slot smoke, ручной switch и non-destructive rollback.
 
-- [ ] **Шаг 1: написать падающие browser/security сценарии**
+- [x] **Шаг 1: написать падающие browser/security сценарии**
 
 ```js
 test("admin browser flow publishes without rebuild", async () => {
@@ -778,21 +778,21 @@ test("admin browser flow publishes without rebuild", async () => {
 });
 ```
 
-- [ ] **Шаг 2: подтвердить RED**
+- [x] **Шаг 2: подтвердить RED**
 
 Выполнить: `node --test tests/adminSecurity.test.mjs tests/adminE2e.test.mjs`
 
 Ожидается: хотя бы один полный сценарий не проходит до финальной wiring/configuration.
 
-- [ ] **Шаг 3: исправить только выявленные integration gaps**
+- [x] **Шаг 3: исправить только выявленные integration gaps**
 
 Не добавлять новое продуктовое поведение. Исправлять только route wiring, focus/accessibility, request/response contracts, test adapter injection и безопасные error boundaries, необходимые для прохождения утверждённых сценариев.
 
-- [ ] **Шаг 4: написать cutover/rollback runbook**
+- [x] **Шаг 4: написать cutover/rollback runbook**
 
 Документ обязан содержать точные команды для backup, `db:migrate`, media dry-run/apply/verify, admin bootstrap, inactive-slot health/admin smoke, ручного Traefik switch и отката без разрушительного DB downgrade. Реальные secrets и домашний адрес не включать.
 
-- [ ] **Шаг 5: выполнить полную проверку**
+- [x] **Шаг 5: выполнить полную проверку**
 
 ```bash
 TEST_DATABASE_URL=postgresql://kordev:kordev@localhost:5433/kordev_test yarn test
@@ -804,7 +804,7 @@ docker compose -f docker-compose.team.yml config --quiet
 
 Ожидается: все команды завершаются кодом 0; skips допустимы только для уже документированных тестов, требующих внешней production-инфраструктуры.
 
-- [ ] **Шаг 6: отметить выполненные пункты и зафиксировать задачу**
+- [x] **Шаг 6: отметить выполненные пункты и зафиксировать задачу**
 
 ```bash
 git add tests/adminSecurity.test.mjs tests/adminE2e.test.mjs docs/runbooks/admin-media-cutover.md docs/PRODUCTION_DEPLOYMENT.md docs/superpowers/plans/2026-09-17-kordev-admin-media.md

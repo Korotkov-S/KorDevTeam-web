@@ -20,18 +20,20 @@ function allowCorsOrigin(origin, callback) {
 
 function createApiApp({ checkReady, leadRouter } = {}) {
   const api = express.Router();
+  const apiOnly = (middleware) => (req, res, next) =>
+    req.path === "/api" || req.path.startsWith("/api/") ? middleware(req, res, next) : next();
 
   // Retired file/SQLite write endpoints fail before body parsers or legacy modules run.
   api.use(createLegacyAdminTombstones());
   if (leadRouter) api.use("/api/leads", leadRouter);
   api.use(cors({ origin: allowCorsOrigin }));
-  api.use(express.json({ limit: process.env.JSON_LIMIT || "25mb" }));
-  api.use(
+  api.use(apiOnly(express.json({ limit: process.env.JSON_LIMIT || "25mb" })));
+  api.use(apiOnly(
     express.urlencoded({
       extended: true,
       limit: process.env.URLENCODED_LIMIT || "25mb",
     }),
-  );
+  ));
 
   api.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);

@@ -78,7 +78,7 @@ databaseTest("admin schema supports expiring sessions and versioned media settin
     adminUserId: admin.id,
     tokenHash: "a".repeat(64),
     csrfHash: "b".repeat(64),
-    expiresAt: new Date("2026-09-18T09:00:00.000Z"),
+    expiresAt: new Date(Date.now() + 60_000),
   });
   await db.insert(adminAuthLimits).values({
     kind: "login",

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { Form, Link, useActionData, useLoaderData, useMatches } from "react-router";
 
 import { AdminFieldError } from "../../components/admin/AdminFieldError";
@@ -39,7 +40,7 @@ export default function AdminContentEditor() {
         {["Контент", "SEO", "Связи", "Предпросмотр", "История"].map(label => <a key={label} href={`#${label.toLowerCase()}`} className="rounded-full border border-input px-3 py-1">{label}</a>)}
       </nav>
 
-      <Form method="post" onChange={() => setDirty(true)} className="space-y-8">
+      <Form method="post" onChange={() => setDirty(true)} onSubmit={() => flushSync(() => setDirty(false))} className="space-y-8">
         <input type="hidden" name="_csrf" value={csrfToken} />
         {entry ? <input type="hidden" name="expectedVersion" value={entry.version} /> : null}
         <section id="контент" className="grid gap-4 rounded-xl border border-border bg-card p-5">

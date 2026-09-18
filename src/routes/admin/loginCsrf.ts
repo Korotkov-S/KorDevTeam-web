@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 
 const LOGIN_CSRF_COOKIE = "__Host-kordev_admin_login_csrf";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-const COOKIE_SCOPE = "Path=/admin/login/; Secure; HttpOnly; SameSite=Strict";
+const COOKIE_SCOPE = "Path=/; Secure; HttpOnly; SameSite=Strict";
 
 export function generateLoginCsrf(): string {
   return randomBytes(32).toString("base64url");

@@ -10,6 +10,20 @@ type TestRuntime = {
   close: () => Promise<void>;
 };
 
+const runtimeSecurityDefaults = {
+  ADMIN_SESSION_HMAC_KEY: Buffer.alloc(32, 1).toString("base64"),
+  ADMIN_RATE_LIMIT_HMAC_KEY: Buffer.alloc(32, 2).toString("base64"),
+  ADMIN_TRUSTED_ORIGIN: "https://kordev.team",
+  PUBLIC_MEDIA_S3_ENDPOINT: "https://s3.example.invalid",
+  PUBLIC_MEDIA_S3_REGION: "test-1",
+  PUBLIC_MEDIA_S3_BUCKET: "public-test",
+  PUBLIC_MEDIA_S3_ACCESS_KEY_ID: "fixture-access",
+  PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY: "fixture-secret",
+  PUBLIC_MEDIA_S3_PREFIX: "media",
+  PUBLIC_MEDIA_BASE_URL: "https://cdn.example.invalid/",
+  PUBLIC_MEDIA_S3_SSE: "AES256",
+};
+
 async function getAvailablePort() {
   const server = createServer();
 
@@ -54,6 +68,7 @@ export async function startTestRuntime(environment: Record<string, string> = {})
     cwd: process.cwd(),
     env: {
       ...process.env,
+      ...runtimeSecurityDefaults,
       NODE_ENV: "test",
       PORT: String(port),
       SQLITE_PATH: path.join(databaseDirectory, "content.sqlite"),

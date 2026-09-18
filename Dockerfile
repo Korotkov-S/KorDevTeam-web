@@ -26,11 +26,15 @@ CMD ["node", "--import", "tsx", "scripts/migrate-content-to-postgres.ts", "--dry
 
 FROM dependencies AS media-migration
 WORKDIR /app
+ARG RELEASE_SHA
+ENV RELEASE_SHA=$RELEASE_SHA
+LABEL org.opencontainers.image.revision=$RELEASE_SHA
 COPY --chown=node:node tsconfig.json tsconfig.server.json package.json ./
 COPY --chown=node:node src/server ./src/server
-COPY --chown=node:node scripts/migrate-media-to-s3.ts scripts/verify-media-migration.ts scripts/sweep-public-media.ts ./scripts/
+COPY --chown=node:node scripts/create-admin.ts scripts/migrate-media-to-s3.ts scripts/verify-media-migration.ts scripts/sweep-public-media.ts ./scripts/
 COPY --chown=node:node drizzle ./drizzle
 COPY --chown=node:node public ./public
+RUN test "${#RELEASE_SHA}" = 40 && printf '%s' "$RELEASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
 USER node
 CMD ["node", "--import", "tsx", "scripts/migrate-media-to-s3.ts", "--dry-run", "--report", "/tmp/media-migration-report.json"]
 

@@ -15,7 +15,7 @@ export default function AdminLogin() {
         <p className="text-sm text-muted-foreground">KorDevTeam</p>
         <h1 className="mt-2 text-2xl font-semibold">Вход в админку</h1>
         {result?.error && <div role="alert" tabIndex={-1} className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3">{result.error}</div>}
-        <Form method="post" className="mt-6 space-y-4">
+        <Form method="post" action="/admin/login/" className="mt-6 space-y-4">
           <input type="hidden" name="_loginCsrf" value={loginCsrf} />
           <input type="hidden" name="returnTo" value={result?.returnTo ?? initial.returnTo} />
           <label className="block text-sm font-medium" htmlFor="admin-login">Логин</label>

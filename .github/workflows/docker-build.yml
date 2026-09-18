@@ -151,6 +151,9 @@ jobs:
       - name: Typecheck
         run: yarn typecheck
 
+      - name: Build browser test runtime
+        run: yarn build
+
       - name: Verify systemd retention unit
         run: |
           sudo useradd --system --no-create-home kordevteam || true

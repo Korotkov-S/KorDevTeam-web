@@ -32,7 +32,9 @@ test("guest admin loader redirects to login with a local return path", async () 
       headers: { "x-kordev-csp-nonce": nonce },
     }), params: {}, context: {} }),
     (response: unknown) => response instanceof Response && response.status === 302 &&
-      response.headers.get("Location") === "/admin/login/?returnTo=%2Fadmin%2Fcontent%2Farticle%2F%3Fstatus%3Ddraft",
+      response.headers.get("Location") === "/admin/login/?returnTo=%2Fadmin%2Fcontent%2Farticle%2F%3Fstatus%3Ddraft" &&
+      response.headers.get("Cache-Control") === "no-store" &&
+      response.headers.get("X-Robots-Tag") === "noindex, nofollow",
   );
 });
 
@@ -78,6 +80,7 @@ test("login loader issues csrf and public chrome is excluded from admin paths", 
     headers: { "x-kordev-csp-nonce": nonce },
   }), params: {}, context: {} });
   assert.match(response.headers.get("Set-Cookie") ?? "", /__Host-kordev_admin_login_csrf=/);
+  assert.match(response.headers.get("Set-Cookie") ?? "", /Path=\/; Secure; HttpOnly; SameSite=Strict/);
   assert.equal(isAdminPath("/admin/"), true);
   assert.equal(isAdminPath("/admin/content/article/"), true);
   assert.equal(isAdminPath("/administration/"), false);
