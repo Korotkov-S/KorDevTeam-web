@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { contentEntries } from "../db/schema";
-import type { ResolvedMediaAsset } from "../media/presentation";
+import type { MediaPresentationMap, ResolvedMediaAsset } from "../media/presentation";
 
 export type ContentKind = "service" | "case" | "article" | "page" | "faq";
 export type RelationType = "related_case" | "related_article" | "related_faq" | "related_service";
@@ -12,8 +12,8 @@ export type ServiceCardView = { slug: string; title: string; summary: string; pr
 export type CaseCardView = { slug: string; title: string; summary: string; result: string | null; image: ResolvedMediaAsset | null; tags: string[] };
 export type ContentCardView = { slug: string; title: string; summary: string; image: ResolvedMediaAsset | null; tags: string[] };
 export type FaqView = { question: string; answer: string };
-export type ServicePageView = { h1: string; lead: string; bodyMd: string; problems: string[]; solutions: string[]; integrations: string[]; technologies: string[]; processSteps: BlockView[]; price: { from: number | null; factors: string[]; timeRange: string | null } | null; results: BlockView[]; guarantees: BlockView[]; relatedCases: CaseCardView[]; relatedArticles: ContentCardView[]; faq: FaqView[]; cta: CtaView };
-export type CommercialCaseView = { slug: string; h1: string; summary: string; problem: string | null; constraints: string[]; solution: string | null; architecture: string | null; integrations: string[]; technologies: string[]; features: string[]; stages: BlockView[]; team: string[]; screenshots: ResolvedMediaAsset[]; results: BlockView[]; testimonial: string | null; bodyMd: string; demoUrl: string | null; githubUrl: string | null; relatedServices: ServiceCardView[]; relatedCases: CaseCardView[]; cta: CtaView };
+export type ServicePageView = { h1: string; lead: string; bodyMd: string; media: MediaPresentationMap; problems: string[]; solutions: string[]; integrations: string[]; technologies: string[]; processSteps: BlockView[]; price: { from: number | null; factors: string[]; timeRange: string | null } | null; results: BlockView[]; guarantees: BlockView[]; relatedCases: CaseCardView[]; relatedArticles: ContentCardView[]; faq: FaqView[]; cta: CtaView };
+export type CommercialCaseView = { slug: string; h1: string; summary: string; problem: string | null; constraints: string[]; solution: string | null; architecture: string | null; integrations: string[]; technologies: string[]; features: string[]; stages: BlockView[]; team: string[]; screenshots: ResolvedMediaAsset[]; media: MediaPresentationMap; results: BlockView[]; testimonial: string | null; bodyMd: string; demoUrl: string | null; githubUrl: string | null; relatedServices: ServiceCardView[]; relatedCases: CaseCardView[]; cta: CtaView };
 
 const block = z.strictObject({ title: z.string(), description: z.string() });
 const cta = z.strictObject({ copy: z.string(), type: z.enum(["form", "telegram", "email", "phone"]) });

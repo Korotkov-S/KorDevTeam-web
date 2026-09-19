@@ -39,6 +39,12 @@ test("public shell exposes canonical navigation and restores focus after closing
   fireEvent.keyDown(document, { key: "Escape" });
   assert.equal(document.activeElement, trigger);
 
+  fireEvent.click(trigger);
+  const reopenedDialog = screen.getByRole("dialog", { name: "Мобильная навигация" });
+  fireEvent.click(within(reopenedDialog).getByRole("link", { name: "Обсудить проект" }));
+  assert.equal(screen.queryByRole("dialog", { name: "Мобильная навигация" }), null);
+  assert.equal(document.body.style.overflow, "");
+
   cleanup();
 });
 

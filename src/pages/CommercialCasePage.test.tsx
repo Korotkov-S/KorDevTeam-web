@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import type { CommercialCaseView } from "../server/content/types";
+import type { MediaPresentationMap } from "../server/media/presentation";
 
 const dom = new JSDOM('<!doctype html><html lang="ru"><body></body></html>', {
   url: "https://kordev.team/cases/example/",
@@ -40,6 +41,7 @@ function caseView(overrides: Partial<CommercialCaseView> = {}): CommercialCaseVi
     stages: [{ title: "Проектирование", description: "Согласовали потоки данных и роли." }],
     team: ["Аналитик", "Два разработчика"],
     screenshots: [],
+    media: {},
     results: [],
     testimonial: null,
     bodyMd: "",
@@ -83,4 +85,31 @@ test("case page renders confirmed proof and links without hiding related navigat
   assert.ok(screen.getByText("Команда запустила систему без остановки операций."));
   assert.equal(screen.getByRole("link", { name: "Подробнее: Интеграции" }).getAttribute("href"), "/services/integrations/");
   assert.equal(screen.getByRole("link", { name: "Смотреть кейс: Следующий кейс" }).getAttribute("href"), "/cases/next/");
+});
+
+test("case markdown resolves media-library images in structured and legacy sections", () => {
+  const ids = [
+    "00000000-0000-4000-8000-000000000051",
+    "00000000-0000-4000-8000-000000000052",
+  ];
+  const media: MediaPresentationMap = Object.fromEntries(ids.map((id, index) => [id, {
+    id,
+    src: `https://cdn.example/cases/image-${index + 1}.png`,
+    srcSet: "",
+    sizes: "100vw",
+    alt: `Экран ${index + 1}`,
+    decorative: false,
+    width: 1200,
+    height: 800,
+  }]));
+  const project = caseView({
+    problem: `![Проблема](media:${ids[0]})`,
+    bodyMd: `![Результат](media:${ids[1]})`,
+  });
+  (project as CommercialCaseView & { media: MediaPresentationMap }).media = media;
+
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={project} /></MemoryRouter>);
+
+  assert.equal(screen.getByRole("img", { name: "Экран 1" }).getAttribute("src"), "https://cdn.example/cases/image-1.png");
+  assert.equal(screen.getByRole("img", { name: "Экран 2" }).getAttribute("src"), "https://cdn.example/cases/image-2.png");
 });

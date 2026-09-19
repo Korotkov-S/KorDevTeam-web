@@ -26,9 +26,10 @@ test("home renders the editorial commercial sequence without unverified metrics"
   render(<MemoryRouter><HomePage services={services} projects={projects} posts={posts} /></MemoryRouter>);
   assert.equal(screen.getAllByRole("heading", { level: 1 }).length, 1);
   assert.deepEqual([...document.querySelectorAll("section[id]")].map(node => node.id), ["home-hero", "proof", "cases", "services", "krasotula", "process", "insights", "contact"]);
-  for (const label of ["Смотреть кейсы", "Обсудить проект", "Интеграция и автоматизация бизнеса", "Krasotula CRM", "Отправить заявку"]) {
+  for (const label of ["Смотреть кейсы", "Обсудить проект", "Интеграция и автоматизация бизнеса", "Krasotula CRM"]) {
     assert.ok(screen.getByText(label, { exact: false }));
   }
+  assert.ok(screen.getByRole("button", { name: "Отправить заявку" }));
   assert.doesNotMatch(document.body.textContent ?? "", /95%|8 недель|83%/);
   assert.equal(screen.getByRole("link", { name: /Смотреть кейсы/ }).getAttribute("href"), "/cases/");
   assert.ok(document.querySelector('a[href="/cases/delivery/"]'));

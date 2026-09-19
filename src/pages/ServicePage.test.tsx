@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import type { ServicePageView } from "../server/content/types";
+import type { MediaPresentationMap } from "../server/media/presentation";
 import { setAnalyticsSinkForTests, type AnalyticsPayload } from "../lib/analytics";
 
 const dom = new JSDOM('<!doctype html><html lang="ru"><body></body></html>', {
@@ -31,6 +32,7 @@ function serviceView(overrides: Partial<ServicePageView> = {}): ServicePageView 
     h1: "Интеграции для бизнеса",
     lead: "Связываем сервисы и убираем повторяющуюся ручную работу.",
     bodyMd: "## Состав работ\n\nПроектируем обмен данными и контролируем результат.",
+    media: {},
     problems: ["Данные приходится переносить вручную"],
     solutions: ["Настраиваем надёжный обмен между системами"],
     integrations: ["CRM", "1С"],
@@ -102,4 +104,42 @@ test("primary service CTA emits service_cta_click without changing its anchor de
     event: "service_cta_click",
     payload: { path: "/services/integrations/", serviceSlug: "integrations" },
   }]);
+});
+
+test("service markdown resolves media-library images from its presentation map", () => {
+  const id = "00000000-0000-4000-8000-000000000041";
+  const media: MediaPresentationMap = {
+    [id]: {
+      id,
+      src: "https://cdn.example/services/diagram.png",
+      srcSet: "https://cdn.example/services/diagram-640.webp 640w",
+      sizes: "(max-width: 768px) 100vw, 768px",
+      alt: "Схема интеграции",
+      decorative: false,
+      width: 1280,
+      height: 720,
+    },
+  };
+  const service = serviceView({ bodyMd: `![Схема](media:${id})` });
+  (service as ServicePageView & { media: MediaPresentationMap }).media = media;
+
+  render(<MemoryRouter><ServicePage pathname="/services/integrations/" service={service} /></MemoryRouter>);
+
+  const image = screen.getByRole("img", { name: "Схема интеграции" });
+  assert.equal(image.getAttribute("src"), "https://cdn.example/services/diagram.png");
+  assert.match(image.getAttribute("srcset") ?? "", /diagram-640\.webp/);
+});
+
+test("lead alternatives emit contact events with the current page path", () => {
+  const events: Array<{ event: string; payload: AnalyticsPayload }> = [];
+  setAnalyticsSinkForTests((event, payload) => events.push({ event, payload }));
+  render(<MemoryRouter><ServicePage pathname="/services/integrations/" service={serviceView()} /></MemoryRouter>);
+
+  fireEvent.click(screen.getByRole("link", { name: "team@korotkov.dev" }));
+  fireEvent.click(screen.getByRole("link", { name: "Telegram" }));
+
+  assert.deepEqual(events, [
+    { event: "email_click", payload: { path: "/services/integrations/" } },
+    { event: "telegram_click", payload: { path: "/services/integrations/" } },
+  ]);
 });

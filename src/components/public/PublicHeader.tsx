@@ -116,7 +116,7 @@ export function PublicHeader(): React.JSX.Element {
             ))}
             <div className="mt-2 flex items-center gap-3">
               <ThemeToggle />
-              <CtaLink to="/#contact">Обсудить проект</CtaLink>
+              <CtaLink to="/#contact" onClick={closeMenu}>Обсудить проект</CtaLink>
             </div>
           </nav>
         </div>

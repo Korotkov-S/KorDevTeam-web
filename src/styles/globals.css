@@ -44,6 +44,7 @@
   --public-subtle: #5B6477;
   --public-blue: #2563EB;
   --public-violet: #7C3AED;
+  --public-action-foreground: #FFFFFF;
   --public-green: #0F9F6E;
   --public-orange: #F97316;
   --public-radius-card: 1.5rem;
@@ -89,6 +90,7 @@
   --public-subtle: #A7B0C0;
   --public-blue: #60A5FA;
   --public-violet: #A78BFA;
+  --public-action-foreground: #0B1020;
   --public-green: #34D399;
   --public-orange: #FB923C;
   --public-radius-card: 1.5rem;

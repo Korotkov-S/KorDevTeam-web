@@ -54,7 +54,7 @@ export function ServicePage({ pathname, service }: { pathname: string; service: 
             const serviceSlug = pathname.match(/^\/services\/([^/]+)\/?$/)?.[1];
             track("service_cta_click", { path: pathname, ...(serviceSlug ? { serviceSlug } : {}) });
           }}
-          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--public-blue)] px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)]"
+          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--public-blue)] px-5 py-3 text-sm font-semibold text-[var(--public-action-foreground)] transition-colors duration-200 hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)]"
         >Обсудить задачу</a>
       </Section>
     </ServiceSection>
@@ -70,7 +70,7 @@ export function ServicePage({ pathname, service }: { pathname: string; service: 
       <Section className="border-t border-border">
         <SectionHeading eyebrow="Решение" title="Что делаем" />
         {service.solutions.length > 0 && <div className="mt-8"><TextList items={service.solutions} /></div>}
-        {service.bodyMd.trim() && <MarkdownContent markdown={service.bodyMd} proseClassName="mt-10 max-w-4xl" />}
+        {service.bodyMd.trim() && <MarkdownContent markdown={service.bodyMd} media={service.media} proseClassName="mt-10 max-w-4xl" />}
       </Section>
     </ServiceSection>}
 

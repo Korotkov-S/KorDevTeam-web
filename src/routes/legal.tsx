@@ -60,7 +60,7 @@ export default function Legal() {
               <button
                 type="button"
                 data-consent-settings="true"
-                className="mt-5 rounded-full bg-[var(--public-blue)] px-5 py-3 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4"
+                className="mt-5 rounded-full bg-[var(--public-blue)] px-5 py-3 font-semibold text-[var(--public-action-foreground)] focus-visible:outline-2 focus-visible:outline-offset-4"
                 onClick={() => window.dispatchEvent(new window.CustomEvent("kordev:open-consent-settings"))}
               >
                 Настроить аналитику повторно

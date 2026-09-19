@@ -117,6 +117,11 @@ test("a displayed validation error emits a safe form_submit_error payload", () =
 test("renders labelled native fields with the approved attachment formats", () => {
   render(<LeadForm pagePath="/" />);
 
+  const form = screen.getByRole("button", { name: "Отправить заявку" }).closest("form");
+  assert.equal(form?.getAttribute("action"), "/api/leads");
+  assert.equal(form?.getAttribute("method"), "post");
+  assert.equal(form?.getAttribute("enctype"), "multipart/form-data");
+
   assert.equal(screen.getByLabelText("Имя").getAttribute("name"), "name");
   assert.equal(screen.getByLabelText("Телефон").getAttribute("name"), "phone");
   assert.equal(screen.getByLabelText("Описание задачи (необязательно)").getAttribute("name"), "description");
@@ -129,6 +134,7 @@ test("renders labelled native fields with the approved attachment formats", () =
   assert.equal(fileHint.id, "lead-file-hint");
   assert.equal(screen.getByLabelText("Файл (необязательно)").getAttribute("aria-describedby"), fileHint.id);
   assert.equal(screen.getByLabelText(/согласен/i).getAttribute("name"), "consent");
+  assert.equal(screen.getByLabelText(/согласен/i).getAttribute("value"), "accepted");
   assert.match(screen.getByText("Ответим в течение рабочего дня").textContent ?? "", /рабочего дня/);
   assert.ok(screen.getByText("Пн–Пт, 09:00–18:00 по Москве"));
   assert.equal(screen.getByRole("link", { name: /обработку персональных данных/i }).getAttribute("href"), "/privacy/");

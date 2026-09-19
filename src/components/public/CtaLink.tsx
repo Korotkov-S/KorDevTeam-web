@@ -7,27 +7,31 @@ export function CtaLink({
   children,
   variant = "primary",
   eventName,
+  onClick,
 }: {
   to: string;
   children: React.ReactNode;
   variant?: "primary" | "secondary";
   eventName?: "service_cta_click" | "project_open";
+  onClick?: React.MouseEventHandler<HTMLAnchorElement>;
 }): React.JSX.Element {
   const location = useLocation();
   const variantClassName = variant === "primary"
-    ? "bg-[var(--public-blue)] text-white hover:bg-[var(--public-violet)] focus-visible:bg-[var(--public-violet)]"
+    ? "bg-[var(--public-blue)] text-[var(--public-action-foreground)] hover:bg-[var(--public-violet)] focus-visible:bg-[var(--public-violet)]"
     : "border border-[var(--public-ink)] text-[var(--public-ink)] hover:border-[var(--public-violet)] hover:text-[var(--public-violet)] focus-visible:border-[var(--public-violet)] focus-visible:text-[var(--public-violet)]";
   const trackedEvent: AnalyticsEvent | undefined = eventName
     ?? (to.includes("#contact") ? "service_cta_click" : undefined);
 
-  const handleClick = () => {
-    if (!trackedEvent) return;
-    const payload: AnalyticsPayload = { path: location.pathname };
-    const serviceMatch = location.pathname.match(/^\/services\/([^/]+)\/?$/);
-    const projectMatch = to.match(/^\/cases\/([^/]+)\/?$/);
-    if (serviceMatch) payload.serviceSlug = serviceMatch[1];
-    if (projectMatch) payload.projectSlug = projectMatch[1];
-    track(trackedEvent, payload);
+  const handleClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
+    if (trackedEvent) {
+      const payload: AnalyticsPayload = { path: location.pathname };
+      const serviceMatch = location.pathname.match(/^\/services\/([^/]+)\/?$/);
+      const projectMatch = to.match(/^\/cases\/([^/]+)\/?$/);
+      if (serviceMatch) payload.serviceSlug = serviceMatch[1];
+      if (projectMatch) payload.projectSlug = projectMatch[1];
+      track(trackedEvent, payload);
+    }
+    onClick?.(event);
   };
 
   return (

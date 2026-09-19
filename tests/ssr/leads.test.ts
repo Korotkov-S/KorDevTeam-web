@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { randomUUID } from "node:crypto";
+import { request as httpRequest } from "node:http";
 import { Readable } from "node:stream";
 import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -154,6 +155,38 @@ test("rejects missing, malformed, duplicate-shaped and non-UUID keys before serv
   for (const key of ["", "bad", "12345678-1234-0234-0234-123456789abc", `${randomUUID()}, ${randomUUID()}`]) {
     await errorResponse(await f.post({ "Idempotency-Key": key }), 400, "validation_error");
   }
+});
+
+test("same-origin no-JS form submission receives server idempotency and a PII-free redirect", async t => {
+  const f = await local(t);
+  const serialized = new Request(`${f.origin}/api/leads`, {
+    method: "POST", body: multipart({ pagePath: "/services/integrations/" }),
+  });
+  const body = Buffer.from(await serialized.arrayBuffer());
+  const response = await new Promise<Response>((resolve, reject) => {
+    const request = httpRequest(`${f.origin}/api/leads`, { method: "POST", headers: {
+      Accept: "text/html",
+      Origin: f.origin,
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "same-origin",
+      "Content-Type": serialized.headers.get("content-type")!,
+      "Content-Length": String(body.byteLength),
+    } }, incoming => {
+      const chunks: Buffer[] = [];
+      incoming.on("data", chunk => chunks.push(Buffer.from(chunk)));
+      incoming.on("end", () => resolve(new Response(Buffer.concat(chunks), {
+        status: incoming.statusCode,
+        headers: incoming.headers as HeadersInit,
+      })));
+    });
+    request.on("error", reject);
+    request.end(body);
+  });
+
+  assert.equal(response.status, 303);
+  headers(response);
+  assert.equal(response.headers.get("location"), "/services/integrations/#lead-submitted-message");
+  assert.doesNotMatch(response.headers.get("location") ?? "", /79991234567|%2B79991234567|Тест/);
 });
 
 test("multipart parser errors return a safe HTTP response rather than resetting the socket", async t => {

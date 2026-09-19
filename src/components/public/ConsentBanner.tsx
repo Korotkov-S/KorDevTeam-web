@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 
 import { useConsent } from "../../contexts/ConsentContext";
 
-const actionClassName = "inline-flex min-h-12 items-center justify-center rounded-full border border-[var(--public-blue)] bg-[var(--public-blue)] px-5 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--public-blue)]";
+const actionClassName = "inline-flex min-h-12 items-center justify-center rounded-full border border-[var(--public-blue)] bg-[var(--public-blue)] px-5 py-3 text-center text-sm font-semibold text-[var(--public-action-foreground)] transition-colors hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--public-blue)]";
 
 export function ConsentBanner() {
   const { decision, accept, reject, closeSettings, settingsOpen, dialogOpen } = useConsent();

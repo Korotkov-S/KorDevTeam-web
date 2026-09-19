@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -66,11 +66,14 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   const [status, setStatus] = useState("");
   const [pending, setPending] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const retryRef = useRef<RetrySubmission | null>(null);
   const inFlightRef = useRef(false);
   const openedRef = useRef(false);
   const startedRef = useRef(false);
+
+  useEffect(() => setHydrated(true), []);
 
   const analyticsPayload = () => ({ path: normalizeSnapshotText(pagePath) });
 
@@ -194,7 +197,16 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   };
 
   return (
-    <form ref={formRef} noValidate onFocusCapture={trackOpen} onSubmit={handleSubmit} className={cn("space-y-5", className)}>
+    <form
+      ref={formRef}
+      action="/api/leads"
+      method="post"
+      encType="multipart/form-data"
+      noValidate={hydrated}
+      onFocusCapture={trackOpen}
+      onSubmit={handleSubmit}
+      className={cn("space-y-5", className)}
+    >
       <div>
         <label htmlFor="lead-name" className="mb-2 block text-sm font-medium text-foreground">
           {t("contact.form.name")}
@@ -281,6 +293,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
             id="lead-consent"
             name="consent"
             type="checkbox"
+            value="accepted"
             required
             checked={fields.consent}
             onChange={(event) => edit("consent", event.target.checked)}
@@ -303,13 +316,19 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
           <p>{t("contact.form.responseTime")}</p>
           <p>{t("contact.form.workingHours")}</p>
         </div>
-        <Button type="submit" size="lg" disabled={pending}>
+        <Button type="submit" size="lg" disabled={pending} className="border-0 bg-[var(--public-blue)] text-[var(--public-action-foreground)] hover:bg-[var(--public-violet)]">
           {pending ? t("contact.form.submitting") : t("contact.form.submit")}
         </Button>
       </div>
 
       <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
         {status}
+      </p>
+      <p id="lead-submitted-message" className="hidden text-sm text-[var(--public-green)] target:block">
+        Заявка отправлена. Мы свяжемся с вами в течение рабочего дня.
+      </p>
+      <p id="lead-submit-error" className="hidden text-sm text-destructive target:block">
+        Не удалось отправить заявку. Попробуйте ещё раз.
       </p>
     </form>
   );

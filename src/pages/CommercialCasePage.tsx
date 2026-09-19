@@ -39,7 +39,7 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
         </nav>
         <SectionHeading level={1} eyebrow="Кейс" title={project.h1} description={project.summary} />
         {(project.demoUrl || project.githubUrl) && <div className="mt-8 flex flex-wrap gap-4">
-          {project.demoUrl && <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full bg-[var(--public-blue)] px-5 py-3 text-sm font-semibold text-white">Открыть проект</a>}
+          {project.demoUrl && <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full bg-[var(--public-blue)] px-5 py-3 text-sm font-semibold text-[var(--public-action-foreground)]">Открыть проект</a>}
           {project.githubUrl && <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full border border-border px-5 py-3 text-sm font-semibold text-[var(--public-blue)]">Исходный код</a>}
         </div>}
       </Section>
@@ -47,20 +47,20 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
 
     {hasProblem && <CaseSection name="problem"><Section className="border-t border-border">
       <SectionHeading eyebrow="Контекст" title="Задача" />
-      {project.problem && <MarkdownContent markdown={project.problem} proseClassName="mt-8 max-w-4xl" />}
+      {project.problem && <MarkdownContent markdown={project.problem} media={project.media} proseClassName="mt-8 max-w-4xl" />}
       {project.constraints.length > 0 && <div className="mt-8"><h3 className="mb-4 text-lg font-semibold">Ограничения</h3><TextList items={project.constraints} /></div>}
     </Section></CaseSection>}
 
     {hasSolution && <CaseSection name="solution"><Section className="border-t border-border">
       <SectionHeading eyebrow="Подход" title="Решение" />
-      {project.solution && <MarkdownContent markdown={project.solution} proseClassName="mt-8 max-w-4xl" />}
-      {project.architecture && <div className="mt-8"><h3 className="text-lg font-semibold">Архитектура</h3><MarkdownContent markdown={project.architecture} proseClassName="mt-3 max-w-4xl" /></div>}
+      {project.solution && <MarkdownContent markdown={project.solution} media={project.media} proseClassName="mt-8 max-w-4xl" />}
+      {project.architecture && <div className="mt-8"><h3 className="text-lg font-semibold">Архитектура</h3><MarkdownContent markdown={project.architecture} media={project.media} proseClassName="mt-3 max-w-4xl" /></div>}
       {project.features.length > 0 && <div className="mt-8"><h3 className="mb-4 text-lg font-semibold">Возможности</h3><TextList items={project.features} /></div>}
       {(project.integrations.length > 0 || project.technologies.length > 0) && <div className="mt-8 grid gap-8 md:grid-cols-2">
         {project.integrations.length > 0 && <div><h3 className="mb-4 text-lg font-semibold">Интеграции</h3><TextList items={project.integrations} /></div>}
         {project.technologies.length > 0 && <div><h3 className="mb-4 text-lg font-semibold">Технологии</h3><TextList items={project.technologies} /></div>}
       </div>}
-      {project.bodyMd.trim() && <MarkdownContent markdown={project.bodyMd} proseClassName="mt-10 max-w-4xl" />}
+      {project.bodyMd.trim() && <MarkdownContent markdown={project.bodyMd} media={project.media} proseClassName="mt-10 max-w-4xl" />}
     </Section></CaseSection>}
 
     {project.stages.length > 0 && <CaseSection name="stages"><Section className="border-t border-border">

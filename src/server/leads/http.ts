@@ -32,6 +32,16 @@ export type LeadRouterOverrides = Partial<LeadServiceDependencies> & {
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const retryAfter = (seconds = 60) => Number.isFinite(seconds) ? Math.max(1, Math.min(3_600, Math.ceil(seconds))) : 60;
 
+function nativeReturnPath(value: string | undefined): string {
+  if (!value?.startsWith("/") || value.startsWith("//") || /[\u0000-\u001f\u007f]/.test(value)) return "/";
+  try {
+    const target = new URL(value, "https://kordev.team");
+    return target.origin === "https://kordev.team" ? target.pathname : "/";
+  } catch {
+    return "/";
+  }
+}
+
 /** Dependencies are lazy so liveness still works when readiness fails configuration. */
 export function createLeadRouter(overrides: LeadRouterOverrides = {}): Router {
   const router = Router();
@@ -62,12 +72,17 @@ export function createLeadRouter(overrides: LeadRouterOverrides = {}): Router {
     const requestId = randomUUID();
     const start = performance.now();
     let code: LeadLog["code"] = "service_unavailable";
+    const nativeNavigation = req.method === "POST"
+      && req.get("sec-fetch-mode") === "navigate"
+      && (req.get("accept") ?? "").includes("text/html");
+    let returnPath = "/";
     res.set("Cache-Control", "no-store");
     res.vary("Origin");
     res.set("X-Content-Type-Options", "nosniff");
     const fail = (errorCode: LeadErrorCode, status: number = leadErrorStatuses[errorCode], delay?: number) => {
       code = errorCode;
       if (status === 429 || status === 503) res.set("Retry-After", String(retryAfter(delay)));
+      if (nativeNavigation) return res.redirect(303, `${returnPath}#lead-submit-error`);
       return res.status(status).json({ error: { code: errorCode, message: messages[errorCode] }, request_id: requestId });
     };
     try {
@@ -80,7 +95,7 @@ export function createLeadRouter(overrides: LeadRouterOverrides = {}): Router {
       const expectedOrigin = production ? "https://kordev.team" : `${req.protocol}://${req.get("host")}`;
       const site = req.get("sec-fetch-site");
       if (req.get("origin") !== expectedOrigin || (site !== undefined && site !== "same-origin")) return fail("validation_error", 403);
-      const submissionKey = req.get("idempotency-key");
+      const submissionKey = req.get("idempotency-key") || (nativeNavigation ? randomUUID() : undefined);
       if (!submissionKey || !uuid.test(submissionKey)) return fail("validation_error");
       const { tempRoot, service, startupSweep } = dependencies();
       await startupSweep;
@@ -102,12 +117,14 @@ export function createLeadRouter(overrides: LeadRouterOverrides = {}): Router {
         body.destroy();
       }
       const { pagePath, referrer, utmSource, utmMedium, utmCampaign, utmContent, utmTerm } = parsed.fields;
+      returnPath = nativeReturnPath(pagePath);
       const decision = await service.accept({ ...parsed,
         context: { pagePath, referrer, utmSource, utmMedium, utmCampaign, utmContent, utmTerm },
         submissionKey, requestIp: req.ip ?? req.socket.remoteAddress ?? "",
       });
       if (decision.kind === "rate_limited") return fail("rate_limit_exceeded", 429, decision.retryAfterSeconds);
       code = decision.kind;
+      if (nativeNavigation) return res.redirect(303, `${returnPath}#lead-submitted-message`);
       if (decision.kind === "ignored") return res.status(202).json({ status: "received" });
       if (decision.kind === "replayed") res.set("Idempotency-Replayed", "true");
       // Explicit projection also protects against extra fields in historical stored JSON.

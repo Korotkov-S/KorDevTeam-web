@@ -1,5 +1,6 @@
 import React from "react";
 import { LeadForm } from "../LeadForm";
+import { track } from "../../lib/analytics";
 import { Section, SectionHeading } from "./Section";
 
 export type LeadCtaSectionProps = { pagePath: string; title?: string; description?: string };
@@ -10,8 +11,8 @@ export function LeadCtaSection({ pagePath, title = "Расскажите о ва
       <div>
         <SectionHeading eyebrow="Начнём с разговора" title={title} description={description} />
         <div className="mt-8 flex flex-col items-start gap-4 text-lg font-medium text-[var(--public-blue)]">
-          <a href="mailto:team@korotkov.dev" className="underline underline-offset-4">team@korotkov.dev</a>
-          <a href="https://telegram.me/ideamen51" className="underline underline-offset-4">Telegram</a>
+          <a href="mailto:team@korotkov.dev" className="underline underline-offset-4" onClick={() => track("email_click", { path: pagePath })}>team@korotkov.dev</a>
+          <a href="https://telegram.me/ideamen51" className="underline underline-offset-4" onClick={() => track("telegram_click", { path: pagePath })}>Telegram</a>
           <div><span className="text-[var(--public-subtle)]">Max: </span><a href="https://max.ru/u/f9LHodD0cOJpymJqsmOnWwFeDCCZGy15ba7H_HhajC8Vnm6U12_ZrsEX8uY" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">Геннадий Коротков</a></div>
         </div>
       </div>
