@@ -135,6 +135,12 @@ test("renders labelled native fields with the approved attachment formats", () =
   assert.equal(screen.getByLabelText("Файл (необязательно)").getAttribute("aria-describedby"), fileHint.id);
   assert.equal(screen.getByLabelText(/согласен/i).getAttribute("name"), "consent");
   assert.equal(screen.getByLabelText(/согласен/i).getAttribute("value"), "accepted");
+  const success = document.getElementById("lead-submitted-message");
+  const error = document.getElementById("lead-submit-error");
+  assert.equal(success?.getAttribute("role"), "status");
+  assert.equal(success?.getAttribute("tabindex"), "-1");
+  assert.equal(error?.getAttribute("role"), "alert");
+  assert.equal(error?.getAttribute("tabindex"), "-1");
   assert.match(screen.getByText("Ответим в течение рабочего дня").textContent ?? "", /рабочего дня/);
   assert.ok(screen.getByText("Пн–Пт, 09:00–18:00 по Москве"));
   assert.equal(screen.getByRole("link", { name: /обработку персональных данных/i }).getAttribute("href"), "/privacy/");
@@ -150,7 +156,7 @@ test("reports Russian inline errors and focuses the first invalid field", async 
   assert.ok(screen.getByText("Укажите имя"));
   assert.ok(screen.getByText("Укажите телефон"));
   assert.ok(screen.getByText("Подтвердите согласие на обработку данных"));
-  assert.match(screen.getByRole("status").textContent ?? "", /проверьте поля/i);
+  assert.match(screen.getByText("Проверьте поля формы").textContent ?? "", /проверьте поля/i);
 });
 
 test("submits from the native keyboard form path as multipart without a Content-Type header", async () => {

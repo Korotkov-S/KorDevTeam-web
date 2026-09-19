@@ -324,10 +324,10 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
       <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
         {status}
       </p>
-      <p id="lead-submitted-message" className="hidden text-sm text-[var(--public-green)] target:block">
+      <p id="lead-submitted-message" role="status" tabIndex={-1} className="hidden text-sm text-[var(--public-green)] target:block">
         Заявка отправлена. Мы свяжемся с вами в течение рабочего дня.
       </p>
-      <p id="lead-submit-error" className="hidden text-sm text-destructive target:block">
+      <p id="lead-submit-error" role="alert" tabIndex={-1} className="hidden text-sm text-destructive target:block">
         Не удалось отправить заявку. Попробуйте ещё раз.
       </p>
     </form>
