@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { PublicFooter } from "./PublicFooter";
 import { PublicHeader } from "./PublicHeader";
+import { setAnalyticsSinkForTests } from "../../lib/analytics";
 
 const dom = new JSDOM("<!doctype html><html lang=\"ru\"><body></body></html>", {
   url: "https://kordev.team/",
@@ -48,5 +49,18 @@ test("footer opens consent settings without navigating", () => {
   fireEvent.click(screen.getByRole("button", { name: "Настройки cookies" }));
   assert.equal(opened, 1);
 
+  cleanup();
+});
+
+test("footer contact actions emit email and telegram events", () => {
+  const events: string[] = [];
+  setAnalyticsSinkForTests((event) => events.push(event));
+  render(<MemoryRouter><PublicFooter /></MemoryRouter>);
+
+  fireEvent.click(screen.getByRole("link", { name: "team@korotkov.dev" }));
+  fireEvent.click(screen.getByRole("link", { name: "Telegram" }));
+
+  assert.deepEqual(events, ["email_click", "telegram_click"]);
+  setAnalyticsSinkForTests(null);
   cleanup();
 });

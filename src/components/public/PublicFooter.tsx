@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { PUBLIC_NAV_ITEMS } from "./PublicHeader";
 import { Wordmark } from "./Wordmark";
+import { track } from "../../lib/analytics";
 
 export function PublicFooter(): React.JSX.Element {
   return (
@@ -14,9 +15,24 @@ export function PublicFooter(): React.JSX.Element {
           <p className="mt-4 max-w-md text-sm leading-6 text-[var(--public-subtle)]">
             Разрабатываем цифровые продукты, которые помогают бизнесу расти и работать проще.
           </p>
-          <a className="mt-4 inline-block text-sm font-medium text-[var(--public-blue)] hover:text-[var(--public-violet)]" href="mailto:team@korotkov.dev">
-            team@korotkov.dev
-          </a>
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[var(--public-blue)]">
+            <a
+              className="hover:text-[var(--public-violet)]"
+              href="mailto:team@korotkov.dev"
+              onClick={() => track("email_click", { path: window.location.pathname })}
+            >
+              team@korotkov.dev
+            </a>
+            <a
+              className="hover:text-[var(--public-violet)]"
+              href="https://telegram.me/ideamen51"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track("telegram_click", { path: window.location.pathname })}
+            >
+              Telegram
+            </a>
+          </div>
         </div>
 
         <nav aria-label="Навигация в подвале" className="grid grid-cols-2 gap-x-10 gap-y-3 text-sm">

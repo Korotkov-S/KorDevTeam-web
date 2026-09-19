@@ -5,6 +5,8 @@ import { JSDOM } from "jsdom";
 import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ContentCard } from "./ContentCard";
+import { CaseCard } from "./CaseCard";
+import { setAnalyticsSinkForTests, type AnalyticsPayload } from "../../lib/analytics";
 
 const dom = new JSDOM("<!doctype html><html lang=\"ru\"><body></body></html>", {
   url: "https://kordev.team/journal/",
@@ -21,7 +23,10 @@ Object.assign(globalThis, {
 });
 const require = createRequire(import.meta.url);
 const { cleanup, fireEvent, render, screen } = require("@testing-library/react");
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setAnalyticsSinkForTests(null);
+});
 
 function Placement() {
   const location = useLocation();
@@ -88,4 +93,36 @@ test("content card preserves ordered media and configurable editorial presentati
     assert.ok(image.classList.contains("aspect-[960/1358]"));
     assert.ok(image.classList.contains("object-contain"));
   }
+});
+
+test("journal and case cards emit safe open events while keeping their destinations", () => {
+  const events: Array<{ event: string; payload: AnalyticsPayload }> = [];
+  setAnalyticsSinkForTests((event, payload) => events.push({ event, payload }));
+  const journal = {
+    slug: "issue-0",
+    title: "Журнал KorDevTeam",
+    summary: "Практический выпуск.",
+    image: null,
+    tags: ["Журнал"],
+  };
+  const project = {
+    slug: "crm",
+    title: "CRM",
+    summary: "Автоматизация продаж.",
+    result: null,
+    image: null,
+    tags: ["CRM"],
+  };
+  render(<MemoryRouter initialEntries={["/"]}>
+    <ContentCard post={journal} href="/journal/issue-0/" />
+    <CaseCard project={project} />
+  </MemoryRouter>);
+
+  fireEvent.click(screen.getByRole("link", { name: /Читать статью: Журнал/ }));
+  fireEvent.click(screen.getByRole("link", { name: /Смотреть кейс: CRM/ }));
+
+  assert.deepEqual(events, [
+    { event: "journal_issue_open", payload: { path: "/journal/issue-0/" } },
+    { event: "project_open", payload: { path: "/cases/crm/", projectSlug: "crm" } },
+  ]);
 });

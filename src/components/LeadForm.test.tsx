@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { afterEach, beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import React from "react";
+import { setAnalyticsSinkForTests, type AnalyticsPayload } from "../lib/analytics";
 
 const dom = new JSDOM("<!doctype html><html lang=\"ru\"><body></body></html>", {
   url: "https://kordev.team/",
@@ -64,11 +65,53 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  setAnalyticsSinkForTests(null);
   globalThis.fetch = originalFetch;
   Object.defineProperty(globalThis.crypto, "randomUUID", {
     configurable: true,
     value: originalRandomUUID,
   });
+});
+
+test("emits form_open and form_start only on the first interaction", () => {
+  const events: string[] = [];
+  setAnalyticsSinkForTests((event) => events.push(event));
+  render(<LeadForm pagePath="/services/integrations/" />);
+
+  const name = screen.getByLabelText("Имя");
+  fireEvent.focus(name);
+  fireEvent.focus(name);
+  fireEvent.change(name, { target: { value: "Анна" } });
+  fireEvent.change(name, { target: { value: "Анна К." } });
+
+  assert.deepEqual(events.filter((event) => event === "form_open"), ["form_open"]);
+  assert.deepEqual(events.filter((event) => event === "form_start"), ["form_start"]);
+});
+
+test("successful persisted lead emits form_submit_success once", async () => {
+  const events: string[] = [];
+  setAnalyticsSinkForTests((event) => events.push(event));
+  globalThis.fetch = async () => jsonResponse(201, { leadId: VALID_LEAD_ID });
+  render(<LeadForm pagePath="/services/integrations/" />);
+  fillRequiredFields();
+
+  fireEvent.click(screen.getByRole("button", { name: "Отправить заявку" }));
+  await screen.findByText("Заявка отправлена");
+
+  assert.deepEqual(events.filter((event) => event === "form_submit_success"), ["form_submit_success"]);
+});
+
+test("a displayed validation error emits a safe form_submit_error payload", () => {
+  const events: Array<{ event: string; payload: AnalyticsPayload }> = [];
+  setAnalyticsSinkForTests((event, payload) => events.push({ event, payload }));
+  render(<LeadForm pagePath="/services/integrations/" />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Отправить заявку" }));
+
+  assert.deepEqual(
+    events.filter(({ event }) => event === "form_submit_error"),
+    [{ event: "form_submit_error", payload: { path: "/services/integrations/", errorCode: "validation" } }],
+  );
 });
 
 test("renders labelled native fields with the approved attachment formats", () => {

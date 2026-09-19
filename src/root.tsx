@@ -24,6 +24,7 @@ import "./i18n";
 import { PublicFooter } from "./components/public/PublicFooter";
 import { PublicHeader } from "./components/public/PublicHeader";
 import { ConsentBanner } from "./components/public/ConsentBanner";
+import { AnalyticsScripts } from "./components/AnalyticsScripts";
 import { ConsentProvider, ConsentShell } from "./contexts/ConsentContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./styles/index.css";
@@ -75,6 +76,7 @@ export default function App() {
         <PublicFooter />
       </ConsentShell>
       <ConsentBanner />
+      <AnalyticsScripts />
     </ConsentProvider>
   );
 }

@@ -9,6 +9,7 @@ import { CtaLink } from "./CtaLink";
 import { Section, SectionHeading } from "./Section";
 import { Wordmark } from "./Wordmark";
 import { DEFAULT_THEME } from "../../contexts/ThemeContext";
+import { setAnalyticsSinkForTests, type AnalyticsPayload } from "../../lib/analytics";
 
 const dom = new JSDOM("<!doctype html><html lang=\"ru\"><body></body></html>", {
   url: "https://kordev.team/",
@@ -26,7 +27,7 @@ Object.assign(globalThis, {
 });
 
 const require = createRequire(import.meta.url);
-const { cleanup, render, screen } = require("@testing-library/react");
+const { cleanup, fireEvent, render, screen } = require("@testing-library/react");
 
 test("public primitives expose the wordmark, one heading and accessible CTA", () => {
   render(
@@ -48,4 +49,25 @@ test("public primitives expose the wordmark, one heading and accessible CTA", ()
 
 test("the server-safe default theme is light", () => {
   assert.equal(DEFAULT_THEME, "light");
+});
+
+test("a contact CTA emits its service action without preventing navigation", () => {
+  const events: Array<{ event: string; payload: AnalyticsPayload }> = [];
+  setAnalyticsSinkForTests((event, payload) => events.push({ event, payload }));
+  render(
+    <MemoryRouter initialEntries={["/services/integrations/"]}>
+      <CtaLink to="/#contact">Обсудить проект</CtaLink>
+    </MemoryRouter>,
+  );
+
+  const link = screen.getByRole("link", { name: "Обсудить проект" });
+  fireEvent.click(link);
+
+  assert.deepEqual(events, [{
+    event: "service_cta_click",
+    payload: { path: "/services/integrations/", serviceSlug: "integrations" },
+  }]);
+  assert.equal(link.getAttribute("href"), "/#contact");
+  setAnalyticsSinkForTests(null);
+  cleanup();
 });

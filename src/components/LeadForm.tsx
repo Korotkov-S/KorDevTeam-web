@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { cn } from "./ui/utils";
+import { track } from "../lib/analytics";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TRANSIENT_STATUSES = new Set([408, 425, 429]);
@@ -68,8 +69,25 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const retryRef = useRef<RetrySubmission | null>(null);
   const inFlightRef = useRef(false);
+  const openedRef = useRef(false);
+  const startedRef = useRef(false);
+
+  const analyticsPayload = () => ({ path: normalizeSnapshotText(pagePath) });
+
+  const trackOpen = () => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    track("form_open", analyticsPayload());
+  };
+
+  const trackStart = () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    track("form_start", analyticsPayload());
+  };
 
   const edit = <K extends keyof FormFields>(key: K, value: FormFields[K]) => {
+    trackStart();
     retryRef.current = null;
     setFields((current) => ({ ...current, [key]: value }));
     if (key === "name" || key === "phone" || key === "consent") {
@@ -79,6 +97,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   };
 
   const onFileChange = () => {
+    trackStart();
     retryRef.current = null;
     setStatus("");
   };
@@ -106,6 +125,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
     if (Object.keys(nextErrors).length > 0) {
       setStatus(t("contact.form.status.invalid"));
       focusFirstError(nextErrors);
+      track("form_submit_error", { ...analyticsPayload(), errorCode: "validation" });
       return;
     }
 
@@ -154,13 +174,19 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
         setErrors({});
         form.reset();
         setStatus(t("contact.form.status.success"));
+        track("form_submit_success", analyticsPayload());
         return;
       }
 
       if (!isTransient(response.status)) retryRef.current = null;
       setStatus(t("contact.form.status.error"));
+      track("form_submit_error", {
+        ...analyticsPayload(),
+        errorCode: response.ok ? "invalid_response" : `http_${response.status}`,
+      });
     } catch {
       setStatus(t("contact.form.status.error"));
+      track("form_submit_error", { ...analyticsPayload(), errorCode: "network" });
     } finally {
       inFlightRef.current = false;
       setPending(false);
@@ -168,7 +194,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   };
 
   return (
-    <form ref={formRef} noValidate onSubmit={handleSubmit} className={cn("space-y-5", className)}>
+    <form ref={formRef} noValidate onFocusCapture={trackOpen} onSubmit={handleSubmit} className={cn("space-y-5", className)}>
       <div>
         <label htmlFor="lead-name" className="mb-2 block text-sm font-medium text-foreground">
           {t("contact.form.name")}
