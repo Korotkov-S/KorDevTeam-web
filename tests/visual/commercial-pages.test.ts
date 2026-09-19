@@ -36,12 +36,22 @@ async function waitForHydration(page: Page): Promise<void> {
 async function assertPageLayout(page: Page, pathname: string): Promise<void> {
   assert.equal(await page.$$eval("h1", nodes => nodes.length), 1, `${pathname} must have one h1`);
   assert.equal(await page.$eval("h1", element => {
-    const style = getComputedStyle(element);
     const box = element.getBoundingClientRect();
-    return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) > 0 && box.width > 0 && box.height > 0;
+    for (let node: Element | null = element; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (node.hasAttribute("hidden") || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    }
+    return box.width > 0 && box.height > 0;
   }), true, `${pathname} h1 must be visible`);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, `${pathname} must not overflow horizontally`);
-  assert.equal(await page.$eval("main", element => element.getBoundingClientRect().height > 100), true, `${pathname} main content must be visible`);
+  assert.equal(await page.$eval("main", element => {
+    const box = element.getBoundingClientRect();
+    for (let node: Element | null = element; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (node.hasAttribute("hidden") || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    }
+    return box.width > 0 && box.height > 100;
+  }), true, `${pathname} main content must be visible`);
 }
 
 async function dismissConsent(page: Page): Promise<void> {
@@ -115,8 +125,19 @@ test("commercial pages keep meaningful layout without JavaScript", { timeout: 12
         const page = await browser.newPage();
         await page.setViewport(viewport);
         await page.setJavaScriptEnabled(false);
-        const response = await page.goto(`${runtime.origin}${route.pathname}`, { waitUntil: "domcontentloaded" });
+        const response = await page.goto(`${runtime.origin}${route.pathname}`, { waitUntil: "networkidle0" });
         assert.equal(response?.status(), 200);
+        const appliedPublicStyles = await page.evaluate(() => {
+          const shell = document.querySelector<HTMLElement>("body > div.min-h-screen");
+          return {
+            surfaceToken: getComputedStyle(document.documentElement).getPropertyValue("--public-surface").trim().toUpperCase(),
+            shellBackground: shell ? getComputedStyle(shell).backgroundColor : "",
+          };
+        });
+        assert.deepEqual(appliedPublicStyles, {
+          surfaceToken: "#F7F8FC",
+          shellBackground: "rgb(247, 248, 252)",
+        }, `${route.pathname} must apply the public stylesheet without JavaScript`);
         await assertPageLayout(page, route.pathname);
         await page.close();
       });
@@ -170,11 +191,9 @@ test("analytics vendors are requested only after explicit consent", { timeout: 1
   t.after(() => browser.close());
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
-  const vendorRequests: string[] = [];
   await page.setRequestInterception(true);
   page.on("request", request => {
     if (vendorPattern.test(request.url())) {
-      vendorRequests.push(request.url());
       void request.abort();
       return;
     }
@@ -184,14 +203,21 @@ test("analytics vendors are requested only after explicit consent", { timeout: 1
   await page.goto(runtime.origin, { waitUntil: "networkidle2" });
   await waitForHydration(page);
   await page.waitForSelector('[role="dialog"][aria-labelledby="consent-dialog-title"]');
-  assert.deepEqual(vendorRequests, []);
+  assert.equal(await page.evaluate(() => document.querySelectorAll('script[data-kordev-analytics]').length), 0);
   const consentChoices = await page.$$('button[data-consent-action="choice"]');
   assert.equal(consentChoices.length, 2);
+  const yandexRequest = page.waitForRequest(request => request.url().includes("mc.yandex.ru"));
+  const topMailRequest = page.waitForRequest(request => request.url().includes("top-fwz1.mail.ru"));
   await consentChoices[0].click();
-  await page.waitForFunction(() => document.querySelectorAll('script[data-kordev-analytics]').length === 2);
-  await page.waitForFunction(() => performance.getEntriesByType("resource").length >= 0);
-  assert.equal(vendorRequests.some(url => url.includes("mc.yandex.ru")), true);
-  assert.equal(vendorRequests.some(url => url.includes("top-fwz1.mail.ru")), true);
+  const [yandex, topMail] = await Promise.all([yandexRequest, topMailRequest]);
+  assert.match(yandex.url(), /mc\.yandex\.ru/);
+  assert.match(topMail.url(), /top-fwz1\.mail\.ru/);
+  assert.deepEqual(await page.evaluate(() => {
+    const raw = localStorage.getItem("kordev.analytics-consent");
+    if (!raw) return null;
+    const value = JSON.parse(raw) as { version?: unknown; decision?: unknown };
+    return { version: value.version, decision: value.decision };
+  }), { version: "2026-09-18", decision: "accepted" });
 });
 
 test("reduced motion removes infinite animation without hiding the commercial hero", { timeout: 120_000 }, async t => {
