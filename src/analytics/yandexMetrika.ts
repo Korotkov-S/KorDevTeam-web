@@ -15,9 +15,7 @@ export function scheduleYandexMetrika() {
 
 export function trackYandexGoal(goal: YandexGoalName, _params?: YandexGoalParams) {
   const path = typeof window === "undefined" ? undefined : window.location.pathname;
-  if (goal === "journal_issue_open") {
-    track("journal_issue_open", path ? { path } : undefined);
-  } else if (goal === "journal_contact") {
+  if (goal === "journal_contact") {
     track("telegram_click", path ? { path } : undefined);
   }
 }

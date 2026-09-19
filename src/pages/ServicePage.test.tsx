@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import type { ServicePageView } from "../server/content/types";
+import { setAnalyticsSinkForTests, type AnalyticsPayload } from "../lib/analytics";
 
 const dom = new JSDOM('<!doctype html><html lang="ru"><body></body></html>', {
   url: "https://kordev.team/services/integrations/",
@@ -21,7 +22,7 @@ Object.assign(globalThis, {
 });
 
 const require = createRequire(import.meta.url);
-const { cleanup, render, screen } = require("@testing-library/react");
+const { cleanup, fireEvent, render, screen } = require("@testing-library/react");
 require("../i18n");
 const { ServicePage } = require("./ServicePage");
 
@@ -46,7 +47,10 @@ function serviceView(overrides: Partial<ServicePageView> = {}): ServicePageView 
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setAnalyticsSinkForTests(null);
+});
 
 test("service page renders populated commercial blocks in their customer journey order", () => {
   render(<MemoryRouter><ServicePage pathname="/services/integrations/" service={serviceView()} /></MemoryRouter>);
@@ -83,4 +87,19 @@ test("service FAQ is native, server-rendered and omitted when empty", () => {
 
   view.rerender(<MemoryRouter><ServicePage pathname="/services/integrations/" service={serviceView({ faq: [] })} /></MemoryRouter>);
   assert.equal(document.querySelector("details"), null);
+});
+
+test("primary service CTA emits service_cta_click without changing its anchor destination", () => {
+  const events: Array<{ event: string; payload: AnalyticsPayload }> = [];
+  setAnalyticsSinkForTests((event, payload) => events.push({ event, payload }));
+  render(<MemoryRouter><ServicePage pathname="/services/integrations/" service={serviceView()} /></MemoryRouter>);
+
+  const cta = screen.getByRole("link", { name: "Обсудить задачу" });
+  fireEvent.click(cta);
+
+  assert.equal(cta.getAttribute("href"), "#contact");
+  assert.deepEqual(events, [{
+    event: "service_cta_click",
+    payload: { path: "/services/integrations/", serviceSlug: "integrations" },
+  }]);
 });

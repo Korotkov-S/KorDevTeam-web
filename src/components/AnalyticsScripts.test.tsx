@@ -87,10 +87,20 @@ test("stored acceptance loads vendors only after the consent restoration effect"
     decidedAt: "2026-09-18T09:30:00.000Z",
   }));
 
-  render(<ConsentProvider><AnalyticsScripts /></ConsentProvider>);
+  const view = render(<ConsentProvider><AnalyticsScripts /></ConsentProvider>);
 
   await waitFor(() => {
     assert.equal(document.querySelectorAll('script[src*="mc.yandex.ru"]').length, 1);
     assert.equal(document.querySelectorAll('script[src*="top-fwz1.mail.ru"]').length, 1);
   });
+
+  const calls: unknown[][] = [];
+  (window as Window & { ym?: (...args: unknown[]) => void }).ym = (...args: unknown[]) => calls.push(args);
+  view.unmount();
+
+  assert.deepEqual(calls, [[105288175, "destruct"]]);
+  assert.equal(document.querySelector('script[src*="mc.yandex.ru"]'), null);
+  assert.equal(document.querySelector('script[src*="top-fwz1.mail.ru"]'), null);
+  assert.equal((window as Window & { ym?: unknown }).ym, undefined);
+  assert.equal((window as Window & { _tmr?: unknown })._tmr, undefined);
 });

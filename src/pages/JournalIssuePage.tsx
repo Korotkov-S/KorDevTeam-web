@@ -1,33 +1,16 @@
 import { ArrowLeft, BookOpen, Download, ExternalLink, MessageCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { trackYandexGoal } from "../analytics/yandexMetrika";
 import { Section, SectionHeading } from "../components/public/Section";
 import { Button } from "../components/ui/button";
 import { currentJournalIssue } from "../data/journalIssues";
 
-type JournalLocationState = {
-  journalPlacement?: string;
-};
-
 export function JournalIssuePage() {
   const { t } = useTranslation();
-  const location = useLocation();
   const [viewerRequested, setViewerRequested] = useState(false);
-  const openTracked = useRef(false);
   const issue = currentJournalIssue;
-  const placement =
-    (location.state as JournalLocationState | null)?.journalPlacement || "direct";
-
-  useEffect(() => {
-    if (openTracked.current) return;
-    openTracked.current = true;
-    trackYandexGoal("journal_issue_open", {
-      issue: issue.issue,
-      placement,
-    });
-  }, [issue.issue, placement]);
 
   useEffect(() => {
     if (!viewerRequested) return;

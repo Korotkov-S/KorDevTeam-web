@@ -6,6 +6,7 @@ import { ContentCard } from "../components/public/ContentCard";
 import { FaqList } from "../components/public/FaqList";
 import { LeadCtaSection } from "../components/public/LeadCtaSection";
 import { Section, SectionHeading } from "../components/public/Section";
+import { track } from "../lib/analytics";
 import type { BlockView, ServicePageView } from "../server/content/types";
 
 export const SERVICE_SECTION_ORDER = [
@@ -49,6 +50,10 @@ export function ServicePage({ pathname, service }: { pathname: string; service: 
         <a
           href="#contact"
           data-event-name="service_cta_click"
+          onClick={() => {
+            const serviceSlug = pathname.match(/^\/services\/([^/]+)\/?$/)?.[1];
+            track("service_cta_click", { path: pathname, ...(serviceSlug ? { serviceSlug } : {}) });
+          }}
           className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--public-blue)] px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)]"
         >Обсудить задачу</a>
       </Section>

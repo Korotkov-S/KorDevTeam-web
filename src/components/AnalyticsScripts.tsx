@@ -11,14 +11,16 @@ export function AnalyticsScripts(): null {
   const { decision, restorationReady } = useConsent();
 
   useEffect(() => {
+    const ownerDocument = document;
     if (!restorationReady || decision !== "accepted") {
-      setAnalyticsConsent(false);
+      setAnalyticsConsent(ownerDocument, false);
       return;
     }
 
-    setAnalyticsConsent(true);
-    loadYandexMetrika(document);
-    loadTopMailRu(document);
+    setAnalyticsConsent(ownerDocument, true);
+    loadYandexMetrika(ownerDocument);
+    loadTopMailRu(ownerDocument);
+    return () => setAnalyticsConsent(ownerDocument, false);
   }, [decision, restorationReady]);
 
   return null;
