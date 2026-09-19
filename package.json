@@ -108,6 +108,7 @@
     "generate:content-index": "node scripts/generate-content-index.mjs",
     "test:blog": "node --test tests/blogPresentation.test.mjs",
     "test:server": "node --test server/utils/*.test.js",
+    "test:commercial": "tsx --test --test-concurrency=1 tests/visual/commercial-pages.test.ts tests/ssr/seoParity.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
