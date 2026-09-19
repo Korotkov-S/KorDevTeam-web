@@ -23,6 +23,8 @@ import { adminHeaders, requestCspNonce } from "./routes/admin/headers";
 import "./i18n";
 import { PublicFooter } from "./components/public/PublicFooter";
 import { PublicHeader } from "./components/public/PublicHeader";
+import { ConsentBanner } from "./components/public/ConsentBanner";
+import { ConsentProvider } from "./contexts/ConsentContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./styles/index.css";
 
@@ -64,13 +66,16 @@ export default function App() {
   const location = useLocation();
   if (isAdminPath(location.pathname)) return <Outlet />;
   return (
-    <div className="min-h-screen bg-[var(--public-surface)] text-[var(--public-ink)]">
-      <PublicHeader />
-      <main id="main-content">
-        <Outlet />
-      </main>
-      <PublicFooter />
-    </div>
+    <ConsentProvider>
+      <div className="min-h-screen bg-[var(--public-surface)] text-[var(--public-ink)]">
+        <PublicHeader />
+        <main id="main-content">
+          <Outlet />
+        </main>
+        <PublicFooter />
+        <ConsentBanner />
+      </div>
+    </ConsentProvider>
   );
 }
 
