@@ -207,39 +207,43 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
       onSubmit={handleSubmit}
       className={cn("space-y-5", className)}
     >
-      <div>
-        <label htmlFor="lead-name" className="mb-2 block text-sm font-medium text-foreground">
-          {t("contact.form.name")}
-        </label>
-        <Input
-          id="lead-name"
-          name="name"
-          autoComplete="name"
-          required
-          value={fields.name}
-          onChange={(event) => edit("name", event.target.value)}
-          aria-invalid={errors.name ? true : undefined}
-          aria-describedby={errors.name ? "lead-name-error" : undefined}
-        />
-        {errors.name && <p id="lead-name-error" className="mt-1 text-sm text-destructive">{errors.name}</p>}
-      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="lead-name" className="mb-2 block text-sm font-medium text-foreground">
+            {t("contact.form.name")}
+          </label>
+          <Input
+            id="lead-name"
+            name="name"
+            autoComplete="name"
+            required
+            value={fields.name}
+            onChange={(event) => edit("name", event.target.value)}
+            aria-invalid={errors.name ? true : undefined}
+            aria-describedby={errors.name ? "lead-name-error" : undefined}
+            className="h-14 rounded-2xl border-black/10 bg-white px-5 text-base dark:border-white/10 dark:bg-white/10"
+          />
+          {errors.name && <p id="lead-name-error" className="mt-1 text-sm text-destructive">{errors.name}</p>}
+        </div>
 
-      <div>
-        <label htmlFor="lead-phone" className="mb-2 block text-sm font-medium text-foreground">
-          {t("contact.form.phone")}
-        </label>
-        <Input
-          id="lead-phone"
-          name="phone"
-          type="tel"
-          autoComplete="tel"
-          required
-          value={fields.phone}
-          onChange={(event) => edit("phone", event.target.value)}
-          aria-invalid={errors.phone ? true : undefined}
-          aria-describedby={errors.phone ? "lead-phone-error" : undefined}
-        />
-        {errors.phone && <p id="lead-phone-error" className="mt-1 text-sm text-destructive">{errors.phone}</p>}
+        <div>
+          <label htmlFor="lead-phone" className="mb-2 block text-sm font-medium text-foreground">
+            {t("contact.form.phone")}
+          </label>
+          <Input
+            id="lead-phone"
+            name="phone"
+            type="tel"
+            autoComplete="tel"
+            required
+            value={fields.phone}
+            onChange={(event) => edit("phone", event.target.value)}
+            aria-invalid={errors.phone ? true : undefined}
+            aria-describedby={errors.phone ? "lead-phone-error" : undefined}
+            className="h-14 rounded-2xl border-black/10 bg-white px-5 text-base dark:border-white/10 dark:bg-white/10"
+          />
+          {errors.phone && <p id="lead-phone-error" className="mt-1 text-sm text-destructive">{errors.phone}</p>}
+        </div>
       </div>
 
       <div>
@@ -252,6 +256,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
           rows={5}
           value={fields.description}
           onChange={(event) => edit("description", event.target.value)}
+          className="min-h-36 rounded-2xl border-black/10 bg-white px-5 py-4 text-base dark:border-white/10 dark:bg-white/10"
         />
       </div>
 
@@ -269,6 +274,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
             setFile(event.currentTarget.files?.[0] ?? null);
             onFileChange();
           }}
+          className="h-14 rounded-2xl border-black/10 bg-white px-4 py-2.5 text-base file:mr-3 file:rounded-full file:bg-[#0b1020] file:px-4 file:text-white dark:border-white/10 dark:bg-white/10"
         />
         <p id="lead-file-hint" className="mt-1 text-xs text-muted-foreground">{t("contact.form.fileHint")}</p>
       </div>
@@ -316,7 +322,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
           <p>{t("contact.form.responseTime")}</p>
           <p>{t("contact.form.workingHours")}</p>
         </div>
-        <Button type="submit" size="lg" disabled={pending} className="border-0 bg-[var(--public-blue)] text-[var(--public-action-foreground)] hover:bg-[var(--public-violet)]">
+        <Button type="submit" size="lg" disabled={pending} className="min-h-13 rounded-full border-0 bg-[var(--public-blue)] px-7 text-[var(--public-action-foreground)] hover:bg-[var(--public-violet)]">
           {pending ? t("contact.form.submitting") : t("contact.form.submit")}
         </Button>
       </div>

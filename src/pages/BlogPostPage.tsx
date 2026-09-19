@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Button } from "../components/ui/button";
-import { ArrowLeft, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
-import { Badge } from "../components/ui/badge";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import {
@@ -32,6 +31,20 @@ function stripFirstMarkdownH1(md: string): string {
 }
 function stripMarkdownImages(md: string): string {
   return md.replace(/^\s*!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*\n*/gm, "").trim();
+}
+function stripRepeatedLead(md: string, excerpt: string): string {
+  const blocks = md.trim().split(/\n\s*\n/);
+  const first = blocks[0]?.trim() ?? "";
+  if (blocks.length < 2 || /^(?:#{1,6}\s|[-*+]\s|>\s|```|!\[)/.test(first)) return md;
+
+  const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
+  const normalizedFirst = normalize(first);
+  const normalizedExcerpt = normalize(excerpt);
+  const excerptPrefix = normalizedExcerpt.replace(/[\s.,;:!?…—–-]+$/g, "");
+  const repeated = normalizedFirst === normalizedExcerpt
+    || (excerptPrefix.length >= 60 && normalizedFirst.startsWith(excerptPrefix));
+
+  return repeated ? blocks.slice(1).join("\n\n").trim() : md;
 }
 function parseDateToISO(value: string): string | undefined {
   const timestamp = Date.parse(value);
@@ -129,7 +142,7 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const content = stripMarkdownImages(stripFirstMarkdownH1(article.bodyMd));
+  const content = stripRepeatedLead(stripMarkdownImages(stripFirstMarkdownH1(article.bodyMd)), article.excerpt);
   const loading = false;
   const meta: BlogPostMeta = { title: article.title, excerpt: article.excerpt, date: article.publishedAt || "",
     updatedDate: article.updatedAt, readTime: article.readTime, tags: article.tags };
@@ -147,114 +160,92 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
         : [];
 
   return (
-    <>
-      <div className="min-h-screen pt-20">
-        <div className="container mx-auto px-4 py-8">
-        {/* Back Button */}
-        <div className="mb-8 relative" style={{ zIndex: 99999 }}>
-          <Button 
-            variant="ghost" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              navigateGoBack();
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            className="gap-2 relative"
-            style={{ zIndex: 99999 }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {t("blog.backToBlog")}
-          </Button>
-        </div>
+    <main className="min-h-screen pt-20">
+      <div className="mx-auto w-full max-w-[1320px] px-5 py-10 sm:px-8 lg:px-10 lg:py-16">
+        <Button
+          variant="ghost"
+          onClick={(event) => {
+            event.preventDefault();
+            navigateGoBack();
+          }}
+          className="-ml-4 gap-2 rounded-full px-4 text-[var(--public-subtle)]"
+        >
+          <ArrowLeft className="size-4" />
+          {t("blog.backToBlog")}
+        </Button>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="size-12 animate-spin rounded-full border-b-2 border-primary" />
           </div>
         ) : (
-          <article className="max-w-4xl mx-auto" itemScope itemType="https://schema.org/BlogPosting">
-            {/* Article Header */}
-            {meta && (
-              <header className="mb-12 pb-8 border-b border-border">
-                <h1 className="text-4xl md:text-5xl mb-6" itemProp="headline">{meta.title}</h1>
+          <article className="mt-9" itemScope itemType="https://schema.org/BlogPosting">
+            <header>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium uppercase tracking-[0.1em] text-[var(--public-subtle)]">
+                <span>Практика KorDevTeam</span>
+                <time dateTime={parseDateToISO(meta.date)} itemProp="datePublished">{displayDate(meta.date)}</time>
+                <span>{meta.readTime}</span>
+                {meta.updatedDate && meta.updatedDate !== meta.date ? (
+                  <time dateTime={parseDateToISO(meta.updatedDate)} itemProp="dateModified">
+                    Обновлено {displayDate(meta.updatedDate)}
+                  </time>
+                ) : null}
+              </div>
 
-                <div className="flex flex-wrap items-center gap-4 text-muted-foreground mb-6">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <time dateTime={parseDateToISO(meta.date)} itemProp="datePublished">{displayDate(meta.date)}</time>
-                  </div>
-                  {meta.updatedDate && meta.updatedDate !== meta.date && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <time dateTime={parseDateToISO(meta.updatedDate)} itemProp="dateModified">
-                        Обновлено: {displayDate(meta.updatedDate)}
-                      </time>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    <span>{meta.readTime}</span>
-                  </div>
-                </div>
+              <h1 className="mt-7 max-w-[18ch] text-balance text-[clamp(3rem,7vw,7.2rem)] font-semibold leading-[.91] tracking-[-0.065em] text-[var(--public-ink)]" itemProp="headline">
+                {meta.title}
+              </h1>
 
-                <div className="flex flex-wrap gap-2">
-                  {meta.tags.map((tag, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="bg-secondary/50 hover:bg-primary/20 hover:text-primary transition-colors"
-                      itemProp="keywords"
-                    >
-                      {tag}
-                    </Badge>
+              {meta.tags.length ? (
+                <ul className="mt-8 flex flex-wrap gap-2" aria-label="Темы статьи">
+                  {meta.tags.map(tag => (
+                    <li key={tag} className="rounded-full border border-border px-4 py-2 text-sm" itemProp="keywords">{tag}</li>
                   ))}
-                </div>
-                <meta itemProp="description" content={meta.excerpt} />
-                <div itemProp="author" itemScope itemType="https://schema.org/Organization" style={{ display: 'none' }}>
-                  <meta itemProp="name" content="KorDevTeam" />
-                  <meta itemProp="url" content="https://kordev.team" />
-                </div>
-              </header>
-            )}
+                </ul>
+              ) : null}
+            </header>
 
-            {/* Cover image */}
             {heroImageUrls.length ? (
-              <div className="mb-10">
-                <div className="relative w-full aspect-video rounded-lg overflow-hidden">
-                  <PostImageCarousel
-                    images={heroImageUrls}
-                    title={meta?.title || slug || "cover"}
-                  />
-                </div>
+              <div className="relative mt-12 aspect-[16/8.5] w-full overflow-hidden rounded-[2rem] bg-secondary sm:rounded-[3rem]">
+                <PostImageCarousel images={heroImageUrls} title={meta.title || slug || "cover"} />
               </div>
             ) : null}
 
-            {/* Article Content */}
-            <MarkdownContent markdown={content} media={article.media} itemProp="articleBody" />
+            <div className="mt-12 grid gap-12 lg:grid-cols-12 lg:gap-8">
+              <div className="lg:col-span-8 lg:col-start-1">
+                <p className="mb-14 max-w-4xl text-balance text-2xl leading-[1.35] tracking-[-0.02em] text-[var(--public-ink)] sm:text-3xl" itemProp="description">
+                  {meta.excerpt}
+                </p>
+                <MarkdownContent markdown={content} media={article.media} itemProp="articleBody" proseClassName="article-prose" />
+              </div>
 
-            {/* Back to Blog Button */}
-            <div className="mt-12 pt-8 border-t border-border relative" style={{ zIndex: 99999 }}>
-              <Button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  navigateGoBack();
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-                className="gap-2 relative"
-                style={{ zIndex: 99999 }}
-              >
-                <ArrowLeft className="w-4 h-4" />
+              <aside className="lg:col-span-3 lg:col-start-10" aria-label="Об авторе" itemProp="author" itemScope itemType="https://schema.org/Person">
+                <div className="lg:sticky lg:top-28">
+                  <img
+                    src="/blog/media/korotkovsStudio/1166-01.jpg"
+                    alt="Геннадий Коротков"
+                    width="543"
+                    height="659"
+                    loading="lazy"
+                    className="aspect-square w-32 rounded-full object-cover object-[50%_28%]"
+                  />
+                  <p className="mt-6 text-2xl font-semibold leading-none tracking-[-0.035em]" itemProp="name">Геннадий Коротков</p>
+                  <p className="mt-2 text-base text-[var(--public-subtle)]" itemProp="jobTitle">Руководитель KorDevTeam</p>
+                  <a href="https://telegram.me/ideamen51" className="mt-6 inline-block border-b border-current font-medium">Написать автору ↗</a>
+                  <meta itemProp="url" content="https://kordev.team" />
+                </div>
+              </aside>
+            </div>
+
+            <div className="mt-16 border-t border-border pt-8">
+              <Button onClick={navigateGoBack} className="gap-2 rounded-full bg-[var(--public-ink)] px-6 text-background hover:bg-[var(--public-violet)] hover:text-white">
+                <ArrowLeft className="size-4" />
                 {t("blog.backToBlog")}
               </Button>
             </div>
           </article>
         )}
-        </div>
       </div>
-    </>
+    </main>
   );
 }

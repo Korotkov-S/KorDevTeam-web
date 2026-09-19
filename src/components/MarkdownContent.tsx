@@ -34,19 +34,19 @@ function MarkdownVideo({ href }: { href: string }) {
 
 const markdownComponents = {
   h1: ({ node, ...props }: any) => (
-    <h2 className="text-4xl mb-8 mt-12 text-foreground" {...props} />
+    <h2 className="mb-8 mt-16 text-balance text-4xl font-semibold leading-[.98] tracking-[-0.045em] text-foreground sm:text-5xl" {...props} />
   ),
   h2: ({ node, ...props }: any) => (
-    <h2 className="text-3xl mt-12 mb-6 text-foreground" {...props} />
+    <h2 className="mb-8 mt-16 text-balance text-4xl font-semibold leading-[.98] tracking-[-0.045em] text-foreground sm:text-5xl" {...props} />
   ),
   h3: ({ node, ...props }: any) => (
-    <h3 className="text-2xl mt-8 mb-4 text-foreground" {...props} />
+    <h3 className="mb-5 mt-12 text-3xl font-semibold leading-tight tracking-[-0.035em] text-foreground" {...props} />
   ),
   h4: ({ node, ...props }: any) => (
-    <h4 className="text-xl mt-6 mb-3 text-foreground" {...props} />
+    <h4 className="mb-4 mt-10 text-2xl font-semibold tracking-[-0.025em] text-foreground" {...props} />
   ),
   p: ({ node, ...props }: any) => (
-    <p className="text-muted-foreground mb-4 leading-relaxed" {...props} />
+    <p className="mb-6 text-lg leading-[1.7] text-foreground/85 sm:text-xl" {...props} />
   ),
   a: ({ node, ...props }: any) => {
     const href = typeof props.href === "string" ? props.href : "";
@@ -56,28 +56,28 @@ const markdownComponents = {
       return <MarkdownVideo href={href} />;
     }
 
-    return <a className="text-primary hover:underline" {...props} />;
+    return <a className="font-medium text-[var(--public-blue)] underline decoration-1 underline-offset-4" {...props} />;
   },
   code: ({ node, inline, ...props }: any) =>
     inline ? (
-      <code className="bg-secondary text-foreground px-1.5 py-0.5 rounded text-sm" {...props} />
+      <code className="rounded bg-secondary px-1.5 py-0.5 text-sm text-foreground" {...props} />
     ) : (
-      <code className="block bg-secondary text-foreground p-4 rounded-lg overflow-x-auto text-sm" {...props} />
+      <code className="block overflow-x-auto rounded-2xl bg-secondary p-5 text-sm text-foreground" {...props} />
     ),
   pre: ({ node, ...props }: any) => (
-    <pre className="bg-secondary rounded-lg p-4 overflow-x-auto mb-6" {...props} />
+    <pre className="mb-8 overflow-x-auto rounded-2xl bg-secondary p-5" {...props} />
   ),
   ul: ({ node, ...props }: any) => (
-    <ul className="list-disc list-inside text-muted-foreground mb-4 space-y-2 ml-4" {...props} />
+    <ul className="mb-8 ml-5 list-disc space-y-3 text-lg leading-8 text-foreground/85 marker:text-[var(--public-violet)] sm:text-xl" {...props} />
   ),
   ol: ({ node, ...props }: any) => (
-    <ol className="list-decimal list-inside text-muted-foreground mb-4 space-y-2 ml-4" {...props} />
+    <ol className="mb-8 ml-5 list-decimal space-y-3 text-lg leading-8 text-foreground/85 marker:font-semibold marker:text-[var(--public-violet)] sm:text-xl" {...props} />
   ),
-  li: ({ node, ...props }: any) => <li className="text-muted-foreground" {...props} />,
+  li: ({ node, ...props }: any) => <li className="pl-2" {...props} />,
   blockquote: ({ node, ...props }: any) => (
-    <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground my-6" {...props} />
+    <blockquote className="my-12 border-l-4 border-[var(--public-violet)] pl-6 text-2xl leading-[1.45] tracking-[-0.02em] text-foreground sm:pl-8 sm:text-3xl" {...props} />
   ),
-  hr: ({ node, ...props }: any) => <hr className="border-border my-8" {...props} />,
+  hr: ({ node, ...props }: any) => <hr className="my-12 border-border" {...props} />,
   strong: ({ node, ...props }: any) => <strong className="text-foreground" {...props} />,
   img: ({ node, ...props }: any) => {
     const rawSrc = typeof props.src === "string" ? props.src.trim() : "";
@@ -92,7 +92,7 @@ const markdownComponents = {
         decoding={props.decoding ?? "async"}
         fallbackSrc={DEFAULT_FALLBACK_IMAGE_SRC}
         className={cn(
-          "max-w-full h-auto rounded-xl border border-border/50 my-6",
+          "my-12 h-auto w-full max-w-full rounded-[2rem] border border-border/50",
           props.className,
         )}
       />
@@ -132,14 +132,14 @@ export function MarkdownContent({
           loading={props.loading ?? "lazy"}
           decoding={props.decoding ?? "async"}
           fallbackSrc={DEFAULT_FALLBACK_IMAGE_SRC}
-          className={cn("max-w-full h-auto rounded-xl border border-border/50 my-6", props.className)}
+          className={cn("my-12 h-auto w-full max-w-full rounded-[2rem] border border-border/50", props.className)}
         />
       );
     },
   };
   return (
     <div
-      className={cn("prose prose-invert prose-lg max-w-none", proseClassName, className)}
+      className={cn("max-w-none", proseClassName, className)}
       {...divProps}
     >
       <ReactMarkdown

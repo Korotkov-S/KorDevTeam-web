@@ -3,98 +3,162 @@ import { Link } from "react-router-dom";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { CaseCard } from "../components/public/CaseCard";
 import { LeadCtaSection } from "../components/public/LeadCtaSection";
-import { Section, SectionHeading } from "../components/public/Section";
+import { Section } from "../components/public/Section";
 import { ServiceCard } from "../components/public/ServiceCard";
 import type { BlockView, CommercialCaseView } from "../server/content/types";
 
 type CaseSectionName = "hero" | "problem" | "solution" | "stages" | "team" | "screenshots" | "results" | "testimonial" | "services" | "cases" | "lead";
 
-function CaseSection({ name, children }: { name: CaseSectionName; children: React.ReactNode }) {
-  return <div data-case-section={name}>{children}</div>;
+function CaseSection({ name, id, children }: { name: CaseSectionName; id?: string; children: React.ReactNode }) {
+  return <div id={id} data-case-section={name}>{children}</div>;
+}
+
+function StorySection({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+  return (
+    <Section className="border-t border-border py-14 lg:py-20">
+      <div className="grid gap-9 lg:grid-cols-12 lg:gap-8">
+        <header className="lg:col-span-4">
+          <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">{eyebrow}</p>
+          <h2 className="mt-4 text-balance text-4xl font-semibold leading-[.95] tracking-[-0.055em] text-[var(--public-ink)] sm:text-6xl">{title}</h2>
+        </header>
+        <div className="lg:col-span-7 lg:col-start-6">{children}</div>
+      </div>
+    </Section>
+  );
 }
 
 function TextList({ items }: { items: string[] }) {
-  return <ul className="grid gap-3 md:grid-cols-2">{items.map(item => <li key={item} className="rounded-[var(--public-radius-card)] border border-border bg-card p-5 leading-7">{item}</li>)}</ul>;
+  return (
+    <ul className="border-t border-border">
+      {items.map(item => (
+        <li key={item} className="grid grid-cols-[1.5rem_1fr] gap-3 border-b border-border py-5 text-lg leading-7 sm:text-xl">
+          <span aria-hidden="true" className="mt-2 size-2 rounded-full bg-[var(--public-violet)]" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function BlockList({ items }: { items: BlockView[] }) {
-  return <ol className="grid gap-4 md:grid-cols-2">{items.map(item => <li key={`${item.title}:${item.description}`} className="rounded-[var(--public-radius-card)] border border-border p-6">
-    <h3 className="text-xl font-semibold tracking-tight">{item.title}</h3>
-    <p className="mt-3 leading-7 text-[var(--public-subtle)]">{item.description}</p>
-  </li>)}</ol>;
+  return (
+    <ol className="border-t border-border">
+      {items.map((item, index) => (
+        <li key={`${item.title}:${item.description}`} className="grid gap-4 border-b border-border py-7 sm:grid-cols-[4rem_1fr]">
+          <span className="text-sm font-semibold text-[var(--public-violet)]">{String(index + 1).padStart(2, "0")}</span>
+          <div>
+            <h3 className="text-2xl font-semibold tracking-[-0.035em]">{item.title}</h3>
+            <p className="mt-3 text-lg leading-8 text-[var(--public-subtle)]">{item.description}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
 }
 
 export function CommercialCasePage({ pathname, project }: { pathname: string; project: CommercialCaseView }) {
   const hasProblem = Boolean(project.problem) || project.constraints.length > 0;
   const hasSolution = Boolean(project.solution || project.architecture || project.bodyMd.trim())
     || project.integrations.length > 0 || project.technologies.length > 0 || project.features.length > 0;
+  const index = [
+    hasProblem ? ["Задача", "#case-problem"] : null,
+    hasSolution ? ["Решение", "#case-solution"] : null,
+    project.stages.length ? ["Этапы", "#case-stages"] : null,
+    project.team.length ? ["Команда", "#case-team"] : null,
+    project.screenshots.length ? ["Интерфейс", "#case-screenshots"] : null,
+    project.results.length ? ["Результаты", "#case-results"] : null,
+  ].filter((item): item is string[] => Boolean(item));
 
-  return <article>
-    <CaseSection name="hero">
-      <Section className="pt-28 sm:pt-32">
-        <nav aria-label="Хлебные крошки" className="mb-8 text-sm text-[var(--public-subtle)]">
-          <Link className="underline underline-offset-4" to="/cases/">Кейсы</Link>
-          <span aria-hidden="true"> / </span>
-          <span aria-current="page">{project.h1}</span>
-        </nav>
-        <SectionHeading level={1} eyebrow="Кейс" title={project.h1} description={project.summary} />
-        {(project.demoUrl || project.githubUrl) && <div className="mt-8 flex flex-wrap gap-4">
-          {project.demoUrl && <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full bg-[var(--public-blue)] px-5 py-3 text-sm font-semibold text-[var(--public-action-foreground)]">Открыть проект</a>}
-          {project.githubUrl && <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full border border-border px-5 py-3 text-sm font-semibold text-[var(--public-blue)]">Исходный код</a>}
-        </div>}
-      </Section>
-    </CaseSection>
+  return (
+    <article>
+      <CaseSection name="hero">
+        <Section className="pt-28 pb-12 sm:pt-32 lg:pb-16">
+          <nav aria-label="Хлебные крошки" className="mb-8 text-sm text-[var(--public-subtle)]">
+            <Link className="underline underline-offset-4" to="/cases/">Кейсы</Link>
+            <span aria-hidden="true"> / </span>
+            <span aria-current="page">{project.h1}</span>
+          </nav>
 
-    {hasProblem && <CaseSection name="problem"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Контекст" title="Задача" />
-      {project.problem && <MarkdownContent markdown={project.problem} media={project.media} proseClassName="mt-8 max-w-4xl" />}
-      {project.constraints.length > 0 && <div className="mt-8"><h3 className="mb-4 text-lg font-semibold">Ограничения</h3><TextList items={project.constraints} /></div>}
-    </Section></CaseSection>}
+          <div className="overflow-hidden rounded-[2rem] bg-[#dfe8ff] px-6 py-9 text-[#0b1020] dark:bg-[#18243c] dark:text-white sm:rounded-[3rem] sm:px-10 sm:py-12 lg:px-14 lg:py-16">
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#6541d8] dark:text-[#b7a7ff]">Кейс KorDevTeam</p>
+            <h1 className="mt-7 max-w-[17ch] text-balance text-[clamp(3rem,7vw,7rem)] font-semibold leading-[.9] tracking-[-0.065em]">{project.h1}</h1>
+            <div className="mt-9 grid gap-7 border-t border-black/15 pt-7 dark:border-white/15 lg:grid-cols-12">
+              <p className="max-w-3xl text-xl leading-8 text-[#3f4a60] dark:text-[#c0c8d8] sm:text-2xl lg:col-span-8">{project.summary}</p>
+              {(project.demoUrl || project.githubUrl) ? (
+                <div className="flex flex-wrap gap-3 lg:col-span-4 lg:justify-end">
+                  {project.demoUrl ? <a href={project.demoUrl} aria-label="Открыть проект" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center rounded-full bg-[var(--public-blue)] px-6 py-3 text-sm font-semibold text-[var(--public-action-foreground)] hover:bg-[var(--public-violet)]">Открыть проект ↗</a> : null}
+                  {project.githubUrl ? <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center rounded-full border border-current px-6 py-3 text-sm font-semibold">Исходный код ↗</a> : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
 
-    {hasSolution && <CaseSection name="solution"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Подход" title="Решение" />
-      {project.solution && <MarkdownContent markdown={project.solution} media={project.media} proseClassName="mt-8 max-w-4xl" />}
-      {project.architecture && <div className="mt-8"><h3 className="text-lg font-semibold">Архитектура</h3><MarkdownContent markdown={project.architecture} media={project.media} proseClassName="mt-3 max-w-4xl" /></div>}
-      {project.features.length > 0 && <div className="mt-8"><h3 className="mb-4 text-lg font-semibold">Возможности</h3><TextList items={project.features} /></div>}
-      {(project.integrations.length > 0 || project.technologies.length > 0) && <div className="mt-8 grid gap-8 md:grid-cols-2">
-        {project.integrations.length > 0 && <div><h3 className="mb-4 text-lg font-semibold">Интеграции</h3><TextList items={project.integrations} /></div>}
-        {project.technologies.length > 0 && <div><h3 className="mb-4 text-lg font-semibold">Технологии</h3><TextList items={project.technologies} /></div>}
-      </div>}
-      {project.bodyMd.trim() && <MarkdownContent markdown={project.bodyMd} media={project.media} proseClassName="mt-10 max-w-4xl" />}
-    </Section></CaseSection>}
+          {index.length ? (
+            <nav aria-label="Навигация по кейсу" className="mt-6 border-y border-border">
+              <ul className="flex flex-wrap gap-x-8 gap-y-1 py-4">
+                {index.map(([label, href], itemIndex) => (
+                  <li key={href} className="inline-flex items-center text-sm font-semibold uppercase tracking-[0.09em]">
+                    <span aria-hidden="true" className="mr-2 text-[var(--public-violet)]">{String(itemIndex + 1).padStart(2, "0")}</span>
+                    <a href={href} className="py-2 text-[var(--public-subtle)] hover:text-[var(--public-ink)]">
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ) : null}
+        </Section>
+      </CaseSection>
 
-    {project.stages.length > 0 && <CaseSection name="stages"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Реализация" title="Этапы проекта" /><div className="mt-8"><BlockList items={project.stages} /></div>
-    </Section></CaseSection>}
+      {hasProblem ? <CaseSection name="problem" id="case-problem">
+        <StorySection eyebrow="Контекст" title="Задача">
+          {project.problem ? <MarkdownContent markdown={project.problem} media={project.media} /> : null}
+          {project.constraints.length ? <div className="mt-10"><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Ограничения</h3><TextList items={project.constraints} /></div> : null}
+        </StorySection>
+      </CaseSection> : null}
 
-    {project.team.length > 0 && <CaseSection name="team"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Команда" title="Кто работал над проектом" /><div className="mt-8"><TextList items={project.team} /></div>
-    </Section></CaseSection>}
+      {hasSolution ? <CaseSection name="solution" id="case-solution">
+        <StorySection eyebrow="Подход" title="Решение">
+          {project.solution ? <MarkdownContent markdown={project.solution} media={project.media} /> : null}
+          {project.architecture ? <div className="mt-10"><h3 className="text-2xl font-semibold tracking-[-0.03em]">Архитектура</h3><MarkdownContent markdown={project.architecture} media={project.media} proseClassName="mt-4" /></div> : null}
+          {project.features.length ? <div className="mt-10"><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Возможности</h3><TextList items={project.features} /></div> : null}
+          {(project.integrations.length || project.technologies.length) ? <div className="mt-12 grid gap-10 sm:grid-cols-2">
+            {project.integrations.length ? <div><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Интеграции</h3><TextList items={project.integrations} /></div> : null}
+            {project.technologies.length ? <div><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Технологии</h3><TextList items={project.technologies} /></div> : null}
+          </div> : null}
+          {project.bodyMd.trim() ? <MarkdownContent markdown={project.bodyMd} media={project.media} proseClassName="mt-12" /> : null}
+        </StorySection>
+      </CaseSection> : null}
 
-    {project.screenshots.length > 0 && <CaseSection name="screenshots"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Интерфейс" title="Скриншоты" />
-      <div className="mt-8 grid gap-5 md:grid-cols-2">{project.screenshots.map(image => <img key={image.id} src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className="w-full rounded-[var(--public-radius-card)] border border-border object-cover" />)}</div>
-    </Section></CaseSection>}
+      {project.stages.length ? <CaseSection name="stages" id="case-stages"><StorySection eyebrow="Реализация" title="Этапы проекта"><BlockList items={project.stages} /></StorySection></CaseSection> : null}
 
-    {project.results.length > 0 && <CaseSection name="results"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Подтверждённый эффект" title="Результаты" /><div className="mt-8"><BlockList items={project.results} /></div>
-    </Section></CaseSection>}
+      {project.team.length ? <CaseSection name="team" id="case-team"><StorySection eyebrow="Команда" title="Кто работал над проектом"><TextList items={project.team} /></StorySection></CaseSection> : null}
 
-    {project.testimonial && <CaseSection name="testimonial"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Обратная связь" title="Отзыв клиента" />
-      <blockquote className="mt-8 max-w-4xl rounded-[var(--public-radius-card)] bg-[color:color-mix(in_srgb,var(--public-green)_10%,var(--card))] p-6 text-xl leading-8 sm:p-8">{project.testimonial}</blockquote>
-    </Section></CaseSection>}
+      {project.screenshots.length ? <CaseSection name="screenshots" id="case-screenshots">
+        <Section className="border-t border-border py-14 lg:py-20">
+          <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Интерфейс</p>
+          <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Продукт в работе</h2>
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">{project.screenshots.map((image, index) => <img key={image.id} src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className={`w-full rounded-[2rem] border border-border object-cover ${index === 0 && project.screenshots.length % 2 ? "lg:col-span-2" : ""}`} />)}</div>
+        </Section>
+      </CaseSection> : null}
 
-    {project.relatedServices.length > 0 && <CaseSection name="services"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Что сделали" title="Связанные услуги" />
-      <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{project.relatedServices.map(service => <ServiceCard key={service.slug} service={service} />)}</div>
-    </Section></CaseSection>}
+      {project.results.length ? <CaseSection name="results" id="case-results">
+        <Section className="border-t border-border py-14 lg:py-20">
+          <div className="rounded-[2rem] bg-[#0b1020] px-6 py-10 text-white sm:rounded-[3rem] sm:px-10 lg:px-14 lg:py-14">
+            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[#b7a7ff]">Подтверждённый эффект</p>
+            <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Результаты</h2>
+            <div className="mt-10 [&_ol]:border-white/20 [&_li]:border-white/20 [&_p]:text-white/70"><BlockList items={project.results} /></div>
+          </div>
+        </Section>
+      </CaseSection> : null}
 
-    {project.relatedCases.length > 0 && <CaseSection name="cases"><Section className="border-t border-border">
-      <SectionHeading eyebrow="Ещё практика" title="Другие кейсы" />
-      <div className="mt-8 grid gap-5 md:grid-cols-2">{project.relatedCases.map((item, index) => <CaseCard key={item.slug} project={item} tone={index % 2 ? "green" : "violet"} />)}</div>
-    </Section></CaseSection>}
+      {project.testimonial ? <CaseSection name="testimonial"><StorySection eyebrow="Обратная связь" title="Отзыв клиента"><blockquote className="text-3xl leading-[1.35] tracking-[-0.03em] sm:text-4xl">{project.testimonial}</blockquote></StorySection></CaseSection> : null}
 
-    <CaseSection name="lead"><LeadCtaSection pagePath={pathname} title={project.cta.title ?? "Обсудить похожую задачу"} description={project.cta.text ?? undefined} /></CaseSection>
-  </article>;
+      {project.relatedServices.length ? <CaseSection name="services"><Section className="border-t border-border py-14 lg:py-20"><p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Что сделали</p><h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Связанные услуги</h2><div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{project.relatedServices.map(service => <ServiceCard key={service.slug} service={service} />)}</div></Section></CaseSection> : null}
+
+      {project.relatedCases.length ? <CaseSection name="cases"><Section className="border-t border-border py-14 lg:py-20"><p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Ещё практика</p><h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Другие кейсы</h2><div className="mt-10 grid gap-5 md:grid-cols-2">{project.relatedCases.map((item, index) => <CaseCard key={item.slug} project={item} tone={index % 2 ? "green" : "violet"} />)}</div></Section></CaseSection> : null}
+
+      <CaseSection name="lead"><LeadCtaSection pagePath={pathname} title={project.cta.title ?? "Обсудить похожую задачу"} description={project.cta.text ?? undefined} /></CaseSection>
+    </article>
+  );
 }

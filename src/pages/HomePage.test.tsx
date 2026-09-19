@@ -55,6 +55,17 @@ test("home omits empty content categories while retaining its contact form", () 
   assert.ok(screen.getByText("Пн–Пт, 09:00–18:00 по Москве"));
 });
 
+test("contact form is introduced by the person who answers the request", () => {
+  render(<MemoryRouter><HomePage services={[]} projects={[]} posts={[]} /></MemoryRouter>);
+
+  const contact = document.getElementById("contact");
+  assert.ok(contact);
+  const portrait = within(contact).getByRole("img", { name: "Геннадий Коротков" });
+  assert.equal(portrait.getAttribute("src"), "/team/gennady-korotkov.jpg");
+  assert.ok(within(contact).getByText("Руководитель KorDevTeam"));
+  assert.ok(within(contact).getByText(/лично посмотрю задачу/i));
+});
+
 test("home cards retain responsive media and use a verified result when present", () => {
   const image = { id: "image", src: "/media/case.webp", srcSet: "/media/case-640.webp 640w, /media/case.webp 1280w", sizes: "100vw", alt: "Экран заказов", decorative: false, width: 1280, height: 800 };
   render(<MemoryRouter><HomePage projects={[{ ...projects[0], result: "Единый кабинет заказов", image }]} posts={[{ ...posts[0], image: { ...image, alt: "Обложка статьи" } }]} /></MemoryRouter>);

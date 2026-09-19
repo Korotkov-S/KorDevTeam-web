@@ -72,6 +72,21 @@ test("case page omits unsupported proof and preserves the narrative order", () =
   );
 });
 
+test("case page exposes an editorial section index for its available story", () => {
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView()} /></MemoryRouter>);
+
+  const navigation = screen.getByRole("navigation", { name: "Навигация по кейсу" });
+  assert.deepEqual(
+    [...navigation.querySelectorAll("a")].map(link => [link.textContent, link.getAttribute("href")]),
+    [
+      ["Задача", "#case-problem"],
+      ["Решение", "#case-solution"],
+      ["Этапы", "#case-stages"],
+      ["Команда", "#case-team"],
+    ],
+  );
+});
+
 test("case page renders confirmed proof and links without hiding related navigation", () => {
   render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView({
     demoUrl: "https://example.com/product",
