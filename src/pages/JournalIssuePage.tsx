@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { trackYandexGoal } from "../analytics/yandexMetrika";
+import { Section, SectionHeading } from "../components/public/Section";
 import { Button } from "../components/ui/button";
 import { currentJournalIssue } from "../data/journalIssues";
 
@@ -50,8 +51,8 @@ export function JournalIssuePage() {
 
   return (
     <>
-      <article className="min-h-screen px-4 pb-24 pt-28 sm:px-6">
-        <div className="mx-auto max-w-7xl">
+      <article className="min-h-screen">
+        <Section className="pt-28 lg:pt-32">
           <Link
             to="/journal/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -76,16 +77,12 @@ export function JournalIssuePage() {
             </div>
 
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-300">
-                <BookOpen className="h-4 w-4" />
-                {t("journal.issueLabel", { issue: issue.issue })}
-              </span>
-              <h1 className="mt-6 text-4xl font-bold leading-tight text-foreground md:text-6xl">
-                {t("journal.issueTitle")}
-              </h1>
-              <p className="mt-5 text-xl font-medium text-foreground/90 md:text-2xl">
-                {t("journal.issueSubtitle")}
-              </p>
+              <SectionHeading
+                level={1}
+                eyebrow={t("journal.issueLabel", { issue: issue.issue })}
+                title={t("journal.issueTitle")}
+                description={t("journal.issueSubtitle")}
+              />
               <p className="mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground">
                 {t("journal.issueDescription")}
               </p>
@@ -205,7 +202,7 @@ export function JournalIssuePage() {
               </a>
             </Button>
           </aside>
-        </div>
+        </Section>
       </article>
     </>
   );

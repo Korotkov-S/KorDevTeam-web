@@ -40,7 +40,7 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
     "/services/integrations/",
     "/services/ai-automation/",
   ];
-  for (const pathname of ["/", "/services/", ...serviceDetailPaths, "/blog/", "/blog/business-automation/", "/cases/", "/cases/web-site/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/"]) {
+  for (const pathname of ["/", "/services/", ...serviceDetailPaths, "/blog/", "/blog/business-automation/", "/cases/", "/cases/web-site/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/", "/requisites/", "/privacy/"]) {
     await t.test(pathname, async () => {
       const response = await fetch(`${runtime.origin}${pathname}`);
       assert.equal(response.status, 200);
@@ -104,6 +104,20 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
         assert.ok((await noJs.$eval("article", el => el.textContent))!.trim().length > 300);
         assert.ok(await noJs.$('form input[name="pagePath"]'));
       }
+      if (pathname === "/privacy/") {
+        const policyText = await noJs.$eval("article", element => element.textContent ?? "");
+        for (const required of ["2026-09-18", "Яндекс.Метрика", "Top.Mail.Ru", "отказ"]) {
+          assert.match(policyText, new RegExp(required, "i"));
+        }
+        assert.ok(await noJs.$('button[data-consent-settings="true"]'));
+      }
+      if (pathname === "/requisites/") {
+        const details = await noJs.$eval("article", element => element.textContent ?? "");
+        for (const required of [/Индивидуальный предприниматель Коротков Александр Евгеньевич/, /ИНН\s*519098647630/, /ОГРНИП\s*324330000002550/, /team@korotkov\.dev/]) {
+          assert.match(details, required);
+        }
+        assert.doesNotMatch(details, /банковск|расч[её]тный сч[её]т|домашн.*адрес/i);
+      }
       await noJs.close();
     });
   }
@@ -139,6 +153,8 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
   });
   assert.equal(legacy.status, 301);
   assert.equal(legacy.location, "https://kordev.team/cases/web-site/?utm_source=test");
+  const legacyTarget = await fetch(`${runtime.origin}${new URL(legacy.location).pathname}`, { redirect: "manual", headers: { accept: "text/html" } });
+  assert.equal(legacyTarget.status, 200);
   const unknownLegacy = await fetch(`${runtime.origin}/project/not-published`, { redirect: "manual", headers: { accept: "text/html" } });
   assert.equal(unknownLegacy.status, 404);
 });

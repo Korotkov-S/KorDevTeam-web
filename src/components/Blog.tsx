@@ -1,30 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import {
-  Calendar,
-  Clock,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { motion } from "motion/react";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  type CarouselApi,
-} from "./ui/carousel";
 import {
   Pagination,
   PaginationContent,
@@ -38,10 +14,12 @@ import {
   buildPaginationItems,
   getBlogPageHref,
   normalizeBlogPage,
-  parseBlogDate,
   formatBlogDate,
   sortBlogPostsByDate,
 } from "../lib/blogPresentation.mjs";
+import type { ContentCardView } from "../server/content/types";
+import { ContentCard } from "./public/ContentCard";
+import { Section, SectionHeading } from "./public/Section";
 
 export interface BlogPost {
   id: string;
@@ -64,135 +42,24 @@ function normalizePublicAssetUrl(url: string | undefined): string {
   return `/${s.replace(/^\.\//, "")}`;
 }
 
-function normalizePublicAssetUrls(urls: Array<string | undefined>): string[] {
-  return [
-    ...new Set(
-      urls.map((url) => normalizePublicAssetUrl(url)).filter(Boolean),
-    ),
-  ];
-}
-
-function mapPostImageUrls(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return normalizePublicAssetUrls(value.map((url) => String(url || "")));
-}
-
-function getPostMediaImages(post: BlogPost, fallbackSrc: string): string[] {
-  const images = normalizePublicAssetUrls([
-    post.coverUrl,
-    ...(post.imageUrls || []),
-  ]);
-  return images.length ? images : [fallbackSrc];
-}
-
-function BlogCardMedia({
-  images,
-  title,
-  gradientClassName,
-}: {
-  images: string[];
-  title: string;
-  gradientClassName: string;
-}) {
-  const [api, setApi] = useState<CarouselApi>();
-  const safeImages = images.length ? images : ["/opengraphlogo.jpeg"];
-
-  if (safeImages.length === 1) {
-    return (
-      <>
-        <ImageWithFallback
-          src={safeImages[0]}
-          alt={title}
-          fallbackSrc="/opengraphlogo.jpeg"
-          fallbackClassName="block w-full h-full object-contain box-border p-4"
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-        />
-        <div
-          className={`absolute inset-0 bg-gradient-to-br ${gradientClassName} opacity-30 group-hover:opacity-50 transition-opacity`}
-        />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <Carousel
-        setApi={setApi}
-        opts={{ loop: true }}
-        className="h-full [&_[data-slot=carousel-content]]:h-full"
-      >
-        <CarouselContent className="h-full -ml-0">
-          {safeImages.map((src, imageIndex) => (
-            <CarouselItem key={`${src}-${imageIndex}`} className="h-full pl-0">
-              <ImageWithFallback
-                src={src}
-                alt={`${title} - ${imageIndex + 1}`}
-                fallbackSrc="/opengraphlogo.jpeg"
-                fallbackClassName="block w-full h-full object-contain box-border p-4"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-      </Carousel>
-      <div
-        className={`absolute inset-0 pointer-events-none bg-gradient-to-br ${gradientClassName} opacity-30 group-hover:opacity-50 transition-opacity`}
-      />
-      <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-3 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          type="button"
-          size="icon"
-          variant="secondary"
-          aria-label="Предыдущее изображение"
-          className="size-8 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            api?.scrollPrev();
-          }}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="secondary"
-          aria-label="Следующее изображение"
-          className="size-8 rounded-full bg-background/80 backdrop-blur-md hover:bg-background"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            api?.scrollNext();
-          }}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          <ChevronRight className="size-4" />
-        </Button>
-      </div>
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-        {safeImages.map((src, imageIndex) => (
-          <span
-            key={`${src}-dot-${imageIndex}`}
-            className="size-1.5 rounded-full bg-background/80 shadow-sm"
-          />
-        ))}
-      </div>
-    </>
-  );
-}
-
-function getBlogDateTime(value: string) {
-  const timestamp = parseBlogDate(value);
-  return timestamp === null
-    ? undefined
-    : new Date(timestamp).toISOString();
+function blogContentCard(post: BlogPost, fallbackSrc: string): ContentCardView {
+  const src = normalizePublicAssetUrl(post.coverUrl || post.imageUrls?.[0] || fallbackSrc);
+  return {
+    slug: post.slug,
+    title: post.title,
+    summary: post.excerpt,
+    tags: post.tags ?? [],
+    image: src ? {
+      id: `blog:${post.id}`,
+      src,
+      srcSet: "",
+      sizes: "(min-width: 768px) 33vw, 100vw",
+      alt: post.title,
+      decorative: false,
+      width: null,
+      height: null,
+    } : null,
+  };
 }
 
 export function Blog({
@@ -204,9 +71,9 @@ export function Blog({
   mode?: "preview" | "index";
   posts?: BlogPost[];
 } = {}) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const sectionRef = useRef<HTMLElement | null>(null);
+  const sectionRef = useRef<HTMLDivElement | null>(null);
   const postsPerPage = mode === "preview" ? 3 : 6;
 
   const blogPosts = posts;
@@ -253,13 +120,11 @@ export function Blog({
 
     window.requestAnimationFrame(() => {
       sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      document.getElementById("blog-heading")?.focus({ preventScroll: true });
+      sectionRef.current?.focus({ preventScroll: true });
     });
   };
 
   const paginationItems = buildPaginationItems(currentPage, totalPages);
-  const MotionHeading = mode === "index" ? motion.h1 : motion.h2;
-
   const postCardImageBySlug: Record<string, string> = {
     "krasotulya-crm-launch": "/blog/krasotula1.jpeg",
     "krasotulya-problem-1-data-fragmentation": "/blog/krasotula2.jpeg",
@@ -273,161 +138,31 @@ export function Blog({
     "/projects/harmonizeMe.png",
     "/projects/sims.png",
   ];
-  const gradients = [
-    "from-blue-500 to-cyan-500",
-    "from-purple-500 to-pink-500",
-    "from-cyan-500 to-blue-500",
-  ];
-
   return (
-    <section
-      {...(withId ? { id: "blog" } : {})}
-      ref={sectionRef}
-      className="scroll-mt-20 py-28 px-4 sm:px-6 relative"
-      itemScope
-      itemType="https://schema.org/Blog"
-    >
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="inline-block mb-4"
-          >
-            <span className="px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-sm">
-              {t("blog.title")}
-            </span>
-          </motion.div>
-
-          <MotionHeading
-            id="blog-heading"
-            tabIndex={-1}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-4xl md:text-6xl font-bold text-foreground mb-6"
-            itemProp="name"
-          >
-            {t("blog.title")}
-          </MotionHeading>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-xl text-muted-foreground max-w-2xl mx-auto"
-            itemProp="description"
-          >
-            {t("blog.subtitle")}
-          </motion.p>
+    <Section id={withId ? "blog" : undefined} className="scroll-mt-20 pt-32 lg:pt-36">
+      <div ref={sectionRef} tabIndex={-1}>
+        <div className="mb-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <SectionHeading
+            level={mode === "index" ? 1 : 2}
+            eyebrow={t("blog.title")}
+            title={t("blog.title")}
+            description={t("blog.subtitle")}
+          />
           {mode === "preview" && (
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.25 }}
-              className="mt-4"
-            >
-              <Link
-                to="/blog/"
-                className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline underline-offset-4"
-              >
-                {t("blog.allArticles")} →
-              </Link>
-            </motion.p>
+            <Link to="/blog/" className="font-semibold text-[var(--public-blue)] underline underline-offset-4">
+              {t("blog.allArticles")} →
+            </Link>
           )}
         </div>
 
-        <div
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8"
-          itemScope
-          itemType="https://schema.org/ItemList"
-        >
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {currentPosts.map((post, index) => (
-            <motion.article
+            <ContentCard
               key={post.id}
-              itemScope
-              itemType="https://schema.org/BlogPosting"
-              itemProp="itemListElement"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{ y: -8 }}
-              className="group"
-              style={{ zIndex: 50 }}
-            >
-              <Link
-                to={`/blog/${post.slug}/`}
-                className="block relative h-full rounded-2xl overflow-hidden bg-card/60 dark:bg-white/5 backdrop-blur-sm border border-border dark:border-white/10 hover:border-border/70 dark:hover:border-white/20 transition-all duration-300"
-              >
-                <div className="relative aspect-video overflow-hidden">
-                  <BlogCardMedia
-                    images={getPostMediaImages(
-                      post,
-                      postCardImageBySlug[post.slug] ??
-                        cardImages[index % cardImages.length],
-                    )}
-                    title={post.title}
-                    gradientClassName={gradients[index % gradients.length]}
-                  />
-
-                  <div className="absolute top-4 left-4">
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-background/40 dark:bg-white/10 backdrop-blur-md border border-border dark:border-white/20 text-foreground dark:text-white">
-                      {post.tags?.[0] ?? "Blog"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      <time
-                        dateTime={getBlogDateTime(post.date)}
-                        itemProp="datePublished"
-                      >
-                        {formatBlogDate(post.date)}
-                      </time>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{post.readTime}</span>
-                    </div>
-                  </div>
-
-                  <h3
-                    className="text-xl font-bold text-foreground mb-3 group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-purple-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300"
-                    itemProp="headline"
-                  >
-                    {post.title}
-                  </h3>
-
-                  <p
-                    className="text-muted-foreground mb-4 leading-relaxed"
-                    itemProp="description"
-                  >
-                    {post.excerpt}
-                  </p>
-
-                  <meta
-                    itemProp="url"
-                    content={`https://kordev.team/blog/${post.slug}/`}
-                  />
-
-                  <div className="flex items-center gap-2 text-blue-400 group-hover:text-purple-400 transition-colors">
-                    <span className="text-sm font-medium">
-                      {t("blog.readMore")}
-                    </span>
-                    <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                  </div>
-                </div>
-              </Link>
-            </motion.article>
+              post={blogContentCard(post, postCardImageBySlug[post.slug] ?? cardImages[index % cardImages.length])}
+              meta={[formatBlogDate(post.date), post.readTime].filter(Boolean).join(" · ")}
+              actionLabel={t("blog.readMore")}
+            />
           ))}
         </div>
 
@@ -570,6 +305,6 @@ export function Blog({
           </Pagination>
         )}
       </div>
-    </section>
+    </Section>
   );
 }

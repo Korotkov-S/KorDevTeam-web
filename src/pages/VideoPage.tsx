@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "../components/ui/button";
+import { LeadCtaSection } from "../components/public/LeadCtaSection";
+import { Section, SectionHeading } from "../components/public/Section";
 import {
   Volume2,
   VolumeX,
@@ -82,28 +83,30 @@ export function VideoPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-white dark:bg-black flex md:items-center justify-center pt-[100px] md:pt-20">
-        <div className="w-full max-w-6xl mx-auto px-4">
+      <Section className="min-h-screen pt-28 lg:pt-32">
           {/* Кнопка возврата */}
-          <div className="mb-6 relative" style={{ zIndex: 10001 }}>
+          <div className="relative mb-8">
             <button
               type="button"
               onClick={() => navigate(-1)}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
-              className="text-black dark:text-white hover:bg-black/10 dark:hover:bg-white/20 px-4 py-2 rounded-md flex items-center gap-2 cursor-pointer transition-colors"
-              style={{ zIndex: 10001 }}
+              className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-4 py-2 text-[var(--public-ink)] transition-colors hover:bg-card"
             >
               <ArrowLeft className="h-5 w-5" />
               Назад
             </button>
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold text-black dark:text-white mb-6">Видео KorDevTeam</h1>
-          <p className="text-muted-foreground mb-8">Видео-презентация команды: наш подход к разработке и примеры работ.</p>
+          <SectionHeading
+            level={1}
+            eyebrow="Видео"
+            title="Видео KorDevTeam"
+            description="Видео-презентация команды: наш подход к разработке и примеры работ."
+          />
           {/* Видео */}
-          <div className="w-[80%] mx-auto">
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden pointer-events-none">
+          <div className="mx-auto mt-10 w-full max-w-5xl">
+            <div className="relative aspect-video overflow-hidden rounded-[var(--public-radius-card)] border border-border bg-black pointer-events-none">
               {isVideoError ? (
                 <div className="w-full h-full flex items-center justify-center text-white/80 px-6 text-center">
                   Видео не найдено или временно недоступно.
@@ -131,16 +134,15 @@ export function VideoPage() {
           {/* Video controls */}
           {!isVideoError && (
           <div
-            className="w-[80%] mx-auto mt-4 flex items-center justify-center gap-4 relative"
-            style={{ zIndex: 9999 }}
+            className="relative mx-auto mt-4 flex w-full max-w-5xl items-center justify-center gap-4"
           >
             <button
               type="button"
               onClick={togglePlayPause}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
+              aria-label={isPlaying ? "Поставить видео на паузу" : "Воспроизвести видео"}
               className="bg-white/90 hover:bg-white text-black h-12 w-12 rounded-full cursor-pointer flex items-center justify-center transition-colors"
-              style={{ zIndex: 10000 }}
             >
               {isPlaying ? (
                 <Pause className="h-6 w-6" />
@@ -153,8 +155,8 @@ export function VideoPage() {
               onClick={toggleMute}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
+              aria-label={isMuted ? "Включить звук" : "Выключить звук"}
               className="bg-white/90 hover:bg-white text-black h-12 w-12 rounded-full cursor-pointer flex items-center justify-center transition-colors"
-              style={{ zIndex: 10000 }}
             >
               {isMuted ? (
                 <VolumeX className="h-6 w-6" />
@@ -167,15 +169,19 @@ export function VideoPage() {
               onClick={restartVideo}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
+              aria-label="Начать видео сначала"
               className="bg-white/90 hover:bg-white text-black h-12 w-12 rounded-full cursor-pointer flex items-center justify-center transition-colors"
-              style={{ zIndex: 10000 }}
             >
               <RotateCw className="h-6 w-6" />
             </button>
           </div>
           )}
-        </div>
-      </div>
+      </Section>
+      <LeadCtaSection
+        pagePath="/video/"
+        title="Обсудить похожий проект"
+        description="Расскажите о задаче — предложим следующий шаг в течение рабочего дня."
+      />
     </>
   );
 }
