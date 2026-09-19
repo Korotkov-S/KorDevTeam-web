@@ -42,6 +42,9 @@ export function JournalIndexPage() {
               meta={t("journal.issueLabel", { issue: issue.issue })}
               eagerImage={index === 0}
               linkState={{ journalPlacement: "journal_archive_button" }}
+              headingLevel={2}
+              imageAspectClass="aspect-[960/1358]"
+              imageObjectFitClass="object-contain"
             />
             <a
               href={issue.pdfUrl}

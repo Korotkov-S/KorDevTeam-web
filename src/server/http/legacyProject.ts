@@ -26,7 +26,6 @@ function exactLegacyPath(pathname: string): string {
 
 export function legacyProjectDecision(request: Request): LegacyProjectDecision | null {
   if (!["GET", "HEAD"].includes(request.method)) return null;
-  if (!(request.headers.get("accept") ?? "").includes("text/html")) return null;
   const source = new URL(request.url);
   return LEGACY_PROJECT_DECISIONS[exactLegacyPath(source.pathname)] ?? null;
 }

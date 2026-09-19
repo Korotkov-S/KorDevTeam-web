@@ -14,6 +14,7 @@ import {
   buildPaginationItems,
   getBlogPageHref,
   normalizeBlogPage,
+  parseBlogDate,
   formatBlogDate,
   sortBlogPostsByDate,
 } from "../lib/blogPresentation.mjs";
@@ -42,24 +43,38 @@ function normalizePublicAssetUrl(url: string | undefined): string {
   return `/${s.replace(/^\.\//, "")}`;
 }
 
-function blogContentCard(post: BlogPost, fallbackSrc: string): ContentCardView {
-  const src = normalizePublicAssetUrl(post.coverUrl || post.imageUrls?.[0] || fallbackSrc);
+function blogMedia(post: BlogPost, fallbackSrc: string) {
+  const urls = [...new Set(
+    [post.coverUrl, ...(post.imageUrls ?? [])]
+      .map(normalizePublicAssetUrl)
+      .filter(Boolean),
+  )];
+  const sources = urls.length > 0 ? urls : [normalizePublicAssetUrl(fallbackSrc)];
+  return sources.map((src, index) => ({
+    id: `blog:${post.id}:${index}`,
+    src,
+    srcSet: "",
+    sizes: "(min-width: 768px) 33vw, 100vw",
+    alt: index === 0 ? post.title : `${post.title} — изображение ${index + 1}`,
+    decorative: false,
+    width: null,
+    height: null,
+  }));
+}
+
+function blogContentCard(post: BlogPost, images: ReturnType<typeof blogMedia>): ContentCardView {
   return {
     slug: post.slug,
     title: post.title,
     summary: post.excerpt,
     tags: post.tags ?? [],
-    image: src ? {
-      id: `blog:${post.id}`,
-      src,
-      srcSet: "",
-      sizes: "(min-width: 768px) 33vw, 100vw",
-      alt: post.title,
-      decorative: false,
-      width: null,
-      height: null,
-    } : null,
+    image: images[0] ?? null,
   };
+}
+
+function getBlogDateTime(value: string): string | undefined {
+  const timestamp = parseBlogDate(value);
+  return timestamp === null ? undefined : new Date(timestamp).toISOString();
 }
 
 export function Blog({
@@ -155,15 +170,20 @@ export function Blog({
           )}
         </div>
 
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {currentPosts.map((post, index) => (
-            <ContentCard
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" itemScope itemType="https://schema.org/ItemList">
+          {currentPosts.map((post, index) => {
+            const images = blogMedia(post, postCardImageBySlug[post.slug] ?? cardImages[index % cardImages.length]);
+            return <ContentCard
               key={post.id}
-              post={blogContentCard(post, postCardImageBySlug[post.slug] ?? cardImages[index % cardImages.length])}
-              meta={[formatBlogDate(post.date), post.readTime].filter(Boolean).join(" · ")}
+              post={blogContentCard(post, images)}
+              images={images}
+              meta={<><time dateTime={getBlogDateTime(post.date)} itemProp="datePublished">{formatBlogDate(post.date)}</time>{post.readTime ? ` · ${post.readTime}` : null}</>}
               actionLabel={t("blog.readMore")}
-            />
-          ))}
+              schemaType="https://schema.org/BlogPosting"
+              schemaItemProp="itemListElement"
+              canonicalUrl={`https://kordev.team/blog/${post.slug}/`}
+            />;
+          })}
         </div>
 
         {mode === "index" && totalPages > 1 && (

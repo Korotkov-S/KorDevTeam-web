@@ -54,3 +54,38 @@ test("editorial content card preserves a custom destination, label and publicati
   fireEvent.click(link);
   assert.ok(screen.getByText("journal_archive"));
 });
+
+test("content card preserves ordered media and configurable editorial presentation", () => {
+  const media = ["/cover.webp", "/inside-1.webp", "/inside-2.webp"].map((src, index) => ({
+    id: `media-${index}`,
+    src,
+    srcSet: "",
+    sizes: "100vw",
+    alt: `Изображение ${index + 1}`,
+    decorative: false,
+    width: 960,
+    height: 1358,
+  }));
+  const props = {
+    post: {
+      slug: "issue-0",
+      title: "Журнал KorDevTeam",
+      summary: "Практический выпуск о разработке.",
+      image: media[0],
+      tags: ["Журнал"],
+    },
+    images: media,
+    headingLevel: 2,
+    imageAspectClass: "aspect-[960/1358]",
+    imageObjectFitClass: "object-contain",
+  };
+  render(<MemoryRouter>{React.createElement(ContentCard as React.ComponentType<Record<string, unknown>>, props)}</MemoryRouter>);
+
+  assert.ok(screen.getByRole("heading", { level: 2, name: "Журнал KorDevTeam" }));
+  const images = screen.getAllByRole("img");
+  assert.deepEqual(images.map((image: HTMLImageElement) => image.getAttribute("src")), media.map(image => image.src));
+  for (const image of images) {
+    assert.ok(image.classList.contains("aspect-[960/1358]"));
+    assert.ok(image.classList.contains("object-contain"));
+  }
+});
