@@ -115,6 +115,32 @@ test("legacy case preserves the first markdown heading when its normalized text 
   assert.match(legacy.bodyMd, /Клиенту была нужна единая рабочая среда\./);
 });
 
+test("commercial cases prefer structured fields and decode only missing legacy fields", () => {
+  const entry = {
+    ...caseFixture({ problem: "Структурированная задача" }),
+    title: "Legacy case",
+    bodyMd: [
+      "## Задача",
+      "Legacy задача",
+      "",
+      "## Решение",
+      "Legacy решение",
+      "",
+      "## Технологии",
+      "- TypeScript",
+      "",
+      "[Сайт проекта](https://example.com/demo)",
+    ].join("\n"),
+  };
+
+  const view = commercialCasePage(entry);
+
+  assert.equal(view.problem, "Структурированная задача");
+  assert.equal(view.solution, "Legacy решение");
+  assert.equal(view.demoUrl, "https://example.com/demo");
+  assert.doesNotMatch(view.bodyMd, /Сайт проекта|Технологии/);
+});
+
 test("commercial case filters blank fields and draft related entries", () => {
   const draftService = { ...serviceFixture(), status: "draft" as const };
   const page = commercialCasePage(caseFixture({
