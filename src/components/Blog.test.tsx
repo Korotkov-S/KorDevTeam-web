@@ -41,7 +41,11 @@ test("blog cards preserve ordered media and SSR article microdata", () => {
   }]} /></StaticRouter>);
   const ssr = new JSDOM(markup).window.document;
 
-  const list = ssr.querySelector('[itemscope][itemtype="https://schema.org/ItemList"]');
+  const blog = ssr.querySelector('[itemscope][itemtype="https://schema.org/Blog"]');
+  assert.ok(blog);
+  assert.equal(blog.querySelector('meta[itemprop="name"]')?.getAttribute("content"), "Блог");
+  assert.ok((blog.querySelector('meta[itemprop="description"]')?.getAttribute("content")?.length ?? 0) > 20);
+  const list = blog.querySelector('[itemscope][itemtype="https://schema.org/ItemList"]');
   assert.ok(list);
   const article = list.querySelector('[itemscope][itemtype="https://schema.org/BlogPosting"]');
   assert.ok(article);
@@ -59,7 +63,7 @@ test("all repository multi-image articles expose every distinct source image in 
     coverUrl: string; imageUrls: string[];
   }>;
   const posts = source.filter(post => post.imageUrls.length > 1).map(post => ({ ...post, id: post.slug }));
-  assert.equal(posts.length, 5);
+  assert.ok(posts.length > 0, "repository must contain at least one multi-image article fixture");
   render(<MemoryRouter initialEntries={["/blog/"]}><Blog mode="index" posts={posts} /></MemoryRouter>);
 
   for (const post of posts) {

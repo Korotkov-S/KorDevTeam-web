@@ -155,7 +155,9 @@ export function Blog({
   ];
   return (
     <Section id={withId ? "blog" : undefined} className="scroll-mt-20 pt-32 lg:pt-36">
-      <div ref={sectionRef} tabIndex={-1}>
+      <div ref={sectionRef} tabIndex={-1} itemScope itemType="https://schema.org/Blog">
+        <meta itemProp="name" content={t("blog.title")} />
+        <meta itemProp="description" content={t("blog.subtitle")} />
         <div className="mb-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <SectionHeading
             level={mode === "index" ? 1 : 2}
