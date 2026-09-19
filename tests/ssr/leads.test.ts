@@ -159,9 +159,9 @@ test("rejects missing, malformed, duplicate-shaped and non-UUID keys before serv
 
 test("same-origin no-JS form submission receives server idempotency and a fixed PII-free redirect", async t => {
   const f = await local(t);
-  const postNative = async (pagePath: string) => {
+  const postNative = async (pagePath: string, values: Record<string, string> = {}) => {
     const serialized = new Request(`${f.origin}/api/leads`, {
-      method: "POST", body: multipart({ pagePath }),
+      method: "POST", body: multipart({ pagePath, ...values }),
     });
     const body = Buffer.from(await serialized.arrayBuffer());
     return new Promise<Response>((resolve, reject) => {
@@ -198,11 +198,11 @@ test("same-origin no-JS form submission receives server idempotency and a fixed 
     assert.doesNotMatch(response.headers.get("location") ?? "", /services|unknown|79991234567|%2B79991234567|victim|example|Тест/);
   }
 
-  const rejectedExternalPath = await postNative("//evil.invalid/victim%40example.com/");
-  assert.equal(rejectedExternalPath.status, 303);
-  headers(rejectedExternalPath);
-  assert.equal(rejectedExternalPath.headers.get("location"), "/#lead-submit-error");
-  assert.doesNotMatch(rejectedExternalPath.headers.get("location") ?? "", /evil|victim|example/);
+  const rejectedPiiPath = await postNative("/cases/+79991234567/", { consent: "no" });
+  assert.equal(rejectedPiiPath.status, 303);
+  headers(rejectedPiiPath);
+  assert.equal(rejectedPiiPath.headers.get("location"), "/#lead-submit-error");
+  assert.doesNotMatch(rejectedPiiPath.headers.get("location") ?? "", /cases|79991234567|%2B79991234567/);
 });
 
 test("multipart parser errors return a safe HTTP response rather than resetting the socket", async t => {
