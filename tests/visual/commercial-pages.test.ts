@@ -191,9 +191,11 @@ test("analytics vendors are requested only after explicit consent", { timeout: 1
   t.after(() => browser.close());
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
+  const vendorRequests: string[] = [];
   await page.setRequestInterception(true);
   page.on("request", request => {
     if (vendorPattern.test(request.url())) {
+      vendorRequests.push(request.url());
       void request.abort();
       return;
     }
@@ -203,6 +205,7 @@ test("analytics vendors are requested only after explicit consent", { timeout: 1
   await page.goto(runtime.origin, { waitUntil: "networkidle2" });
   await waitForHydration(page);
   await page.waitForSelector('[role="dialog"][aria-labelledby="consent-dialog-title"]');
+  assert.deepEqual(vendorRequests, [], "analytics vendors must not be requested before consent");
   assert.equal(await page.evaluate(() => document.querySelectorAll('script[data-kordev-analytics]').length), 0);
   const consentChoices = await page.$$('button[data-consent-action="choice"]');
   assert.equal(consentChoices.length, 2);
