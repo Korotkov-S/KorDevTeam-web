@@ -12,7 +12,7 @@ import {
 import { trackYandexGoal } from "../analytics/yandexMetrika";
 
 type AnalyticsWindow = Window & typeof globalThis & {
-  ym?: (...args: unknown[]) => void;
+  ym?: ((...args: unknown[]) => void) & { a?: unknown[][] };
   _tmr?: Array<Record<string, unknown>>;
 };
 
@@ -150,6 +150,52 @@ test("a late vendor load after rejection is torn down and cannot restore globals
   assert.deepEqual(lateCalls, [[105288175, "destruct"]]);
   assert.equal((window as AnalyticsWindow).ym, undefined);
   assert.equal((window as AnalyticsWindow)._tmr, undefined);
+});
+
+test("late scripts from an old generation cannot tear down the current accepted generation", () => {
+  const analyticsWindow = window as AnalyticsWindow;
+  setAnalyticsConsent(document, true);
+  loadYandexMetrika(document);
+  loadTopMailRu(document);
+  const oldYandex = document.querySelector<HTMLScriptElement>('script[src*="mc.yandex.ru"]');
+  const oldTopMail = document.querySelector<HTMLScriptElement>('script[src*="top-fwz1.mail.ru"]');
+  assert.ok(oldYandex && oldTopMail);
+
+  setAnalyticsConsent(document, false);
+  setAnalyticsConsent(document, true);
+  loadYandexMetrika(document);
+  loadTopMailRu(document);
+  const currentYandex = document.querySelector<HTMLScriptElement>('script[src*="mc.yandex.ru"]');
+  const currentTopMail = document.querySelector<HTMLScriptElement>('script[src*="top-fwz1.mail.ru"]');
+  const currentYm = analyticsWindow.ym;
+  const currentTmr = analyticsWindow._tmr;
+  assert.ok(currentYandex && currentTopMail && currentYm && currentTmr);
+  currentYandex.dispatchEvent(new dom.window.Event("load"));
+  currentTopMail.dispatchEvent(new dom.window.Event("load"));
+
+  oldYandex.dispatchEvent(new dom.window.Event("load"));
+  assert.equal(document.querySelector('script[src*="mc.yandex.ru"]'), currentYandex);
+  assert.equal(document.querySelector('script[src*="top-fwz1.mail.ru"]'), currentTopMail);
+  assert.equal(analyticsWindow.ym, currentYm);
+  assert.equal(analyticsWindow._tmr, currentTmr);
+
+  oldTopMail.dispatchEvent(new dom.window.Event("load"));
+  assert.equal(document.querySelector('script[src*="mc.yandex.ru"]'), currentYandex);
+  assert.equal(document.querySelector('script[src*="top-fwz1.mail.ru"]'), currentTopMail);
+  assert.equal(analyticsWindow.ym, currentYm);
+  assert.equal(analyticsWindow._tmr, currentTmr);
+
+  track("project_open", { projectSlug: "crm" });
+  assert.deepEqual(currentYm.a?.at(-1), [
+    105288175,
+    "reachGoal",
+    "project_open",
+    { projectSlug: "crm" },
+  ]);
+  assert.deepEqual(
+    currentTmr.map(({ id, type }) => ({ id, type })),
+    [{ id: "3793508", type: "pageView" }],
+  );
 });
 
 test("legacy journal goals cannot initialize a vendor before consent", () => {

@@ -64,7 +64,11 @@ function consentState(document: Document): DocumentConsentState {
 function guardLateLoad(document: Document, script: HTMLScriptElement, generation: number): void {
   script.addEventListener("load", () => {
     const current = consentState(document);
-    if (!current.accepted || current.generation !== generation) removeVendorState(document);
+    if (!current.accepted) {
+      removeVendorState(document);
+    } else if (current.generation !== generation) {
+      script.remove();
+    }
   }, { once: true });
 }
 
