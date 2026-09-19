@@ -2,27 +2,31 @@ import React from "react";
 import { Section } from "../public/Section";
 import { CtaLink } from "../public/CtaLink";
 
+const disciplines = [
+  { label: "CRM", className: "bg-[#e9ff64] text-[#10131f]" },
+  { label: "API", className: "bg-[#ff7448] text-white" },
+  { label: "WEB", className: "bg-[var(--public-blue)] text-white" },
+  { label: "APP", className: "bg-[#9c6cff] text-white" },
+  { label: "AI", className: "bg-[#111827] text-white dark:bg-white dark:text-[#111827]" },
+] as const;
+
 export function HomeHero() {
-  return <Section id="home-hero">
-    <p className="mb-6 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--public-violet)]">KorDevTeam / Разработка и автоматизация</p>
-    <div className="grid items-end gap-10 lg:grid-cols-12">
-      <div className="lg:col-span-8">
-        <h1 className="max-w-4xl text-balance text-5xl font-semibold leading-[1.02] tracking-[-0.055em] text-[var(--public-ink)] sm:text-6xl lg:text-7xl">Помогаем бизнесу работать проще с помощью технологий</h1>
-        <p className="mt-7 max-w-2xl text-lg leading-8 text-[var(--public-subtle)]">Автоматизируем процессы, связываем системы и разрабатываем веб-сервисы и мобильные приложения под ваши задачи.</p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <CtaLink to="/#contact">Обсудить проект</CtaLink>
-          <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
-        </div>
-      </div>
-      <div className="rounded-[var(--public-radius-card)] border border-border bg-card p-6 lg:col-span-4 lg:p-8">
-        <p className="text-sm font-medium text-[var(--public-subtle)]">От процесса к продукту</p>
-        <div className="mt-6 space-y-3 text-lg font-semibold">
-          <p className="rounded-xl bg-[var(--public-surface)] px-4 py-4">Задача бизнеса</p>
-          <p aria-hidden="true" className="pl-4 text-[var(--public-violet)]">↓</p>
-          <p className="rounded-xl bg-[var(--public-surface)] px-4 py-4">CRM · Интеграции · Приложения</p>
-          <p aria-hidden="true" className="pl-4 text-[var(--public-violet)]">↓</p>
-          <p className="rounded-xl bg-[var(--public-blue)] px-4 py-4 text-white dark:text-slate-950">Единая рабочая система</p>
-        </div>
+  return <Section id="home-hero" className="relative overflow-hidden !pb-20 !pt-14 sm:!pt-20 lg:!pb-28 lg:!pt-24">
+    <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-12 -z-10 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,var(--public-hero-glow)_0%,transparent_68%)] sm:h-[44rem] sm:w-[44rem]" />
+    <div className="flex flex-col items-center text-center">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--public-violet)] sm:text-sm">KorDevTeam · разработка и автоматизация</p>
+      <ul aria-label="Направления работы" className="mt-8 flex items-center justify-center pl-3 sm:mt-10 sm:pl-5">
+        {disciplines.map((discipline, index) => <li key={discipline.label} className={`home-hero-orb relative -ml-3 grid h-16 w-16 place-items-center rounded-full border-4 border-[var(--public-surface)] text-xs font-bold tracking-[0.08em] shadow-sm sm:-ml-5 sm:h-20 sm:w-20 sm:text-sm ${discipline.className}`} style={{ zIndex: index === 2 ? 2 : 1 }}>
+          {discipline.label}
+        </li>)}
+      </ul>
+      <h1 className="mt-9 max-w-[76rem] text-balance text-[clamp(3.6rem,8.7vw,8.5rem)] font-medium leading-[0.84] tracking-[-0.075em] text-[var(--public-ink)]">
+        Собираем бизнес в работающую систему
+      </h1>
+      <p className="mt-8 max-w-3xl text-balance text-lg leading-8 text-[var(--public-subtle)] sm:text-xl">Автоматизируем процессы, соединяем CRM и внешние сервисы, создаём веб-продукты и мобильные приложения.</p>
+      <div className="mt-9 flex flex-wrap justify-center gap-3">
+        <CtaLink to="/#contact">Обсудить проект</CtaLink>
+        <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
       </div>
     </div>
   </Section>;

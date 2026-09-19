@@ -3,8 +3,8 @@ import { HomeHero } from "../components/home/HomeHero";
 import { ProofStrip } from "../components/home/ProofStrip";
 import { ProductFeature } from "../components/home/ProductFeature";
 import { ProcessSteps } from "../components/home/ProcessSteps";
-import { CaseCard } from "../components/public/CaseCard";
-import { ServiceCard } from "../components/public/ServiceCard";
+import { HomeCaseMosaic } from "../components/home/HomeCaseMosaic";
+import { HomeServicesList } from "../components/home/HomeServicesList";
 import { ContentCard } from "../components/public/ContentCard";
 import { LeadCtaSection } from "../components/public/LeadCtaSection";
 import { Section, SectionHeading } from "../components/public/Section";
@@ -22,11 +22,11 @@ export function HomePage({ services = [], projects = [], posts = [] }: {
         <SectionHeading eyebrow="Практика" title="Задачи бизнеса. Работающие решения." description="Веб-сервисы, приложения и интеграции — от задачи до реализации." />
         <CtaLink to="/cases/" variant="secondary">Все кейсы</CtaLink>
       </div>
-      <div className="mt-10 grid gap-5 md:grid-cols-2">{projects.map((project, index) => <CaseCard key={project.slug} project={project} tone={index % 3 === 0 ? "violet" : index % 3 === 1 ? "green" : "neutral"} />)}</div>
+      <HomeCaseMosaic projects={projects} />
     </Section>}
     {services.length > 0 && <Section id="services" className="border-t border-border">
       <SectionHeading eyebrow="Что мы делаем" title="Технологии под вашу задачу" description="Соединяем процессы, данные и людей. Создаём инструменты для повседневной работы бизнеса." />
-      <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{services.map(service => <ServiceCard key={service.slug} service={service} />)}</div>
+      <HomeServicesList services={services} />
       <div className="mt-8"><CtaLink to="/services/" variant="secondary">Все услуги</CtaLink></div>
     </Section>}
     <ProductFeature />

@@ -66,3 +66,29 @@ test("home cards retain responsive media and use a verified result when present"
     assert.equal(img.getAttribute("loading"), "lazy");
   }
 });
+
+test("home uses a distinctive editorial composition instead of uniform card grids", () => {
+  const editorialProjects: CaseCardView[] = [
+    projects[0],
+    { ...projects[0], slug: "crm", title: "CRM для отдела продаж" },
+    { ...projects[0], slug: "mobile", title: "Мобильное рабочее место" },
+    { ...projects[0], slug: "portal", title: "Клиентский портал" },
+  ];
+  const editorialServices: ServiceCardView[] = [
+    services[0],
+    { ...services[0], slug: "web-services", title: "Заказная разработка" },
+    { ...services[0], slug: "mobile-app-development", title: "Мобильные приложения" },
+  ];
+
+  render(<MemoryRouter><HomePage services={editorialServices} projects={editorialProjects} /></MemoryRouter>);
+
+  assert.equal(within(screen.getByRole("list", { name: "Направления работы" })).getAllByRole("listitem").length, 5);
+  assert.deepEqual(
+    [...document.querySelectorAll("[data-home-case-layout]")].map(node => node.getAttribute("data-home-case-layout")),
+    ["wide", "compact", "compact", "wide"],
+  );
+  assert.deepEqual(
+    within(document.getElementById("services")).getAllByRole("listitem").map((item: HTMLElement) => item.getAttribute("data-service-number")),
+    ["01", "02", "03"],
+  );
+});

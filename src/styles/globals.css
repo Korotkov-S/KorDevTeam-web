@@ -48,6 +48,8 @@
   --public-green: #0F9F6E;
   --public-orange: #F97316;
   --public-radius-card: 1.5rem;
+  --public-hero-glow: rgba(87, 83, 255, 0.16);
+  --public-service-hover: rgba(87, 83, 255, 0.08);
 }
 
 .dark {
@@ -94,6 +96,8 @@
   --public-green: #34D399;
   --public-orange: #FB923C;
   --public-radius-card: 1.5rem;
+  --public-hero-glow: rgba(96, 165, 250, 0.14);
+  --public-service-hover: rgba(96, 165, 250, 0.1);
 }
 
 @theme inline {
@@ -213,4 +217,12 @@ html {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.home-hero-orb {
+  transition: transform 240ms ease;
+}
+
+.home-hero-orb:hover {
+  transform: translateY(-7px) rotate(-2deg);
 }
