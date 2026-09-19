@@ -5,16 +5,23 @@ import { useConsent } from "../../contexts/ConsentContext";
 const actionClassName = "inline-flex min-h-12 items-center justify-center rounded-full border border-[var(--public-blue)] bg-[var(--public-blue)] px-5 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--public-blue)]";
 
 export function ConsentBanner() {
-  const { decision, accept, reject, closeSettings, settingsOpen } = useConsent();
+  const { decision, accept, reject, closeSettings, settingsOpen, dialogOpen } = useConsent();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const visible = decision === "unknown" || settingsOpen;
 
   useEffect(() => {
-    if (!visible) return;
-    dialogRef.current?.querySelector<HTMLElement>("[data-consent-action]")?.focus();
-  }, [visible]);
+    if (!dialogOpen) return;
+    const focusPrimaryAction = () => {
+      dialogRef.current?.querySelector<HTMLElement>("[data-consent-action]")?.focus();
+    };
+    const keepFocusInDialog = (event: FocusEvent) => {
+      if (!dialogRef.current?.contains(event.target as Node)) focusPrimaryAction();
+    };
+    focusPrimaryAction();
+    document.addEventListener("focusin", keepFocusInDialog);
+    return () => document.removeEventListener("focusin", keepFocusInDialog);
+  }, [dialogOpen]);
 
-  if (!visible) return null;
+  if (!dialogOpen) return null;
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape" && decision !== "unknown") {

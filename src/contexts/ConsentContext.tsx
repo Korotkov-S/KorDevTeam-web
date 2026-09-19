@@ -16,6 +16,8 @@ import {
 
 type ConsentContextValue = {
   decision: ConsentDecision;
+  restorationReady: boolean;
+  dialogOpen: boolean;
   accept: () => void;
   reject: () => void;
   openSettings: () => void;
@@ -27,14 +29,11 @@ const ConsentContext = createContext<ConsentContextValue | null>(null);
 
 export function ConsentProvider({ children }: { children: React.ReactNode }) {
   const [decision, setDecision] = useState<ConsentDecision>("unknown");
+  const [restorationReady, setRestorationReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const returnFocusRef = useRef<HTMLElement | null>(null);
-
-  const restoreFocus = useCallback(() => {
-    const target = returnFocusRef.current;
-    returnFocusRef.current = null;
-    if (target?.isConnected) target.focus();
-  }, []);
+  const restoreFocusAfterCloseRef = useRef(false);
+  const dialogOpen = settingsOpen || (restorationReady && decision === "unknown");
 
   const choose = useCallback((nextDecision: Exclude<ConsentDecision, "unknown">) => {
     setDecision(nextDecision);
@@ -47,8 +46,8 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // The in-memory choice still applies when storage is unavailable.
     }
-    restoreFocus();
-  }, [restoreFocus]);
+    restoreFocusAfterCloseRef.current = true;
+  }, []);
 
   const openSettings = useCallback(() => {
     returnFocusRef.current = document.activeElement instanceof HTMLElement
@@ -59,16 +58,27 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
 
   const closeSettings = useCallback(() => {
     setSettingsOpen(false);
-    restoreFocus();
-  }, [restoreFocus]);
+    restoreFocusAfterCloseRef.current = true;
+  }, []);
 
   useEffect(() => {
+    let restoredDecision: ConsentDecision = "unknown";
     try {
-      setDecision(parseConsentRecord(window.localStorage.getItem(CONSENT_STORAGE_KEY)));
+      restoredDecision = parseConsentRecord(window.localStorage.getItem(CONSENT_STORAGE_KEY));
     } catch {
-      setDecision("unknown");
+      restoredDecision = "unknown";
     }
+    setDecision(restoredDecision);
+    setRestorationReady(true);
   }, []);
+
+  useEffect(() => {
+    if (dialogOpen || !restoreFocusAfterCloseRef.current) return;
+    restoreFocusAfterCloseRef.current = false;
+    const target = returnFocusRef.current;
+    returnFocusRef.current = null;
+    if (target?.isConnected) target.focus();
+  }, [dialogOpen]);
 
   useEffect(() => {
     window.addEventListener("kordev:open-consent-settings", openSettings);
@@ -78,6 +88,8 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
   return (
     <ConsentContext.Provider value={{
       decision,
+      restorationReady,
+      dialogOpen,
       accept: () => choose("accepted"),
       reject: () => choose("rejected"),
       openSettings,
@@ -86,6 +98,35 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     }}>
       {children}
     </ConsentContext.Provider>
+  );
+}
+
+export function ConsentShell({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { dialogOpen } = useConsent();
+  const inertAttribute: Record<string, string> = dialogOpen ? { inert: "" } : {};
+
+  const blockBackgroundInteraction = (event: React.SyntheticEvent) => {
+    if (!dialogOpen) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  return (
+    <div
+      {...inertAttribute}
+      className={className}
+      aria-hidden={dialogOpen ? "true" : undefined}
+      onClickCapture={blockBackgroundInteraction}
+      onPointerDownCapture={blockBackgroundInteraction}
+    >
+      {children}
+    </div>
   );
 }
 

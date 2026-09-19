@@ -6,7 +6,7 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 
 import { ConsentBanner } from "./ConsentBanner";
-import { ConsentProvider, useConsent } from "../../contexts/ConsentContext";
+import { ConsentProvider, ConsentShell, useConsent } from "../../contexts/ConsentContext";
 import { CONSENT_STORAGE_KEY, CONSENT_VERSION } from "../../lib/consent";
 
 const dom = new JSDOM("<!doctype html><html lang=\"ru\"><body></body></html>", {
@@ -38,7 +38,7 @@ function DecisionProbe() {
   return <output aria-label="Текущее согласие">{decision}</output>;
 }
 
-test("server rendering stays unknown and a current-version choice is restored after hydration", async () => {
+test("stored consent restores without rendering a transient dialog or stealing focus", async () => {
   window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({
     version: CONSENT_VERSION,
     decision: "accepted",
@@ -47,11 +47,50 @@ test("server rendering stays unknown and a current-version choice is restored af
 
   const serverMarkup = renderToString(<ConsentProvider><DecisionProbe /><ConsentBanner /></ConsentProvider>);
   assert.match(serverMarkup, />unknown</);
-  assert.match(serverMarkup, /Настройки аналитики/);
+  assert.doesNotMatch(serverMarkup, /Настройки аналитики/);
 
+  const priorFocus = document.createElement("button");
+  priorFocus.textContent = "Предыдущее действие";
+  document.body.append(priorFocus);
+  priorFocus.focus();
   render(<ConsentProvider><DecisionProbe /><ConsentBanner /></ConsentProvider>);
   await waitFor(() => assert.equal(screen.getByLabelText("Текущее согласие").textContent, "accepted"));
   assert.equal(screen.queryByRole("dialog"), null);
+  assert.equal(document.activeElement, priorFocus);
+  priorFocus.remove();
+});
+
+test("an open consent dialog makes the public shell inert and keeps focus out of the background", async () => {
+  let backgroundClicks = 0;
+  render(
+    <ConsentProvider>
+      <ConsentShell>
+        <button type="button" onClick={() => { backgroundClicks += 1; }}>Фоновое действие</button>
+      </ConsentShell>
+      <ConsentBanner />
+    </ConsentProvider>,
+  );
+
+  const dialog = await screen.findByRole("dialog", { name: "Настройки аналитики" });
+  const background = screen.getByRole("button", { name: "Фоновое действие", hidden: true });
+  const shell = background.parentElement;
+  assert.ok(shell);
+  assert.equal(shell.hasAttribute("inert"), true);
+  assert.equal(shell.getAttribute("aria-hidden"), "true");
+
+  fireEvent.click(background);
+  assert.equal(backgroundClicks, 0);
+  background.focus();
+  await waitFor(() => assert.equal(
+    document.activeElement,
+    within(dialog).getByRole("button", { name: "Разрешить аналитику" }),
+  ));
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "Только необходимые" }));
+  assert.equal(shell.hasAttribute("inert"), false);
+  assert.equal(shell.getAttribute("aria-hidden"), null);
+  fireEvent.click(background);
+  assert.equal(backgroundClicks, 1);
 });
 
 test("banner offers equal accept and reject actions and can reopen from the footer event", async () => {

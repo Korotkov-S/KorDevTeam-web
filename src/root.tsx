@@ -24,7 +24,7 @@ import "./i18n";
 import { PublicFooter } from "./components/public/PublicFooter";
 import { PublicHeader } from "./components/public/PublicHeader";
 import { ConsentBanner } from "./components/public/ConsentBanner";
-import { ConsentProvider } from "./contexts/ConsentContext";
+import { ConsentProvider, ConsentShell } from "./contexts/ConsentContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./styles/index.css";
 
@@ -67,14 +67,14 @@ export default function App() {
   if (isAdminPath(location.pathname)) return <Outlet />;
   return (
     <ConsentProvider>
-      <div className="min-h-screen bg-[var(--public-surface)] text-[var(--public-ink)]">
+      <ConsentShell className="min-h-screen bg-[var(--public-surface)] text-[var(--public-ink)]">
         <PublicHeader />
         <main id="main-content">
           <Outlet />
         </main>
         <PublicFooter />
-        <ConsentBanner />
-      </div>
+      </ConsentShell>
+      <ConsentBanner />
     </ConsentProvider>
   );
 }
