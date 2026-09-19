@@ -885,7 +885,7 @@ git commit -m "test(design): verify responsive commercial pages"
 - Потребляет: завершённые задачи 1–10.
 - Производит: проверенный локальный commit range без push и production-переключения.
 
-- [ ] **Шаг 1: Запустить статические и модульные проверки**
+- [x] **Шаг 1: Запустить статические и модульные проверки**
 
 ```bash
 yarn typecheck
@@ -895,29 +895,29 @@ yarn build
 
 Ожидается: exit code 0. Допускаются только уже задокументированные skip; новые skip запрещены.
 
-- [ ] **Шаг 2: Запустить PostgreSQL, browser и SEO-проверки**
+- [x] **Шаг 2: Запустить PostgreSQL, browser и SEO-проверки**
 
 ```bash
 TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn test:commercial
-TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn seo:crawl
+TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn seo:crawl --origin http://127.0.0.1:<local-port>
 ```
 
 Ожидается: все канонические URL возвращают правильный status, один H1, metadata, canonical, рабочие внутренние ссылки и отсутствие draft content.
 
-- [ ] **Шаг 3: Проверить consent сетевыми перехватами**
+- [x] **Шаг 3: Проверить consent сетевыми перехватами**
 
 В Puppeteer включить request listener, открыть главную в чистом profile и подтвердить отсутствие запросов к `mc.yandex.ru` и `top-fwz1.mail.ru`. Нажать «Разрешить аналитику» и подтвердить ровно по одному script request к каждому vendor. Перезагрузить страницу и убедиться, что скрипты загружаются, а page view не вставляет второй script element.
 
-- [ ] **Шаг 4: Проверить production Compose**
+- [x] **Шаг 4: Проверить production Compose**
 
 ```bash
 docker compose -f docker-compose.yml config --quiet
-docker compose --env-file tests/fixtures/deploy-leads.env -f docker-compose.team.yml config --quiet
+docker compose --env-file tests/fixtures/deploy-leads.env -f deploy/docker-compose.team.yml config --quiet
 ```
 
 Ожидается: exit code 0; новые обязательные secret-переменные не появились.
 
-- [ ] **Шаг 5: Проверить состав изменений**
+- [x] **Шаг 5: Проверить состав изменений**
 
 ```bash
 git diff --check
@@ -927,7 +927,7 @@ git log --oneline --decorate -15
 
 Ожидается: нет временных PNG, секретов, `.env`, browser profile и несвязанных файлов. Изменения остаются только локально.
 
-- [ ] **Шаг 6: Отметить выполненные шаги и зафиксировать финальную проверку**
+- [x] **Шаг 6: Отметить выполненные шаги и зафиксировать финальную проверку**
 
 После фактического прохождения каждого шага заменить соответствующие `- [ ]` на `- [x]`, затем:
 

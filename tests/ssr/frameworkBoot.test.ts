@@ -4,8 +4,10 @@ import { startTestRuntime } from "./support/runtime";
 import { seoSnapshot } from "./support/seoSnapshot";
 import { resetTestDatabase } from "../../src/server/db/testDatabase";
 import { createDb } from "../../src/server/db/client";
+import { contentEntries } from "../../src/server/db/schema";
 import { importLegacyContent } from "../../scripts/migrate-content-to-postgres";
 import { seedHomeServices } from "./support/homeFixtures";
+import { and, eq } from "drizzle-orm";
 
 test("one runtime serves health and server-rendered home", async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -13,6 +15,15 @@ test("one runtime serves health and server-rendered home", async (t) => {
   await resetTestDatabase(databaseUrl);
   await importLegacyContent({ db: createDb(databaseUrl), batchId: "home-structure" });
   await seedHomeServices(databaseUrl);
+  const serviceDescriptions = await createDb(databaseUrl)
+    .select({ description: contentEntries.seoDescription })
+    .from(contentEntries)
+    .where(and(eq(contentEntries.kind, "service"), eq(contentEntries.status, "published")));
+  assert.equal(
+    new Set(serviceDescriptions.map(({ description }) => description)).size,
+    serviceDescriptions.length,
+    "every service fixture must have a unique SEO description",
+  );
   const runtime = await startTestRuntime();
   t.after(runtime.close);
 

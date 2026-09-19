@@ -34,7 +34,7 @@ export async function seedHomeServices(databaseUrl: string) {
   ].map(([slug, title]) => ({
     kind: "service" as const, slug, title, status: "published" as const,
     excerpt: "Согласуем задачу и создадим решение для рабочих процессов команды.",
-    seoTitle: title, seoDescription: "Разработка и сопровождение цифровых решений для бизнеса.",
+    seoTitle: title, seoDescription: `KorDevTeam: ${title.toLocaleLowerCase("ru-RU")} для рабочих процессов бизнеса.`,
     bodyMd: "Работаем с существующей инфраструктурой, документируем решение и учитываем дальнейшее развитие продукта.",
     payload: servicePayload(title), publishedAt: new Date("2026-09-01T00:00:00Z"),
   })));
