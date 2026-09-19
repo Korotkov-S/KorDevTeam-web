@@ -51,7 +51,7 @@ test("article opens with a visible lead and a personal author byline", () => {
   const author = screen.getByRole("complementary", { name: "Об авторе" });
   assert.ok(author.textContent?.includes("Геннадий Коротков"));
   assert.ok(author.textContent?.includes("Руководитель KorDevTeam"));
-  assert.equal(author.querySelector("img")?.getAttribute("src"), "/blog/media/korotkovsStudio/1166-01.jpg");
+  assert.equal(author.querySelector("img")?.getAttribute("src"), "/team/gennady-korotkov.jpg?v=20260919");
 });
 
 test("article does not repeat an excerpt that already opens the body", () => {

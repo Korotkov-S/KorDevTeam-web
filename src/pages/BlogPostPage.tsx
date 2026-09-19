@@ -222,12 +222,12 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
               <aside className="lg:col-span-3 lg:col-start-10" aria-label="Об авторе" itemProp="author" itemScope itemType="https://schema.org/Person">
                 <div className="lg:sticky lg:top-28">
                   <img
-                    src="/blog/media/korotkovsStudio/1166-01.jpg"
+                    src="/team/gennady-korotkov.jpg?v=20260919"
                     alt="Геннадий Коротков"
-                    width="543"
-                    height="659"
+                    width="1024"
+                    height="1024"
                     loading="lazy"
-                    className="aspect-square w-32 rounded-full object-cover object-[50%_28%]"
+                    className="aspect-square w-32 rounded-full object-cover"
                   />
                   <p className="mt-6 text-2xl font-semibold leading-none tracking-[-0.035em]" itemProp="name">Геннадий Коротков</p>
                   <p className="mt-2 text-base text-[var(--public-subtle)]" itemProp="jobTitle">Руководитель KorDevTeam</p>

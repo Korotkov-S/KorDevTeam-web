@@ -61,7 +61,7 @@ test("contact form is introduced by the person who answers the request", () => {
   const contact = document.getElementById("contact");
   assert.ok(contact);
   const portrait = within(contact).getByRole("img", { name: "Геннадий Коротков" });
-  assert.equal(portrait.getAttribute("src"), "/team/gennady-korotkov.jpg");
+  assert.equal(portrait.getAttribute("src"), "/team/gennady-korotkov.jpg?v=20260919");
   assert.ok(within(contact).getByText("Руководитель KorDevTeam"));
   assert.ok(within(contact).getByText(/лично посмотрю задачу/i));
 });

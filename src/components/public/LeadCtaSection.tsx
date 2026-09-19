@@ -5,7 +5,7 @@ import { Section } from "./Section";
 
 export type LeadCtaSectionProps = { pagePath: string; title?: string; description?: string };
 
-const PORTRAIT = "/team/gennady-korotkov.jpg";
+const PORTRAIT = "/team/gennady-korotkov.jpg?v=20260919";
 
 export function LeadCtaSection({
   pagePath,
