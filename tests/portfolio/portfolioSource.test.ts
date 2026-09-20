@@ -115,3 +115,18 @@ test("loader ignores nested directories and non-JSON files", async t => {
 
   assert.deepEqual((await loadPortfolioSources(root)).map(record => record.slug), ["serviceplus"]);
 });
+
+test("web and support portfolio batch is complete", async () => {
+  const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
+  for (const slug of [
+    "alliance-stroy-garant",
+    "stroyrem",
+    "sims-dynasty-tree",
+    "siberian-steel",
+    "wowbanner",
+    "sgormash",
+    "inplain",
+    "jully-bride",
+    "nagrada",
+  ]) assert.ok(slugs.has(slug), slug);
+});
