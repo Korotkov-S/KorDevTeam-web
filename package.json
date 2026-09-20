@@ -122,7 +122,8 @@
     "media:sweep": "tsx scripts/sweep-public-media.ts",
     "media:migrate": "tsx scripts/migrate-media-to-s3.ts",
     "media:verify": "tsx scripts/verify-media-migration.ts",
-    "portfolio:validate": "tsx scripts/validate-project-portfolio.ts"
+    "portfolio:validate": "tsx scripts/validate-project-portfolio.ts",
+    "portfolio:import": "tsx scripts/import-project-portfolio.ts"
   },
   "packageManager": "yarn@3.8.7"
 }
