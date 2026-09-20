@@ -54,6 +54,12 @@ raw SQL. Each child sitemap supports at most 50,000 unique URLs. Overflow fails
 closed via the existing safe 503 resource response instead of silently dropping
 records or emitting an invalid oversized sitemap.
 
+The reviewed local portfolio source currently publishes exactly 26 canonical
+case routes. Integration coverage imports that source into PostgreSQL, verifies
+all 26 SSR documents and asserts that the pages sitemap contains the same exact
+slug set. The source files remain authoritative for the dynamic route inventory;
+individual case rows are intentionally not duplicated in this static document.
+
 ## Timestamp evidence and maintenance
 
 The committed dates reflect actual page source history, not the earlier design

@@ -21,11 +21,28 @@ const routes = [
   { slug: "service", pathname: "/services/business-process-automation/" },
   { slug: "cases", pathname: "/cases/" },
   { slug: "case", pathname: "/cases/long-case/" },
+  { slug: "case-krasotula", pathname: "/cases/krasotula-crm/" },
+  { slug: "case-serviceplus", pathname: "/cases/serviceplus/" },
+  { slug: "case-jully-bride", pathname: "/cases/jully-bride/" },
+  { slug: "case-sims", pathname: "/cases/sims-dynasty-tree/" },
+  { slug: "case-noodome", pathname: "/cases/noodome/" },
+  { slug: "case-teharmatura", pathname: "/cases/teharmatura-automation/" },
+  { slug: "case-notion", pathname: "/cases/notion-analog/" },
   { slug: "blog", pathname: "/blog/" },
   { slug: "article", pathname: "/blog/long-article/" },
   { slug: "journal", pathname: "/journal/" },
   { slug: "privacy", pathname: "/privacy/" },
 ] as const;
+
+const portfolioPaths = new Set([
+  "/cases/krasotula-crm/",
+  "/cases/serviceplus/",
+  "/cases/jully-bride/",
+  "/cases/sims-dynasty-tree/",
+  "/cases/noodome/",
+  "/cases/teharmatura-automation/",
+  "/cases/notion-analog/",
+]);
 
 const vendorPattern = /(?:mc\.yandex\.ru|top-fwz1\.mail\.ru)/;
 
@@ -54,6 +71,34 @@ async function assertPageLayout(page: Page, pathname: string): Promise<void> {
   }), true, `${pathname} main content must be visible`);
 }
 
+async function assertPortfolioScreenshots(page: Page, pathname: string): Promise<void> {
+  await page.$$eval("#case-screenshots figure img", images => images.forEach(image => image.scrollIntoView({ block: "center" })));
+  await page.waitForFunction(() => {
+    const images = [...document.querySelectorAll<HTMLImageElement>("#case-screenshots figure img")];
+    return images.length > 0 && images.every(image => image.complete && image.naturalWidth > 0);
+  });
+  const screenshots = await page.$$eval("#case-screenshots figure img", images => images.map(image => {
+    const element = image as HTMLImageElement;
+    const box = element.getBoundingClientRect();
+    const parentBox = element.parentElement?.getBoundingClientRect();
+    return {
+      complete: element.complete,
+      naturalWidth: element.naturalWidth,
+      naturalHeight: element.naturalHeight,
+      width: Number(element.getAttribute("width")),
+      height: Number(element.getAttribute("height")),
+      fitsParent: !parentBox || box.left >= parentBox.left - 1 && box.right <= parentBox.right + 1,
+    };
+  }));
+  assert.ok(screenshots.length >= 1, `${pathname} must show at least one portfolio image`);
+  for (const screenshot of screenshots) {
+    assert.equal(screenshot.complete, true, `${pathname} image must finish loading`);
+    assert.ok(screenshot.naturalWidth > 0 && screenshot.naturalHeight > 0, `${pathname} image must decode`);
+    assert.ok(screenshot.width > 0 && screenshot.height > 0, `${pathname} image must reserve intrinsic space`);
+    assert.equal(screenshot.fitsParent, true, `${pathname} image must stay inside its figure`);
+  }
+}
+
 async function dismissConsent(page: Page): Promise<void> {
   const button = await page.$('button[data-consent-action="choice"]');
   if (button) {
@@ -63,7 +108,7 @@ async function dismissConsent(page: Page): Promise<void> {
   }
 }
 
-test("commercial pages remain responsive, visible and decodable at desktop and mobile sizes", { timeout: 180_000 }, async t => {
+test("commercial pages remain responsive, visible and decodable at desktop and mobile sizes", { timeout: 300_000 }, async t => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
   await resetTestDatabase(databaseUrl);
@@ -83,12 +128,17 @@ test("commercial pages remain responsive, visible and decodable at desktop and m
     for (const route of routes) {
       await t.test(`${viewport.name} ${route.pathname}`, async () => {
         const page = await browser.newPage();
+        const errors: string[] = [];
+        page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+        page.on("pageerror", error => errors.push(String(error)));
         await page.setViewport(viewport);
         await page.evaluateOnNewDocument(() => localStorage.setItem("kordev.analytics-consent", JSON.stringify({ version: "2026-09-18", decision: "rejected", decidedAt: "2026-09-18T09:00:00.000Z" })));
         await page.goto(`${runtime.origin}${route.pathname}`, { waitUntil: "networkidle2" });
         await waitForHydration(page);
         await dismissConsent(page);
         await assertPageLayout(page, route.pathname);
+        if (portfolioPaths.has(route.pathname)) await assertPortfolioScreenshots(page, route.pathname);
+        assert.deepEqual(errors, [], `${route.pathname} must hydrate without browser errors`);
 
         if (route.pathname === "/") {
           for (const id of ["home-hero", "cases", "services", "krasotula", "process", "contact"]) {
@@ -109,7 +159,7 @@ test("commercial pages remain responsive, visible and decodable at desktop and m
   }
 });
 
-test("commercial pages keep meaningful layout without JavaScript", { timeout: 120_000 }, async t => {
+test("commercial pages keep meaningful layout without JavaScript", { timeout: 240_000 }, async t => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
   await resetTestDatabase(databaseUrl);
@@ -139,6 +189,7 @@ test("commercial pages keep meaningful layout without JavaScript", { timeout: 12
           shellBackground: "rgb(247, 248, 252)",
         }, `${route.pathname} must apply the public stylesheet without JavaScript`);
         await assertPageLayout(page, route.pathname);
+        if (portfolioPaths.has(route.pathname)) await assertPortfolioScreenshots(page, route.pathname);
         await page.close();
       });
     }

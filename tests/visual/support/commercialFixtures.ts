@@ -1,5 +1,7 @@
 import { createDb } from "../../../src/server/db/client";
 import { contentEntries } from "../../../src/server/db/schema";
+import { applyPortfolioImport, planPortfolioImport } from "../../../src/server/portfolio/importer";
+import { loadPortfolioSources } from "../../../src/server/portfolio/loader";
 
 const publishedAt = new Date("2026-09-18T09:00:00.000Z");
 
@@ -48,6 +50,9 @@ export async function seedCommercialFixtures(databaseUrl: string): Promise<void>
     payload: servicePayload(title),
     publishedAt: new Date(publishedAt.getTime() + index * 1_000),
   })));
+
+  const portfolioSources = await loadPortfolioSources();
+  await applyPortfolioImport(db, await planPortfolioImport(db, portfolioSources));
 
   await db.insert(contentEntries).values([
     {

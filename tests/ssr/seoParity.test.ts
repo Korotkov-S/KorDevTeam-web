@@ -9,6 +9,8 @@ import { contentEntries, contentRelations } from "../../src/server/db/schema";
 import { createContentService } from "../../src/server/content/service";
 import { and, eq } from "drizzle-orm";
 import { importLegacyContent } from "../../scripts/migrate-content-to-postgres";
+import { applyPortfolioImport, planPortfolioImport } from "../../src/server/portfolio/importer";
+import { loadPortfolioSources } from "../../src/server/portfolio/loader";
 import { startTestRuntime } from "./support/runtime";
 import { seoSnapshot } from "./support/seoSnapshot";
 import { seedHomeServices } from "./support/homeFixtures";
@@ -17,10 +19,12 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
   await resetTestDatabase(databaseUrl);
-  await importLegacyContent({ db: createDb(databaseUrl), batchId: "ssr-parity" });
-  await seedHomeServices(databaseUrl);
   const db = createDb(databaseUrl);
-  const [fixtureCase] = await db.select({ id: contentEntries.id }).from(contentEntries).where(and(eq(contentEntries.kind, "case"), eq(contentEntries.slug, "web-site")));
+  await importLegacyContent({ db, batchId: "ssr-parity" });
+  const portfolioSources = await loadPortfolioSources();
+  await applyPortfolioImport(db, await planPortfolioImport(db, portfolioSources));
+  await seedHomeServices(databaseUrl);
+  const [fixtureCase] = await db.select({ id: contentEntries.id }).from(contentEntries).where(and(eq(contentEntries.kind, "case"), eq(contentEntries.slug, "alliance-stroy-garant")));
   const [fixtureService] = await db.select({ id: contentEntries.id }).from(contentEntries).where(and(eq(contentEntries.kind, "service"), eq(contentEntries.slug, "web-services")));
   assert.ok(fixtureCase && fixtureService);
   await db.insert(contentRelations).values({ sourceId: fixtureCase.id, targetId: fixtureService.id, type: "related_service" });
@@ -40,7 +44,7 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
     "/services/integrations/",
     "/services/ai-automation/",
   ];
-  for (const pathname of ["/", "/services/", ...serviceDetailPaths, "/blog/", "/blog/business-automation/", "/cases/", "/cases/web-site/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/", "/requisites/", "/privacy/"]) {
+  for (const pathname of ["/", "/services/", ...serviceDetailPaths, "/blog/", "/blog/business-automation/", "/cases/", "/cases/alliance-stroy-garant/", "/video/", "/journal/", "/journal/issue-0/", "/under-metup/video-1/", "/requisites/", "/privacy/"]) {
     await t.test(pathname, async () => {
       const response = await fetch(`${runtime.origin}${pathname}`);
       assert.equal(response.status, 200);
@@ -90,15 +94,17 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
           }), true);
         }
       }
-      if (pathname.includes("business-automation") || pathname.includes("web-site")) {
+      if (pathname.includes("business-automation") || pathname.includes("alliance-stroy-garant")) {
         assert.ok((await noJs.$eval("article", el => el.textContent))!.trim().length > 300);
       }
       if (pathname === "/cases/") {
-        assert.ok(await noJs.$('a[href="/cases/web-site/"]'));
+        const detailLinks = await noJs.$$eval('a[href^="/cases/"]', links => [...new Set(links.map(link => link.getAttribute("href")).filter(href => href && href !== "/cases/"))]);
+        assert.equal(detailLinks.length, 26);
+        assert.ok(detailLinks.includes("/cases/alliance-stroy-garant/"));
       }
-      if (pathname === "/cases/web-site/") {
+      if (pathname === "/cases/alliance-stroy-garant/") {
         assert.ok(await noJs.$('a[href="/services/web-services/"]'));
-        assert.ok(await noJs.$('form input[name="pagePath"][value="/cases/web-site/"]'));
+        assert.ok(await noJs.$('form input[name="pagePath"][value="/cases/alliance-stroy-garant/"]'));
       }
       if (serviceDetailPaths.includes(pathname)) {
         assert.ok((await noJs.$eval("article", el => el.textContent))!.trim().length > 300);
@@ -152,7 +158,7 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
     request.end();
   });
   assert.equal(legacy.status, 301);
-  assert.equal(legacy.location, "https://kordev.team/cases/web-site/?utm_source=test");
+  assert.equal(legacy.location, "https://kordev.team/cases/alliance-stroy-garant/?utm_source=test");
   const legacyTarget = await fetch(`${runtime.origin}${new URL(legacy.location).pathname}`, { redirect: "manual", headers: { accept: "text/html" } });
   assert.equal(legacyTarget.status, 200);
   const unknownLegacy = await fetch(`${runtime.origin}/project/not-published`, { redirect: "manual", headers: { accept: "text/html" } });
