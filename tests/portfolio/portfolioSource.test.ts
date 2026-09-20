@@ -145,3 +145,25 @@ test("product and mobile portfolio batch is complete", async () => {
     "stone-product-calculator",
   ]) assert.ok(slugs.has(slug), slug);
 });
+
+test("automation and internal portfolio batch is complete", async () => {
+  const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
+  for (const slug of [
+    "21-century-crm",
+    "skycreative-random-coffee",
+    "twitch-automation-service",
+    "notion-analog",
+    "krasotula-crm",
+    "roost",
+    "teharmatura-automation",
+    "tbi-group-tour-service",
+  ]) assert.ok(slugs.has(slug), slug);
+});
+
+test("portfolio source contains exactly the approved 26 unique cases", async () => {
+  const records = await loadPortfolioSources();
+  assert.equal(records.length, 26);
+  assert.equal(new Set(records.map(record => record.slug)).size, 26);
+  assert.equal(new Set(records.map(record => record.seoTitle)).size, 26);
+  assert.equal(new Set(records.map(record => record.seoDescription)).size, 26);
+});
