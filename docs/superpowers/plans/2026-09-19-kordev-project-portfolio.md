@@ -47,7 +47,7 @@
 - Consumes: `ContentEntry.payload`, `MediaPresentationMap`, `ResolvedMediaAsset`.
 - Produces: `CaseMediaRef`, расширенный case payload и корректные `caseCard()` / `commercialCasePage()`.
 
-- [ ] **Step 1: Написать падающие тесты контракта и представления**
+- [x] **Step 1: Написать падающие тесты контракта и представления**
 
 Добавить проверки строкового UUID media ref, локального объекта изображения, тегов, технологий, функций и ссылок:
 
@@ -95,13 +95,13 @@ test("case presentation resolves local media without S3 records", () => {
 });
 ```
 
-- [ ] **Step 2: Запустить тесты и подтвердить ожидаемое падение**
+- [x] **Step 2: Запустить тесты и подтвердить ожидаемое падение**
 
 Run: `yarn tsx --test src/server/content/commercialPresentation.test.ts src/server/content/service.test.ts`
 
 Expected: FAIL, потому что case schema пока отклоняет новые поля, а `asset()` не понимает объект локального изображения.
 
-- [ ] **Step 3: Реализовать схему media ref и case payload**
+- [x] **Step 3: Реализовать схему media ref и case payload**
 
 В `types.ts` добавить:
 
@@ -138,13 +138,13 @@ export const casePayload = z.strictObject({
 
 В `commercialPresentation.ts` разделить разрешение UUID и локального объекта. Локальный объект преобразовать в `ResolvedMediaAsset` с пустым `srcSet`, фиксированными размерами и `sizes: "(max-width: 768px) 100vw, 960px"`. `caseCard()` возвращает `tags`, сначала выбирает первый screenshot, затем `ogMediaId`, затем legacy image. `commercialCasePage()` предпочитает структурированные `technologies`, `features`, `demoUrl` и `githubUrl`, сохраняя legacy fallback.
 
-- [ ] **Step 4: Запустить узкие тесты**
+- [x] **Step 4: Запустить узкие тесты**
 
 Run: `yarn tsx --test src/server/content/commercialPresentation.test.ts src/server/content/service.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Зафиксировать контракт**
+- [x] **Step 5: Зафиксировать контракт**
 
 ```bash
 git add src/server/content/types.ts src/server/content/commercialPresentation.ts src/server/content/commercialPresentation.test.ts src/server/content/service.test.ts
@@ -165,7 +165,7 @@ git commit -m "feat(portfolio): extend structured case content"
 - Consumes: расширенный case payload из Task 1 и JSON-файлы `content/portfolio/cases/*.json`.
 - Produces: `PortfolioCaseSource`, `loadPortfolioSources(root?)`, `validatePortfolioSources(records)` и `toPortfolioCommand(record)`.
 
-- [ ] **Step 1: Написать тесты загрузчика, приватности и уникальности**
+- [x] **Step 1: Написать тесты загрузчика, приватности и уникальности**
 
 ```ts
 test("loader reads sorted JSON records from a bounded fixture directory", async () => {
@@ -196,13 +196,13 @@ test("NDA case cannot name protected organizations", () => {
 });
 ```
 
-- [ ] **Step 2: Запустить тест и подтвердить отсутствие модулей**
+- [x] **Step 2: Запустить тест и подтвердить отсутствие модулей**
 
 Run: `yarn tsx --test tests/portfolio/portfolioSource.test.ts`
 
 Expected: FAIL с `ERR_MODULE_NOT_FOUND` для `src/server/portfolio/loader.ts`.
 
-- [ ] **Step 3: Реализовать редакционную схему**
+- [x] **Step 3: Реализовать редакционную схему**
 
 Использовать строгую структуру:
 
@@ -237,7 +237,7 @@ export const portfolioCaseSource = z.strictObject({
 
 Проверка приватности применяется к `JSON.stringify(toPortfolioCommand(record))`, а не к evidence. Запрещённые шаблоны: российские телефоны, email кроме `team@korotkov.dev`, `kus_live_`, `api[_-]?key`, `token`, денежные суммы рядом с `₽`, `руб` или `бюджет`. Для `notion-analog` дополнительно запрещены названия конечных заказчиков из исходного внутреннего текста.
 
-- [ ] **Step 4: Добавить CLI валидации**
+- [x] **Step 4: Добавить CLI валидации**
 
 Добавить `scripts/validate-project-portfolio.ts`, который печатает JSON:
 
@@ -247,13 +247,13 @@ export const portfolioCaseSource = z.strictObject({
 
 В `package.json` добавить `"portfolio:validate": "tsx scripts/validate-project-portfolio.ts"`.
 
-- [ ] **Step 5: Запустить тесты схемы**
+- [x] **Step 5: Запустить тесты схемы**
 
 Run: `yarn tsx --test tests/portfolio/portfolioSource.test.ts`
 
 Expected: PASS на временных fixture-файлах.
 
-- [ ] **Step 6: Зафиксировать инфраструктуру валидатора**
+- [x] **Step 6: Зафиксировать инфраструктуру валидатора**
 
 ```bash
 git add package.json src/server/portfolio/schema.ts src/server/portfolio/loader.ts scripts/validate-project-portfolio.ts tests/portfolio/portfolioSource.test.ts content/portfolio/cases/.gitkeep
@@ -278,7 +278,7 @@ git commit -m "feat(portfolio): add source schema and validator"
 - Consumes: `PortfolioCaseSource` из Task 2 и факты Google Sheet/Doc/repository.
 - Produces: 9 валидных редакционных записей.
 
-- [ ] **Step 1: Зафиксировать ожидаемый состав партии**
+- [x] **Step 1: Зафиксировать ожидаемый состав партии**
 
 Добавить тест:
 
@@ -292,7 +292,7 @@ test("web and support portfolio batch is complete", async () => {
 });
 ```
 
-- [ ] **Step 2: Написать девять JSON-кейсов**
+- [x] **Step 2: Написать девять JSON-кейсов**
 
 Каждый файл заполняется полностью по структуре спецификации. Редакционные акценты:
 
@@ -310,13 +310,13 @@ test("web and support portfolio batch is complete", async () => {
 
 Для каждого файла обязательны `problem`, `solution`, минимум 3 `features`, минимум 2 `stages`, `team`, `results`, `tags` и evidence. Для остановленных проектов результат описывает выполненный объём, а не коммерческий успех клиента.
 
-- [ ] **Step 3: Запустить тест партии**
+- [x] **Step 3: Запустить тест партии**
 
 Run: `yarn tsx --test tests/portfolio/portfolioSource.test.ts`
 
 Expected: PASS; тест партии находит все 9 slug, а общая проверка 26 записей ещё не добавлена.
 
-- [ ] **Step 4: Зафиксировать первую контентную партию**
+- [x] **Step 4: Зафиксировать первую контентную партию**
 
 ```bash
 git add content/portfolio/cases tests/portfolio/portfolioSource.test.ts
@@ -341,7 +341,7 @@ git commit -m "content(portfolio): add web and support cases"
 - Consumes: schema Task 2, Google Sheet/Doc, публичные App Store/site страницы и YouGile.
 - Produces: ещё 9 валидных записей, всего 18.
 
-- [ ] **Step 1: Зафиксировать состав продуктовой партии**
+- [x] **Step 1: Зафиксировать состав продуктовой партии**
 
 ```ts
 test("product and mobile portfolio batch is complete", async () => {
@@ -353,7 +353,7 @@ test("product and mobile portfolio batch is complete", async () => {
 });
 ```
 
-- [ ] **Step 2: Написать девять JSON-кейсов**
+- [x] **Step 2: Написать девять JSON-кейсов**
 
 | slug | Основная задача | Подтверждённый результат/эффект | Технологии |
 |---|---|---|---|
@@ -369,13 +369,13 @@ test("product and mobile portfolio batch is complete", async () => {
 
 Для ServicePlus использовать функции, подтверждённые YouGile: техника, типы и бренды, подразделения, маршруты, сотрудники, права администраторов, Excel-экспорт, фотофиксация и офлайн-синхронизация. Не превращать незакрытые баги доски в публичные преимущества.
 
-- [ ] **Step 3: Запустить тест партии**
+- [x] **Step 3: Запустить тест партии**
 
 Run: `yarn tsx --test tests/portfolio/portfolioSource.test.ts`
 
 Expected: PASS; обе партии содержат 18 валидных уникальных записей.
 
-- [ ] **Step 4: Зафиксировать продуктовую партию**
+- [x] **Step 4: Зафиксировать продуктовую партию**
 
 ```bash
 git add content/portfolio/cases tests/portfolio/portfolioSource.test.ts
@@ -400,7 +400,7 @@ git commit -m "content(portfolio): add product and mobile cases"
 - Consumes: schema Task 2, договорную справку, карту проектов, YouGile и безопасный обзор Krasotula.
 - Produces: полный набор 26 кейсов и зелёный `portfolio:validate`.
 
-- [ ] **Step 1: Зафиксировать состав последней партии**
+- [x] **Step 1: Зафиксировать состав последней партии**
 
 ```ts
 test("automation and internal portfolio batch is complete", async () => {
@@ -413,7 +413,7 @@ test("automation and internal portfolio batch is complete", async () => {
 });
 ```
 
-- [ ] **Step 2: Написать восемь JSON-кейсов**
+- [x] **Step 2: Написать восемь JSON-кейсов**
 
 | slug | Основная задача | Публичный акцент | Ограничение |
 |---|---|---|---|
@@ -426,7 +426,7 @@ test("automation and internal portfolio batch is complete", async () => {
 | `teharmatura-automation` | Автоматизация процессов торгового дома | Битрикс24, 1С, email, OCR, AI, обследование и интеграции | Не публиковать договорную стоимость и контакты |
 | `tbi-group-tour-service` | Расчёт и сопровождение туристических групп | Поддержка, развитие функций и SLA по критичности | Не показывать закрытый staging URL и внутренние группы |
 
-- [ ] **Step 3: Запустить полный валидатор**
+- [x] **Step 3: Запустить полный валидатор**
 
 Перед запуском добавить финальный тест полноты:
 
@@ -444,13 +444,13 @@ Run: `yarn portfolio:validate`
 
 Expected: PASS и JSON с `count: 26`.
 
-- [ ] **Step 4: Запустить source-тесты**
+- [x] **Step 4: Запустить source-тесты**
 
 Run: `yarn tsx --test tests/portfolio/portfolioSource.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Зафиксировать схему и полный контентный набор**
+- [x] **Step 5: Зафиксировать схему и полный контентный набор**
 
 ```bash
 git add content/portfolio/cases tests/portfolio/portfolioSource.test.ts
@@ -470,7 +470,7 @@ git commit -m "content(portfolio): complete verified 26-case source"
 - Consumes: `loadPortfolioSources()`, `toPortfolioCommand()`, Drizzle `ContentDatabase`.
 - Produces: `planPortfolioImport(db, records)`, `applyPortfolioImport(db, plan)`, `assertPortfolioDatabaseAllowed(url, options)` и CLI `portfolio:import`.
 
-- [ ] **Step 1: Написать тесты guard, dry-run, update, revision и idempotency**
+- [x] **Step 1: Написать тесты guard, dry-run, update, revision и idempotency**
 
 ```ts
 test("database guard permits local PostgreSQL and rejects remote hosts", () => {
@@ -515,13 +515,13 @@ databaseTest("legacy slug is renamed instead of creating a duplicate case", asyn
 });
 ```
 
-- [ ] **Step 2: Запустить тесты и подтвердить падение**
+- [x] **Step 2: Запустить тесты и подтвердить падение**
 
 Run: `TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/portfolio/importer.test.ts scripts/import-project-portfolio.test.ts`
 
 Expected: FAIL из-за отсутствующих модулей.
 
-- [ ] **Step 3: Реализовать планирование и атомарное применение**
+- [x] **Step 3: Реализовать планирование и атомарное применение**
 
 `planPortfolioImport()` ищет запись сначала по каноническому slug, затем по `legacySlugs`, и формирует элементы:
 
@@ -539,7 +539,7 @@ export type PortfolioImportItem = {
 
 Guard удалённой БД разрешает запись только когда одновременно заданы `--allow-production` и `KORDEV_ALLOW_PRODUCTION_PORTFOLIO_IMPORT=1`; этот режим не используется в данной работе.
 
-- [ ] **Step 4: Добавить CLI и package scripts**
+- [x] **Step 4: Добавить CLI и package scripts**
 
 CLI поддерживает:
 
@@ -550,13 +550,13 @@ yarn portfolio:import
 
 Dry-run печатает actions и checksums без записи. В `package.json` добавить `"portfolio:import": "tsx scripts/import-project-portfolio.ts"`.
 
-- [ ] **Step 5: Запустить тесты импортёра**
+- [x] **Step 5: Запустить тесты импортёра**
 
 Run: `TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test src/server/portfolio/importer.test.ts scripts/import-project-portfolio.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 6: Зафиксировать импортёр**
+- [x] **Step 6: Зафиксировать импортёр**
 
 ```bash
 git add package.json src/server/portfolio/importer.ts src/server/portfolio/importer.test.ts scripts/import-project-portfolio.ts scripts/import-project-portfolio.test.ts
@@ -577,7 +577,7 @@ git commit -m "feat(portfolio): add guarded local PostgreSQL import"
 - Consumes: 26 case sources, allowlisted public URLs, Puppeteer и Sharp.
 - Produces: `public/projects/portfolio/<slug>/cover.webp`, безопасные gallery images и отчёт захвата.
 
-- [ ] **Step 1: Написать тесты allowlist и fallback-обложки**
+- [x] **Step 1: Написать тесты allowlist и fallback-обложки**
 
 ```ts
 test("media manifest covers every portfolio slug exactly once", async () => {
@@ -600,13 +600,13 @@ test("unavailable page produces branded cover without fabricated interface", asy
 });
 ```
 
-- [ ] **Step 2: Запустить тесты и подтвердить падение**
+- [x] **Step 2: Запустить тесты и подтвердить падение**
 
 Run: `yarn tsx --test scripts/capture-project-media.test.ts tests/assets/portfolioAssets.test.ts`
 
 Expected: FAIL из-за отсутствующих manifest и script.
 
-- [ ] **Step 3: Создать media manifest**
+- [x] **Step 3: Создать media manifest**
 
 Каждая запись содержит `slug`, `mode`, `sourceUrl`, `output`, `alt`, `viewport` и необязательный `selector`. Режимы:
 
@@ -616,7 +616,7 @@ Expected: FAIL из-за отсутствующих manifest и script.
 
 App Store страницы могут дать реальное изображение только при успешной загрузке без авторизации. При ошибке используется fallback, а не чужое или выдуманное приложение.
 
-- [ ] **Step 4: Реализовать захват и обработку**
+- [x] **Step 4: Реализовать захват и обработку**
 
 Скрипт:
 
@@ -632,7 +632,7 @@ App Store страницы могут дать реальное изображе
 
 Fallback cover содержит только название, категорию и фирменную геометрию KorDevTeam; он не имитирует интерфейс продукта.
 
-- [ ] **Step 5: Добавить package script и запустить unit-тесты**
+- [x] **Step 5: Добавить package script и запустить unit-тесты**
 
 В `package.json` добавить `"portfolio:media": "tsx scripts/capture-project-media.ts"`.
 
@@ -640,7 +640,7 @@ Run: `yarn tsx --test scripts/capture-project-media.test.ts tests/assets/portfol
 
 Expected: тесты логики PASS; asset completeness остаётся красным до Task 8.
 
-- [ ] **Step 6: Зафиксировать медиапроцесс после Task 8, когда asset test станет зелёным**
+- [x] **Step 6: Зафиксировать медиапроцесс после Task 8, когда asset test станет зелёным**
 
 Не выполнять commit на этом шаге.
 
@@ -656,17 +656,17 @@ Expected: тесты логики PASS; asset completeness остаётся кр
 - Consumes: media manifest и capture script Task 7.
 - Produces: все локальные файлы и заполненные structured screenshots в case payload.
 
-- [ ] **Step 1: Запустить медиасбор**
+- [x] **Step 1: Запустить медиасбор**
 
 Run: `yarn portfolio:media`
 
 Expected: отчёт содержит 26 успешных cover outputs; недоступные сайты отмечены `fallback`, а не роняют весь процесс.
 
-- [ ] **Step 2: Визуально проверить реальные capture-источники**
+- [x] **Step 2: Визуально проверить реальные capture-источники**
 
 Проверить, что кадры показывают продукт, не содержат cookie overlay, персональные данные, админские токены или случайные чаты. Неудачный кадр переводится в `existing` или `fallback` в manifest и пересобирается.
 
-- [ ] **Step 3: Добавить изображения в payload кейсов**
+- [x] **Step 3: Добавить изображения в payload кейсов**
 
 Формат каждого изображения:
 
@@ -681,13 +681,13 @@ Expected: отчёт содержит 26 успешных cover outputs; нед�
 
 Первое изображение служит обложкой карточки. Для семи приоритетных кейсов добавить от двух до пяти безопасных изображений, если реальные материалы доступны.
 
-- [ ] **Step 4: Запустить asset- и source-тесты**
+- [x] **Step 4: Запустить asset- и source-тесты**
 
 Run: `yarn tsx --test tests/assets/portfolioAssets.test.ts tests/portfolio/portfolioSource.test.ts`
 
 Expected: PASS; каждый путь существует, WebP декодируется, размеры совпадают с payload, alt непустой.
 
-- [ ] **Step 5: Зафиксировать media pipeline и assets**
+- [x] **Step 5: Зафиксировать media pipeline и assets**
 
 ```bash
 git add package.json content/portfolio/media.json content/portfolio/cases src/server/portfolio/mediaManifest.ts scripts/capture-project-media.ts scripts/capture-project-media.test.ts tests/assets/portfolioAssets.test.ts public/projects/portfolio
@@ -707,7 +707,7 @@ git commit -m "feat(portfolio): add verified project media"
 - Consumes: `CaseCardView.tags` и 26 опубликованных entries.
 - Produces: SSR-first каталог и фильтрацию по семи категориям.
 
-- [ ] **Step 1: Написать тесты no-JS структуры и интерактивного фильтра**
+- [x] **Step 1: Написать тесты no-JS структуры и интерактивного фильтра**
 
 ```tsx
 test("catalog renders every case link before filtering", () => {
@@ -727,25 +727,25 @@ test("category filter hides unrelated cards and can reset", async () => {
 });
 ```
 
-- [ ] **Step 2: Запустить тест и подтвердить падение**
+- [x] **Step 2: Запустить тест и подтвердить падение**
 
 Run: `yarn tsx --test src/pages/CasesPage.test.tsx`
 
 Expected: FAIL, потому что фильтр и article labels отсутствуют.
 
-- [ ] **Step 3: Реализовать фильтр как enhancement**
+- [x] **Step 3: Реализовать фильтр как enhancement**
 
 На первом SSR-рендере `selected = "all"`, поэтому видны все карточки. После нажатия фильтра React выводит подмножество. Кнопки находятся в горизонтально прокручиваемой группе с `aria-pressed`; число результатов объявляется через `aria-live="polite"`. URL и query-параметры не меняются.
 
 `CaseCard` получает `aria-label={project.title}` на article, отображает не более трёх тегов и не использует технологию как основной результат.
 
-- [ ] **Step 4: Запустить unit-тесты каталога**
+- [x] **Step 4: Запустить unit-тесты каталога**
 
 Run: `yarn tsx --test src/pages/CasesPage.test.tsx src/server/content/commercialPresentation.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Зафиксировать каталог**
+- [x] **Step 5: Зафиксировать каталог**
 
 ```bash
 git add src/pages/CasesPage.tsx src/pages/CasesPage.test.tsx src/components/public/CaseCard.tsx src/server/content/types.ts src/server/content/commercialPresentation.ts
@@ -765,7 +765,7 @@ git commit -m "feat(cases): show and filter complete portfolio"
 - Consumes: `CommercialCaseView` с structured screenshots, tags, technologies и features.
 - Produces: полноценные страницы 26 кейсов и одношаговые legacy redirects.
 
-- [ ] **Step 1: Написать тест галереи и честных неполных кейсов**
+- [x] **Step 1: Написать тест галереи и честных неполных кейсов**
 
 ```tsx
 test("case page renders sized screenshots without inventing empty proof", () => {
@@ -781,17 +781,17 @@ test("case page renders sized screenshots without inventing empty proof", () => 
 });
 ```
 
-- [ ] **Step 2: Запустить тест и подтвердить текущее поведение**
+- [x] **Step 2: Запустить тест и подтвердить текущее поведение**
 
 Run: `yarn tsx --test src/pages/CommercialCasePage.test.tsx tests/seo/legacyDecisions.test.ts`
 
 Expected: case test выявляет недостающие gallery semantics или styling; redirect test станет красным после добавления нового списка legacy slug.
 
-- [ ] **Step 3: Улучшить gallery без смены общего дизайна**
+- [x] **Step 3: Улучшить gallery без смены общего дизайна**
 
 Добавить `<figure>`/`<figcaption>` только когда подпись отличается от H1, сохранить width/height, использовать `object-contain` для интерфейсных кадров и нейтральный фон вместо обрезания UI. Первая широкая картинка занимает две колонки; мобильная версия остаётся одной колонкой. Пустые results/testimonial/team не выводятся.
 
-- [ ] **Step 4: Обновить точные решения legacy URL**
+- [x] **Step 4: Обновить точные решения legacy URL**
 
 Сохранить существующие маршруты:
 
@@ -802,13 +802,13 @@ Expected: case test выявляет недостающие gallery semantics и
 
 Добавить решения для legacy ID/имен из старого JSON только после нормализации и проверить, что destination сам не является source другого redirect.
 
-- [ ] **Step 5: Запустить тесты страницы и редиректов**
+- [x] **Step 5: Запустить тесты страницы и редиректов**
 
 Run: `yarn tsx --test src/pages/CommercialCasePage.test.tsx tests/seo/legacyDecisions.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 6: Зафиксировать страницу и redirects**
+- [x] **Step 6: Зафиксировать страницу и redirects**
 
 ```bash
 git add src/pages/CommercialCasePage.tsx src/pages/CommercialCasePage.test.tsx docs/seo/legacy-url-decisions.md public/_redirects tests/seo/legacyDecisions.test.ts
@@ -829,7 +829,7 @@ git commit -m "feat(cases): complete case stories and legacy routes"
 - Consumes: importer, catalog/case routes, media files.
 - Produces: интеграционные доказательства 26 локально опубликованных страниц.
 
-- [ ] **Step 1: Написать интеграционный тест импорта и каталога**
+- [x] **Step 1: Написать интеграционный тест импорта и каталога**
 
 ```ts
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -849,7 +849,7 @@ test("local portfolio import publishes all 26 cases and every route resolves", {
 });
 ```
 
-- [ ] **Step 2: Расширить SSR/SEO проверки**
+- [x] **Step 2: Расширить SSR/SEO проверки**
 
 Проверить:
 
@@ -860,7 +860,7 @@ test("local portfolio import publishes all 26 cases and every route resolves", {
 - private evidence и запрещённые шаблоны не встречаются в HTML;
 - фильтр не создаёт query-based canonical variants.
 
-- [ ] **Step 3: Добавить репрезентативные visual routes**
+- [x] **Step 3: Добавить репрезентативные visual routes**
 
 Добавить в visual suite:
 
@@ -878,19 +878,19 @@ const portfolioRoutes = [
 
 На desktop и mobile проверить один H1, отсутствие horizontal overflow, декодирование изображений, размеры gallery и отсутствие hydration errors.
 
-- [ ] **Step 4: Запустить интеграционные тесты**
+- [x] **Step 4: Запустить интеграционные тесты**
 
 Run: `TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn tsx --test --test-concurrency=1 tests/portfolio/portfolioImport.integration.test.ts tests/ssr/seoParity.test.ts tests/seo/crawler.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Запустить визуальные тесты**
+- [x] **Step 5: Запустить визуальные тесты**
 
 Run: `TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn test:commercial`
 
 Expected: PASS на desktop/mobile и без JavaScript.
 
-- [ ] **Step 6: Обновить SEO inventory и зафиксировать**
+- [x] **Step 6: Обновить SEO inventory и зафиксировать**
 
 ```bash
 git add tests/portfolio/portfolioImport.integration.test.ts tests/ssr/seoParity.test.ts tests/seo/crawler.test.ts tests/visual/commercial-pages.test.ts tests/visual/support/commercialFixtures.ts docs/seo/public-route-inventory.md
@@ -907,25 +907,25 @@ git commit -m "test(portfolio): verify all local case routes"
 - Consumes: весь реализованный портфель.
 - Produces: локальный сайт с 26 кейсами, доказательства проверок и чистый commit history без push.
 
-- [ ] **Step 1: Проверить dry-run на локальной БД**
+- [x] **Step 1: Проверить dry-run на локальной БД**
 
 Run: `DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev yarn portfolio:import --dry-run`
 
 Expected: `ok: true`, 26 planned entries, без записи.
 
-- [ ] **Step 2: Импортировать все кейсы локально**
+- [x] **Step 2: Импортировать все кейсы локально**
 
 Run: `DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev yarn portfolio:import`
 
 Expected: сумма `inserted + updated + unchanged` равна 26, `published` отражает все новые публикации.
 
-- [ ] **Step 3: Повторить импорт и доказать idempotency**
+- [x] **Step 3: Повторить импорт и доказать idempotency**
 
 Run: `DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev yarn portfolio:import`
 
 Expected: `inserted: 0`, `updated: 0`, `unchanged: 26`.
 
-- [ ] **Step 4: Запустить полную автоматическую проверку**
+- [x] **Step 4: Запустить полную автоматическую проверку**
 
 Run: `TEST_DATABASE_URL=postgres://kordev:kordev@127.0.0.1:5433/kordev_test yarn test`
 
@@ -937,13 +937,13 @@ Run: `git diff --check`
 
 Expected: все команды завершаются с exit 0.
 
-- [ ] **Step 5: Поднять локальный runtime и проверить страницы**
+- [x] **Step 5: Поднять локальный runtime и проверить страницы**
 
 Run: `DATABASE_URL=postgresql://kordev:kordev@127.0.0.1:5433/kordev PORT=3001 yarn start`
 
 Проверить `/cases/`, фильтры и семь репрезентативных страниц из Task 11 на desktop/mobile. Убедиться, что форма заявки, тема, навигация и consent продолжают работать.
 
-- [ ] **Step 6: Проверить безопасность release boundary**
+- [x] **Step 6: Проверить безопасность release boundary**
 
 Run: `git status --short`
 
@@ -951,7 +951,7 @@ Run: `git log --oneline --max-count=12`
 
 Expected: только ожидаемые изменения и локальные commits. Не выполнять `git push`, deployment или production import.
 
-- [ ] **Step 7: Зафиксировать только итоговые корректировки приёмки**
+- [x] **Step 7: Зафиксировать только итоговые корректировки приёмки**
 
 Если визуальная приёмка потребовала правок, добавить только относящиеся файлы и выполнить:
 
