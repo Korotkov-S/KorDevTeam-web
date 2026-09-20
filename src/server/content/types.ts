@@ -17,6 +17,13 @@ export type CommercialCaseView = { slug: string; h1: string; summary: string; pr
 
 const block = z.strictObject({ title: z.string(), description: z.string() });
 const cta = z.strictObject({ copy: z.string(), type: z.enum(["form", "telegram", "email", "phone"]) });
+const staticCaseImage = z.strictObject({
+  src: z.string().regex(/^\/projects\/portfolio\/[a-z0-9-]+\/[a-z0-9-]+\.(?:webp|png|jpe?g)$/),
+  alt: z.string().trim().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+const caseMediaRef = z.union([z.uuid(), staticCaseImage]);
 const servicePayload = z.strictObject({
   h1: z.string().optional(),
   lead: z.string().optional(),
@@ -35,6 +42,26 @@ const servicePayload = z.strictObject({
   guarantees: z.array(block).optional(),
 });
 
+export const casePayload = z.strictObject({
+  h1: z.string().optional(),
+  problem: z.string().optional(),
+  constraints: z.array(z.string()).optional(),
+  solution: z.string().optional(),
+  architecture: z.string().optional(),
+  integrations: z.array(z.string()).optional(),
+  technologies: z.array(z.string()).optional(),
+  features: z.array(z.string()).optional(),
+  stages: z.array(block).optional(),
+  team: z.array(z.string()).optional(),
+  screenshots: z.array(caseMediaRef).optional(),
+  results: z.array(block).optional(),
+  testimonial: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  demoUrl: z.url().optional(),
+  githubUrl: z.url().optional(),
+  cta: cta.optional(),
+});
+
 const base = {
   id: z.uuid().optional(),
   expectedVersion: z.number().int().positive().optional(),
@@ -50,12 +77,7 @@ const base = {
 
 export const saveContentSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...base, kind: z.literal("service"), payload: servicePayload.default({}) }),
-  z.strictObject({ ...base, kind: z.literal("case"), payload: z.strictObject({
-    h1: z.string().optional(), problem: z.string().optional(), constraints: z.array(z.string()).optional(),
-    solution: z.string().optional(), architecture: z.string().optional(), integrations: z.array(z.string()).optional(),
-    stages: z.array(block).optional(), team: z.array(z.string()).optional(), screenshots: z.array(z.uuid()).optional(),
-    results: z.array(block).optional(), testimonial: z.string().optional(), cta: cta.optional(),
-  }).default({}) }),
+  z.strictObject({ ...base, kind: z.literal("case"), payload: casePayload.default({}) }),
   z.strictObject({ ...base, kind: z.literal("article"), payload: z.strictObject({
     h1: z.string().optional(), author: z.string().optional(), tags: z.array(z.string()).optional(),
     coverUrl: z.string().optional(), imageUrls: z.array(z.string()).optional(), readTime: z.string().optional(),
@@ -73,6 +95,7 @@ export const saveContentSchema = z.discriminatedUnion("kind", [
 export type SaveContentCommand = z.input<typeof saveContentSchema>;
 export type ValidatedContentCommand = z.output<typeof saveContentSchema>;
 export type ServicePayload = z.output<typeof servicePayload>;
+export type CaseMediaRef = z.output<typeof caseMediaRef>;
 
 export function parseContentCommand(command: SaveContentCommand): ValidatedContentCommand {
   const result = saveContentSchema.safeParse(command);

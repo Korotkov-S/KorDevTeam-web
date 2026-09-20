@@ -21,6 +21,13 @@ function caseFixture(payload: Record<string, unknown> = {}): ContentEntry {
   };
 }
 
+const localCover = {
+  src: "/projects/portfolio/serviceplus/cover.webp",
+  alt: "Мобильное приложение ServicePlus для осмотра техники",
+  width: 1600,
+  height: 1000,
+};
+
 test("service presentation omits empty optional blocks and preserves confirmed payload", () => {
   const view = servicePage(serviceFixture({
     priceFrom: null, priceFactors: [" ", "  Complexity  "], timeRange: " ", results: [],
@@ -63,6 +70,24 @@ test("case card falls back to the migrated legacy body image", () => {
   };
 
   assert.deepEqual(caseCard(entry, { [mediaId]: image }).image, image);
+});
+
+test("case presentation resolves local media and structured commercial fields without S3 records", () => {
+  const view = commercialCasePage(caseFixture({
+    h1: "ServicePlus",
+    technologies: ["React Native"],
+    features: ["Фотофиксация"],
+    tags: ["Мобильные приложения"],
+    screenshots: [localCover],
+    demoUrl: "https://servicplus.ru/",
+  }));
+
+  assert.equal(view.screenshots[0]?.src, localCover.src);
+  assert.equal(view.screenshots[0]?.width, 1600);
+  assert.deepEqual(view.technologies, ["React Native"]);
+  assert.deepEqual(view.features, ["Фотофиксация"]);
+  assert.equal(view.demoUrl, "https://servicplus.ru/");
+  assert.deepEqual(caseCard(caseFixture({ screenshots: [localCover], tags: ["Мобильные приложения"] })).tags, ["Мобильные приложения"]);
 });
 
 test("legacy case removes the first markdown heading when its normalized text matches the entry title", () => {

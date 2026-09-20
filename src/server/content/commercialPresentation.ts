@@ -53,9 +53,29 @@ function caseCta(entry: ContentEntry): CtaView {
 }
 
 function asset(value: unknown, media: MediaPresentationMap): ResolvedMediaAsset | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const image = value as Record<string, unknown>;
+    if (typeof image.src === "string" && typeof image.alt === "string"
+      && typeof image.width === "number" && typeof image.height === "number") {
+      return {
+        id: `static:${image.src}`,
+        src: image.src,
+        srcSet: "",
+        sizes: "(max-width: 768px) 100vw, 960px",
+        alt: image.alt,
+        decorative: false,
+        width: image.width,
+        height: image.height,
+      };
+    }
+  }
   const id = text(value);
   if (!id) return null;
   return media[id] ?? (id.startsWith("media:") ? media[id.slice(6)] ?? null : null);
+}
+
+function mediaRefs(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function legacyImageAsset(entry: ContentEntry, image: string, media: MediaPresentationMap): ResolvedMediaAsset | null {
@@ -85,7 +105,7 @@ export function serviceCard(entry: ContentEntry): ServiceCardView {
 }
 
 export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}): CaseCardView {
-  const screenshots = strings(entry.payload.screenshots);
+  const screenshots = mediaRefs(entry.payload.screenshots);
   const results = blocks(entry.payload.results);
   const image = screenshots.map(id => asset(id, media)).find((value): value is ResolvedMediaAsset => value !== null)
     ?? asset(entry.ogMediaId, media)
@@ -96,7 +116,7 @@ export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}):
     summary: text(entry.excerpt) ?? "",
     result: results[0]?.title ?? null,
     image,
-    tags: [],
+    tags: strings(entry.payload.tags),
   };
 }
 
@@ -157,8 +177,8 @@ export function commercialCasePage(
   relatedCases: ContentEntry[] = [],
 ): CommercialCaseView {
   const legacy = legacyCaseContent(entry, media);
-  const screenshots = strings(entry.payload.screenshots)
-    .map(id => asset(id, media))
+  const screenshots = mediaRefs(entry.payload.screenshots)
+    .map(reference => asset(reference, media))
     .filter((value): value is ResolvedMediaAsset => value !== null);
   const legacyImage = legacyImageAsset(entry, legacy.image, media);
   if (!screenshots.length && legacyImage) screenshots.push(legacyImage);
@@ -174,8 +194,8 @@ export function commercialCasePage(
     solution: text(entry.payload.solution) ?? legacy.solution,
     architecture: text(entry.payload.architecture) ?? legacy.architecture,
     integrations: integrations.length ? integrations : legacy.integrations,
-    technologies: legacy.technologies,
-    features: legacy.features,
+    technologies: strings(entry.payload.technologies).length ? strings(entry.payload.technologies) : legacy.technologies,
+    features: strings(entry.payload.features).length ? strings(entry.payload.features) : legacy.features,
     stages: blocks(entry.payload.stages),
     team: team.length ? team : legacy.team,
     screenshots,

@@ -7,6 +7,7 @@ import { adminUsers, contentEntries, contentMediaRefs, contentRelations, content
 import { resetTestDatabase } from "../db/testDatabase";
 import { ContentCache } from "./cache";
 import { createContentService } from "./service";
+import { parseContentCommand } from "./types";
 import { buildPagesSitemap } from "../seo/sitemaps";
 
 const databaseUrl = process.env.TEST_DATABASE_URL ?? "";
@@ -33,6 +34,32 @@ const draftCommand = () => ({
     results: [{ title: "Automated workflow", description: "Approved result" }],
     guarantees: [{ title: "Support", description: "Agreed support period" }],
   },
+});
+
+test("case payload accepts structured local media and commercial fields", () => {
+  const localCover = {
+    src: "/projects/portfolio/serviceplus/cover.webp",
+    alt: "Мобильное приложение ServicePlus для осмотра техники",
+    width: 1600,
+    height: 1000,
+  };
+  const command = parseContentCommand({
+    kind: "case",
+    slug: "serviceplus",
+    title: "ServicePlus",
+    seoTitle: "ServicePlus — мобильное приложение для осмотра техники",
+    seoDescription: "Кейс разработки приложения ServicePlus.",
+    payload: {
+      h1: "ServicePlus: мобильное приложение для осмотра техники",
+      technologies: ["React Native", "Node.js", "PostgreSQL"],
+      features: ["Работа по VIN", "Фотофиксация", "Офлайн-режим"],
+      tags: ["Мобильные приложения", "Автоматизация"],
+      screenshots: [localCover],
+      demoUrl: "https://servicplus.ru/",
+    },
+  });
+
+  assert.deepEqual(command.payload.screenshots, [localCover]);
 });
 
 databaseTest("draft is invisible and publish is immediately visible", async () => {
