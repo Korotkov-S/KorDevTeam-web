@@ -28,6 +28,9 @@
       {"title": "Мобильный интерфейс обновлён", "description": "Согласованные пользовательские сценарии реализованы в новом React Native-интерфейсе."},
       {"title": "Работа встроена в существующий продукт", "description": "Мобильная часть интегрирована с действующим Python API."}
     ],
+    "screenshots": [
+      {"src": "/projects/portfolio/amch/cover.webp", "alt": "Инвестиционный продукт AMCH", "width": 1600, "height": 1000}
+    ],
     "tags": ["Мобильные приложения", "FinTech", "React Native", "Python", "Редизайн"]
   },
   "evidence": [

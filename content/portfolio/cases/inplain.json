@@ -23,6 +23,9 @@
     "results": [
       {"title": "Подтверждённый объём выполнен", "description": "Команда реализовала согласованные задачи разработки и поддержки веб-проекта."}
     ],
+    "screenshots": [
+      {"src": "/projects/portfolio/inplain/cover.webp", "alt": "Веб-проект Inplain", "width": 1600, "height": 1000}
+    ],
     "tags": ["Веб-разработка", "Техническая поддержка", "Legacy-проект"]
   },
   "evidence": [

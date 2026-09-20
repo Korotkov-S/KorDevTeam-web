@@ -28,6 +28,9 @@
       {"title": "Windows-клиент создан", "description": "AI-задачи ставятся и контролируются из отдельного desktop-приложения."},
       {"title": "Удалённые GPU скрыты за интерфейсом", "description": "Пользователю не требуется вручную управлять вычислительной инфраструктурой."}
     ],
+    "screenshots": [
+      {"src": "/projects/portfolio/nisli/cover.webp", "alt": "Windows-приложение Nisli для AI-задач", "width": 1600, "height": 1000}
+    ],
     "tags": ["AI", "Desktop", "Electron", "Node.js", "GPU"]
   },
   "evidence": [

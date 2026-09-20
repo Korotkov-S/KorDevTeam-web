@@ -27,6 +27,9 @@
       {"title": "SEO-требования внедрены", "description": "Сайт адаптирован под согласованные требования продвижения без полной замены движка."},
       {"title": "Сохранена рабочая платформа", "description": "Маркетинговые задачи решены внутри существующей технической системы."}
     ],
+    "screenshots": [
+      {"src": "/projects/portfolio/sgormash/cover.webp", "alt": "SEO-доработки legacy-сайта Sgormash", "width": 1600, "height": 1000}
+    ],
     "tags": ["SEO", "Техническая поддержка", "Legacy", "PHP", "Angular"]
   },
   "evidence": [

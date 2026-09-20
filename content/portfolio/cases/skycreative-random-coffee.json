@@ -28,6 +28,9 @@
       {"title": "Формирование пар автоматизировано", "description": "Администратору не нужно вручную сопоставлять участников каждого цикла."},
       {"title": "Сценарий работает в Telegram", "description": "Участники подключаются к знакомствам без установки отдельного приложения."}
     ],
+    "screenshots": [
+      {"src": "/projects/portfolio/skycreative-random-coffee/cover.webp", "alt": "Telegram-бот Random Coffee для бизнес-клуба", "width": 1600, "height": 1000}
+    ],
     "tags": ["Telegram-бот", "Автоматизация", "Бизнес-клуб", "Node.js"]
   },
   "evidence": [

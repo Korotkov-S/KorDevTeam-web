@@ -28,6 +28,9 @@
       {"title": "Продукт запущен", "description": "Пользователи получили рабочий сервис для создания и хранения игровых династий."},
       {"title": "Проект приносит доход", "description": "После запуска продукт сохранил коммерческую модель и продолжил развитие."}
     ],
+    "screenshots": [
+      {"src": "/projects/portfolio/sims-dynasty-tree/cover.webp", "alt": "Сервис семейных древ Sims Dynasty Tree", "width": 1600, "height": 1000}
+    ],
     "tags": ["Веб-сервисы", "Графы", "Next.js", "Node.js", "PostgreSQL"]
   },
   "evidence": [

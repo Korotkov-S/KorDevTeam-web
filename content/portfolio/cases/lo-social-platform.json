@@ -26,6 +26,9 @@
     "results": [
       {"title": "Frontend-объём реализован", "description": "Согласованные функции вошли в развивающийся публичный мобильный продукт."}
     ],
+    "screenshots": [
+      {"src": "/projects/portfolio/lo-social-platform/cover.webp", "alt": "Мобильная социальная платформа LO", "width": 1600, "height": 1000}
+    ],
     "tags": ["Мобильные приложения", "Социальная платформа", "React Native", "Frontend"]
   },
   "evidence": [
