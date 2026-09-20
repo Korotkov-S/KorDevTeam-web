@@ -130,3 +130,18 @@ test("web and support portfolio batch is complete", async () => {
     "nagrada",
   ]) assert.ok(slugs.has(slug), slug);
 });
+
+test("product and mobile portfolio batch is complete", async () => {
+  const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
+  for (const slug of [
+    "noodome",
+    "harmonize-me",
+    "lo-social-platform",
+    "eventor",
+    "dom-krugom",
+    "serviceplus",
+    "nisli",
+    "amch",
+    "stone-product-calculator",
+  ]) assert.ok(slugs.has(slug), slug);
+});
