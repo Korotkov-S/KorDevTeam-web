@@ -1,6 +1,8 @@
 import type { MediaPresentationMap, ResolvedMediaAsset } from "../media/presentation";
+import { caseCategory } from "./types";
 import type {
   BlockView,
+  CaseCategory,
   CaseCardView,
   CommercialCaseView,
   ContentCardView,
@@ -23,6 +25,13 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.flatMap(item => {
     const normalized = text(item);
     return normalized ? [normalized] : [];
+  }) : [];
+}
+
+function categories(value: unknown): CaseCategory[] {
+  return Array.isArray(value) ? value.flatMap(item => {
+    const parsed = caseCategory.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
   }) : [];
 }
 
@@ -117,6 +126,7 @@ export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}):
     result: results[0]?.title ?? null,
     image,
     tags: strings(entry.payload.tags),
+    categories: categories(entry.payload.categories),
   };
 }
 

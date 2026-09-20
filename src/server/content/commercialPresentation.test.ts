@@ -88,6 +88,7 @@ test("case presentation resolves local media and structured commercial fields wi
   assert.deepEqual(view.features, ["Фотофиксация"]);
   assert.equal(view.demoUrl, "https://servicplus.ru/");
   assert.deepEqual(caseCard(caseFixture({ screenshots: [localCover], tags: ["Мобильные приложения"] })).tags, ["Мобильные приложения"]);
+  assert.deepEqual(caseCard(caseFixture({ categories: ["mobile", "automation"] })).categories, ["mobile", "automation"]);
 });
 
 test("legacy case removes the first markdown heading when its normalized text matches the entry title", () => {

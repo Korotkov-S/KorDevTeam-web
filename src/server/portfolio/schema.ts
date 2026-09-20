@@ -1,16 +1,8 @@
 import { z } from "zod";
 
-import { casePayload } from "../content/types";
+import { caseCategory, casePayload } from "../content/types";
 
-export const portfolioCategory = z.enum([
-  "automation",
-  "crm",
-  "mobile",
-  "web-service",
-  "commerce",
-  "support",
-  "own-product",
-]);
+export const portfolioCategory = caseCategory;
 
 export const evidence = z.strictObject({
   kind: z.enum(["google-doc", "google-sheet", "yougile", "public-url", "repository"]),

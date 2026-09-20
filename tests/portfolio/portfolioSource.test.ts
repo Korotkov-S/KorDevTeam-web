@@ -103,6 +103,7 @@ test("public command excludes editorial evidence and legacy slugs", () => {
   assert.equal(command.slug, "serviceplus");
   assert.equal("evidence" in command, false);
   assert.equal("legacySlugs" in command, false);
+  assert.deepEqual(command.payload.categories, ["mobile"]);
   assert.doesNotMatch(JSON.stringify(command), /projects!A2:Z2|web-service/);
 });
 

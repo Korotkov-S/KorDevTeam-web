@@ -4,6 +4,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { ContentDatabase } from "../content/repository";
 import type { ContentEntry, ValidatedContentCommand } from "../content/types";
+import { parseContentCommand } from "../content/types";
 import { contentEntries, contentMediaRefs, contentRelations, contentRevisions } from "../db/schema";
 import { toPortfolioCommand, validatePortfolioSources } from "./loader";
 import type { PortfolioCaseSource } from "./schema";
@@ -43,19 +44,16 @@ function commandFields(command: ValidatedContentCommand) {
 }
 
 function entryCommand(entry: ContentEntry): ValidatedContentCommand {
-  return toPortfolioCommand({
-    schemaVersion: 1,
+  return parseContentCommand({
+    kind: "case",
     slug: entry.slug,
-    legacySlugs: [],
     title: entry.title,
     excerpt: entry.excerpt,
     bodyMd: entry.bodyMd,
     seoTitle: entry.seoTitle,
     seoDescription: entry.seoDescription,
     indexable: entry.indexable,
-    categories: ["web-service"],
     payload: entry.payload,
-    evidence: [{ kind: "repository", locator: "postgres", supports: ["scope"] }],
   });
 }
 

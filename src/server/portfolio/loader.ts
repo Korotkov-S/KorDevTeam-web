@@ -26,7 +26,7 @@ export function toPortfolioCommand(record: PortfolioCaseSource): ValidatedConten
     seoTitle: record.seoTitle,
     seoDescription: record.seoDescription,
     indexable: record.indexable,
-    payload: record.payload,
+    payload: { ...record.payload, categories: record.categories },
   });
 }
 
