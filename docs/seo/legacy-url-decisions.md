@@ -7,11 +7,11 @@
 
 | Старый путь | Решение | Цель | Основание |
 | --- | --- | --- | --- |
-| `/project/Media%20%26%20Entertainment/` | redirect | `/cases/media-entertainment/` | Точный вариант из redirect fixture |
-| `/project/Media%20&%20Entertainment/` | redirect | `/cases/media-entertainment/` | Точный вариант из redirect fixture |
-| `/project/media-entertainment/` | redirect | `/cases/media-entertainment/` | Опубликованный legacy-кейс и статический маршрут |
-| `/project/web-site/` | redirect | `/cases/web-site/` | Опубликованный legacy-кейс и SSR fixture |
-| `/project/web-service/` | redirect | `/cases/web-service/` | Опубликованный legacy-кейс |
+| `/project/Media%20%26%20Entertainment/` | redirect | `/cases/noodome/` | Точный вариант из redirect fixture; канонический кейс Noodome |
+| `/project/Media%20&%20Entertainment/` | redirect | `/cases/noodome/` | Точный вариант из redirect fixture; канонический кейс Noodome |
+| `/project/media-entertainment/` | redirect | `/cases/noodome/` | Legacy slug кейса Noodome |
+| `/project/web-site/` | redirect | `/cases/alliance-stroy-garant/` | Legacy slug кейса АльянсСтройГарант |
+| `/project/web-service/` | redirect | `/cases/sims-dynasty-tree/` | Legacy slug кейса Sims Dynasty Tree |
 | `/project/harmonize-me/` | redirect | `/cases/harmonize-me/` | Опубликованный legacy-кейс |
 | `/project/stroyrem/` | redirect | `/cases/stroyrem/` | Опубликованный legacy-кейс |
 | `/project/wowbanner/` | redirect | `/cases/wowbanner/` | Опубликованный legacy-кейс |

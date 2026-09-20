@@ -51,8 +51,17 @@
 /video/    /video    301!
 /journal    /journal/    301!
 /journal/issue-0    /journal/issue-0/    301!
-/project/Media%20%26%20Entertainment    /project/media-entertainment    301!
-/project/Media%20&%20Entertainment    /project/media-entertainment    301!
+/project/Media%20%26%20Entertainment    /cases/noodome/    301!
+/project/Media%20&%20Entertainment    /cases/noodome/    301!
+/project/media-entertainment    /cases/noodome/    301!
+/project/web-site    /cases/alliance-stroy-garant/    301!
+/project/web-service    /cases/sims-dynasty-tree/    301!
+/project/harmonize-me    /cases/harmonize-me/    301!
+/project/stroyrem    /cases/stroyrem/    301!
+/project/wowbanner    /cases/wowbanner/    301!
+/project/serviceplus    /cases/serviceplus/    301!
+/project/amch    /cases/amch/    301!
+/project/notion-analog    /cases/notion-analog/    301!
 
 # Cache headers
 /assets/*  Cache-Control: public, max-age=31536000, immutable

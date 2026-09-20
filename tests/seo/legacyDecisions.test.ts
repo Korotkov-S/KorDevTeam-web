@@ -73,9 +73,42 @@ test("approved GET and HEAD redirects work with browser, wildcard or missing Acc
         "https://kordev.team/project/web-site/?utm_source=test&deploy=bad",
         { method, headers },
       ));
-      assert.equal(target?.href, "https://kordev.team/cases/web-site/?utm_source=test", `${method} ${accept ?? "no Accept"}`);
+      assert.equal(target?.href, "https://kordev.team/cases/alliance-stroy-garant/?utm_source=test", `${method} ${accept ?? "no Accept"}`);
     }
   }
+});
+
+test("legacy project ids redirect straight to canonical portfolio slugs", async () => {
+  const expected = new Map([
+    ["media-entertainment", "noodome"],
+    ["web-site", "alliance-stroy-garant"],
+    ["web-service", "sims-dynasty-tree"],
+    ["harmonize-me", "harmonize-me"],
+    ["stroyrem", "stroyrem"],
+    ["wowbanner", "wowbanner"],
+    ["serviceplus", "serviceplus"],
+    ["amch", "amch"],
+    ["notion-analog", "notion-analog"],
+  ]);
+
+  for (const [legacy, canonical] of expected) {
+    const target = await legacyProjectRedirect(new Request(`https://kordev.team/project/${legacy}/`));
+    assert.equal(target?.pathname, `/cases/${canonical}/`, legacy);
+  }
+
+  const noodome = JSON.parse(await readFile("content/portfolio/cases/noodome.json", "utf8")) as { legacySlugs: string[] };
+  assert.deepEqual(noodome.legacySlugs, ["media-entertainment"]);
+});
+
+test("static redirect fixture sends every documented legacy project directly to its canonical case", async () => {
+  const rows = await readLegacyDecisionTable("docs/seo/legacy-url-decisions.md");
+  const redirects = new Map((await readFile("public/_redirects", "utf8"))
+    .split("\n")
+    .map(line => line.trim().split(/\s{2,}/))
+    .filter(cells => cells.length === 3 && cells[0]?.startsWith("/project/") && cells[2] === "301!")
+    .map(cells => [normalizeProjectPath(cells[0]!), cells[1]!]));
+
+  for (const row of rows) assert.equal(redirects.get(row.path), row.target, row.path);
 });
 
 test("legacy decisions reject mutation methods and never infer unknown project paths", async () => {

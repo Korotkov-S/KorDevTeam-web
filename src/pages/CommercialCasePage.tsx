@@ -56,6 +56,11 @@ function BlockList({ items }: { items: BlockView[] }) {
   );
 }
 
+function hasDistinctCaption(alt: string, heading: string): boolean {
+  const normalize = (value: string) => value.replace(/\s+/g, " ").trim().toLocaleLowerCase("ru");
+  return normalize(alt) !== normalize(heading);
+}
+
 export function CommercialCasePage({ pathname, project }: { pathname: string; project: CommercialCaseView }) {
   const hasProblem = Boolean(project.problem) || project.constraints.length > 0;
   const hasSolution = Boolean(project.solution || project.architecture || project.bodyMd.trim())
@@ -138,7 +143,15 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
         <Section className="border-t border-border py-14 lg:py-20">
           <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Интерфейс</p>
           <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Продукт в работе</h2>
-          <div className="mt-10 grid gap-5 lg:grid-cols-2">{project.screenshots.map((image, index) => <img key={image.id} src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className={`w-full rounded-[2rem] border border-border object-cover ${index === 0 && project.screenshots.length % 2 ? "lg:col-span-2" : ""}`} />)}</div>
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">{project.screenshots.map((image, index) => {
+            const firstLandscape = index === 0 && image.width !== null && image.height !== null && image.width >= image.height;
+            return <figure key={image.id} className={firstLandscape ? "lg:col-span-2" : undefined}>
+              <div className="flex overflow-hidden rounded-[2rem] border border-border bg-[#eef2f7] p-3 dark:bg-[#151b2a] sm:p-5">
+                <img src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className="h-auto max-h-[70rem] w-full rounded-[1.2rem] object-contain" />
+              </div>
+              {hasDistinctCaption(image.alt, project.h1) ? <figcaption className="mt-3 px-2 text-sm leading-6 text-[var(--public-subtle)]">{image.alt}</figcaption> : null}
+            </figure>;
+          })}</div>
         </Section>
       </CaseSection> : null}
 

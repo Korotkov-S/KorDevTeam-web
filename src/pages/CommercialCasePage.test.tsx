@@ -102,6 +102,43 @@ test("case page renders confirmed proof and links without hiding related navigat
   assert.equal(screen.getByRole("link", { name: "Смотреть кейс: Следующий кейс" }).getAttribute("href"), "/cases/next/");
 });
 
+test("case page renders sized interface screenshots without inventing empty proof", () => {
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/serviceplus/" project={caseView({
+    h1: "ServicePlus",
+    results: [],
+    testimonial: null,
+    team: [],
+    screenshots: [{
+      id: "static:/projects/portfolio/serviceplus/cover.webp",
+      src: "/projects/portfolio/serviceplus/cover.webp",
+      srcSet: "",
+      sizes: "100vw",
+      alt: "Приложение ServicePlus для осмотра техники",
+      decorative: false,
+      width: 1600,
+      height: 1000,
+    }],
+  })} /></MemoryRouter>);
+
+  const image = screen.getByRole("img", { name: "Приложение ServicePlus для осмотра техники" });
+  assert.equal(image.getAttribute("width"), "1600");
+  assert.equal(image.getAttribute("height"), "1000");
+  assert.match(image.className, /object-contain/);
+  assert.match(image.closest("figure")?.className ?? "", /lg:col-span-2/);
+  assert.equal(image.closest("figure")?.querySelector("figcaption")?.textContent, "Приложение ServicePlus для осмотра техники");
+  assert.equal(screen.queryByText("Отзыв клиента"), null);
+  assert.equal(screen.queryByText("Подтверждённый эффект"), null);
+  assert.equal(screen.queryByText("Кто работал над проектом"), null);
+});
+
+test("gallery omits a redundant caption when alt repeats the case heading", () => {
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView({
+    screenshots: [{ id: "local", src: "/case.webp", srcSet: "", sizes: "100vw", alt: "Платформа для логистики", decorative: false, width: 1600, height: 1000 }],
+  })} /></MemoryRouter>);
+
+  assert.equal(document.querySelector("figcaption"), null);
+});
+
 test("case markdown resolves media-library images in structured and legacy sections", () => {
   const ids = [
     "00000000-0000-4000-8000-000000000051",

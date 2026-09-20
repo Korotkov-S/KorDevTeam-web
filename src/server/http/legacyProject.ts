@@ -6,11 +6,11 @@ export type LegacyProjectDecision = {
 };
 
 export const LEGACY_PROJECT_DECISIONS: Readonly<Record<string, LegacyProjectDecision>> = Object.freeze({
-  "/project/Media%20%26%20Entertainment/": { action: "redirect", target: "/cases/media-entertainment/" },
-  "/project/Media%20&%20Entertainment/": { action: "redirect", target: "/cases/media-entertainment/" },
-  "/project/media-entertainment/": { action: "redirect", target: "/cases/media-entertainment/" },
-  "/project/web-site/": { action: "redirect", target: "/cases/web-site/" },
-  "/project/web-service/": { action: "redirect", target: "/cases/web-service/" },
+  "/project/Media%20%26%20Entertainment/": { action: "redirect", target: "/cases/noodome/" },
+  "/project/Media%20&%20Entertainment/": { action: "redirect", target: "/cases/noodome/" },
+  "/project/media-entertainment/": { action: "redirect", target: "/cases/noodome/" },
+  "/project/web-site/": { action: "redirect", target: "/cases/alliance-stroy-garant/" },
+  "/project/web-service/": { action: "redirect", target: "/cases/sims-dynasty-tree/" },
   "/project/harmonize-me/": { action: "redirect", target: "/cases/harmonize-me/" },
   "/project/stroyrem/": { action: "redirect", target: "/cases/stroyrem/" },
   "/project/wowbanner/": { action: "redirect", target: "/cases/wowbanner/" },
