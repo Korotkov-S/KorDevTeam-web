@@ -22,7 +22,7 @@ Object.assign(globalThis, {
 });
 
 const require = createRequire(import.meta.url);
-const { cleanup, render, screen } = require("@testing-library/react");
+const { cleanup, fireEvent, render, screen } = require("@testing-library/react");
 require("../i18n");
 const { CommercialCasePage } = require("./CommercialCasePage");
 
@@ -141,14 +141,15 @@ test("case page renders sized interface screenshots without inventing empty proo
   assert.equal(image.getAttribute("width"), "1600");
   assert.equal(image.getAttribute("height"), "1000");
   assert.match(image.className, /object-contain/);
-  assert.match(image.closest("figure")?.className ?? "", /lg:col-span-2/);
+  assert.ok(screen.getByRole("region", { name: "Скриншоты продукта" }));
+  assert.equal(screen.queryByRole("button", { name: "Следующий скриншот" }), null);
   assert.equal(image.closest("figure")?.querySelector("figcaption")?.textContent, "Приложение ServicePlus для осмотра техники");
   assert.equal(screen.queryByText("Отзыв клиента"), null);
   assert.equal(screen.queryByText("Подтверждённый эффект"), null);
   assert.equal(screen.queryByText("Кто работал над проектом"), null);
 });
 
-test("case gallery keeps screenshots with different source ratios at one visual height", () => {
+test("case gallery keeps screenshots with different source ratios on one stable canvas", () => {
   render(<MemoryRouter><CommercialCasePage pathname="/cases/serviceplus/" project={caseView({
     screenshots: [
       {
@@ -175,16 +176,17 @@ test("case gallery keeps screenshots with different source ratios at one visual 
   })} /></MemoryRouter>);
 
   const images = [
-    screen.getByRole("img", { name: "Управление техникой" }),
-    screen.getByRole("img", { name: "Отчёт по осмотру" }),
+    document.querySelector('img[alt="Управление техникой"]'),
+    document.querySelector('img[alt="Отчёт по осмотру"]'),
   ];
   const frames = images.map(image => image.parentElement);
   assert.equal(frames.length, 2);
-  for (const frame of frames) assert.match(frame?.className ?? "", /aspect-\[8\/5\]/);
+  for (const frame of frames) assert.match(frame?.className ?? "", /aspect-\[4\/5\]/);
+  for (const frame of frames) assert.match(frame?.className ?? "", /sm:aspect-\[16\/10\]/);
   for (const image of images) assert.match(image.className, /h-full/);
 });
 
-test("case gallery gives portrait app screenshots a taller frame", () => {
+test("case gallery uses the same full-width frame for landscape and portrait screenshots", () => {
   render(<MemoryRouter><CommercialCasePage pathname="/cases/amch/" project={caseView({
     screenshots: [
       {
@@ -210,12 +212,55 @@ test("case gallery gives portrait app screenshots a taller frame", () => {
     ],
   })} /></MemoryRouter>);
 
-  const cover = screen.getByRole("img", { name: "Обложка AMCH" });
-  const appScreen = screen.getByRole("img", { name: "Экран приложения AMCH" });
-  assert.match(cover.parentElement?.className ?? "", /aspect-\[8\/5\]/);
-  assert.match(cover.closest("figure")?.className ?? "", /lg:col-span-2/);
-  assert.match(appScreen.parentElement?.className ?? "", /aspect-\[4\/5\]/);
-  assert.doesNotMatch(appScreen.closest("figure")?.className ?? "", /lg:col-span-2/);
+  const cover = document.querySelector('img[alt="Обложка AMCH"]');
+  const appScreen = document.querySelector('img[alt="Экран приложения AMCH"]');
+  assert.equal(cover.parentElement?.className, appScreen.parentElement?.className);
+  assert.match(cover.parentElement?.className ?? "", /aspect-\[4\/5\]/);
+  assert.match(cover.parentElement?.className ?? "", /sm:aspect-\[16\/10\]/);
+});
+
+test("case gallery lets visitors browse every product screenshot", () => {
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/amch/" project={caseView({
+    screenshots: [
+      {
+        id: "overview",
+        src: "/overview.webp",
+        srcSet: "",
+        sizes: "100vw",
+        alt: "Главный экран AMCH",
+        decorative: false,
+        width: 1600,
+        height: 1000,
+      },
+      {
+        id: "portfolio",
+        src: "/portfolio.webp",
+        srcSet: "",
+        sizes: "100vw",
+        alt: "Портфель AMCH",
+        decorative: false,
+        width: 792,
+        height: 1714,
+      },
+    ],
+  })} /></MemoryRouter>);
+
+  const slider = screen.getByRole("region", { name: "Скриншоты продукта" });
+  assert.equal(slider.getAttribute("aria-roledescription"), "карусель");
+  assert.equal(screen.getByText("1 / 2").textContent, "1 / 2");
+  const overview = document.querySelector('img[alt="Главный экран AMCH"]');
+  const portfolio = document.querySelector('img[alt="Портфель AMCH"]');
+  assert.equal(overview?.closest("figure")?.hasAttribute("hidden"), false);
+  assert.equal(portfolio?.closest("figure")?.hasAttribute("hidden"), true);
+
+  fireEvent.click(screen.getByRole("button", { name: "Следующий скриншот" }));
+
+  assert.equal(screen.getByText("2 / 2").textContent, "2 / 2");
+  assert.equal(overview?.closest("figure")?.hasAttribute("hidden"), true);
+  assert.equal(portfolio?.closest("figure")?.hasAttribute("hidden"), false);
+
+  fireEvent.keyDown(slider, { key: "ArrowLeft" });
+  assert.equal(screen.getByText("1 / 2").textContent, "1 / 2");
 });
 
 test("gallery omits a redundant caption when alt repeats the case heading", () => {

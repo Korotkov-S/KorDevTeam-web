@@ -61,6 +61,110 @@ function hasDistinctCaption(alt: string, heading: string): boolean {
   return normalize(alt) !== normalize(heading);
 }
 
+function CaseScreenshotSlider({ images, heading }: { images: CommercialCaseView["screenshots"]; heading: string }) {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const touchStartX = React.useRef<number | null>(null);
+  const hasNavigation = images.length > 1;
+
+  const showPrevious = () => setActiveIndex(index => (index - 1 + images.length) % images.length);
+  const showNext = () => setActiveIndex(index => (index + 1) % images.length);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!hasNavigation) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      showPrevious();
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      showNext();
+    }
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!hasNavigation || touchStartX.current === null) return;
+    const endX = event.changedTouches[0]?.clientX;
+    if (endX === undefined) return;
+    const distance = endX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(distance) < 45) return;
+    if (distance < 0) showNext();
+    else showPrevious();
+  };
+
+  return (
+    <div
+      role="region"
+      aria-label="Скриншоты продукта"
+      aria-roledescription="карусель"
+      tabIndex={hasNavigation ? 0 : undefined}
+      onKeyDown={handleKeyDown}
+      onTouchStart={event => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+      onTouchEnd={handleTouchEnd}
+      className="mt-10 rounded-[2rem] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--public-blue)] sm:rounded-[3rem]"
+    >
+      <div className="relative">
+        {images.map((image, index) => (
+          <figure key={image.id} hidden={index !== activeIndex} aria-label={`${index + 1} из ${images.length}`}>
+            <div className="flex aspect-[4/5] overflow-hidden rounded-[2rem] border border-border bg-[#eef2f7] p-3 dark:bg-[#151b2a] sm:aspect-[16/10] sm:rounded-[3rem] sm:p-6">
+              <img
+                src={image.src}
+                srcSet={image.srcSet || undefined}
+                sizes={image.sizes}
+                width={image.width ?? undefined}
+                height={image.height ?? undefined}
+                alt={image.alt}
+                loading="eager"
+                className="h-full w-full rounded-[1.25rem] object-contain sm:rounded-[2rem]"
+              />
+            </div>
+            {hasDistinctCaption(image.alt, heading) ? <figcaption className="mt-4 max-w-3xl px-2 text-base leading-6 text-[var(--public-subtle)]">{image.alt}</figcaption> : null}
+          </figure>
+        ))}
+
+        {hasNavigation ? (
+          <div className="pointer-events-none absolute inset-x-3 top-1/2 flex -translate-y-1/2 justify-between sm:inset-x-6">
+            <button
+              type="button"
+              aria-label="Предыдущий скриншот"
+              onClick={showPrevious}
+              className="pointer-events-auto grid size-12 place-items-center rounded-full border border-white/25 bg-[#0b1020]/85 text-xl text-white shadow-lg backdrop-blur transition-colors hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)] sm:size-14"
+            >
+              <span aria-hidden="true">←</span>
+            </button>
+            <button
+              type="button"
+              aria-label="Следующий скриншот"
+              onClick={showNext}
+              className="pointer-events-auto grid size-12 place-items-center rounded-full border border-white/25 bg-[#0b1020]/85 text-xl text-white shadow-lg backdrop-blur transition-colors hover:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)] sm:size-14"
+            >
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {hasNavigation ? (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-border px-2 pt-5">
+          <p aria-live="polite" className="text-sm font-semibold tabular-nums text-[var(--public-subtle)]">{activeIndex + 1} / {images.length}</p>
+          <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Выбор скриншота">
+            {images.map((image, index) => (
+              <button
+                key={image.id}
+                type="button"
+                aria-label={`Показать скриншот ${index + 1}: ${image.alt}`}
+                aria-current={index === activeIndex ? "true" : undefined}
+                onClick={() => setActiveIndex(index)}
+                className="h-2.5 w-8 rounded-full bg-[color:color-mix(in_srgb,var(--public-ink)_16%,transparent)] transition-[width,background-color] hover:bg-[var(--public-blue)] aria-current:w-12 aria-current:bg-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--public-blue)]"
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function CommercialCasePage({ pathname, project }: { pathname: string; project: CommercialCaseView }) {
   const hasProblem = Boolean(project.problem) || project.constraints.length > 0;
   const hasSolution = Boolean(project.solution || project.architecture || project.bodyMd.trim())
@@ -119,16 +223,7 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
         <Section className="border-t border-border py-14 lg:py-20">
           <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Интерфейс</p>
           <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Продукт в работе</h2>
-          <div className="mt-10 grid gap-5 lg:grid-cols-2">{project.screenshots.map((image, index) => {
-            const firstLandscape = index === 0 && image.width !== null && image.height !== null && image.width >= image.height;
-            const portrait = image.width !== null && image.height !== null && image.height > image.width;
-            return <figure key={image.id} className={firstLandscape ? "lg:col-span-2" : undefined}>
-              <div className={`flex ${portrait ? "aspect-[4/5]" : "aspect-[8/5]"} overflow-hidden rounded-[2rem] border border-border bg-[#eef2f7] p-3 dark:bg-[#151b2a] sm:p-5`}>
-                <img src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className="h-full w-full rounded-[1.2rem] object-contain" />
-              </div>
-              {hasDistinctCaption(image.alt, project.h1) ? <figcaption className="mt-3 px-2 text-sm leading-6 text-[var(--public-subtle)]">{image.alt}</figcaption> : null}
-            </figure>;
-          })}</div>
+          <CaseScreenshotSlider key={project.slug} images={project.screenshots} heading={project.h1} />
         </Section>
       </CaseSection> : null}
 
