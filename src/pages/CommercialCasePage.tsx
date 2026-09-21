@@ -122,8 +122,8 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
           <div className="mt-10 grid gap-5 lg:grid-cols-2">{project.screenshots.map((image, index) => {
             const firstLandscape = index === 0 && image.width !== null && image.height !== null && image.width >= image.height;
             return <figure key={image.id} className={firstLandscape ? "lg:col-span-2" : undefined}>
-              <div className="flex overflow-hidden rounded-[2rem] border border-border bg-[#eef2f7] p-3 dark:bg-[#151b2a] sm:p-5">
-                <img src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className="h-auto max-h-[70rem] w-full rounded-[1.2rem] object-contain" />
+              <div className="flex aspect-[8/5] overflow-hidden rounded-[2rem] border border-border bg-[#eef2f7] p-3 dark:bg-[#151b2a] sm:p-5">
+                <img src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className="h-full w-full rounded-[1.2rem] object-contain" />
               </div>
               {hasDistinctCaption(image.alt, project.h1) ? <figcaption className="mt-3 px-2 text-sm leading-6 text-[var(--public-subtle)]">{image.alt}</figcaption> : null}
             </figure>;

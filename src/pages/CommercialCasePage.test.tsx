@@ -148,6 +148,42 @@ test("case page renders sized interface screenshots without inventing empty proo
   assert.equal(screen.queryByText("Кто работал над проектом"), null);
 });
 
+test("case gallery keeps screenshots with different source ratios at one visual height", () => {
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/serviceplus/" project={caseView({
+    screenshots: [
+      {
+        id: "equipment",
+        src: "/equipment.webp",
+        srcSet: "",
+        sizes: "100vw",
+        alt: "Управление техникой",
+        decorative: false,
+        width: 1600,
+        height: 1000,
+      },
+      {
+        id: "report",
+        src: "/report.webp",
+        srcSet: "",
+        sizes: "100vw",
+        alt: "Отчёт по осмотру",
+        decorative: false,
+        width: 1600,
+        height: 909,
+      },
+    ],
+  })} /></MemoryRouter>);
+
+  const images = [
+    screen.getByRole("img", { name: "Управление техникой" }),
+    screen.getByRole("img", { name: "Отчёт по осмотру" }),
+  ];
+  const frames = images.map(image => image.parentElement);
+  assert.equal(frames.length, 2);
+  for (const frame of frames) assert.match(frame?.className ?? "", /aspect-\[8\/5\]/);
+  for (const image of images) assert.match(image.className, /h-full/);
+});
+
 test("gallery omits a redundant caption when alt repeats the case heading", () => {
   render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView({
     screenshots: [{ id: "local", src: "/case.webp", srcSet: "", sizes: "100vw", alt: "Платформа для логистики", decorative: false, width: 1600, height: 1000 }],
