@@ -9,6 +9,7 @@
   "seoDescription": "Кейс KorDevTeam: восстановление сайтов Jully Bride после вирусов и DDoS, оптимизация WordPress и сокращение запросов MySQL примерно с 1500 до 16.",
   "indexable": true,
   "categories": ["support", "commerce"],
+  "catalogOrder": 4,
   "payload": {
     "h1": "Jully Bride: восстановление и оптимизация пяти WordPress-сайтов",
     "problem": "Вернуть стабильную работу сети сайтов после атак и заражений, одновременно устранить критическую нагрузку на MySQL.",

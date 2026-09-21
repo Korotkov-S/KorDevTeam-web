@@ -9,6 +9,7 @@
   "seoDescription": "Кейс разработки Sims Dynasty Tree: графовая модель семейных связей, интерфейс создания династий, Next.js, Node.js и PostgreSQL.",
   "indexable": true,
   "categories": ["web-service"],
+  "catalogOrder": 6,
   "payload": {
     "h1": "Sims Dynasty Tree: сервис сложных семейных древ The Sims",
     "problem": "Представить сложные родственные связи игровых династий, включая повторные браки и пересекающиеся ветви.",

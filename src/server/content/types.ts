@@ -11,7 +11,7 @@ export type CtaView = { title: string | null; text: string | null; type: CtaType
 export type ServiceCardView = { slug: string; title: string; summary: string; priority: boolean };
 export const caseCategory = z.enum(["automation", "crm", "mobile", "web-service", "commerce", "support", "own-product"]);
 export type CaseCategory = z.output<typeof caseCategory>;
-export type CaseCardView = { slug: string; title: string; summary: string; result: string | null; image: ResolvedMediaAsset | null; tags: string[]; categories?: CaseCategory[] };
+export type CaseCardView = { slug: string; title: string; summary: string; result: string | null; image: ResolvedMediaAsset | null; tags: string[]; categories?: CaseCategory[]; catalogOrder?: number | null; catalogVisible?: boolean };
 export type ContentCardView = { slug: string; title: string; summary: string; image: ResolvedMediaAsset | null; tags: string[] };
 export type FaqView = { question: string; answer: string };
 export type ServicePageView = { h1: string; lead: string; bodyMd: string; media: MediaPresentationMap; problems: string[]; solutions: string[]; integrations: string[]; technologies: string[]; processSteps: BlockView[]; price: { from: number | null; factors: string[]; timeRange: string | null } | null; results: BlockView[]; guarantees: BlockView[]; relatedCases: CaseCardView[]; relatedArticles: ContentCardView[]; faq: FaqView[]; cta: CtaView };
@@ -60,6 +60,8 @@ export const casePayload = z.strictObject({
   testimonial: z.string().optional(),
   tags: z.array(z.string()).optional(),
   categories: z.array(caseCategory).optional(),
+  catalogOrder: z.number().int().positive().optional(),
+  catalogVisible: z.boolean().optional(),
   demoUrl: z.url().optional(),
   githubUrl: z.url().optional(),
   cta: cta.optional(),

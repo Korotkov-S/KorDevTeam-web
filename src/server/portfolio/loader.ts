@@ -17,6 +17,7 @@ function validationError(code: string, cause?: unknown): Error {
 }
 
 export function toPortfolioCommand(record: PortfolioCaseSource): ValidatedContentCommand {
+  const catalogOrder = record.catalogOrder === undefined ? {} : { catalogOrder: record.catalogOrder };
   return parseContentCommand({
     kind: "case",
     slug: record.slug,
@@ -26,7 +27,12 @@ export function toPortfolioCommand(record: PortfolioCaseSource): ValidatedConten
     seoTitle: record.seoTitle,
     seoDescription: record.seoDescription,
     indexable: record.indexable,
-    payload: { ...record.payload, categories: record.categories },
+    payload: {
+      ...record.payload,
+      categories: record.categories,
+      catalogVisible: record.catalogVisible ?? true,
+      ...catalogOrder,
+    },
   });
 }
 

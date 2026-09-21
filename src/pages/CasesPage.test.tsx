@@ -24,7 +24,11 @@ const { cleanup, fireEvent, render, screen } = require("@testing-library/react")
 require("../i18n");
 const { CasesPage } = require("./CasesPage");
 
-type FilterableCase = CaseCardView & { categories: string[] };
+type FilterableCase = CaseCardView & {
+  categories: string[];
+  catalogOrder: number | null;
+  catalogVisible: boolean;
+};
 
 function project(index: number, categories: string[] = ["web-service"]): FilterableCase {
   return {
@@ -35,6 +39,8 @@ function project(index: number, categories: string[] = ["web-service"]): Filtera
     image: null,
     tags: ["Первый тег", "Второй тег", "Третий тег", "Скрытый тег"],
     categories,
+    catalogOrder: null,
+    catalogVisible: true,
   };
 }
 
@@ -69,6 +75,22 @@ test("category filter hides unrelated cards and can reset", () => {
   fireEvent.click(screen.getByRole("button", { name: "Все проекты" }));
   assert.equal(screen.getAllByRole("article").length, 3);
   assert.equal(screen.getByRole("button", { name: "Все проекты" }).getAttribute("aria-pressed"), "true");
+});
+
+test("catalog hides excluded projects and puts curated projects first", () => {
+  const serviceplus = { ...project(1), slug: "serviceplus", title: "ServicePlus", catalogOrder: 1 };
+  const amch = { ...project(2), slug: "amch", title: "AMCH", catalogOrder: 2 };
+  const ordinary = { ...project(3), slug: "ordinary", title: "Обычный проект" };
+  const inplain = { ...project(4), slug: "inplain", title: "Inplain", catalogVisible: false };
+
+  render(<MemoryRouter><CasesPage projects={[ordinary, inplain, amch, serviceplus]} /></MemoryRouter>);
+
+  assert.deepEqual(
+    screen.getAllByRole("article").map((article: HTMLElement) => article.getAttribute("aria-label")),
+    ["ServicePlus", "AMCH", "Обычный проект"],
+  );
+  assert.equal(screen.queryByRole("article", { name: "Inplain" }), null);
+  assert.equal(screen.getByText("3 проекта").getAttribute("aria-live"), "polite");
 });
 
 test("case card exposes its title and limits visible tags to three", () => {

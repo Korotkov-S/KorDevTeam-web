@@ -98,12 +98,20 @@ test("public case material rejects contact, budget, token and NDA leakage", () =
 });
 
 test("public command excludes editorial evidence and legacy slugs", () => {
-  const command = toPortfolioCommand(sourceFixture({ legacySlugs: ["web-service"] }));
+  const source = sourceFixture({ legacySlugs: ["web-service"] }) as PortfolioCaseSource & {
+    catalogOrder: number;
+    catalogVisible: boolean;
+  };
+  source.catalogOrder = 1;
+  source.catalogVisible = false;
+  const command = toPortfolioCommand(source);
   assert.equal(command.kind, "case");
   assert.equal(command.slug, "serviceplus");
   assert.equal("evidence" in command, false);
   assert.equal("legacySlugs" in command, false);
   assert.deepEqual(command.payload.categories, ["mobile"]);
+  assert.equal(command.payload.catalogOrder, 1);
+  assert.equal(command.payload.catalogVisible, false);
   assert.doesNotMatch(JSON.stringify(command), /projects!A2:Z2|web-service/);
 });
 
@@ -167,4 +175,32 @@ test("portfolio source contains exactly the approved 26 unique cases", async () 
   assert.equal(new Set(records.map(record => record.slug)).size, 26);
   assert.equal(new Set(records.map(record => record.seoTitle)).size, 26);
   assert.equal(new Set(records.map(record => record.seoDescription)).size, 26);
+});
+
+test("portfolio source keeps the approved catalog order and hidden projects", async () => {
+  const records = await loadPortfolioSources();
+  const bySlug = new Map(records.map(record => [record.slug, record]));
+  assert.deepEqual(
+    [...bySlug.values()]
+      .filter(record => record.catalogOrder !== undefined)
+      .sort((left, right) => left.catalogOrder! - right.catalogOrder!)
+      .map(record => record.slug),
+    [
+      "serviceplus",
+      "amch",
+      "dom-krugom",
+      "jully-bride",
+      "noodome",
+      "sims-dynasty-tree",
+      "stone-product-calculator",
+      "stroyrem",
+      "tbi-group-tour-service",
+      "wowbanner",
+      "teharmatura-automation",
+    ],
+  );
+  assert.deepEqual(
+    records.filter(record => record.catalogVisible === false).map(record => record.slug).sort(),
+    ["inplain", "roost", "siberian-steel"],
+  );
 });

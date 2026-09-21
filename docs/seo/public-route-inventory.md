@@ -59,6 +59,9 @@ case routes. Integration coverage imports that source into PostgreSQL, verifies
 all 26 SSR documents and asserts that the pages sitemap contains the same exact
 slug set. The source files remain authoritative for the dynamic route inventory;
 individual case rows are intentionally not duplicated in this static document.
+The `/cases/` catalog intentionally shows 23 curated cards: Inplain, Roost and
+Сибирская сталь retain their direct canonical routes but are omitted from the
+catalog pending a separate content decision.
 
 ## Timestamp evidence and maintenance
 

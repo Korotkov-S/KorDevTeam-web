@@ -21,6 +21,8 @@ export const portfolioCaseSource = z.strictObject({
   seoDescription: z.string().trim().min(1).max(320),
   indexable: z.boolean(),
   categories: z.array(portfolioCategory).min(1),
+  catalogOrder: z.number().int().positive().optional(),
+  catalogVisible: z.boolean().optional(),
   payload: casePayload,
   evidence: z.array(evidence).min(1),
 });

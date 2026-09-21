@@ -9,6 +9,7 @@
   "seoDescription": "Кейс KorDevTeam: React Native-приложение ServicePlus для осмотра техники по VIN, чек-листов, фотофиксации, офлайн-синхронизации и отчётов.",
   "indexable": true,
   "categories": ["mobile", "automation", "crm"],
+  "catalogOrder": 1,
   "payload": {
     "h1": "ServicePlus: мобильное приложение для осмотра техники",
     "problem": "Стандартизировать выездные осмотры и надёжно передавать данные даже при нестабильном интернете.",

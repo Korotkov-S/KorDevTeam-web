@@ -9,6 +9,7 @@
   "seoDescription": "Собственный продукт KorDevTeam в разработке: Roost для управления задачами, статусами и командными уведомлениями через Telegram и VK.",
   "indexable": true,
   "categories": ["own-product", "automation"],
+  "catalogVisible": false,
   "payload": {
     "h1": "Roost: управление разработкой через Telegram и VK",
     "problem": "Сделать работу с задачами доступной в каналах, где команда уже общается каждый день.",

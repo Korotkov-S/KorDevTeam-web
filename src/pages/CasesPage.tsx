@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { CaseCard } from "../components/public/CaseCard";
 import { LeadCtaSection } from "../components/public/LeadCtaSection";
 import { Section, SectionHeading } from "../components/public/Section";
+import { curateCaseCards } from "../server/content/commercialPresentation";
 import type { CaseCardView, CaseCategory } from "../server/content/types";
 
 const filters: Array<{ id: "all" | CaseCategory; label: string }> = [
@@ -24,7 +25,8 @@ function projectCount(value: number): string {
 
 export function CasesPage({ projects }: { projects: CaseCardView[] }) {
   const [selected, setSelected] = useState<"all" | CaseCategory>("all");
-  const visibleProjects = selected === "all" ? projects : projects.filter(project => project.categories?.includes(selected));
+  const catalogProjects = curateCaseCards(projects);
+  const visibleProjects = selected === "all" ? catalogProjects : catalogProjects.filter(project => project.categories?.includes(selected));
 
   return <>
     <Section className="pt-28 sm:pt-32">
@@ -35,7 +37,7 @@ export function CasesPage({ projects }: { projects: CaseCardView[] }) {
         description="Показываем исходную задачу, принятое решение и только подтверждённые результаты проекта."
       />
     </Section>
-    {projects.length > 0 && <Section className="border-t border-border pt-12 lg:pt-16">
+    {catalogProjects.length > 0 && <Section className="border-t border-border pt-12 lg:pt-16">
       <div className="mb-9 flex items-end justify-between gap-6">
         <div className="min-w-0 overflow-x-auto pb-2" role="group" aria-label="Фильтр кейсов">
           <div className="flex w-max gap-2">

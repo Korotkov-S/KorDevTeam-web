@@ -34,11 +34,28 @@ databaseTest("local portfolio import publishes 26 indexable SSR case routes", { 
   assert.equal(catalogResponse.status, 200);
   const catalog = load(await catalogResponse.text());
   assert.equal(catalog('link[rel="canonical"]').attr("href"), "https://kordev.team/cases/");
-  const catalogLinks = new Set(catalog('a[href^="/cases/"]')
+  const catalogHrefs = catalog('a[href^="/cases/"]')
     .map((_, element) => catalog(element).attr("href"))
     .get()
-    .filter(href => href !== "/cases/"));
-  assert.equal(catalogLinks.size, 26);
+    .filter(href => href !== "/cases/");
+  const catalogLinks = [...new Set(catalogHrefs)];
+  assert.equal(catalogLinks.length, 23);
+  assert.deepEqual(catalogLinks.slice(0, 11), [
+    "/cases/serviceplus/",
+    "/cases/amch/",
+    "/cases/dom-krugom/",
+    "/cases/jully-bride/",
+    "/cases/noodome/",
+    "/cases/sims-dynasty-tree/",
+    "/cases/stone-product-calculator/",
+    "/cases/stroyrem/",
+    "/cases/tbi-group-tour-service/",
+    "/cases/wowbanner/",
+    "/cases/teharmatura-automation/",
+  ]);
+  for (const hidden of ["inplain", "roost", "siberian-steel"]) {
+    assert.equal(catalogLinks.includes(`/cases/${hidden}/`), false);
+  }
 
   for (const source of sources) {
     const pathname = `/cases/${source.slug}/`;

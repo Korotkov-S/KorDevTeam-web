@@ -127,7 +127,20 @@ export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}):
     image,
     tags: strings(entry.payload.tags),
     categories: categories(entry.payload.categories),
+    catalogOrder: typeof entry.payload.catalogOrder === "number" ? entry.payload.catalogOrder : null,
+    catalogVisible: entry.payload.catalogVisible !== false,
   };
+}
+
+export function curateCaseCards(projects: readonly CaseCardView[]): CaseCardView[] {
+  return projects
+    .filter(project => project.catalogVisible !== false)
+    .map((project, sourceIndex) => ({ project, sourceIndex }))
+    .sort((left, right) =>
+      (left.project.catalogOrder ?? Number.MAX_SAFE_INTEGER) - (right.project.catalogOrder ?? Number.MAX_SAFE_INTEGER)
+      || left.sourceIndex - right.sourceIndex,
+    )
+    .map(({ project }) => project);
 }
 
 export function contentCard(entry: ContentEntry, media: MediaPresentationMap = {}): ContentCardView {

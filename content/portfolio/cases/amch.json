@@ -9,6 +9,7 @@
   "seoDescription": "Кейс KorDevTeam: участие в разработке AMCH, новый интерфейс инвестиционного приложения на React Native и интеграция с Python API.",
   "indexable": true,
   "categories": ["mobile", "web-service"],
+  "catalogOrder": 2,
   "payload": {
     "h1": "AMCH: редизайн мобильного инвестиционного приложения",
     "problem": "Обновить мобильный интерфейс инвестиционного продукта и встроить его в существующую серверную архитектуру.",

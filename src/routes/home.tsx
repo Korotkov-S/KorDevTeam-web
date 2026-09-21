@@ -1,7 +1,7 @@
 import { data, useLoaderData } from "react-router";
 import { HomePage } from "../pages/HomePage";
 import { listPublishedEntries } from "../server/content/service";
-import { serviceCard, caseCard, contentCard } from "../server/content/commercialPresentation";
+import { serviceCard, caseCard, contentCard, curateCaseCards } from "../server/content/commercialPresentation";
 import { buildRouteMeta, type RouteSeoInput } from "../server/seo/metadata";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMaps } from "../server/media/presentation";
@@ -13,11 +13,11 @@ export async function loader() {
   const [services, cases, articles] = await Promise.all([
     listPublishedEntries("service"), listPublishedEntries("case"), listPublishedEntries("article"),
   ]);
-  const selectedCases = cases.slice(0, 4);
   const selectedArticles = [...articles].sort((left, right) =>
     (right.publishedAt?.getTime() ?? 0) - (left.publishedAt?.getTime() ?? 0) || left.slug.localeCompare(right.slug),
   ).slice(0, 3);
-  const media = await getEntryMediaMaps([...selectedArticles, ...selectedCases].map(entry => entry.id));
+  const media = await getEntryMediaMaps([...selectedArticles, ...cases].map(entry => entry.id));
+  const selectedCases = curateCaseCards(cases.map(entry => caseCard(entry, media[entry.id]))).slice(0, 4);
   const priorityRank = (slug: string) => {
     const index = PRIORITY_SERVICE_SLUGS.findIndex(priority => priority === slug);
     return index < 0 ? PRIORITY_SERVICE_SLUGS.length : index;
@@ -30,7 +30,7 @@ export async function loader() {
     services: services.map(serviceCard).map(service => ({ ...service, priority: priorityRank(service.slug) < PRIORITY_SERVICE_SLUGS.length }))
       .sort((left, right) => priorityRank(left.slug) - priorityRank(right.slug)),
     posts: selectedArticles.map(entry => contentCard(entry, media[entry.id])),
-    projects: selectedCases.map(entry => caseCard(entry, media[entry.id])),
+    projects: selectedCases,
   }, { headers: documentHeaders });
 }
 
