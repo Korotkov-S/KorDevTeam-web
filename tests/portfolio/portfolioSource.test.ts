@@ -190,6 +190,29 @@ test("Jully Bride shows the four approved website views", async () => {
   }
 });
 
+test("NooDome shows the approved website and mobile product views", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "noodome");
+  assert.ok(record, "noodome");
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
+    "/projects/portfolio/noodome/cover.webp",
+    "/projects/portfolio/noodome/club-space.webp",
+    "/projects/portfolio/noodome/main-feed.webp",
+    "/projects/portfolio/noodome/programme.webp",
+    "/projects/portfolio/noodome/community.webp",
+    "/projects/portfolio/noodome/showcase.webp",
+    "/projects/portfolio/noodome/media.webp",
+  ]);
+  assert.equal(new Set(screenshots.map(screenshot => screenshot.src)).size, screenshots.length);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/noodome\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("automation and internal portfolio batch is complete", async () => {
   const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
   for (const slug of [
