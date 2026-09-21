@@ -222,7 +222,7 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
       {project.screenshots.length ? <CaseSection name="screenshots" id="case-screenshots">
         <Section className="border-t border-border py-14 lg:py-20">
           <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Интерфейс</p>
-          <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Продукт в работе</h2>
+          <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Как выглядит продукт</h2>
           <CaseScreenshotSlider key={project.slug} images={project.screenshots} heading={project.h1} />
         </Section>
       </CaseSection> : null}
