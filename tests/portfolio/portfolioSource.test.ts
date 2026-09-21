@@ -176,7 +176,7 @@ test("Jully Bride shows the four approved website views", async () => {
 
   const screenshots = record.payload.screenshots ?? [];
   assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
-    "/projects/portfolio/jully-bride/bride-book-hero.webp",
+    "/projects/portfolio/jully-bride/cover.webp",
     "/projects/portfolio/jully-bride/salon-video.webp",
     "/projects/portfolio/jully-bride/salon-cafe.webp",
     "/projects/portfolio/jully-bride/promotions.webp",
