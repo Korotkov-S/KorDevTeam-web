@@ -66,12 +66,12 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
   const hasSolution = Boolean(project.solution || project.architecture || project.bodyMd.trim())
     || project.integrations.length > 0 || project.technologies.length > 0 || project.features.length > 0;
   const index = [
+    project.screenshots.length ? ["Интерфейс", "#case-screenshots"] : null,
     hasProblem ? ["Задача", "#case-problem"] : null,
+    project.results.length ? ["Результаты", "#case-results"] : null,
     hasSolution ? ["Решение", "#case-solution"] : null,
     project.stages.length ? ["Этапы", "#case-stages"] : null,
     project.team.length ? ["Команда", "#case-team"] : null,
-    project.screenshots.length ? ["Интерфейс", "#case-screenshots"] : null,
-    project.results.length ? ["Результаты", "#case-results"] : null,
   ].filter((item): item is string[] => Boolean(item));
 
   return (
@@ -115,11 +115,37 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
         </Section>
       </CaseSection>
 
+      {project.screenshots.length ? <CaseSection name="screenshots" id="case-screenshots">
+        <Section className="border-t border-border py-14 lg:py-20">
+          <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Интерфейс</p>
+          <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Продукт в работе</h2>
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">{project.screenshots.map((image, index) => {
+            const firstLandscape = index === 0 && image.width !== null && image.height !== null && image.width >= image.height;
+            return <figure key={image.id} className={firstLandscape ? "lg:col-span-2" : undefined}>
+              <div className="flex overflow-hidden rounded-[2rem] border border-border bg-[#eef2f7] p-3 dark:bg-[#151b2a] sm:p-5">
+                <img src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className="h-auto max-h-[70rem] w-full rounded-[1.2rem] object-contain" />
+              </div>
+              {hasDistinctCaption(image.alt, project.h1) ? <figcaption className="mt-3 px-2 text-sm leading-6 text-[var(--public-subtle)]">{image.alt}</figcaption> : null}
+            </figure>;
+          })}</div>
+        </Section>
+      </CaseSection> : null}
+
       {hasProblem ? <CaseSection name="problem" id="case-problem">
         <StorySection eyebrow="Контекст" title="Задача">
           {project.problem ? <MarkdownContent markdown={project.problem} media={project.media} /> : null}
           {project.constraints.length ? <div className="mt-10"><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Ограничения</h3><TextList items={project.constraints} /></div> : null}
         </StorySection>
+      </CaseSection> : null}
+
+      {project.results.length ? <CaseSection name="results" id="case-results">
+        <Section className="border-t border-border py-14 lg:py-20">
+          <div className="rounded-[2rem] bg-[#0b1020] px-6 py-10 text-white sm:rounded-[3rem] sm:px-10 lg:px-14 lg:py-14">
+            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[#b7a7ff]">Подтверждённый эффект</p>
+            <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Результаты</h2>
+            <div className="mt-10 [&_ol]:border-white/20 [&_li]:border-white/20 [&_p]:text-white/70"><BlockList items={project.results} /></div>
+          </div>
+        </Section>
       </CaseSection> : null}
 
       {hasSolution ? <CaseSection name="solution" id="case-solution">
@@ -138,32 +164,6 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
       {project.stages.length ? <CaseSection name="stages" id="case-stages"><StorySection eyebrow="Реализация" title="Этапы проекта"><BlockList items={project.stages} /></StorySection></CaseSection> : null}
 
       {project.team.length ? <CaseSection name="team" id="case-team"><StorySection eyebrow="Команда" title="Кто работал над проектом"><TextList items={project.team} /></StorySection></CaseSection> : null}
-
-      {project.screenshots.length ? <CaseSection name="screenshots" id="case-screenshots">
-        <Section className="border-t border-border py-14 lg:py-20">
-          <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Интерфейс</p>
-          <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Продукт в работе</h2>
-          <div className="mt-10 grid gap-5 lg:grid-cols-2">{project.screenshots.map((image, index) => {
-            const firstLandscape = index === 0 && image.width !== null && image.height !== null && image.width >= image.height;
-            return <figure key={image.id} className={firstLandscape ? "lg:col-span-2" : undefined}>
-              <div className="flex overflow-hidden rounded-[2rem] border border-border bg-[#eef2f7] p-3 dark:bg-[#151b2a] sm:p-5">
-                <img src={image.src} srcSet={image.srcSet || undefined} sizes={image.sizes} width={image.width ?? undefined} height={image.height ?? undefined} alt={image.alt} loading="lazy" className="h-auto max-h-[70rem] w-full rounded-[1.2rem] object-contain" />
-              </div>
-              {hasDistinctCaption(image.alt, project.h1) ? <figcaption className="mt-3 px-2 text-sm leading-6 text-[var(--public-subtle)]">{image.alt}</figcaption> : null}
-            </figure>;
-          })}</div>
-        </Section>
-      </CaseSection> : null}
-
-      {project.results.length ? <CaseSection name="results" id="case-results">
-        <Section className="border-t border-border py-14 lg:py-20">
-          <div className="rounded-[2rem] bg-[#0b1020] px-6 py-10 text-white sm:rounded-[3rem] sm:px-10 lg:px-14 lg:py-14">
-            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[#b7a7ff]">Подтверждённый эффект</p>
-            <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Результаты</h2>
-            <div className="mt-10 [&_ol]:border-white/20 [&_li]:border-white/20 [&_p]:text-white/70"><BlockList items={project.results} /></div>
-          </div>
-        </Section>
-      </CaseSection> : null}
 
       {project.testimonial ? <CaseSection name="testimonial"><StorySection eyebrow="Обратная связь" title="Отзыв клиента"><blockquote className="text-3xl leading-[1.35] tracking-[-0.03em] sm:text-4xl">{project.testimonial}</blockquote></StorySection></CaseSection> : null}
 

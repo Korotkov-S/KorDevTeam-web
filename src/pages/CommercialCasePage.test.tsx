@@ -102,6 +102,23 @@ test("case page renders confirmed proof and links without hiding related navigat
   assert.equal(screen.getByRole("link", { name: "Смотреть кейс: Следующий кейс" }).getAttribute("href"), "/cases/next/");
 });
 
+test("case page shows product evidence and business results before technical implementation", () => {
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView({
+    screenshots: [{ id: "local", src: "/case.webp", srcSet: "", sizes: "100vw", alt: "Интерфейс продукта", decorative: false, width: 1600, height: 1000 }],
+    results: [{ title: "Единый процесс", description: "Данные доступны офису после синхронизации." }],
+  })} /></MemoryRouter>);
+
+  assert.deepEqual(
+    [...document.querySelectorAll("[data-case-section]")].map(node => node.getAttribute("data-case-section")),
+    ["hero", "screenshots", "problem", "results", "solution", "stages", "team", "services", "lead"],
+  );
+  const navigation = screen.getByRole("navigation", { name: "Навигация по кейсу" });
+  assert.deepEqual(
+    [...navigation.querySelectorAll("a")].map(link => link.textContent),
+    ["Интерфейс", "Задача", "Результаты", "Решение", "Этапы", "Команда"],
+  );
+});
+
 test("case page renders sized interface screenshots without inventing empty proof", () => {
   render(<MemoryRouter><CommercialCasePage pathname="/cases/serviceplus/" project={caseView({
     h1: "ServicePlus",
