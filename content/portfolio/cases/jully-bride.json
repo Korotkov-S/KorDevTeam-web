@@ -86,46 +86,28 @@
     ],
     "screenshots": [
       {
-        "src": "/projects/portfolio/jully-bride/cover.webp",
-        "alt": "Главная страница сети свадебных салонов Jully Bride",
-        "width": 1600,
-        "height": 1000
+        "src": "/projects/portfolio/jully-bride/bride-book-hero.webp",
+        "alt": "Главная страница Jully Bride с проектом «Главная книга невесты»",
+        "width": 1680,
+        "height": 930
       },
       {
-        "src": "/projects/portfolio/jully-bride/catalog.webp",
-        "alt": "Каталог свадебных платьев Jully Bride с фильтрами и карточками моделей",
-        "width": 1600,
-        "height": 1000
+        "src": "/projects/portfolio/jully-bride/salon-video.webp",
+        "alt": "Страница Jully Bride с видеопрезентацией свадебного салона",
+        "width": 1680,
+        "height": 930
       },
       {
-        "src": "/projects/portfolio/jully-bride/product.webp",
-        "alt": "Карточка свадебного платья Jully Bride с галереей и записью на примерку",
-        "width": 1600,
-        "height": 1000
+        "src": "/projects/portfolio/jully-bride/salon-cafe.webp",
+        "alt": "Страница Jully Bride с интерьером салона и кафе для невест",
+        "width": 1680,
+        "height": 930
       },
       {
-        "src": "/projects/portfolio/jully-bride/mobile-home.webp",
-        "alt": "Мобильная версия главной страницы сайта Jully Bride",
-        "width": 390,
-        "height": 844
-      },
-      {
-        "src": "/projects/portfolio/jully-bride/blog.webp",
-        "alt": "Раздел статей и полезных материалов для невест на сайте Jully Bride",
-        "width": 1600,
-        "height": 1000
-      },
-      {
-        "src": "/projects/portfolio/jully-bride/bride-passport.webp",
-        "alt": "Специальный проект «Паспорт невесты» на сайте Jully Bride",
-        "width": 1600,
-        "height": 1000
-      },
-      {
-        "src": "/projects/portfolio/jully-bride/franchise.webp",
-        "alt": "Страница франшизы сети свадебных салонов Jully Bride",
-        "width": 1600,
-        "height": 1000
+        "src": "/projects/portfolio/jully-bride/promotions.webp",
+        "alt": "Страница акций Jully Bride с предложениями и записью на примерку",
+        "width": 1680,
+        "height": 899
       }
     ],
     "tags": ["WordPress", "WooCommerce", "Интернет-каталог", "Редизайн сайта", "Техническое SEO", "Оптимизация MySQL", "Поддержка сайта"]

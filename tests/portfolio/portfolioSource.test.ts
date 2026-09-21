@@ -170,12 +170,17 @@ test("Дом.Кругом shows several real product views instead of a single f
   }
 });
 
-test("Jully Bride shows the real website, catalog, product and mobile views", async () => {
+test("Jully Bride shows the four approved website views", async () => {
   const record = (await loadPortfolioSources()).find(item => item.slug === "jully-bride");
   assert.ok(record, "jully-bride");
 
   const screenshots = record.payload.screenshots ?? [];
-  assert.ok(screenshots.length >= 7, "expected website, catalog, product and mobile views");
+  assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
+    "/projects/portfolio/jully-bride/bride-book-hero.webp",
+    "/projects/portfolio/jully-bride/salon-video.webp",
+    "/projects/portfolio/jully-bride/salon-cafe.webp",
+    "/projects/portfolio/jully-bride/promotions.webp",
+  ]);
   assert.equal(new Set(screenshots.map(screenshot => screenshot.src)).size, screenshots.length);
   for (const screenshot of screenshots) {
     assert.match(screenshot.src, /^\/projects\/portfolio\/jully-bride\//);
