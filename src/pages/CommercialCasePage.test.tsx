@@ -184,6 +184,40 @@ test("case gallery keeps screenshots with different source ratios at one visual 
   for (const image of images) assert.match(image.className, /h-full/);
 });
 
+test("case gallery gives portrait app screenshots a taller frame", () => {
+  render(<MemoryRouter><CommercialCasePage pathname="/cases/amch/" project={caseView({
+    screenshots: [
+      {
+        id: "cover",
+        src: "/cover.webp",
+        srcSet: "",
+        sizes: "100vw",
+        alt: "Обложка AMCH",
+        decorative: false,
+        width: 1600,
+        height: 1000,
+      },
+      {
+        id: "app-screen",
+        src: "/app-screen.webp",
+        srcSet: "",
+        sizes: "100vw",
+        alt: "Экран приложения AMCH",
+        decorative: false,
+        width: 792,
+        height: 1714,
+      },
+    ],
+  })} /></MemoryRouter>);
+
+  const cover = screen.getByRole("img", { name: "Обложка AMCH" });
+  const appScreen = screen.getByRole("img", { name: "Экран приложения AMCH" });
+  assert.match(cover.parentElement?.className ?? "", /aspect-\[8\/5\]/);
+  assert.match(cover.closest("figure")?.className ?? "", /lg:col-span-2/);
+  assert.match(appScreen.parentElement?.className ?? "", /aspect-\[4\/5\]/);
+  assert.doesNotMatch(appScreen.closest("figure")?.className ?? "", /lg:col-span-2/);
+});
+
 test("gallery omits a redundant caption when alt repeats the case heading", () => {
   render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView({
     screenshots: [{ id: "local", src: "/case.webp", srcSet: "", sizes: "100vw", alt: "Платформа для логистики", decorative: false, width: 1600, height: 1000 }],

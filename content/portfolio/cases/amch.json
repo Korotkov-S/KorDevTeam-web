@@ -31,7 +31,12 @@
       {"title": "Продукт получил основу для дальнейшего развития", "description": "Обновлённые компоненты и проверенные пользовательские потоки можно последовательно развивать вместе с основной продуктовой командой."}
     ],
     "screenshots": [
-      {"src": "/projects/portfolio/amch/cover.webp", "alt": "Инвестиционный продукт AMCH", "width": 1600, "height": 1000}
+      {"src": "/projects/portfolio/amch/cover.webp", "alt": "Инвестиционный продукт AMCH", "width": 1600, "height": 1000},
+      {"src": "/projects/portfolio/amch/app-overview.webp", "alt": "Главный экран мобильного инвестиционного приложения AMCH", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/amch/app-opportunities.webp", "alt": "Витрина инвестиционных возможностей в приложении AMCH", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/amch/app-secondary-market.webp", "alt": "Вторичный рынок инвестиций в мобильном приложении AMCH", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/amch/app-ipo.webp", "alt": "Раздел будущих IPO в приложении AMCH", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/amch/app-portfolio.webp", "alt": "Инвестиционный портфель и диверсификация в приложении AMCH", "width": 792, "height": 1714}
     ],
     "tags": ["Инвестиционное приложение", "Редизайн приложения", "React Native", "FinTech", "Python API"]
   },
