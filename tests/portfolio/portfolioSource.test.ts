@@ -170,6 +170,21 @@ test("Дом.Кругом shows several real product views instead of a single f
   }
 });
 
+test("Jully Bride shows the real website, catalog, product and mobile views", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "jully-bride");
+  assert.ok(record, "jully-bride");
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.ok(screenshots.length >= 7, "expected website, catalog, product and mobile views");
+  assert.equal(new Set(screenshots.map(screenshot => screenshot.src)).size, screenshots.length);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/jully-bride\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("automation and internal portfolio batch is complete", async () => {
   const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
   for (const slug of [
