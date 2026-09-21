@@ -155,6 +155,21 @@ test("product and mobile portfolio batch is complete", async () => {
   ]) assert.ok(slugs.has(slug), slug);
 });
 
+test("Дом.Кругом shows several real product views instead of a single fallback cover", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "dom-krugom");
+  assert.ok(record, "dom-krugom");
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.ok(screenshots.length >= 6, "expected website and mobile application views");
+  assert.equal(new Set(screenshots.map(screenshot => screenshot.src)).size, screenshots.length);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/dom-krugom\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("automation and internal portfolio batch is complete", async () => {
   const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
   for (const slug of [
