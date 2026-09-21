@@ -213,6 +213,25 @@ test("NooDome shows the approved website and mobile product views", async () => 
   }
 });
 
+test("Sims Dynasty Tree shows the approved product gallery", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "sims-dynasty-tree");
+  assert.ok(record, "sims-dynasty-tree");
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
+    "/projects/portfolio/sims-dynasty-tree/cover.webp",
+    "/projects/portfolio/sims-dynasty-tree/large-dynasty.webp",
+    "/projects/portfolio/sims-dynasty-tree/product-overview.webp",
+  ]);
+  assert.equal(new Set(screenshots.map(screenshot => screenshot.src)).size, screenshots.length);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/sims-dynasty-tree\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("automation and internal portfolio batch is complete", async () => {
   const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
   for (const slug of [
