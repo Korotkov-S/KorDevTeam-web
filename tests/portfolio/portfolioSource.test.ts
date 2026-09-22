@@ -232,6 +232,37 @@ test("Sims Dynasty Tree shows the approved product gallery", async () => {
   }
 });
 
+test("stone product calculator presents the implemented workflow and approved screens", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "stone-product-calculator");
+  assert.ok(record, "stone-product-calculator");
+
+  assert.deepEqual(record.payload.features, [
+    "2D-чертёж и раскрой на слэбе",
+    "Библиотека изделий, вырезов и производственных операций",
+    "Автоматический расчёт сметы",
+    "Наценки, скидки и расчёты в разных валютах",
+    "Коммерческое предложение и приложение в PDF",
+    "Импорт и обновление цен из Excel",
+  ]);
+  assert.deepEqual(record.payload.technologies, ["React", "TypeScript", "Konva", "AdonisJS", "PostgreSQL", "Puppeteer"]);
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
+    "/projects/portfolio/stone-product-calculator/cover.webp",
+    "/projects/portfolio/stone-product-calculator/plan.webp",
+    "/projects/portfolio/stone-product-calculator/estimate.webp",
+    "/projects/portfolio/stone-product-calculator/commercial-offer-1.webp",
+    "/projects/portfolio/stone-product-calculator/commercial-offer-2.webp",
+    "/projects/portfolio/stone-product-calculator/commercial-offer-3.webp",
+  ]);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/stone-product-calculator\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("automation and internal portfolio batch is complete", async () => {
   const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
   for (const slug of [
