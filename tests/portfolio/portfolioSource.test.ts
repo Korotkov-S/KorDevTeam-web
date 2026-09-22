@@ -245,6 +245,13 @@ test("stone product calculator presents the implemented workflow and approved sc
     "Импорт и обновление цен из Excel",
   ]);
   assert.deepEqual(record.payload.technologies, ["React", "TypeScript", "Konva", "AdonisJS", "PostgreSQL", "Puppeteer"]);
+  assert.match(record.payload.problem ?? "", /бесплатной программе/i);
+  assert.match(record.payload.problem ?? "", /Excel/);
+  assert.match(record.payload.problem ?? "", /бумаге/i);
+  assert.match(
+    (record.payload.results ?? []).map(result => `${result.title} ${result.description}`).join(" "),
+    /сократил[^.]*время работы менеджер/i,
+  );
 
   const screenshots = record.payload.screenshots ?? [];
   assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
