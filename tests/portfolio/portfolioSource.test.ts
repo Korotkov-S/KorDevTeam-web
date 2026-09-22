@@ -190,6 +190,40 @@ test("Jully Bride shows the four approved website views", async () => {
   }
 });
 
+test("Награда describes server cleanup savings and incident remediation", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "nagrada");
+  assert.ok(record, "nagrada");
+
+  const copy = [
+    record.bodyMd,
+    record.payload.problem,
+    record.payload.solution,
+    ...(record.payload.results ?? []).flatMap(result => [result.title, result.description]),
+  ].join(" ");
+  assert.match(copy, /сервер/i);
+  assert.match(copy, /скрипт/i);
+  assert.match(copy, /расход/i);
+  assert.match(copy, /зараж|вирус|вредонос/i);
+  assert.match(copy, /уязвим/i);
+});
+
+test("Награда shows the approved website screenshot without browser chrome", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "nagrada");
+  assert.ok(record, "nagrada");
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
+    "/projects/portfolio/nagrada/cover.webp",
+    "/projects/portfolio/nagrada/website.webp",
+  ]);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/nagrada\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("NooDome shows the approved website and mobile product views", async () => {
   const record = (await loadPortfolioSources()).find(item => item.slug === "noodome");
   assert.ok(record, "noodome");
