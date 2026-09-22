@@ -1,5 +1,4 @@
 [
-  {"slug":"21-century-crm","mode":"fallback","output":"/projects/portfolio/21-century-crm/cover.webp","alt":"CRM 21 век — кабинеты пользователей и сотрудников","viewport":{"width":1440,"height":1000},"title":"CRM «21 век»","category":"CRM и внутренние системы"},
   {"slug":"alliance-stroy-garant","mode":"existing","sourcePath":"public/projects/asg.webp","output":"/projects/portfolio/alliance-stroy-garant/cover.webp","alt":"Корпоративный сайт АльянсСтройГарант","viewport":{"width":1440,"height":1000},"title":"АльянсСтройГарант","category":"Сайты и интернет-магазины"},
   {"slug":"amch","mode":"existing","sourcePath":"public/projects/amch.webp","output":"/projects/portfolio/amch/cover.webp","alt":"Инвестиционный продукт AMCH","viewport":{"width":1440,"height":1000},"title":"AMCH","category":"Мобильные приложения"},
   {"slug":"dom-krugom","mode":"capture","sourceUrl":"https://dom-krugom.ru/","output":"/projects/portfolio/dom-krugom/cover.webp","alt":"Главная страница сервиса Дом.Кругом с подбором автодома и событиями для автопутешествий","viewport":{"width":1440,"height":1000},"title":"Дом.Кругом","category":"Мобильные приложения"},

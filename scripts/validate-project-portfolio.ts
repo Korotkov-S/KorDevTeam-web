@@ -2,7 +2,7 @@ import { loadPortfolioSources } from "../src/server/portfolio/loader";
 
 async function main(): Promise<void> {
   const records = await loadPortfolioSources();
-  if (records.length !== 26) throw new Error("portfolio_count_invalid");
+  if (records.length !== 25) throw new Error("portfolio_count_invalid");
   process.stdout.write(`${JSON.stringify({
     ok: true,
     count: records.length,

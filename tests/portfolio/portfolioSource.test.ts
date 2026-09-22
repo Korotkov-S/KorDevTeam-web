@@ -273,7 +273,6 @@ test("stone product calculator presents the implemented workflow and approved sc
 test("automation and internal portfolio batch is complete", async () => {
   const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
   for (const slug of [
-    "21-century-crm",
     "skycreative-random-coffee",
     "twitch-automation-service",
     "notion-analog",
@@ -304,12 +303,12 @@ test("Service Plus gallery includes the approved mobile application screens", as
   }
 });
 
-test("portfolio source contains exactly the approved 26 unique cases", async () => {
+test("portfolio source contains exactly the approved 25 unique cases", async () => {
   const records = await loadPortfolioSources();
-  assert.equal(records.length, 26);
-  assert.equal(new Set(records.map(record => record.slug)).size, 26);
-  assert.equal(new Set(records.map(record => record.seoTitle)).size, 26);
-  assert.equal(new Set(records.map(record => record.seoDescription)).size, 26);
+  assert.equal(records.length, 25);
+  assert.equal(new Set(records.map(record => record.slug)).size, 25);
+  assert.equal(new Set(records.map(record => record.seoTitle)).size, 25);
+  assert.equal(new Set(records.map(record => record.seoDescription)).size, 25);
 });
 
 test("portfolio source keeps the approved catalog order and hidden projects", async () => {
