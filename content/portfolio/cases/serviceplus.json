@@ -35,7 +35,9 @@
     "screenshots": [
       {"src": "/projects/portfolio/serviceplus/cover.webp", "alt": "Горнодобывающая техника компании Сервис Плюс", "width": 1600, "height": 1000},
       {"src": "/projects/portfolio/serviceplus/admin-equipment.webp", "alt": "Веб-панель Сервис Плюс с фильтрами по технике, подразделениям и маршрутам", "width": 1600, "height": 1000},
-      {"src": "/projects/portfolio/serviceplus/inspection-report.webp", "alt": "Отчёт Сервис Плюс с пунктами осмотра, статусами и ссылками на фотографии", "width": 1600, "height": 909}
+      {"src": "/projects/portfolio/serviceplus/inspection-report.webp", "alt": "Отчёт Сервис Плюс с пунктами осмотра, статусами и ссылками на фотографии", "width": 1600, "height": 909},
+      {"src": "/projects/portfolio/serviceplus/mobile-login.webp", "alt": "Экран входа сотрудника в мобильное приложение Сервис Плюс по табельному номеру", "width": 1080, "height": 2340},
+      {"src": "/projects/portfolio/serviceplus/mobile-inspection-checklist.webp", "alt": "Мобильный чек-лист осмотра БелАЗа с фиксацией неисправности и обязательной фотографией", "width": 1080, "height": 2340}
     ],
     "tags": ["Грузовая техника", "Цифровые чек-листы", "Офлайн-работа", "Фотофиксация дефектов", "Android-приложение", "Веб-панель"]
   },

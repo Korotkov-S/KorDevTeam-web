@@ -277,6 +277,26 @@ test("automation and internal portfolio batch is complete", async () => {
   ]) assert.ok(slugs.has(slug), slug);
 });
 
+test("Service Plus gallery includes the approved mobile application screens", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "serviceplus");
+  assert.ok(record);
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
+    "/projects/portfolio/serviceplus/cover.webp",
+    "/projects/portfolio/serviceplus/admin-equipment.webp",
+    "/projects/portfolio/serviceplus/inspection-report.webp",
+    "/projects/portfolio/serviceplus/mobile-login.webp",
+    "/projects/portfolio/serviceplus/mobile-inspection-checklist.webp",
+  ]);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/serviceplus\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("portfolio source contains exactly the approved 26 unique cases", async () => {
   const records = await loadPortfolioSources();
   assert.equal(records.length, 26);
