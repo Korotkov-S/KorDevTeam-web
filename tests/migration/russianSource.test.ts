@@ -19,7 +19,7 @@ test('sanitization is deterministic and cannot mutate its source bytes or Russia
   try {for(const table of ['posts','projects']) assert.deepEqual(after.exec(`SELECT * FROM ${table} WHERE lang='ru' ORDER BY 1`),before.exec(`SELECT * FROM ${table} WHERE lang='ru' ORDER BY 1`));}
   finally {before.close();after.close();}
 });
-test('first-install database guards and real import produce exactly 46 published articles and 9 cases', {skip:!process.env.TEST_DATABASE_URL}, async () => {
+test('first-install database guards and real import produce exactly 46 published articles and 8 cases', {skip:!process.env.TEST_DATABASE_URL}, async () => {
   const url=process.env.TEST_DATABASE_URL!;
   await resetTestDatabase(url);
   const {checkDatabase}=await import('../../scripts/bootstrap-content-check.mjs');
@@ -29,12 +29,12 @@ test('first-install database guards and real import produce exactly 46 published
   await checkDatabase('empty',url);
   const db=createDb(url);
   const report=await importLegacyContent({db,batchId:'first-install-real-test'});
-  assert.equal(report.inserted,55);
+  assert.equal(report.inserted,54);
   await checkDatabase('populated',url);
   assert.equal((await verifyContentMigration({db,batchId:'first-install-real-test'})).ok,true);
   await assert.rejects(checkDatabase('pristine',url),/not empty/);
 });
-test('committed migration source contains only Russian rows and complete 46/9 migration inventory', async () => {
+test('committed migration source contains only Russian rows and excludes retired legacy cases', async () => {
   const tracked=execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0');
   assert.deepEqual(tracked.filter(file=>/\.en\.(md|json)$/i.test(file)),[]);
   for(const file of tracked.filter(file=>/^public\/content\/.*\.ru\.json$/.test(file))) {
@@ -54,5 +54,5 @@ test('committed migration source contains only Russian rows and complete 46/9 mi
     assert.equal(db.exec('SELECT count(*) FROM projects')[0].values[0][0],9);
   } finally {db.close();}
   const report=await importLegacyContent({dryRun:true});
-  assert.deepEqual(report.counts,{articles:46,cases:9}); assert.deepEqual(report.collisions,[]); assert.deepEqual(report.invalidRecords,[]);
+  assert.deepEqual(report.counts,{articles:46,cases:8}); assert.deepEqual(report.collisions,[]); assert.deepEqual(report.invalidRecords,[]);
 });

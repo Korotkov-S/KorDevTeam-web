@@ -58,4 +58,4 @@ done
 [[ "$(docker inspect --format '{{.Config.Image}}' kordevteam-blue)" == "$web_image" ]] || fail 'Initial blue image mismatch'
 mkdir -- "$DEPLOY_STATE_DIR/slots"
 printf '%s\n' "$web_image" > "$DEPLOY_STATE_DIR/slots/blue"
-printf 'Verified 46 articles / 9 cases. Initial blue recorded and ready locally. Public route installation remains a separate manual operation.\n'
+printf 'Verified 46 articles / 8 cases. Initial blue recorded and ready locally. Public route installation remains a separate manual operation.\n'

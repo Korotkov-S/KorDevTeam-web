@@ -32,11 +32,11 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   await resetTestDatabase(databaseUrl);
   const imported = await importLegacyContent({ db: createDb(databaseUrl), batchId: "sitemap-runtime" });
   assert.equal(imported.ok, true);
-  assert.deepEqual(imported.counts, { articles: 46, cases: 9 });
+  assert.deepEqual(imported.counts, { articles: 46, cases: 8 });
   const portfolioSources = await loadPortfolioSources();
   const portfolioDb = createDb(databaseUrl);
   const portfolioResult = await applyPortfolioImport(portfolioDb, await planPortfolioImport(portfolioDb, portfolioSources));
-  assert.equal(portfolioResult.inserted + portfolioResult.updated + portfolioResult.unchanged, 25);
+  assert.equal(portfolioResult.inserted + portfolioResult.updated + portfolioResult.unchanged, 23);
   const service = createContentService(createDb(databaseUrl));
   const actor = randomUUID();
   await createDb(databaseUrl).insert(adminUsers).values({ id: actor, login: "sitemap-admin", passwordDigest: "unused", passwordSalt: "unused" });
@@ -69,7 +69,7 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   const locations = [pages, blog].map($ => $("url > loc").map((_, el) => $(el).text()).get());
   assert.equal(locations[0].filter(loc => locations[1].includes(loc)).length, 0);
   const caseLocations = locations[0].filter(location => /^https:\/\/kordev\.team\/cases\/[^/]+\/$/.test(location));
-  assert.equal(caseLocations.length, 25);
+  assert.equal(caseLocations.length, 23);
   assert.deepEqual(new Set(caseLocations), new Set(portfolioSources.map(source => `https://kordev.team/cases/${source.slug}/`)));
   for (const pathname of ["/", "/blog/", "/services/", "/cases/", "/journal/", "/journal/issue-0/", "/video/", "/under-metup/video-1/", "/under-metup/video-2/", "/under-metup/video-3/", "/requisites/", "/privacy/", "/about-test/", "/services/test-service/"]) assert.ok(locations[0].includes(`https://kordev.team${pathname}`), pathname);
   assert.ok(locations[1].length > 0);

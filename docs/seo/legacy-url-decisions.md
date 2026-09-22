@@ -17,8 +17,7 @@
 | `/project/wowbanner/` | redirect | `/cases/wowbanner/` | Опубликованный legacy-кейс |
 | `/project/serviceplus/` | redirect | `/cases/serviceplus/` | Опубликованный legacy-кейс |
 | `/project/amch/` | redirect | `/cases/amch/` | Опубликованный legacy-кейс |
-| `/project/notion-analog/` | redirect | `/cases/notion-analog/` | Опубликованный legacy-кейс |
+| `/project/notion-analog/` | gone | — | Проект снят с публикации по решению владельца портфолио |
 
 Все редиректы ведут сразу на канонический URL со слешем и сохраняют только
-разрешённые параметры атрибуции. На момент аудита подтверждённых путей для
-решений `keep`, `noindex` или `gone` в репозитории нет.
+разрешённые параметры атрибуции. Снятый с публикации проект возвращает `410 Gone`.

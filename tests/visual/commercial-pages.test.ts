@@ -27,7 +27,6 @@ const routes = [
   { slug: "case-sims", pathname: "/cases/sims-dynasty-tree/" },
   { slug: "case-noodome", pathname: "/cases/noodome/" },
   { slug: "case-teharmatura", pathname: "/cases/teharmatura-automation/" },
-  { slug: "case-notion", pathname: "/cases/notion-analog/" },
   { slug: "blog", pathname: "/blog/" },
   { slug: "article", pathname: "/blog/long-article/" },
   { slug: "journal", pathname: "/journal/" },
@@ -41,7 +40,6 @@ const portfolioPaths = new Set([
   "/cases/sims-dynasty-tree/",
   "/cases/noodome/",
   "/cases/teharmatura-automation/",
-  "/cases/notion-analog/",
 ]);
 
 const vendorPattern = /(?:mc\.yandex\.ru|top-fwz1\.mail\.ru)/;

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { safePath } from './release-files.mjs';
 
 export function checkReport(report, batch, checksum) {
-  if(!report.ok || report.counts?.articles!==46 || report.counts?.cases!==9 || report.collisions?.length!==0 || report.invalidRecords?.length!==0 || (report.mismatches && report.mismatches.length)) throw Error('Expected verified Russian counts 46/9 with zero errors');
+  if(!report.ok || report.counts?.articles!==46 || report.counts?.cases!==8 || report.collisions?.length!==0 || report.invalidRecords?.length!==0 || (report.mismatches && report.mismatches.length)) throw Error('Expected verified Russian counts 46/8 with zero errors');
   if(report.batchId!==batch || !/^[a-f0-9]{64}$/.test(report.checksums?.batch ?? '') || (checksum && report.checksums.batch!==checksum)) throw Error('Approved batch/checksum mismatch');
 }
 export async function checkDatabase(mode, databaseUrl=process.env.DATABASE_URL) {

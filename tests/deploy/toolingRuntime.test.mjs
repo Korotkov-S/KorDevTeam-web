@@ -26,6 +26,6 @@ test('actual tooling image reads private inputs and completes default and bootst
     const result=run(args);
     assert.equal(result.status,0,`${args.join(' ') || 'default CMD'}: ${result.stderr}`);
     const report=JSON.parse(result.stdout);
-    assert.equal(report.ok,true);assert.deepEqual(report.counts,{articles:46,cases:9});assert.deepEqual(report.collisions,[]);assert.deepEqual(report.invalidRecords,[]);
+    assert.equal(report.ok,true);assert.deepEqual(report.counts,{articles:46,cases:8});assert.deepEqual(report.collisions,[]);assert.deepEqual(report.invalidRecords,[]);
   }
 });

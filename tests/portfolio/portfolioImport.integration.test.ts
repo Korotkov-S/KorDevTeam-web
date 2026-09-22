@@ -14,18 +14,18 @@ import { startTestRuntime } from "../ssr/support/runtime";
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseTest = databaseUrl ? test : test.skip;
 
-databaseTest("local portfolio import publishes 25 indexable SSR case routes", { timeout: 120_000 }, async t => {
+databaseTest("local portfolio import publishes 23 indexable SSR case routes", { timeout: 120_000 }, async t => {
   await resetTestDatabase(databaseUrl!);
   const db = createDb(databaseUrl!);
   const sources = await loadPortfolioSources();
   const result = await applyPortfolioImport(db, await planPortfolioImport(db, sources));
-  assert.equal(result.inserted + result.updated + result.unchanged, 25);
+  assert.equal(result.inserted + result.updated + result.unchanged, 23);
 
   const entries = await db.select().from(contentEntries).where(eq(contentEntries.kind, "case"));
-  assert.equal(entries.length, 25);
+  assert.equal(entries.length, 23);
   assert.ok(entries.every(entry => entry.status === "published" && entry.indexable));
-  assert.equal(new Set(entries.map(entry => entry.seoTitle)).size, 25);
-  assert.equal(new Set(entries.map(entry => entry.seoDescription)).size, 25);
+  assert.equal(new Set(entries.map(entry => entry.seoTitle)).size, 23);
+  assert.equal(new Set(entries.map(entry => entry.seoDescription)).size, 23);
 
   const runtime = await startTestRuntime({ DATABASE_URL: databaseUrl! });
   t.after(runtime.close);
@@ -39,7 +39,7 @@ databaseTest("local portfolio import publishes 25 indexable SSR case routes", { 
     .get()
     .filter(href => href !== "/cases/");
   const catalogLinks = [...new Set(catalogHrefs)];
-  assert.equal(catalogLinks.length, 22);
+  assert.equal(catalogLinks.length, 20);
   assert.deepEqual(catalogLinks.slice(0, 11), [
     "/cases/serviceplus/",
     "/cases/amch/",
@@ -76,6 +76,6 @@ databaseTest("local portfolio import publishes 25 indexable SSR case routes", { 
   assert.equal(sitemapResponse.status, 200);
   const sitemap = load(await sitemapResponse.text(), { xml: true });
   const caseLocations = sitemap("url > loc").map((_, element) => sitemap(element).text()).get().filter(location => location.includes("/cases/") && location !== "https://kordev.team/cases/");
-  assert.equal(caseLocations.length, 25);
+  assert.equal(caseLocations.length, 23);
   assert.deepEqual(new Set(caseLocations), new Set(sources.map(source => `https://kordev.team/cases/${source.slug}/`)));
 });

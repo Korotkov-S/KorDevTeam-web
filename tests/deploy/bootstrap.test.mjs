@@ -16,7 +16,7 @@ function fixture(t) {
     if(s.includes('image inspect')) console.log(process.env.WRONG_LABEL==='1'||(process.env.WRONG_TOOL_LABEL==='1'&&s.includes('example/content:'))?'c'.repeat(40):'${sha}');
     else if(a[0]==='inspect') console.log('${web}');
     else if(/bootstrap-content-check.mjs (empty|pristine)/.test(s) && process.env.NONEMPTY==='1') process.exit(1);
-    else if(s.includes('migrate-content-to-postgres.ts') || s.includes('verify-content-migration.ts')) console.log(JSON.stringify({ok:true,batchId:'first-${sha}',counts:{articles:process.env.WRONG_COUNTS==='1'?45:46,cases:9},collisions:[],invalidRecords:[],checksums:{batch:process.env.CHANGED_CHECKSUM==='1'?'c'.repeat(64):'${checksum}'},mismatches:[]}));`);
+    else if(s.includes('migrate-content-to-postgres.ts') || s.includes('verify-content-migration.ts')) console.log(JSON.stringify({ok:true,batchId:'first-${sha}',counts:{articles:process.env.WRONG_COUNTS==='1'?45:46,cases:8},collisions:[],invalidRecords:[],checksums:{batch:process.env.CHANGED_CHECKSUM==='1'?'c'.repeat(64):'${checksum}'},mismatches:[]}));`);
   stub('curl', `const s=process.argv.join(' '); if(process.env.FAIL_SMOKE==='1') process.exit(22); console.log(s.includes('health/ready')?'{{"status":"ready"}}'.slice(1,-1):s.includes('sitemap.xml')?'<sitemapindex/>':'<title>Сайт</title><h1>Сайт</h1>');`);
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir, DEPLOY_STATE_DIR: `${dir}/state`,
     TRAEFIK_DYNAMIC_FILE: `${dir}/traefik/route.yml`, DATABASE_URL: 'postgresql://u:secret@postgres/team', POSTGRES_USER: 'u', POSTGRES_PASSWORD: 'secret', POSTGRES_DB: 'team',

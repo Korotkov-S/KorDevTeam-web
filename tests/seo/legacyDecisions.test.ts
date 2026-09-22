@@ -88,7 +88,6 @@ test("legacy project ids redirect straight to canonical portfolio slugs", async 
     ["wowbanner", "wowbanner"],
     ["serviceplus", "serviceplus"],
     ["amch", "amch"],
-    ["notion-analog", "notion-analog"],
   ]);
 
   for (const [legacy, canonical] of expected) {
@@ -100,6 +99,12 @@ test("legacy project ids redirect straight to canonical portfolio slugs", async 
   assert.deepEqual(noodome.legacySlugs, ["media-entertainment"]);
 });
 
+test("removed corporate platform returns gone instead of redirecting to a missing case", async () => {
+  const decision = LEGACY_PROJECT_DECISIONS["/project/notion-analog/"];
+  assert.deepEqual(decision, { action: "gone" });
+  assert.equal(await legacyProjectRedirect(new Request("https://kordev.team/project/notion-analog/")), null);
+});
+
 test("static redirect fixture sends every documented legacy project directly to its canonical case", async () => {
   const rows = await readLegacyDecisionTable("docs/seo/legacy-url-decisions.md");
   const redirects = new Map((await readFile("public/_redirects", "utf8"))
@@ -108,7 +113,10 @@ test("static redirect fixture sends every documented legacy project directly to 
     .filter(cells => cells.length === 3 && cells[0]?.startsWith("/project/") && cells[2] === "301!")
     .map(cells => [normalizeProjectPath(cells[0]!), cells[1]!]));
 
-  for (const row of rows) assert.equal(redirects.get(row.path), row.target, row.path);
+  for (const row of rows.filter(row => row.action === "redirect")) {
+    assert.equal(redirects.get(row.path), row.target, row.path);
+  }
+  assert.match(await readFile("public/_redirects", "utf8"), /^\/project\/notion-analog\s+\/404\.html\s+410!$/m);
 });
 
 test("legacy decisions reject mutation methods and never infer unknown project paths", async () => {

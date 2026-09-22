@@ -1072,7 +1072,7 @@ function buildRedirects(slugs, projects) {
   lines.push("/project/wowbanner    /cases/wowbanner/    301!");
   lines.push("/project/serviceplus    /cases/serviceplus/    301!");
   lines.push("/project/amch    /cases/amch/    301!");
-  lines.push("/project/notion-analog    /cases/notion-analog/    301!");
+  lines.push("/project/notion-analog    /404.html    410!");
   lines.push("");
   lines.push("# Cache headers");
   lines.push("/assets/*  Cache-Control: public, max-age=31536000, immutable");

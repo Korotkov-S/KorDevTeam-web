@@ -16,6 +16,7 @@ export type MigrationOptions = { fixtureRoot?: string; dryRun?: boolean; batchId
 const text = (value: unknown) => typeof value === "string" ? value : "";
 const plain = (value: string) => value.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/<[^>]*>/g, " ").replace(/[#*_`>]/g, "").replace(/\s+/g, " ").trim();
 const normalizeSlug = (value: unknown) => text(value).trim().toLowerCase().replace(/[^a-z0-9\p{L}]+/gu, "-").replace(/^-|-$/g, "");
+const RETIRED_LEGACY_CASE_SLUGS = new Set(["notion-analog"]);
 function historicalDate(value: unknown): string | undefined {
   const timestamp = typeof value === "number" ? value : parseBlogDate(value) ??
     (/^\d{4}-\d{2}-\d{2}T/.test(text(value)) ? Date.parse(text(value)) : NaN);
@@ -38,6 +39,10 @@ export async function importLegacyContent(options: MigrationOptions = {}) {
   const add = (kind: "article" | "case", row: LegacyRow, source: string, fallback = false, sourceData: unknown = row) => {
     const rawId = text(kind === "article" ? row.slug : row.id);
     const identity = `${kind}:${rawId}`;
+    if (kind === "case" && RETIRED_LEGACY_CASE_SLUGS.has(normalizeSlug(rawId))) {
+      occupiedLegacy.add(identity);
+      return;
+    }
     if (fallback && occupiedLegacy.has(identity)) return;
     occupiedLegacy.add(identity);
     const slug = normalizeSlug(rawId);

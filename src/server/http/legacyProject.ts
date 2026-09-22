@@ -16,7 +16,7 @@ export const LEGACY_PROJECT_DECISIONS: Readonly<Record<string, LegacyProjectDeci
   "/project/wowbanner/": { action: "redirect", target: "/cases/wowbanner/" },
   "/project/serviceplus/": { action: "redirect", target: "/cases/serviceplus/" },
   "/project/amch/": { action: "redirect", target: "/cases/amch/" },
-  "/project/notion-analog/": { action: "redirect", target: "/cases/notion-analog/" },
+  "/project/notion-analog/": { action: "gone" },
 });
 
 function exactLegacyPath(pathname: string): string {

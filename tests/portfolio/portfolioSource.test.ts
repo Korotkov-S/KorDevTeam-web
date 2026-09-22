@@ -133,7 +133,6 @@ test("web and support portfolio batch is complete", async () => {
     "sims-dynasty-tree",
     "siberian-steel",
     "wowbanner",
-    "sgormash",
     "inplain",
     "jully-bride",
     "nagrada",
@@ -334,12 +333,46 @@ test("automation and internal portfolio batch is complete", async () => {
   for (const slug of [
     "skycreative-random-coffee",
     "twitch-automation-service",
-    "notion-analog",
     "krasotula-crm",
     "roost",
     "teharmatura-automation",
     "tbi-group-tour-service",
   ]) assert.ok(slugs.has(slug), slug);
+});
+
+test("Twitch case reflects the implemented multi-service product", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "twitch-automation-service");
+  assert.ok(record, "twitch-automation-service");
+
+  assert.deepEqual(record.payload.technologies, [
+    "Next.js",
+    "TypeScript",
+    "Django REST Framework",
+    "FastAPI",
+    "PostgreSQL",
+    "Redis",
+    "Celery",
+    "Docker",
+  ]);
+  assert.deepEqual(record.payload.features, [
+    "Личный кабинет и авторизация",
+    "Управление каналами и заказами",
+    "Баланс, платежи и история операций",
+    "Очередь и статусы фоновых задач",
+    "Администрирование серверов, аккаунтов и прокси",
+    "Журналы, метрики и мониторинг инфраструктуры",
+  ]);
+
+  const copy = [record.bodyMd, record.payload.solution, record.payload.architecture].join(" ");
+  for (const pattern of [/шест[ьи] сервис/i, /Next\.js/i, /Django/i, /FastAPI/i, /Celery/i, /Docker/i]) {
+    assert.match(copy, pattern);
+  }
+});
+
+test("removed corporate platform and Sgormash cases stay out of the portfolio", async () => {
+  const slugs = new Set((await loadPortfolioSources()).map(record => record.slug));
+  assert.equal(slugs.has("notion-analog"), false);
+  assert.equal(slugs.has("sgormash"), false);
 });
 
 test("Service Plus gallery includes the approved mobile application screens", async () => {
@@ -362,12 +395,12 @@ test("Service Plus gallery includes the approved mobile application screens", as
   }
 });
 
-test("portfolio source contains exactly the approved 25 unique cases", async () => {
+test("portfolio source contains exactly the approved 23 unique cases", async () => {
   const records = await loadPortfolioSources();
-  assert.equal(records.length, 25);
-  assert.equal(new Set(records.map(record => record.slug)).size, 25);
-  assert.equal(new Set(records.map(record => record.seoTitle)).size, 25);
-  assert.equal(new Set(records.map(record => record.seoDescription)).size, 25);
+  assert.equal(records.length, 23);
+  assert.equal(new Set(records.map(record => record.slug)).size, 23);
+  assert.equal(new Set(records.map(record => record.seoTitle)).size, 23);
+  assert.equal(new Set(records.map(record => record.seoDescription)).size, 23);
 });
 
 test("portfolio source keeps the approved catalog order and hidden projects", async () => {
