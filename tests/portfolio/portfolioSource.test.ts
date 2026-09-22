@@ -213,6 +213,31 @@ test("NooDome shows the approved website and mobile product views", async () => 
   }
 });
 
+test("LO shows the approved mobile application gallery", async () => {
+  const record = (await loadPortfolioSources()).find(item => item.slug === "lo-social-platform");
+  assert.ok(record, "lo-social-platform");
+
+  const screenshots = record.payload.screenshots ?? [];
+  assert.deepEqual(screenshots.map(screenshot => screenshot.src), [
+    "/projects/portfolio/lo-social-platform/cover.webp",
+    "/projects/portfolio/lo-social-platform/news.webp",
+    "/projects/portfolio/lo-social-platform/communication.webp",
+    "/projects/portfolio/lo-social-platform/short-videos.webp",
+    "/projects/portfolio/lo-social-platform/calls.webp",
+    "/projects/portfolio/lo-social-platform/appearance.webp",
+    "/projects/portfolio/lo-social-platform/gallery.webp",
+    "/projects/portfolio/lo-social-platform/contacts.webp",
+    "/projects/portfolio/lo-social-platform/profile.webp",
+  ]);
+  assert.equal(new Set(screenshots.map(screenshot => screenshot.src)).size, screenshots.length);
+  for (const screenshot of screenshots) {
+    assert.match(screenshot.src, /^\/projects\/portfolio\/lo-social-platform\//);
+    assert.ok(screenshot.alt.trim().length > 20, screenshot.src);
+    assert.ok(screenshot.width > 0, screenshot.src);
+    assert.ok(screenshot.height > 0, screenshot.src);
+  }
+});
+
 test("Sims Dynasty Tree shows the approved product gallery", async () => {
   const record = (await loadPortfolioSources()).find(item => item.slug === "sims-dynasty-tree");
   assert.ok(record, "sims-dynasty-tree");

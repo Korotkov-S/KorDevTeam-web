@@ -28,7 +28,15 @@
       {"title": "Интерфейсы подключены к API", "description": "Экраны и состояния работают с существующей серверной частью продукта."}
     ],
     "screenshots": [
-      {"src": "/projects/portfolio/lo-social-platform/cover.webp", "alt": "Мобильная социальная платформа LO", "width": 1600, "height": 1000}
+      {"src": "/projects/portfolio/lo-social-platform/cover.webp", "alt": "Мобильная социальная платформа LO", "width": 1600, "height": 1000},
+      {"src": "/projects/portfolio/lo-social-platform/news.webp", "alt": "Лента новостей мобильного приложения LO", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/lo-social-platform/communication.webp", "alt": "Защищённые чаты мобильного приложения LO", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/lo-social-platform/short-videos.webp", "alt": "Лента коротких видео в мобильном приложении LO", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/lo-social-platform/calls.webp", "alt": "Экран аудио- и видеозвонка в мобильном приложении LO", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/lo-social-platform/appearance.webp", "alt": "Светлая и тёмная темы мобильного приложения LO", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/lo-social-platform/gallery.webp", "alt": "Галерея фотографий в мобильном приложении LO", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/lo-social-platform/contacts.webp", "alt": "Список контактов в мобильном приложении LO", "width": 792, "height": 1714},
+      {"src": "/projects/portfolio/lo-social-platform/profile.webp", "alt": "Профиль пользователя в мобильном приложении LO", "width": 792, "height": 1714}
     ],
     "tags": ["Frontend-разработка", "Мобильная платформа", "React Native", "API-интеграция"]
   },
