@@ -8,6 +8,17 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 const dom = new JSDOM('<!doctype html><html lang="ru"><body></body></html>', {
   url: "https://kordev.team/blog/editorial/",
 });
+const matchMedia = (query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addEventListener() {},
+  removeEventListener() {},
+  addListener() {},
+  removeListener() {},
+  dispatchEvent: () => false,
+});
+dom.window.matchMedia = matchMedia as typeof dom.window.matchMedia;
 Object.assign(globalThis, {
   React,
   window: dom.window,
@@ -17,6 +28,7 @@ Object.assign(globalThis, {
   Document: dom.window.Document,
   MutationObserver: dom.window.MutationObserver,
   getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
+  matchMedia,
   IS_REACT_ACT_ENVIRONMENT: true,
 });
 
@@ -75,4 +87,49 @@ test("article does not repeat an excerpt that already opens the body", () => {
 
   assert.equal(screen.getAllByText("Вступление к статье.").length, 1);
   assert.ok(screen.getByRole("heading", { name: "Первый раздел" }));
+});
+
+test("article hero preserves the specific markdown alt text for its source image", () => {
+  render(
+    <MemoryRouter initialEntries={["/blog/editorial/"]}>
+      <Routes>
+        <Route path="/blog/:slug/" element={<BlogPostPage article={{
+          title: "Рабочий процесс",
+          excerpt: "Практический разбор.",
+          bodyMd: "![Обсуждение процесса за столом](/first.jpg)",
+          publishedAt: "2026-09-01T00:00:00.000Z",
+          readTime: "3 мин",
+          tags: [],
+          coverUrl: "/first.jpg",
+          imageUrls: ["/first.jpg"],
+          media: {},
+        }} />}/>
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  assert.ok(screen.getByAltText("Обсуждение процесса за столом"));
+});
+
+test("article content column can shrink around a wide markdown table", () => {
+  render(
+    <MemoryRouter initialEntries={["/blog/editorial/"]}>
+      <Routes>
+        <Route path="/blog/:slug/" element={<BlogPostPage article={{
+          title: "Рабочий процесс",
+          excerpt: "Практический разбор.",
+          bodyMd: "| Шаг | Участник | Результат |\n| --- | --- | --- |\n| Получить заявку | Сайт | Заявка создана |",
+          publishedAt: "2026-09-01T00:00:00.000Z",
+          readTime: "3 мин",
+          tags: [],
+          coverUrl: "",
+          imageUrls: [],
+          media: {},
+        }} />}/>
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const articleBody = document.querySelector('[itemprop="articleBody"]');
+  assert.ok(articleBody?.parentElement?.classList.contains("min-w-0"));
 });

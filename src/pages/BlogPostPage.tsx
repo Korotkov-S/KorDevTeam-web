@@ -32,6 +32,12 @@ function stripFirstMarkdownH1(md: string): string {
 function stripMarkdownImages(md: string): string {
   return md.replace(/^\s*!\[[^\]]*\]\((\S+?)(?:\s+["'][^"']*["'])?\)\s*\n*/gm, "").trim();
 }
+function markdownImageAlts(md: string): Map<string, string> {
+  return new Map(
+    [...md.matchAll(/!\[([^\]]*)\]\((\S+?)(?:\s+["'][^"']*["'])?\)/g)]
+      .map(match => [match[2], match[1].trim()]),
+  );
+}
 function stripRepeatedLead(md: string, excerpt: string): string {
   const blocks = md.trim().split(/\n\s*\n/);
   const first = blocks[0]?.trim() ?? "";
@@ -57,19 +63,17 @@ function displayDate(value: string): string {
 
 function PostImageCarousel({
   images,
-  title,
 }: {
-  images: string[];
-  title: string;
+  images: Array<{ src: string; alt: string }>;
 }) {
   const [api, setApi] = useState<CarouselApi>();
-  const safeImages = images.filter(Boolean);
+  const safeImages = images.filter(image => Boolean(image.src));
 
   if (safeImages.length <= 1) {
     return (
       <ImageWithFallback
-        src={safeImages[0] || ""}
-        alt={title}
+        src={safeImages[0]?.src || ""}
+        alt={safeImages[0]?.alt || ""}
         fallbackSrc="/opengraphlogo.jpeg"
         className="w-full h-full object-cover"
       />
@@ -84,11 +88,11 @@ function PostImageCarousel({
         className="h-full [&_[data-slot=carousel-content]]:h-full"
       >
         <CarouselContent className="h-full -ml-0">
-          {safeImages.map((src, index) => (
-            <CarouselItem key={`${src}-${index}`} className="h-full pl-0">
+          {safeImages.map((image, index) => (
+            <CarouselItem key={`${image.src}-${index}`} className="h-full pl-0">
               <ImageWithFallback
-                src={src}
-                alt={`${title} - ${index + 1}`}
+                src={image.src}
+                alt={image.alt}
                 fallbackSrc="/opengraphlogo.jpeg"
                 className="w-full h-full object-cover"
               />
@@ -123,9 +127,9 @@ function PostImageCarousel({
         </Button>
       </div>
       <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/45 px-3 py-2 backdrop-blur-md">
-        {safeImages.map((src, index) => (
+        {safeImages.map((image, index) => (
           <span
-            key={`${src}-dot-${index}`}
+            key={`${image.src}-dot-${index}`}
             className="size-2 rounded-full bg-white shadow-sm"
           />
         ))}
@@ -148,16 +152,20 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
     updatedDate: article.updatedAt, readTime: article.readTime, tags: article.tags };
   const coverUrl = article.coverUrl;
   const imageUrls = article.imageUrls;
+  const imageAlts = markdownImageAlts(article.bodyMd);
   const hasVideoMedia = hasMarkdownVideo(article.bodyMd);
   const navigateGoBack = () => navigate("/blog/");
 
-  const heroImageUrls = hasVideoMedia
+  const heroImages = (hasVideoMedia
     ? []
     : imageUrls.length
       ? imageUrls
       : coverUrl
         ? [coverUrl]
-        : [];
+        : []).map((src, index) => ({
+          src,
+          alt: imageAlts.get(src) || `${meta.title || slug || "Изображение статьи"} — изображение ${index + 1}`,
+        }));
 
   return (
     <main className="min-h-screen pt-20">
@@ -205,14 +213,14 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
               ) : null}
             </header>
 
-            {heroImageUrls.length ? (
+            {heroImages.length ? (
               <div className="relative mt-12 aspect-[16/8.5] w-full overflow-hidden rounded-[2rem] bg-secondary sm:rounded-[3rem]">
-                <PostImageCarousel images={heroImageUrls} title={meta.title || slug || "cover"} />
+                <PostImageCarousel images={heroImages} />
               </div>
             ) : null}
 
             <div className="mt-12 grid gap-12 lg:grid-cols-12 lg:gap-8">
-              <div className="lg:col-span-8 lg:col-start-1">
+              <div className="min-w-0 lg:col-span-8 lg:col-start-1">
                 <p className="mb-14 max-w-4xl text-balance text-2xl leading-[1.35] tracking-[-0.02em] text-[var(--public-ink)] sm:text-3xl" itemProp="description">
                   {meta.excerpt}
                 </p>

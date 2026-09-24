@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { cn } from "./ui/utils";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
@@ -79,6 +80,15 @@ const markdownComponents = {
   ),
   hr: ({ node, ...props }: any) => <hr className="my-12 border-border" {...props} />,
   strong: ({ node, ...props }: any) => <strong className="text-foreground" {...props} />,
+  table: ({ node, ...props }: any) => (
+    <div className="mb-8 w-full overflow-x-auto rounded-2xl border border-border">
+      <table className="min-w-[760px] w-full table-fixed border-collapse text-left text-base text-foreground/85" {...props} />
+    </div>
+  ),
+  thead: ({ node, ...props }: any) => <thead className="bg-secondary text-foreground" {...props} />,
+  tr: ({ node, ...props }: any) => <tr className="border-b border-border last:border-b-0" {...props} />,
+  th: ({ node, ...props }: any) => <th className="break-words px-4 py-3 align-top font-semibold" {...props} />,
+  td: ({ node, ...props }: any) => <td className="break-words px-4 py-3 align-top leading-6" {...props} />,
   img: ({ node, ...props }: any) => {
     const rawSrc = typeof props.src === "string" ? props.src.trim() : "";
     const src = rawSrc || DEFAULT_FALLBACK_IMAGE_SRC;
@@ -144,6 +154,7 @@ export function MarkdownContent({
     >
       <ReactMarkdown
         components={components}
+        remarkPlugins={[remarkGfm]}
         urlTransform={(url) => /^media:[0-9a-f-]{36}$/i.test(url) ? url : defaultUrlTransform(url)}
       >{markdown}</ReactMarkdown>
     </div>
