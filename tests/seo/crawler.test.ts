@@ -50,7 +50,7 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   const servicePayload = {
     h1: "Проверка услуги", lead: "Описание задачи", problems: ["Ручная работа"], solutions: ["Автоматизация"], integrations: ["CRM"], technologies: ["TypeScript"], processSteps: [{ title: "Анализ", description: "Описание задачи" }], priceFactors: ["Объём задачи"], timeRange: "По согласованию", ctaTitle: "Обсудить", ctaText: "Расскажите о задаче", ctaType: "email", results: [{ title: "Решение", description: "Описание решения" }], guarantees: [{ title: "Условия", description: "По договору" }],
   } as const;
-  for (const [slug, title] of [["test-service", "Проверка услуги"], ["business-process-automation", "Автоматизация бизнес-процессов"]] as const) {
+  for (const [slug, title] of [["test-service", "Проверка услуги"], ["business-process-automation", "Автоматизация бизнес-процессов"], ["crm-development", "Разработка CRM"]] as const) {
     const serviceDraft = await service.saveDraft({ kind: "service", slug, title, seoTitle: title, seoDescription: `${title}: описание опубликованной страницы и её метаданных.`, bodyMd: "## Описание услуги\nТекст услуги для проверки SSR.", payload: servicePayload }, actor);
     await service.publishEntry(serviceDraft.id, serviceDraft.version, actor);
   }
