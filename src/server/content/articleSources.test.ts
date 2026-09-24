@@ -62,6 +62,27 @@ test("article source loader combines curated metadata with the matching markdown
   assert.equal(source.payload.coverUrl, "/cover.webp");
 });
 
+test("article source loader validates full fields only for requested legacy-catalog records", async t => {
+  const root = await articleFixture(
+    [validMetadata, {
+      slug: "unrelated-legacy-article",
+      lang: "ru",
+      title: "Старая статья",
+      excerpt: "Старое описание без отдельного SEO-поля.",
+      seoTitle: "Старая статья",
+      readTime: "3 мин",
+      tags: [],
+    }],
+    "# Описание бизнес-процессов\n\nПолный практический текст статьи.",
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const [source] = await loadArticleSources(["process-description"], root);
+
+  assert.equal(source.slug, "process-description");
+  assert.equal(source.seoDescription, validMetadata.seoDescription);
+});
+
 test("article source loader rejects an unknown requested slug", async t => {
   const root = await articleFixture(
     [validMetadata],
