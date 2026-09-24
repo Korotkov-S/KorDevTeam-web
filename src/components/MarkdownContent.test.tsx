@@ -51,7 +51,9 @@ test("renders GFM tables inside their own horizontal scroll container", () => {
   }
 
   assert.match(html, /overflow-x-auto/);
-  assert.match(html, /<table[^>]*table-fixed/);
+  assert.match(html, /<table[^>]*min-w-\[1120px\][^>]*table-auto[^>]*text-sm/);
   assert.match(html, /<th[^>]*>Шаг<\/th>/);
-  assert.match(html, /<td[^>]*break-words[^>]*>Получить заявку<\/td>/);
+  assert.match(html, /<td[^>]*whitespace-normal[^>]*>Получить заявку<\/td>/);
+  assert.doesNotMatch(html, /break-words/);
+  assert.doesNotMatch(html, /table-fixed/);
 });

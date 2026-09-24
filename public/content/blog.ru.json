@@ -115,19 +115,12 @@
     "title": "Описание бизнес-процессов: как подготовить процесс к автоматизации",
     "seoTitle": "Описание бизнес-процессов перед автоматизацией: этапы и пример",
     "seoDescription": "Как описать бизнес-процесс AS IS, найти потери, спроектировать TO BE и подготовить требования к автоматизации: этапы, таблица и практический пример.",
-    "coverUrl": "/blog/media/korotkovsStudio/1130-01.jpg",
-    "imageUrls": [
-      "/blog/media/korotkovsStudio/1130-01.jpg",
-      "/blog/media/korotkovsStudio/1130-02.jpg",
-      "/blog/media/korotkovsStudio/1130-03.jpg",
-      "/blog/media/korotkovsStudio/1130-04.jpg",
-      "/blog/media/korotkovsStudio/1130-05.jpg",
-      "/blog/media/korotkovsStudio/1130-06.jpg"
-    ],
+    "coverUrl": "",
+    "imageUrls": [],
     "excerpt": "Пошагово описываем бизнес-процесс AS IS, находим потери и готовим модель TO BE перед внедрением CRM, интеграции или заказной системы.",
     "date": "9 июля 2026",
     "updatedDate": "24 сентября 2026",
-    "readTime": "9 мин",
+    "readTime": "11 мин",
     "tags": [
       "Бизнес-процессы",
       "Автоматизация",

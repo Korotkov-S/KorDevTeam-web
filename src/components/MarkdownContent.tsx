@@ -82,13 +82,13 @@ const markdownComponents = {
   strong: ({ node, ...props }: any) => <strong className="text-foreground" {...props} />,
   table: ({ node, ...props }: any) => (
     <div className="mb-8 w-full overflow-x-auto rounded-2xl border border-border">
-      <table className="min-w-[760px] w-full table-fixed border-collapse text-left text-base text-foreground/85" {...props} />
+      <table className="min-w-[1120px] w-full table-auto border-collapse text-left text-sm text-foreground/85" {...props} />
     </div>
   ),
   thead: ({ node, ...props }: any) => <thead className="bg-secondary text-foreground" {...props} />,
   tr: ({ node, ...props }: any) => <tr className="border-b border-border last:border-b-0" {...props} />,
-  th: ({ node, ...props }: any) => <th className="break-words px-4 py-3 align-top font-semibold" {...props} />,
-  td: ({ node, ...props }: any) => <td className="break-words px-4 py-3 align-top leading-6" {...props} />,
+  th: ({ node, ...props }: any) => <th className="whitespace-normal break-normal px-3 py-3 align-top font-semibold" {...props} />,
+  td: ({ node, ...props }: any) => <td className="whitespace-normal break-normal px-3 py-3 align-top leading-5" {...props} />,
   img: ({ node, ...props }: any) => {
     const rawSrc = typeof props.src === "string" ? props.src.trim() : "";
     const src = rawSrc || DEFAULT_FALLBACK_IMAGE_SRC;
