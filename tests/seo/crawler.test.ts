@@ -47,10 +47,13 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   }
   const page = await service.saveDraft({ kind: "page", slug: "about-test", title: "О команде для проверки", seoTitle: "О команде для проверки", seoDescription: "Опубликованная страница команды для проверки карты сайта.", bodyMd: "Содержимое опубликованной страницы." }, actor);
   const published = await service.publishEntry(page.id, page.version, actor);
-  const serviceDraft = await service.saveDraft({ kind: "service", slug: "test-service", title: "Проверка услуги", seoTitle: "Проверка опубликованной услуги", seoDescription: "Описание услуги для проверки опубликованной страницы и её метаданных.", bodyMd: "## Описание услуги\nТекст услуги для проверки SSR.", payload: {
+  const servicePayload = {
     h1: "Проверка услуги", lead: "Описание задачи", problems: ["Ручная работа"], solutions: ["Автоматизация"], integrations: ["CRM"], technologies: ["TypeScript"], processSteps: [{ title: "Анализ", description: "Описание задачи" }], priceFactors: ["Объём задачи"], timeRange: "По согласованию", ctaTitle: "Обсудить", ctaText: "Расскажите о задаче", ctaType: "email", results: [{ title: "Решение", description: "Описание решения" }], guarantees: [{ title: "Условия", description: "По договору" }],
-  } }, actor);
-  await service.publishEntry(serviceDraft.id, serviceDraft.version, actor);
+  } as const;
+  for (const [slug, title] of [["test-service", "Проверка услуги"], ["business-process-automation", "Автоматизация бизнес-процессов"]] as const) {
+    const serviceDraft = await service.saveDraft({ kind: "service", slug, title, seoTitle: title, seoDescription: `${title}: описание опубликованной страницы и её метаданных.`, bodyMd: "## Описание услуги\nТекст услуги для проверки SSR.", payload: servicePayload }, actor);
+    await service.publishEntry(serviceDraft.id, serviceDraft.version, actor);
+  }
   const runtime = await startTestRuntime({ DATABASE_URL: databaseUrl });
   t.after(runtime.close);
   const getXml = async (pathname: string) => {
