@@ -37,6 +37,10 @@ function snapshotFromEditorData(data: EditorData): McpContentSnapshot {
 }
 
 export function createMcpContentService(admin: Pick<AdminContentService, "list" | "getEditorData" | "save" | "unpublish">) {
+  const getCurrent = async (id: string) => {
+    const { revisions: _revisions, ...current } = await admin.getEditorData(id);
+    return current;
+  };
   return {
     async list(input: McpContentListInput = {}) {
       const page = decodePage(input.cursor, input.limit);
@@ -45,11 +49,11 @@ export function createMcpContentService(admin: Pick<AdminContentService, "list" 
     },
 
     async get(selector: McpContentSelector) {
-      if (selector.id) return admin.getEditorData(selector.id);
+      if (selector.id) return getCurrent(selector.id);
       const candidates = await admin.list({ kind: selector.kind, q: selector.slug });
       const exact = candidates.find(candidate => candidate.kind === selector.kind && candidate.slug === selector.slug);
       if (!exact) throw new Error("content_not_found");
-      return admin.getEditorData(exact.id);
+      return getCurrent(exact.id);
     },
 
     createDraft(snapshot: McpContentSnapshot, actorId: string) {

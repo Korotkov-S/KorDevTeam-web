@@ -86,7 +86,9 @@ test("kind and slug lookup requires an exact slug match", async () => {
     async list() { return [entry({ id: "00000000-0000-4000-8000-000000000011", slug: "exact-article-extra" }), entry()]; },
     async getEditorData(id) { loadedId = id; return editorData(); },
   }));
-  assert.equal((await service.get({ kind: "article", slug: "exact-article" })).entry.id, ENTRY_ID);
+  const current = await service.get({ kind: "article", slug: "exact-article" });
+  assert.equal(current.entry.id, ENTRY_ID);
+  assert.equal("revisions" in current, false);
   assert.equal(loadedId, ENTRY_ID);
   await assert.rejects(() => service.get({ kind: "article", slug: "missing" }), /content_not_found/);
 });
