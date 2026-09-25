@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { isAdminPath } from "../../lib/adminPath";
 import { adminHeaders } from "./headers";
 import { createAdminIndexLoader } from "./index.server";
+import { meta as loginMeta } from "./login";
 import { createLoginAction, createLoginLoader } from "./login.server";
 import { createLoginCsrfCookie } from "./loginCsrf";
 
@@ -15,6 +16,10 @@ const principal = {
   csrfToken: "b".repeat(43),
   expiresAt: new Date("2026-09-17T21:00:00.000Z"),
 };
+
+test("login page has an explicit non-error browser title", () => {
+  assert.deepEqual(loginMeta(), [{ title: "Вход в админку | KorDevTeam" }]);
+});
 
 test("admin headers are private, non-indexable and nonce protected", () => {
   const headers = adminHeaders(nonce);

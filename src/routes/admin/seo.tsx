@@ -30,7 +30,8 @@ export type SeoAdminLoaderData = {
 
 const integer = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
-const frequencyLabels: Record<Frequency, string> = { high: "ВЧ", medium: "СЧ", low: "НЧ", unclassified: "Не классифицирован" };
+
+export function meta() { return [{ title: "SEO-мониторинг | KorDevTeam" }]; }
 
 function percent(value: number | null) { return value === null ? "—" : `${decimal.format(value * 100)}%`; }
 function position(value: number | null) { return value === null ? "—" : decimal.format(value); }

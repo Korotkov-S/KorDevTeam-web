@@ -5,6 +5,8 @@ export { action, headers, loader } from "./login.server";
 type LoginData = { loginCsrf: string; returnTo: string };
 type LoginActionData = { error?: string; login?: string; returnTo?: string; loginCsrf?: string };
 
+export function meta() { return [{ title: "Вход в админку | KorDevTeam" }]; }
+
 export default function AdminLogin() {
   const initial = useLoaderData<LoginData>();
   const result = useActionData<LoginActionData>();

@@ -6,7 +6,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 
 import type { AdminAuthConfig } from "../../server/auth/config";
 import { createAdminCookie } from "../../server/auth/cookie";
-import { AdminSeoDashboard, type SeoAdminLoaderData } from "./seo";
+import { AdminSeoDashboard, meta as seoMeta, type SeoAdminLoaderData } from "./seo";
 import { createSeoAdminAction, createSeoAdminLoader } from "./seo.server";
 
 const adminId = "00000000-0000-4000-8000-000000000001";
@@ -61,6 +61,10 @@ function renderDashboard(value: SeoAdminLoaderData) {
   const router = createMemoryRouter([{ path: "*", element: <AdminSeoDashboard data={value} csrfToken={csrf} /> }], { initialEntries: ["/admin/seo/"] });
   return renderToStaticMarkup(<RouterProvider router={router} />);
 }
+
+test("SEO dashboard has an explicit non-error browser title", () => {
+  assert.deepEqual(seoMeta(), [{ title: "SEO-мониторинг | KorDevTeam" }]);
+});
 
 test("SEO loader redirects unauthenticated users and accepts bounded shared filters", async () => {
   const unauthenticated = createSeoAdminLoader({ authenticate: async () => null }, service(), () => new Date("2026-09-25T10:00:00Z"));
