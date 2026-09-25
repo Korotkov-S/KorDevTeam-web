@@ -152,7 +152,7 @@ export function BlogPostPage({
   relatedArticles,
 }: {
   article: ArticlePresentation;
-  category: Pick<BlogCategoryDefinition, "slug" | "title">;
+  category: Pick<BlogCategoryDefinition, "slug" | "title"> | null;
   relatedArticles: BlogPostCardView[];
 }) {
   const { slug } = useParams<{ slug: string }>();
@@ -182,11 +182,25 @@ export function BlogPostPage({
   return (
     <main className="min-h-screen pt-20">
       <div className="mx-auto w-full max-w-[1320px] px-5 py-10 sm:px-8 lg:px-10 lg:py-16">
-        <nav aria-label="Хлебные крошки" className="flex flex-wrap items-center gap-2 text-sm text-[var(--public-subtle)]">
-          <Link to="/blog/" className="underline underline-offset-4">Блог</Link>
-          <span aria-hidden="true">→</span>
-          <Link to={blogCategoryPath(category.slug)} className="underline underline-offset-4">{category.title}</Link>
-        </nav>
+        {category ? (
+          <nav aria-label="Хлебные крошки" className="flex flex-wrap items-center gap-2 text-sm text-[var(--public-subtle)]">
+            <Link to="/blog/" className="underline underline-offset-4">Блог</Link>
+            <span aria-hidden="true">→</span>
+            <Link to={blogCategoryPath(category.slug)} className="underline underline-offset-4">{category.title}</Link>
+          </nav>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={(event) => {
+              event.preventDefault();
+              navigateGoBack();
+            }}
+            className="-ml-4 gap-2 rounded-full px-4 text-[var(--public-subtle)]"
+          >
+            <ArrowLeft className="size-4" />
+            {t("blog.backToBlog")}
+          </Button>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-20">

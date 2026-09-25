@@ -22,7 +22,6 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const entry = await getPublishedEntry("article", params.slug || "");
   if (!entry) throw new Response(null, { status: 404, headers: documentHeaders });
   const category = getBlogCategory(entry.payload.category);
-  if (!category) throw new Response(null, { status: 404, headers: documentHeaders });
   const relatedSlugs = Array.isArray(entry.payload.relatedArticleSlugs)
     ? entry.payload.relatedArticleSlugs.filter((slug): slug is string => typeof slug === "string")
     : [];

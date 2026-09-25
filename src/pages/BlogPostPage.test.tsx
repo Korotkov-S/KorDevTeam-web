@@ -165,6 +165,31 @@ test("article title can wrap an unbroken long word on a narrow screen", () => {
   assert.ok(title.classList.contains("break-words"));
 });
 
+test("a published legacy article without taxonomy remains readable", () => {
+  render(
+    <MemoryRouter initialEntries={["/blog/editorial/"]}>
+      <Routes>
+        <Route path="/blog/:slug/" element={<BlogPostPage article={{
+          title: "Материал из редактора",
+          excerpt: "Опубликован до введения категорий.",
+          bodyMd: "Основной текст.",
+          publishedAt: "2026-09-01T00:00:00.000Z",
+          readTime: "3 мин",
+          tags: [],
+          coverUrl: "",
+          imageUrls: [],
+          media: {},
+          category: null,
+        }} category={null} relatedArticles={[]} />}/>
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  assert.ok(screen.getByRole("heading", { name: "Материал из редактора", level: 1 }));
+  assert.equal(document.querySelector('nav[aria-label="Хлебные крошки"]'), null);
+  assert.ok(screen.getAllByRole("button", { name: "Вернуться к блогу" }).length >= 1);
+});
+
 const relatedArticles = ["related-one", "related-two", "related-three"].map((slug, index) => ({
   id: `related-${index}`,
   slug,
