@@ -10,7 +10,8 @@ export { meta } from "./home";
 
 export async function loader() {
   const seo: RouteSeoInput = { pathname: "/blog/", title: "Блог", description: "Статьи KorDevTeam про разработку веб-сервисов, CRM, мобильных приложений, автоматизацию бизнеса, интеграции и кейсы команды.", indexable: true, kind: "page" };
-  const entries = await listPublishedEntries("article");
+  const entries = (await listPublishedEntries("article"))
+    .filter(entry => entry.indexable);
   const media = await getEntryMediaMaps(entries.map(entry => entry.id));
   return data({ seo, posts: entries.map(entry => articleCard(entry, media[entry.id])) }, { headers: documentHeaders });
 }

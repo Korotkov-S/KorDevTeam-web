@@ -72,7 +72,8 @@ export async function importLegacyContent(options: MigrationOptions = {}) {
         seoTitle: text(row.seoTitle) || title.slice(0, 180),
         seoDescription: (text(row.seoDescription) || excerpt || plain(bodyMd) || title).slice(0, 320),
         payload: kind === "article" ? { h1: title, tags: row.tags ?? [],
-          coverUrl: row.coverUrl ?? (Array.isArray(imageUrls) ? imageUrls[0] ?? "" : ""), imageUrls, readTime: row.readTime ?? "" } : { h1: title },
+          coverUrl: row.coverUrl ?? (Array.isArray(imageUrls) ? imageUrls[0] ?? "" : ""), imageUrls, readTime: row.readTime ?? "",
+          category: row.category, relatedArticleSlugs: row.relatedArticleSlugs } : { h1: title },
       } as SaveContentCommand);
       validatePublication(command as ContentEntry);
       const publishedAt = historicalDate(row.date) ?? historicalDate(row.createdAtMs);

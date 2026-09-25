@@ -25,6 +25,7 @@ export default [
   route("privacy/", "routes/legal.tsx", { id: "privacy" }),
   route(":slug/", "routes/content-page.tsx", { id: "content-page" }),
   route("blog/", "routes/blog-index.tsx"),
+  route("blog/category/:category/", "routes/blog-category.tsx"),
   route("blog/:slug/", "routes/blog-post.tsx"),
   route("cases/:slug/", "routes/case.tsx"),
   route("project/:slug/", "routes/legacy-project.tsx"),

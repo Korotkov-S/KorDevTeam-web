@@ -13,7 +13,7 @@ export async function loader() {
   const [services, cases, articles] = await Promise.all([
     listPublishedEntries("service"), listPublishedEntries("case"), listPublishedEntries("article"),
   ]);
-  const selectedArticles = [...articles].sort((left, right) =>
+  const selectedArticles = articles.filter(entry => entry.indexable).sort((left, right) =>
     (right.publishedAt?.getTime() ?? 0) - (left.publishedAt?.getTime() ?? 0) || left.slug.localeCompare(right.slug),
   ).slice(0, 3);
   const media = await getEntryMediaMaps([...selectedArticles, ...cases].map(entry => entry.id));

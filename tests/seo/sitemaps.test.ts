@@ -36,3 +36,43 @@ test("each child sitemap accepts 50000 unique URLs and refuses overflow rather t
   assert.equal(load(buildPagesSitemap(pages), { xml: true })("url").length, 50_000);
   assert.throws(() => buildPagesSitemap([...pages, { ...entry, kind: "page", slug: "overflow" }]), /sitemap_url_limit_exceeded/);
 });
+
+test("blog sitemap emits each non-empty category once with its newest article date", () => {
+  const base: ContentEntry = {
+    id: "00000000-0000-4000-8000-000000000001",
+    kind: "article",
+    slug: "older-crm",
+    status: "published",
+    title: "CRM",
+    excerpt: "Описание",
+    bodyMd: "Текст",
+    seoTitle: "CRM",
+    seoDescription: "Описание",
+    manualCanonicalPath: null,
+    indexable: true,
+    ogMediaId: null,
+    payload: { category: "crm-sales" },
+    version: 2,
+    publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+  };
+  const newerCrm = {
+    ...base,
+    id: "00000000-0000-4000-8000-000000000002",
+    slug: "newer-crm",
+    updatedAt: new Date("2026-02-03T04:05:06.000Z"),
+  };
+  const aiArticle = {
+    ...base,
+    id: "00000000-0000-4000-8000-000000000003",
+    slug: "ai-article",
+    payload: { category: "ai-for-business" },
+  };
+  const sitemap = buildBlogSitemap([base, newerCrm, aiArticle]);
+
+  assert.match(sitemap, /https:\/\/kordev\.team\/blog\/category\/crm-sales\//);
+  assert.match(sitemap, new RegExp(newerCrm.updatedAt.toISOString()));
+  assert.equal((sitemap.match(/\/blog\/category\/crm-sales\//g) ?? []).length, 1);
+  assert.equal((sitemap.match(/\/blog\/category\/ai-for-business\//g) ?? []).length, 1);
+});

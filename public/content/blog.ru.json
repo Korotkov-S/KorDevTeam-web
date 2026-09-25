@@ -18,7 +18,13 @@
       "Предпроектное обследование",
       "Дорожная карта"
     ],
-    "mtimeMs": 1788806029712.2832
+    "mtimeMs": 1788806029712.2832,
+    "category": "it-project-management",
+    "relatedArticleSlugs": [
+      "government-contractors-guide",
+      "argumentation-guide",
+      "business-processes-before-automation"
+    ]
   },
   {
     "slug": "technical-support-debt-time-tracking",
@@ -41,7 +47,13 @@
       "Оплата услуг",
       "Управление проектами"
     ],
-    "mtimeMs": 1788806029460.5127
+    "mtimeMs": 1788806029460.5127,
+    "category": "technical-support",
+    "relatedArticleSlugs": [
+      "wordpress-optimization",
+      "krasotulya-telegram-138",
+      "krasotulya-telegram-130"
+    ]
   },
   {
     "slug": "ai-ops-business-automation-audit",
@@ -62,7 +74,13 @@
       "Мониторинг",
       "AI-автоматизация"
     ],
-    "mtimeMs": 1788805581947.1804
+    "mtimeMs": 1788805581947.1804,
+    "category": "ai-for-business",
+    "relatedArticleSlugs": [
+      "ai-business-strategy-without-hype",
+      "krasotulya-telegram-116",
+      "business-automation-without-custom-development"
+    ]
   },
   {
     "slug": "long-b2b-sales-cycle-crm",
@@ -84,7 +102,13 @@
       "Работа с клиентами",
       "Управление продажами"
     ],
-    "mtimeMs": 1788806029584.8716
+    "mtimeMs": 1788806029584.8716,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-122",
+      "krasotulya-telegram-109",
+      "crm-implementation"
+    ]
   },
   {
     "slug": "max-comments-business-process",
@@ -106,7 +130,13 @@
       "Модерация",
       "Интеграции"
     ],
-    "mtimeMs": 1784034957273.8223
+    "mtimeMs": 1784034957273.8223,
+    "category": "business-automation",
+    "relatedArticleSlugs": [
+      "business-processes-before-automation",
+      "business-automation",
+      "telegram-broadcast-automation"
+    ]
   },
   {
     "slug": "business-processes-before-automation",
@@ -127,7 +157,13 @@
       "CRM",
       "IT-консалтинг"
     ],
-    "mtimeMs": 1784034967962.8635
+    "mtimeMs": 1784034967962.8635,
+    "category": "business-automation",
+    "relatedArticleSlugs": [
+      "business-automation",
+      "business-automation-without-custom-development",
+      "stone-calculator-automation"
+    ]
   },
   {
     "slug": "business-automation-without-custom-development",
@@ -148,7 +184,13 @@
       "Интеграции",
       "Стоимость владения"
     ],
-    "mtimeMs": 1784034957022.0793
+    "mtimeMs": 1784034957022.0793,
+    "category": "business-automation",
+    "relatedArticleSlugs": [
+      "business-processes-before-automation",
+      "business-automation",
+      "software-development-to-it-consulting"
+    ]
   },
   {
     "slug": "offline-packaging-for-it-studio",
@@ -174,7 +216,13 @@
       "Аналитика",
       "IT-студия"
     ],
-    "mtimeMs": 1784034957393.1223
+    "mtimeMs": 1784034957393.1223,
+    "category": "it-project-management",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-111",
+      "long-b2b-sales-cycle-crm",
+      "argumentation-guide"
+    ]
   },
   {
     "slug": "ai-business-strategy-without-hype",
@@ -195,7 +243,13 @@
       "Автоматизация",
       "Пилот"
     ],
-    "mtimeMs": 1784034957762.5957
+    "mtimeMs": 1784034957762.5957,
+    "category": "ai-for-business",
+    "relatedArticleSlugs": [
+      "ai-ops-business-automation-audit",
+      "krasotulya-telegram-116",
+      "business-processes-before-automation"
+    ]
   },
   {
     "slug": "krasotulya-telegram-140",
@@ -216,7 +270,13 @@
       "сервисный бизнес",
       "автоматизация"
     ],
-    "mtimeMs": 1784032296931.8008
+    "mtimeMs": 1784032296931.8008,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "crm-implementation",
+      "krasotulya-online-booking",
+      "krasotulya-telegram-120"
+    ]
   },
   {
     "slug": "krasotulya-telegram-139",
@@ -240,7 +300,13 @@
       "Архитектура",
       "Модули"
     ],
-    "mtimeMs": 1784032296934.0002
+    "mtimeMs": 1784032296934.0002,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "react-native-best-practices",
+      "krasotulya-telegram-140",
+      "krasotulya-telegram-108"
+    ]
   },
   {
     "slug": "krasotulya-telegram-138",
@@ -264,7 +330,13 @@
       "Сеть",
       "ТСПУ"
     ],
-    "mtimeMs": 1784032296934.657
+    "mtimeMs": 1784032296934.657,
+    "category": "technical-support",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-130",
+      "wordpress-optimization",
+      "technical-support-debt-time-tracking"
+    ]
   },
   {
     "slug": "krasotulya-telegram-130",
@@ -289,7 +361,13 @@
       "DNS",
       "Безопасность"
     ],
-    "mtimeMs": 1784032296935.9712
+    "mtimeMs": 1784032296935.9712,
+    "category": "technical-support",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-138",
+      "wordpress-optimization",
+      "technical-support-debt-time-tracking"
+    ]
   },
   {
     "slug": "krasotulya-telegram-122",
@@ -313,7 +391,13 @@
       "Автоматизация",
       "Krasotula CRM"
     ],
-    "mtimeMs": 1784032296928.9243
+    "mtimeMs": 1784032296928.9243,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "long-b2b-sales-cycle-crm",
+      "krasotulya-telegram-111",
+      "krasotulya-telegram-109"
+    ]
   },
   {
     "slug": "krasotulya-telegram-121",
@@ -334,7 +418,13 @@
       "аналитика продаж",
       "Krasotula"
     ],
-    "mtimeMs": 1784032296931.4856
+    "mtimeMs": 1784032296931.4856,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "crm-implementation",
+      "krasotulya-telegram-109",
+      "long-b2b-sales-cycle-crm"
+    ]
   },
   {
     "slug": "krasotulya-telegram-120",
@@ -358,7 +448,13 @@
       "Продажи",
       "Клиенты"
     ],
-    "mtimeMs": 1784032296929.3533
+    "mtimeMs": 1784032296929.3533,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-140",
+      "krasotulya-problem-1-data-fragmentation",
+      "crm-implementation"
+    ]
   },
   {
     "slug": "krasotulya-telegram-119",
@@ -382,7 +478,13 @@
       "Управление командой",
       "Krasotula CRM"
     ],
-    "mtimeMs": 1784032296929.9336
+    "mtimeMs": 1784032296929.9336,
+    "category": "it-project-management",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-105",
+      "krasotulya-telegram-107",
+      "krasotulya-telegram-109"
+    ]
   },
   {
     "slug": "krasotulya-telegram-118",
@@ -406,7 +508,13 @@
       "Рассылки",
       "Krasotula CRM"
     ],
-    "mtimeMs": 1784032296929.646
+    "mtimeMs": 1784032296929.646,
+    "category": "business-automation",
+    "relatedArticleSlugs": [
+      "telegram-broadcast-automation",
+      "krasotulya-problem-4-email-campaigns",
+      "krasotulya-telegram-108"
+    ]
   },
   {
     "slug": "krasotulya-telegram-117",
@@ -428,7 +536,13 @@
       "Продажи",
       "Krasotula CRM"
     ],
-    "mtimeMs": 1784032296934.3284
+    "mtimeMs": 1784032296934.3284,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-120",
+      "krasotulya-telegram-105",
+      "krasotulya-telegram-109"
+    ]
   },
   {
     "slug": "krasotulya-telegram-116",
@@ -452,7 +566,13 @@
       "VK",
       "Автоматизация"
     ],
-    "mtimeMs": 1784032296935.6118
+    "mtimeMs": 1784032296935.6118,
+    "category": "ai-for-business",
+    "relatedArticleSlugs": [
+      "ai-business-strategy-without-hype",
+      "ai-ops-business-automation-audit",
+      "krasotulya-telegram-108"
+    ]
   },
   {
     "slug": "krasotulya-telegram-115",
@@ -476,7 +596,13 @@
       "38-ФЗ",
       "CRM"
     ],
-    "mtimeMs": 1784032242820.121
+    "mtimeMs": 1784032242820.121,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-problem-4-email-campaigns",
+      "telegram-broadcast-automation",
+      "krasotulya-telegram-118"
+    ]
   },
   {
     "slug": "krasotulya-telegram-112",
@@ -501,7 +627,13 @@
       "Krasotula CRM",
       "Сервис"
     ],
-    "mtimeMs": 1784032242818.479
+    "mtimeMs": 1784032242818.479,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-problem-4-email-campaigns",
+      "long-b2b-sales-cycle-crm",
+      "krasotulya-telegram-122"
+    ]
   },
   {
     "slug": "krasotulya-telegram-111",
@@ -525,7 +657,13 @@
       "Follow-up",
       "Бьюти-бизнес"
     ],
-    "mtimeMs": 1784032239878.5366
+    "mtimeMs": 1784032239878.5366,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-122",
+      "offline-packaging-for-it-studio",
+      "krasotulya-telegram-110"
+    ]
   },
   {
     "slug": "krasotulya-telegram-110",
@@ -549,7 +687,13 @@
       "Выставки",
       "Автоматизация"
     ],
-    "mtimeMs": 1784032239877.643
+    "mtimeMs": 1784032239877.643,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-109",
+      "krasotulya-telegram-119",
+      "krasotulya-telegram-105"
+    ]
   },
   {
     "slug": "krasotulya-telegram-109",
@@ -573,7 +717,13 @@
       "Krasotula CRM",
       "Продажи"
     ],
-    "mtimeMs": 1784032239877.149
+    "mtimeMs": 1784032239877.149,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "long-b2b-sales-cycle-crm",
+      "krasotulya-telegram-121",
+      "krasotulya-telegram-110"
+    ]
   },
   {
     "slug": "krasotulya-telegram-108",
@@ -597,7 +747,13 @@
       "Омниканальность",
       "Клиентский сервис"
     ],
-    "mtimeMs": 1784032239875.271
+    "mtimeMs": 1784032239875.271,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-116",
+      "telegram-broadcast-automation",
+      "krasotulya-telegram-140"
+    ]
   },
   {
     "slug": "krasotulya-telegram-107",
@@ -621,7 +777,13 @@
       "CRM",
       "Krasotula"
     ],
-    "mtimeMs": 1784032239873.7727
+    "mtimeMs": 1784032239873.7727,
+    "category": "it-project-management",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-105",
+      "krasotulya-telegram-119",
+      "software-development-to-it-consulting"
+    ]
   },
   {
     "slug": "krasotulya-telegram-105",
@@ -646,7 +808,13 @@
       "Управление задачами",
       "Krasotula"
     ],
-    "mtimeMs": 1784032239869.7666
+    "mtimeMs": 1784032239869.7666,
+    "category": "it-project-management",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-119",
+      "krasotulya-telegram-107",
+      "technical-support-debt-time-tracking"
+    ]
   },
   {
     "slug": "krasotulya-online-booking",
@@ -669,7 +837,13 @@
       "сервисный бизнес",
       "Krasotula"
     ],
-    "mtimeMs": 1780584409040.593
+    "mtimeMs": 1780584409040.593,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "crm-implementation",
+      "krasotulya-telegram-140",
+      "krasotulya-problem-1-data-fragmentation"
+    ]
   },
   {
     "slug": "krasotulya-landing-launch",
@@ -693,7 +867,13 @@
       "Регистрация",
       "Аналитика"
     ],
-    "mtimeMs": 1780584409040.0508
+    "mtimeMs": 1780584409040.0508,
+    "category": "digital-products",
+    "relatedArticleSlugs": [
+      "krasotulya-crm-launch",
+      "krasotulya-telegram-139",
+      "harmonize-me-story"
+    ]
   },
   {
     "slug": "krasotulya-problem-4-email-campaigns",
@@ -716,7 +896,13 @@
       "Повторные продажи",
       "Krasotula CRM"
     ],
-    "mtimeMs": 1780584409042.2156
+    "mtimeMs": 1780584409042.2156,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-112",
+      "krasotulya-telegram-115",
+      "telegram-broadcast-automation"
+    ]
   },
   {
     "slug": "krasotulya-crm-launch",
@@ -739,7 +925,13 @@
       "Krasotula CRM",
       "Автоматизация"
     ],
-    "mtimeMs": 1780584409039.2302
+    "mtimeMs": 1780584409039.2302,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-140",
+      "krasotulya-landing-launch",
+      "crm-implementation"
+    ]
   },
   {
     "slug": "krasotulya-problem-1-data-fragmentation",
@@ -762,7 +954,13 @@
       "Интеграции",
       "Krasotula CRM"
     ],
-    "mtimeMs": 1780584409041.2224
+    "mtimeMs": 1780584409041.2224,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "crm-implementation",
+      "krasotulya-telegram-120",
+      "krasotulya-telegram-140"
+    ]
   },
   {
     "slug": "react-native-best-practices",
@@ -785,7 +983,13 @@
       "Производительность",
       "Архитектура приложений"
     ],
-    "mtimeMs": 1780584409045.067
+    "mtimeMs": 1780584409045.067,
+    "category": "digital-products",
+    "relatedArticleSlugs": [
+      "nodejs-microservices",
+      "laravel-api-development",
+      "krasotulya-telegram-139"
+    ]
   },
   {
     "slug": "business-automation",
@@ -809,7 +1013,13 @@
       "Telegram",
       "личный кабинет"
     ],
-    "mtimeMs": 1784032227582.9248
+    "mtimeMs": 1784032227582.9248,
+    "category": "business-automation",
+    "relatedArticleSlugs": [
+      "business-processes-before-automation",
+      "business-automation-without-custom-development",
+      "stone-calculator-automation"
+    ]
   },
   {
     "slug": "nodejs-microservices",
@@ -832,7 +1042,13 @@
       "Распределённые системы",
       "Backend"
     ],
-    "mtimeMs": 1780584409044.1733
+    "mtimeMs": 1780584409044.1733,
+    "category": "digital-products",
+    "relatedArticleSlugs": [
+      "laravel-api-development",
+      "sims-dynasty-tree-platform",
+      "harmonize-me-platform"
+    ]
   },
   {
     "slug": "crm-implementation",
@@ -853,7 +1069,13 @@
       "интеграции",
       "клиентская база"
     ],
-    "mtimeMs": 1784032227585.3113
+    "mtimeMs": 1784032227585.3113,
+    "category": "crm-sales",
+    "relatedArticleSlugs": [
+      "krasotulya-problem-1-data-fragmentation",
+      "krasotulya-telegram-121",
+      "krasotulya-online-booking"
+    ]
   },
   {
     "slug": "wordpress-optimization",
@@ -876,7 +1098,13 @@
       "Core Web Vitals",
       "SEO"
     ],
-    "mtimeMs": 1784032296935.3083
+    "mtimeMs": 1784032296935.3083,
+    "category": "technical-support",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-138",
+      "krasotulya-telegram-130",
+      "technical-support-debt-time-tracking"
+    ]
   },
   {
     "slug": "laravel-api-development",
@@ -899,7 +1127,13 @@
       "API Development",
       "Интеграции"
     ],
-    "mtimeMs": 1780584409043.2083
+    "mtimeMs": 1780584409043.2083,
+    "category": "digital-products",
+    "relatedArticleSlugs": [
+      "nodejs-microservices",
+      "harmonize-me-platform",
+      "sims-dynasty-tree-platform"
+    ]
   },
   {
     "slug": "stone-calculator-automation",
@@ -922,7 +1156,13 @@
       "смета",
       "веб-сервис"
     ],
-    "mtimeMs": 1784032296933.6238
+    "mtimeMs": 1784032296933.6238,
+    "category": "business-automation",
+    "relatedArticleSlugs": [
+      "business-processes-before-automation",
+      "business-automation",
+      "business-automation-without-custom-development"
+    ]
   },
   {
     "slug": "telegram-broadcast-automation",
@@ -945,7 +1185,13 @@
       "Сегментация клиентов",
       "Автоматизация"
     ],
-    "mtimeMs": 1784032296932.4617
+    "mtimeMs": 1784032296932.4617,
+    "category": "business-automation",
+    "relatedArticleSlugs": [
+      "krasotulya-telegram-118",
+      "krasotulya-problem-4-email-campaigns",
+      "krasotulya-telegram-108"
+    ]
   },
   {
     "slug": "government-contractors-guide",
@@ -968,7 +1214,13 @@
       "Управление IT-проектами",
       "Приёмка"
     ],
-    "mtimeMs": 1784032232172.5261
+    "mtimeMs": 1784032232172.5261,
+    "category": "it-project-management",
+    "relatedArticleSlugs": [
+      "argumentation-guide",
+      "software-development-to-it-consulting",
+      "business-processes-before-automation"
+    ]
   },
   {
     "slug": "argumentation-guide",
@@ -991,7 +1243,13 @@
       "IT-проекты",
       "Работа с возражениями"
     ],
-    "mtimeMs": 1784032227580.671
+    "mtimeMs": 1784032227580.671,
+    "category": "it-project-management",
+    "relatedArticleSlugs": [
+      "government-contractors-guide",
+      "long-b2b-sales-cycle-crm",
+      "software-development-to-it-consulting"
+    ]
   },
   {
     "slug": "harmonize-me-story",
@@ -1014,7 +1272,13 @@
       "Геймификация",
       "HarmonizeME"
     ],
-    "mtimeMs": 1780584409037.7744
+    "mtimeMs": 1780584409037.7744,
+    "category": "digital-products",
+    "relatedArticleSlugs": [
+      "harmonize-me-platform",
+      "business-automation-without-custom-development",
+      "sims-dynasty-tree-platform"
+    ]
   },
   {
     "slug": "sims-dynasty-tree-platform",
@@ -1037,7 +1301,13 @@
       "The Sims",
       "Next.js"
     ],
-    "mtimeMs": 1780584409046.1812
+    "mtimeMs": 1780584409046.1812,
+    "category": "digital-products",
+    "relatedArticleSlugs": [
+      "harmonize-me-platform",
+      "nodejs-microservices",
+      "react-native-best-practices"
+    ]
   },
   {
     "slug": "harmonize-me-platform",
@@ -1060,6 +1330,12 @@
       "Личный кабинет",
       "Платежи"
     ],
-    "mtimeMs": 1780584409035.5957
+    "mtimeMs": 1780584409035.5957,
+    "category": "digital-products",
+    "relatedArticleSlugs": [
+      "harmonize-me-story",
+      "nodejs-microservices",
+      "laravel-api-development"
+    ]
   }
 ]

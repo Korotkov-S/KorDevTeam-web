@@ -36,6 +36,7 @@ test("blog cards preserve ordered media and SSR article microdata", () => {
     date: "2026-09-18",
     readTime: "7 мин",
     tags: ["Практика"],
+    category: "digital-products",
     coverUrl: "/cover.webp",
     imageUrls: ["/inside-1.webp", "inside-2.webp"],
   }]} /></StaticRouter>);
@@ -60,6 +61,7 @@ test("blog cards preserve ordered media and SSR article microdata", () => {
 test("all repository multi-image articles expose every distinct source image in order", async () => {
   const source = JSON.parse(await readFile("public/content/blog.ru.json", "utf8")) as Array<{
     slug: string; title: string; excerpt: string; date: string; readTime: string; tags: string[];
+    category: "business-automation" | "crm-sales" | "digital-products" | "technical-support" | "ai-for-business" | "it-project-management";
     coverUrl: string; imageUrls: string[];
   }>;
   const posts = source.filter(post => post.imageUrls.length > 1).map(post => ({ ...post, id: post.slug }));
@@ -76,4 +78,67 @@ test("all repository multi-image articles expose every distinct source image in 
       post.slug,
     );
   }
+});
+
+const categoryPosts = [
+  ["business-automation", "Автоматизация"],
+  ["crm-sales", "CRM"],
+  ["digital-products", "Продукты"],
+  ["technical-support", "Поддержка"],
+  ["ai-for-business", "ИИ"],
+  ["it-project-management", "Проекты"],
+].map(([category, title], index) => ({
+  id: `article-${index}`,
+  slug: `article-${index}`,
+  title,
+  excerpt: `Описание статьи ${index}`,
+  date: `2026-09-${String(index + 10).padStart(2, "0")}`,
+  readTime: "5 мин",
+  tags: ["Практика"],
+  category,
+}));
+
+test("blog index exposes every category as an SSR link with counts", () => {
+  const markup = renderToStaticMarkup(
+    <StaticRouter location="/blog/">
+      <Blog mode="index" posts={categoryPosts} />
+    </StaticRouter>,
+  );
+  const ssr = new JSDOM(markup).window.document;
+
+  assert.equal(ssr.querySelectorAll('nav[aria-label="Категории блога"] a').length, 6);
+  assert.equal(
+    ssr.querySelector('a[href="/blog/category/crm-sales/"] [data-category-count]')?.textContent,
+    "1",
+  );
+});
+
+test("category mode renders all supplied articles without pagination", () => {
+  const posts = Array.from({ length: 18 }, (_, index) => ({
+    id: `crm-${index}`,
+    slug: `crm-${index}`,
+    title: `CRM-статья ${index + 1}`,
+    excerpt: "Практический материал о CRM.",
+    date: `2026-08-${String((index % 28) + 1).padStart(2, "0")}`,
+    readTime: "6 мин",
+    tags: ["CRM"],
+    category: "crm-sales",
+  }));
+  const markup = renderToStaticMarkup(
+    <StaticRouter location="/blog/category/crm-sales/">
+      <Blog
+        mode="category"
+        posts={posts}
+        heading={{
+          eyebrow: "Категория блога",
+          title: "CRM и управление продажами",
+          description: "Материалы о заявках, сделках и повторных касаниях.",
+        }}
+      />
+    </StaticRouter>,
+  );
+  const ssr = new JSDOM(markup).window.document;
+
+  assert.equal(ssr.querySelectorAll('article[itemtype="https://schema.org/BlogPosting"]').length, 18);
+  assert.equal(ssr.querySelector('nav[aria-label="Навигация по страницам"]'), null);
 });

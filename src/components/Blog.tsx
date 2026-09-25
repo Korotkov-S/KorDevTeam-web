@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,77 +14,29 @@ import {
   buildPaginationItems,
   getBlogPageHref,
   normalizeBlogPage,
-  parseBlogDate,
-  formatBlogDate,
   sortBlogPostsByDate,
 } from "../lib/blogPresentation.mjs";
-import type { ContentCardView } from "../server/content/types";
-import { ContentCard } from "./public/ContentCard";
 import { Section, SectionHeading } from "./public/Section";
+import { BlogCard, type BlogPostCardView } from "./BlogCard";
+import { BlogCategoryNav } from "./BlogCategoryNav";
+import type { BlogCategorySlug } from "../lib/blogCategories";
 
-export interface BlogPost {
-  id: string;
-  title: string;
-  excerpt: string;
-  date: string;
-  readTime: string;
-  tags: string[];
-  slug: string;
-  coverUrl?: string;
-  imageUrls?: string[];
-}
-
-function normalizePublicAssetUrl(url: string | undefined): string {
-  const s = String(url || "").trim();
-  if (!s) return "";
-  if (s.startsWith("data:")) return s;
-  if (/^https?:\/\//i.test(s)) return s;
-  if (s.startsWith("/")) return s;
-  return `/${s.replace(/^\.\//, "")}`;
-}
-
-function blogMedia(post: BlogPost, fallbackSrc: string) {
-  const urls = [...new Set(
-    [post.coverUrl, ...(post.imageUrls ?? [])]
-      .map(normalizePublicAssetUrl)
-      .filter(Boolean),
-  )];
-  const sources = urls.length > 0 ? urls : [normalizePublicAssetUrl(fallbackSrc)];
-  return sources.map((src, index) => ({
-    id: `blog:${post.id}:${index}`,
-    src,
-    srcSet: "",
-    sizes: "(min-width: 768px) 33vw, 100vw",
-    alt: index === 0 ? post.title : `${post.title} — изображение ${index + 1}`,
-    decorative: false,
-    width: null,
-    height: null,
-  }));
-}
-
-function blogContentCard(post: BlogPost, images: ReturnType<typeof blogMedia>): ContentCardView {
-  return {
-    slug: post.slug,
-    title: post.title,
-    summary: post.excerpt,
-    tags: post.tags ?? [],
-    image: images[0] ?? null,
-  };
-}
-
-function getBlogDateTime(value: string): string | undefined {
-  const timestamp = parseBlogDate(value);
-  return timestamp === null ? undefined : new Date(timestamp).toISOString();
-}
+export type BlogHeading = { eyebrow?: string; title: string; description?: string };
 
 export function Blog({
   withId = true,
   mode = "index",
   posts = [],
+  heading,
+  serviceLink,
+  breadcrumbs,
 }: {
   withId?: boolean;
-  mode?: "preview" | "index";
-  posts?: BlogPost[];
+  mode?: "preview" | "index" | "category";
+  posts?: BlogPostCardView[];
+  heading?: BlogHeading;
+  serviceLink?: { href: string; label: string };
+  breadcrumbs?: ReactNode;
 } = {}) {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -95,7 +47,7 @@ export function Blog({
   const postsResolved = true;
 
   const sortedPosts = useMemo(
-    () => sortBlogPostsByDate(blogPosts) as BlogPost[],
+    () => sortBlogPostsByDate(blogPosts) as BlogPostCardView[],
     [blogPosts],
   );
   const totalPages = Math.max(1, Math.ceil(sortedPosts.length / postsPerPage));
@@ -104,7 +56,11 @@ export function Blog({
     mode === "index" ? normalizeBlogPage(requestedPage, totalPages) : 1;
   const startIndex = (currentPage - 1) * postsPerPage;
   const endIndex = startIndex + postsPerPage;
-  const currentPosts = sortedPosts.slice(startIndex, endIndex);
+  const currentPosts = mode === "category" ? sortedPosts : sortedPosts.slice(startIndex, endIndex);
+  const categoryCounts = sortedPosts.reduce<Partial<Record<BlogCategorySlug, number>>>((counts, post) => {
+    if (post.category) counts[post.category] = (counts[post.category] ?? 0) + 1;
+    return counts;
+  }, {});
 
   useEffect(() => {
     if (mode !== "index" || !postsResolved) return;
@@ -153,37 +109,45 @@ export function Blog({
     "/projects/harmonizeMe.png",
     "/projects/sims.png",
   ];
+  const resolvedHeading = heading ?? {
+    eyebrow: t("blog.title"),
+    title: t("blog.title"),
+    description: t("blog.subtitle"),
+  };
   return (
     <Section id={withId ? "blog" : undefined} className="scroll-mt-20 pt-32 lg:pt-36">
       <div ref={sectionRef} tabIndex={-1} itemScope itemType="https://schema.org/Blog">
         <meta itemProp="name" content={t("blog.title")} />
         <meta itemProp="description" content={t("blog.subtitle")} />
+        {breadcrumbs}
         <div className="mb-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <SectionHeading
-            level={mode === "index" ? 1 : 2}
-            eyebrow={t("blog.title")}
-            title={t("blog.title")}
-            description={t("blog.subtitle")}
+            level={mode === "preview" ? 2 : 1}
+            eyebrow={resolvedHeading.eyebrow}
+            title={resolvedHeading.title}
+            description={resolvedHeading.description}
           />
           {mode === "preview" && (
             <Link to="/blog/" className="font-semibold text-[var(--public-blue)] underline underline-offset-4">
               {t("blog.allArticles")} →
             </Link>
           )}
+          {mode === "category" && serviceLink ? (
+            <Link to={serviceLink.href} className="font-semibold text-[var(--public-blue)] underline underline-offset-4">
+              {serviceLink.label} →
+            </Link>
+          ) : null}
         </div>
+
+        {mode === "index" ? <BlogCategoryNav counts={categoryCounts} /> : null}
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" itemScope itemType="https://schema.org/ItemList">
           {currentPosts.map((post, index) => {
-            const images = blogMedia(post, postCardImageBySlug[post.slug] ?? cardImages[index % cardImages.length]);
-            return <ContentCard
+            return <BlogCard
               key={post.id}
-              post={blogContentCard(post, images)}
-              images={images}
-              meta={<><time dateTime={getBlogDateTime(post.date)} itemProp="datePublished">{formatBlogDate(post.date)}</time>{post.readTime ? ` · ${post.readTime}` : null}</>}
+              post={post}
+              fallbackSrc={postCardImageBySlug[post.slug] ?? cardImages[index % cardImages.length]}
               actionLabel={t("blog.readMore")}
-              schemaType="https://schema.org/BlogPosting"
-              schemaItemProp="itemListElement"
-              canonicalUrl={`https://kordev.team/blog/${post.slug}/`}
             />;
           })}
         </div>

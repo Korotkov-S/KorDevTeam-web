@@ -3,6 +3,7 @@ import type { ArticlePresentation } from "../../pages/BlogPostPage";
 import type { Project } from "../../pages/ProjectPage";
 import type { RouteSeoInput } from "../seo/metadata";
 import type { MediaPresentationMap } from "../media/presentation";
+import { isBlogCategorySlug } from "../../lib/blogCategories";
 
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 const text = (value: unknown) => typeof value === "string" ? value : "";
@@ -96,6 +97,7 @@ export function articlePresentation(entry: ContentEntry, media: MediaPresentatio
   return { title: text(entry.payload.h1) || entry.title, excerpt: entry.excerpt, bodyMd: entry.bodyMd,
     publishedAt: entry.publishedAt?.toISOString(), updatedAt: entry.updatedAt.toISOString(),
     readTime: text(entry.payload.readTime), tags: strings(entry.payload.tags),
+    category: isBlogCategorySlug(entry.payload.category) ? entry.payload.category : null,
     coverUrl: mediaUrl(text(entry.payload.coverUrl), media), imageUrls: strings(entry.payload.imageUrls).map(value => mediaUrl(value, media)), media };
 }
 

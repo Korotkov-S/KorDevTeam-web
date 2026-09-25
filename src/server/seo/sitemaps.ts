@@ -1,4 +1,5 @@
 import type { ContentEntry } from "../content/service";
+import { BLOG_CATEGORIES, blogCategoryPath, isBlogCategorySlug } from "../../lib/blogCategories";
 import { canonicalUrl, SITE_ORIGIN } from "./metadata";
 import { staticContentDates } from "./staticContentDates";
 
@@ -33,6 +34,26 @@ export function buildSitemapIndex(): string {
 export function buildPagesSitemap(entries: ContentEntry[]): string {
   return urlset([...Object.entries(staticContentDates).map(([pathname, lastmod]) => ({ loc: canonicalUrl({ pathname }), lastmod })), ...recordUrls(entries, false)]);
 }
-export function buildBlogSitemap(entries: ContentEntry[]): string { return urlset(recordUrls(entries, true)); }
+export function buildBlogSitemap(entries: ContentEntry[]): string {
+  const categoryRecords = BLOG_CATEGORIES.flatMap(category => {
+    const members = entries.filter(entry =>
+      entry.kind === "article"
+      && entry.status === "published"
+      && entry.indexable
+      && isBlogCategorySlug(entry.payload.category)
+      && entry.payload.category === category.slug,
+    );
+    if (!members.length) return [];
+    const latest = members.reduce(
+      (value, entry) => entry.updatedAt > value ? entry.updatedAt : value,
+      members[0].updatedAt,
+    );
+    return [{
+      loc: canonicalUrl({ pathname: blogCategoryPath(category.slug) }),
+      lastmod: latest.toISOString(),
+    }];
+  });
+  return urlset([...recordUrls(entries, true), ...categoryRecords]);
+}
 export function buildRobotsText(): string { return `User-agent: *\nDisallow: /admin/\n\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`; }
 export const sitemapHeaders = { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-cache" };

@@ -126,7 +126,7 @@ test("fallback articles preserve Russian index SEO and Markdown tags", async t =
   const fixtureRoot = await fixture(t);
   await writeFile(path.join(fixtureRoot, "public/blog/first.md"), "# Первая статья\n\nРусский текст.\n\n**Теги**: CRM, Разработка");
   await writeFile(path.join(fixtureRoot, "public/content/blog.ru.json"), JSON.stringify([
-    { slug: "first", lang: "ru", seoTitle: "SEO заголовок", excerpt: "Описание из индекса", coverUrl: "/cover.jpg", imageUrls: ["/cover.jpg", "/detail.jpg"], readTime: "3 мин", date: "1 января 2025", updatedDate: "2 января 2025" },
+    { slug: "first", lang: "ru", seoTitle: "SEO заголовок", excerpt: "Описание из индекса", coverUrl: "/cover.jpg", imageUrls: ["/cover.jpg", "/detail.jpg"], readTime: "3 мин", date: "1 января 2025", updatedDate: "2 января 2025", category: "business-automation", relatedArticleSlugs: ["related-one", "related-two", "related-three"] },
   ]));
   const result = await importLegacyContent({ fixtureRoot, dryRun: true });
   const first = result.records.find(r => r.command.slug === "first")!;
@@ -135,6 +135,8 @@ test("fallback articles preserve Russian index SEO and Markdown tags", async t =
   assert.deepEqual(first.command.payload.tags, ["CRM", "Разработка"]);
   assert.deepEqual(first.command.payload.imageUrls, ["/cover.jpg", "/detail.jpg"]);
   assert.equal(first.command.payload.readTime, "3 мин");
+  assert.equal(first.command.payload.category, "business-automation");
+  assert.deepEqual(first.command.payload.relatedArticleSlugs, ["related-one", "related-two", "related-three"]);
   assert.equal(first.timestamps.publishedAt, "2025-01-01T00:00:00.000Z");
   assert.equal(first.timestamps.updatedAt, "2025-01-02T00:00:00.000Z");
 });

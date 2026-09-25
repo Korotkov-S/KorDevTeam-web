@@ -36,6 +36,9 @@ const require = createRequire(import.meta.url);
 const { cleanup, render, screen } = require("@testing-library/react");
 require("../i18n");
 const { BlogPostPage } = require("./BlogPostPage");
+const { getBlogCategory } = require("../lib/blogCategories") as typeof import("../lib/blogCategories");
+const { selectPublishedRelatedEntries } = require("../routes/blog-post") as typeof import("../routes/blog-post");
+const businessCategory = getBlogCategory("business-automation")!;
 
 afterEach(cleanup);
 
@@ -54,7 +57,8 @@ test("article opens with a visible lead and a personal author byline", () => {
           coverUrl: "",
           imageUrls: [],
           media: {},
-        }} />}/>
+          category: "business-automation",
+        }} category={businessCategory} relatedArticles={[]} />}/>
       </Routes>
     </MemoryRouter>,
   );
@@ -80,7 +84,8 @@ test("article does not repeat an excerpt that already opens the body", () => {
           coverUrl: "",
           imageUrls: [],
           media: {},
-        }} />}/>
+          category: "business-automation",
+        }} category={businessCategory} relatedArticles={[]} />}/>
       </Routes>
     </MemoryRouter>,
   );
@@ -103,7 +108,8 @@ test("article hero preserves the specific markdown alt text for its source image
           coverUrl: "/first.jpg",
           imageUrls: ["/first.jpg"],
           media: {},
-        }} />}/>
+          category: "business-automation",
+        }} category={businessCategory} relatedArticles={[]} />}/>
       </Routes>
     </MemoryRouter>,
   );
@@ -125,7 +131,8 @@ test("article content column can shrink around a wide markdown table", () => {
           coverUrl: "",
           imageUrls: [],
           media: {},
-        }} />}/>
+          category: "business-automation",
+        }} category={businessCategory} relatedArticles={[]} />}/>
       </Routes>
     </MemoryRouter>,
   );
@@ -148,11 +155,92 @@ test("article title can wrap an unbroken long word on a narrow screen", () => {
           coverUrl: "",
           imageUrls: [],
           media: {},
-        }} />}/>
+          category: "business-automation",
+        }} category={businessCategory} relatedArticles={[]} />}/>
       </Routes>
     </MemoryRouter>,
   );
 
   const title = screen.getByRole("heading", { name: "CRM для предпринимателя", level: 1 });
   assert.ok(title.classList.contains("break-words"));
+});
+
+test("a published legacy article without taxonomy remains readable", () => {
+  render(
+    <MemoryRouter initialEntries={["/blog/editorial/"]}>
+      <Routes>
+        <Route path="/blog/:slug/" element={<BlogPostPage article={{
+          title: "Материал из редактора",
+          excerpt: "Опубликован до введения категорий.",
+          bodyMd: "Основной текст.",
+          publishedAt: "2026-09-01T00:00:00.000Z",
+          readTime: "3 мин",
+          tags: [],
+          coverUrl: "",
+          imageUrls: [],
+          media: {},
+          category: null,
+        }} category={null} relatedArticles={[]} />}/>
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  assert.ok(screen.getByRole("heading", { name: "Материал из редактора", level: 1 }));
+  assert.equal(document.querySelector('nav[aria-label="Хлебные крошки"]'), null);
+  assert.ok(screen.getAllByRole("button", { name: "Вернуться к блогу" }).length >= 1);
+});
+
+const relatedArticles = ["related-one", "related-two", "related-three"].map((slug, index) => ({
+  id: `related-${index}`,
+  slug,
+  title: `Связанная статья ${index + 1}`,
+  excerpt: "Практическое продолжение темы.",
+  date: `2026-08-${String(index + 1).padStart(2, "0")}`,
+  readTime: "4 мин",
+  tags: ["Автоматизация"],
+  category: "business-automation" as const,
+}));
+
+test("article renders category breadcrumbs and three curated related cards in order", () => {
+  render(
+    <MemoryRouter initialEntries={["/blog/editorial/"]}>
+      <Routes>
+        <Route path="/blog/:slug/" element={<BlogPostPage article={{
+          title: "Рабочий процесс",
+          excerpt: "Практический разбор.",
+          bodyMd: "Основной текст.",
+          publishedAt: "2026-09-01T00:00:00.000Z",
+          readTime: "3 мин",
+          tags: [],
+          coverUrl: "",
+          imageUrls: [],
+          media: {},
+          category: "business-automation",
+        }} category={businessCategory} relatedArticles={relatedArticles} />}/>
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  assert.equal(document.querySelector('nav[aria-label="Хлебные крошки"] a[href="/blog/"]')?.textContent, "Блог");
+  assert.equal(document.querySelector('nav[aria-label="Хлебные крошки"] a[href="/blog/category/business-automation/"]')?.textContent, "Автоматизация бизнеса");
+  assert.deepEqual(
+    [...document.querySelectorAll('section[aria-labelledby="related-articles-title"] article a')]
+      .map(link => link.getAttribute("href")),
+    ["/blog/related-one/", "/blog/related-two/", "/blog/related-three/"],
+  );
+});
+
+test("published related lookup omits an unavailable article and preserves curated order", () => {
+  const available = [
+    { slug: "related-three" },
+    { slug: "related-one" },
+  ];
+
+  assert.deepEqual(
+    selectPublishedRelatedEntries(
+      ["related-one", "related-two", "related-three"],
+      available as Parameters<typeof selectPublishedRelatedEntries>[1],
+    ).map(entry => entry.slug),
+    ["related-one", "related-three"],
+  );
 });
