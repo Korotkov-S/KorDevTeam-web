@@ -36,6 +36,13 @@
       "when": 1790326122473,
       "tag": "0004_mcp_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790333729506,
+      "tag": "0005_seo_monitoring",
+      "breakpoints": true
     }
   ]
 }

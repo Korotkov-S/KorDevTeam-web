@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.mcp_tokens': '0', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
 const postMigrationTableCounts = {
   ...preMigrationTableCounts,
-  'drizzle.__drizzle_migrations': '5',
+  'drizzle.__drizzle_migrations': '6',
   'public.leads': '0',
   'public.lead_attachments': '0',
   'public.lead_delivery_jobs': '0',
@@ -16,6 +16,13 @@ const postMigrationTableCounts = {
   'public.admin_sessions': '0',
   'public.admin_auth_limits': '0',
   'public.content_media_refs': '0',
+  'public.seo_changes': '0',
+  'public.seo_collection_runs': '0',
+  'public.seo_daily_metrics': '0',
+  'public.seo_queries': '0',
+  'public.seo_recommendations': '0',
+  'public.seo_regions': '9',
+  'public.seo_sources': '2',
 };
 const preMigrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0000_content_foundation.sql')).digest('hex'), created_at: '1789122602054' },
@@ -26,6 +33,7 @@ const migrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0002_lead_delivery_resilience.sql')).digest('hex'), created_at: '1789387439441' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0003_admin_media.sql')).digest('hex'), created_at: '1789631643667' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0004_mcp_tokens.sql')).digest('hex'), created_at: '1790326122473' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0005_seo_monitoring.sql')).digest('hex'), created_at: '1790333729506' },
 ];
 const tableCounts = postMigrationTableCounts;
 function inventoryQuery(sql, tables = tableCounts) {
@@ -78,7 +86,7 @@ test('database inventory counts all actual tables and fails when a required tabl
   assert.deepEqual(await databaseInventory(client), { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } });
   await assert.rejects(databaseInventory({ query: async sql => {
     const result = inventoryQuery(sql);
-    if (sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== 'content_revisions');
+    if (sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== 'seo_daily_metrics');
     return result;
   }}), /required|inventory/i);
 });

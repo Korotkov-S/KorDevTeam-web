@@ -16,9 +16,11 @@ export async function checkDatabase(mode, databaseUrl=process.env.DATABASE_URL) 
     await client.connect();
     if(mode==='pristine') {
       const tables=(await client.query("SELECT tablename FROM pg_tables WHERE schemaname='public'")).rows;
+      const migrationSeeds={seo_regions:9,seo_sources:2};
       for(const {tablename} of tables) {
         const quoted='"'+tablename.replaceAll('"','""')+'"';
-        if(Number((await client.query(`SELECT count(*) AS count FROM public.${quoted}`)).rows[0].count)!==0) throw Error('First-install database is not empty');
+        const expected=migrationSeeds[tablename]??0;
+        if(Number((await client.query(`SELECT count(*) AS count FROM public.${quoted}`)).rows[0].count)!==expected) throw Error('First-install database is not empty');
       }
     } else if(mode==='empty') {
       for(const table of ['content_entries','content_relations','content_revisions','media_assets','redirects','site_settings','admin_users']) {

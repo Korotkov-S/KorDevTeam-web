@@ -42,12 +42,19 @@ async function publishedCounts(client) {
 async function migrationRows(client) {
   return (await client.query('SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY id')).rows;
 }
-const requiredTables = ['drizzle.__drizzle_migrations', 'public.admin_users', 'public.content_entries', 'public.content_relations', 'public.content_revisions', 'public.mcp_tokens', 'public.media_assets', 'public.redirects', 'public.site_settings'];
+const coreRequiredTables = ['drizzle.__drizzle_migrations', 'public.admin_users', 'public.content_entries', 'public.content_relations', 'public.content_revisions', 'public.mcp_tokens', 'public.media_assets', 'public.redirects', 'public.site_settings'];
+const seoRequiredTables = ['public.seo_changes', 'public.seo_collection_runs', 'public.seo_daily_metrics', 'public.seo_queries', 'public.seo_recommendations', 'public.seo_regions', 'public.seo_sources'];
+const requiredTables = [...coreRequiredTables, ...seoRequiredTables];
+const seoMigrationCreatedAt = '1790333729506';
+const migrationSeedCounts = { 'public.seo_regions': '9', 'public.seo_sources': '2' };
+const requiredTablesForHistory = history => history.some(row => row.created_at === seoMigrationCreatedAt)
+  ? requiredTables
+  : coreRequiredTables;
 const quoteIdentifier = value => `"${value.replaceAll('"', '""')}"`;
-export async function databaseInventory(client) {
+export async function databaseInventory(client, requiredInventoryTables = requiredTables) {
   const { rows } = await client.query("SELECT n.nspname AS schema, c.relname AS name FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname IN ('public', 'drizzle') AND c.relkind IN ('r', 'p') ORDER BY n.nspname, c.relname");
   const names = rows.map(row => `${row.schema}.${row.name}`);
-  if (requiredTables.some(name => !names.includes(name))) throw Error('Required table missing from database inventory');
+  if (requiredInventoryTables.some(name => !names.includes(name))) throw Error('Required table missing from database inventory');
   const tables = {};
   for (const row of rows) {
     const result = await client.query(`SELECT count(*)::text AS count FROM ${quoteIdentifier(row.schema)}.${quoteIdentifier(row.name)}`);
@@ -67,13 +74,15 @@ export function expectedMigrationHistory() {
   return readMigrationFiles({ migrationsFolder: 'drizzle' }).map(migration => ({ hash: migration.hash, created_at: String(migration.folderMillis) }));
 }
 export async function verifyRestoreState(client, manifest, afterMigrations = false) {
-  const inventory = await databaseInventory(client);
-  const expectedTables = { ...manifest.inventory.tables };
   const history = afterMigrations ? expectedMigrationHistory() : manifest.migrations;
+  const inventory = await databaseInventory(client, requiredTablesForHistory(history));
+  const expectedTables = { ...manifest.inventory.tables };
   if (afterMigrations) {
     expectedTables['drizzle.__drizzle_migrations'] = String(history.length);
     // Expand migrations may add empty tables; existing data counts must survive.
-    for (const name of Object.keys(inventory.tables)) if (!Object.hasOwn(expectedTables, name)) expectedTables[name] = '0';
+    for (const name of Object.keys(inventory.tables)) {
+      if (!Object.hasOwn(expectedTables, name)) expectedTables[name] = migrationSeedCounts[name] ?? '0';
+    }
   }
   same(Object.entries(inventory.tables).sort(), Object.entries(expectedTables).sort());
   same(inventory.contentStatuses, manifest.inventory.contentStatuses);
@@ -138,7 +147,7 @@ export async function restoreDatabase(config, run = runCommand, connect = async 
   await run('tar', ['-xf', archive, '--no-same-owner', '--no-same-permissions', '-C', directory]);
   for (const name of names) if (!lstatSync(path.join(directory, name)).isFile()) throw Error('Invalid archive entry');
   const manifest = JSON.parse(readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
-  if (manifest.version !== 2 || !['daily', 'pre-release'].includes(manifest.reason) || typeof manifest.createdAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(manifest.createdAt) || !Number.isFinite(Date.parse(manifest.createdAt)) || !manifest.publishedCounts || !Array.isArray(manifest.migrations) || manifest.migrations.some(row => !/^[a-f0-9]{64}$/.test(row.hash) || !/^\d+$/.test(row.created_at) || Object.keys(row).sort().join(',') !== 'created_at,hash') || !manifest.inventory?.contentStatuses || requiredTables.some(name => !/^\d+$/.test(manifest.inventory?.tables?.[name] ?? '')) || checksum(path.join(directory, 'backup.dump')) !== manifest.dumpSha256) throw Error('Dump checksum or manifest mismatch');
+  if (manifest.version !== 2 || !['daily', 'pre-release'].includes(manifest.reason) || typeof manifest.createdAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(manifest.createdAt) || !Number.isFinite(Date.parse(manifest.createdAt)) || !manifest.publishedCounts || !Array.isArray(manifest.migrations) || manifest.migrations.some(row => !/^[a-f0-9]{64}$/.test(row.hash) || !/^\d+$/.test(row.created_at) || Object.keys(row).sort().join(',') !== 'created_at,hash') || !manifest.inventory?.contentStatuses || requiredTablesForHistory(manifest.migrations).some(name => !/^\d+$/.test(manifest.inventory?.tables?.[name] ?? '')) || checksum(path.join(directory, 'backup.dump')) !== manifest.dumpSha256) throw Error('Dump checksum or manifest mismatch');
   const client = await connect(targetUrl);
   let beforeMigrations, afterMigrations;
   try {

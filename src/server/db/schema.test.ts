@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 import { createDb } from "./client";
@@ -19,6 +19,11 @@ import {
   leads,
   mediaAssets,
   mcpTokens,
+  seoChanges,
+  seoDailyMetrics,
+  seoQueries,
+  seoRegions,
+  seoSources,
   siteSettings,
 } from "./schema";
 import { resetTestDatabase } from "./testDatabase";
@@ -64,6 +69,46 @@ async function assertConstraintViolation(operation: () => Promise<unknown>) {
     const cause = error instanceof Error ? error.cause as { code?: string } | undefined : undefined;
     return cause?.code === "23505" || cause?.code === "23514";
   });
+}
+
+async function assertDatabaseCode(operation: () => Promise<unknown>, expectedCode: string) {
+  await assert.rejects(operation, (error: unknown) => {
+    if (!(error instanceof Error)) return false;
+    const directCode = (error as Error & { code?: string }).code;
+    const causeCode = (error.cause as { code?: string } | undefined)?.code;
+    return directCode === expectedCode || causeCode === expectedCode;
+  });
+}
+
+async function seoMetricFixture(databaseUrl: string) {
+  const db = createDb(databaseUrl);
+  const [region] = await db
+    .select()
+    .from(seoRegions)
+    .where(and(eq(seoRegions.source, "google_search_console"), eq(seoRegions.code, "ru")));
+  const [query] = await db
+    .insert(seoQueries)
+    .values({ queryText: "внедрение crm", normalizedQuery: "внедрение crm" })
+    .returning();
+
+  assert.ok(region);
+  return {
+    db,
+    query,
+    region,
+    metric: {
+      observationDate: "2026-09-24",
+      source: "google_search_console" as const,
+      queryId: query.id,
+      pagePath: "/services/crm",
+      regionId: region.id,
+      device: "desktop" as const,
+      impressions: 100,
+      clicks: 7,
+      ctr: "0.07000000",
+      averagePosition: "8.2500",
+    },
+  };
 }
 
 databaseTest("admin schema supports expiring sessions and versioned media settings", async () => {
@@ -138,6 +183,72 @@ databaseTest("MCP tokens keep only a digest and cascade with their administrator
   assert.equal("token" in token, false);
   await db.delete(adminUsers).where(eq(adminUsers.id, admin.id));
   assert.equal((await db.select().from(mcpTokens)).length, 0);
+});
+
+databaseTest("SEO observations are unique and reject impossible search metrics", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const { db, metric } = await seoMetricFixture(TEST_DATABASE_URL);
+
+  await db.insert(seoDailyMetrics).values(metric);
+  await assertConstraintViolation(() => db.insert(seoDailyMetrics).values(metric));
+  await assertConstraintViolation(() => db.insert(seoDailyMetrics).values({
+    ...metric,
+    observationDate: "2026-09-23",
+    averagePosition: "0",
+  }));
+  await assertConstraintViolation(() => db.insert(seoDailyMetrics).values({
+    ...metric,
+    observationDate: "2026-09-22",
+    clicks: 101,
+  }));
+  await assertConstraintViolation(() => db.insert(seoDailyMetrics).values({
+    ...metric,
+    observationDate: "2026-09-21",
+    ctr: "1.00000001",
+  }));
+});
+
+databaseTest("Google SEO observations require an explicit Russia region", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const { db, metric } = await seoMetricFixture(TEST_DATABASE_URL);
+  const [yandexRussia] = await db
+    .select()
+    .from(seoRegions)
+    .where(and(eq(seoRegions.source, "yandex_webmaster"), eq(seoRegions.code, "ru")));
+
+  await assertDatabaseCode(() => db.insert(seoDailyMetrics).values({
+    ...metric,
+    regionId: null as never,
+  }), "23502");
+  await assertDatabaseCode(() => db.insert(seoDailyMetrics).values({
+    ...metric,
+    regionId: yandexRussia.id,
+  }), "23503");
+});
+
+databaseTest("content deletion preserves SEO change history and clears only its optional link", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const [entry] = await db.insert(contentEntries).values({
+    kind: "article",
+    slug: "seo-history",
+    title: "SEO history",
+  }).returning();
+  const [change] = await db.insert(seoChanges).values({
+    pagePath: "/blog/seo-history/",
+    summary: "Обновили title и description",
+    type: "metadata",
+    contentEntryId: entry.id,
+    contentVersion: 1,
+  }).returning();
+
+  await db.delete(contentEntries).where(eq(contentEntries.id, entry.id));
+
+  const [preserved] = await db.select().from(seoChanges).where(eq(seoChanges.id, change.id));
+  assert.equal(preserved.contentEntryId, null);
+  assert.equal(preserved.pagePath, "/blog/seo-history/");
+  assert.equal(preserved.summary, "Обновили title и description");
+  assert.equal((await db.select().from(seoSources)).length, 2);
 });
 
 databaseTest("admin counters and optimistic versions reject invalid values", async () => {
@@ -267,6 +378,8 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
   const db = createDb(TEST_DATABASE_URL);
   const [lead] = await db.insert(leads).values(leadFixture).returning();
   await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });
+  await db.execute(sql`DROP TABLE seo_daily_metrics, seo_recommendations, seo_changes, seo_collection_runs, seo_regions, seo_queries, seo_sources`);
+  await db.execute(sql`DROP TYPE seo_change_type, seo_device, seo_frequency_band, seo_query_origin, seo_recommendation_confidence, seo_recommendation_status, seo_region_scope, seo_run_status, seo_source`);
   await db.execute(sql`DROP TABLE mcp_tokens, content_media_refs, admin_sessions, admin_auth_limits`);
   await db.execute(sql`DROP TYPE admin_auth_limit_kind`);
   await db.execute(sql`DROP INDEX media_assets_checksum_visibility_processing_uq`);

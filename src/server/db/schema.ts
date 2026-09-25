@@ -2,14 +2,18 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
+  foreignKey,
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   primaryKey,
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -37,6 +41,28 @@ export const leadDeliveryStatus = pgEnum("lead_delivery_status", [
 ]);
 export const leadRateLimitKind = pgEnum("lead_rate_limit_kind", ["ip", "phone", "crm_token"]);
 export const adminAuthLimitKind = pgEnum("admin_auth_limit_kind", ["ip", "login", "global"]);
+export const seoSource = pgEnum("seo_source", ["yandex_webmaster", "google_search_console"]);
+export const seoDevice = pgEnum("seo_device", ["desktop", "mobile", "tablet", "all"]);
+export const seoFrequencyBand = pgEnum("seo_frequency_band", ["high", "medium", "low", "unclassified"]);
+export const seoQueryOrigin = pgEnum("seo_query_origin", ["manual", "api", "import"]);
+export const seoRunStatus = pgEnum("seo_run_status", ["running", "success", "partial", "failed"]);
+export const seoRegionScope = pgEnum("seo_region_scope", ["country", "city"]);
+export const seoChangeType = pgEnum("seo_change_type", [
+  "content",
+  "metadata",
+  "structure",
+  "interlinking",
+  "technical",
+  "other",
+]);
+export const seoRecommendationConfidence = pgEnum("seo_recommendation_confidence", ["low", "medium", "high"]);
+export const seoRecommendationStatus = pgEnum("seo_recommendation_status", [
+  "new",
+  "accepted",
+  "rejected",
+  "implemented",
+  "dismissed",
+]);
 
 export const adminUsers = pgTable(
   "admin_users",
@@ -389,6 +415,194 @@ export const leadRateLimits = pgTable(
   ],
 );
 
+export const seoSources = pgTable(
+  "seo_sources",
+  {
+    id: seoSource("id").primaryKey(),
+    displayName: varchar("display_name", { length: 120 }).notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    lastErrorCode: varchar("last_error_code", { length: 120 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("seo_sources_display_name_nonempty", sql`length(btrim(${table.displayName})) > 0`),
+  ],
+);
+
+export const seoRegions = pgTable(
+  "seo_regions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    source: seoSource("source")
+      .notNull()
+      .references(() => seoSources.id, { onDelete: "restrict" }),
+    externalId: varchar("external_id", { length: 120 }),
+    code: varchar("code", { length: 80 }).notNull(),
+    displayName: varchar("display_name", { length: 160 }).notNull(),
+    scope: seoRegionScope("scope").notNull(),
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("seo_regions_source_code_uq").on(table.source, table.code),
+    uniqueIndex("seo_regions_source_external_id_uq").on(table.source, table.externalId),
+    unique("seo_regions_source_id_uq").on(table.source, table.id),
+    index("seo_regions_active_sort_idx").on(table.active, table.sortOrder),
+    check("seo_regions_code_nonempty", sql`length(btrim(${table.code})) > 0`),
+    check("seo_regions_display_name_nonempty", sql`length(btrim(${table.displayName})) > 0`),
+    check("seo_regions_sort_order_non_negative", sql`${table.sortOrder} >= 0`),
+  ],
+);
+
+export const seoQueries = pgTable(
+  "seo_queries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    queryText: text("query_text").notNull(),
+    normalizedQuery: text("normalized_query").notNull(),
+    targetPath: varchar("target_path", { length: 500 }),
+    origin: seoQueryOrigin("origin").notNull().default("api"),
+    wordstatFrequency: integer("wordstat_frequency"),
+    frequencyBand: seoFrequencyBand("frequency_band").notNull().default("unclassified"),
+    tracked: boolean("tracked").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("seo_queries_normalized_query_uq").on(table.normalizedQuery),
+    index("seo_queries_tracked_band_idx").on(table.tracked, table.frequencyBand),
+    check("seo_queries_query_text_nonempty", sql`length(btrim(${table.queryText})) > 0`),
+    check("seo_queries_normalized_query_nonempty", sql`length(btrim(${table.normalizedQuery})) > 0`),
+    check("seo_queries_frequency_non_negative", sql`${table.wordstatFrequency} IS NULL OR ${table.wordstatFrequency} >= 0`),
+    check("seo_queries_target_path_valid", sql`${table.targetPath} IS NULL OR ${table.targetPath} LIKE '/%'`),
+  ],
+);
+
+export const seoDailyMetrics = pgTable(
+  "seo_daily_metrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    observationDate: date("observation_date", { mode: "string" }).notNull(),
+    source: seoSource("source").notNull(),
+    queryId: uuid("query_id")
+      .notNull()
+      .references(() => seoQueries.id, { onDelete: "restrict" }),
+    pagePath: varchar("page_path", { length: 500 }).notNull(),
+    regionId: uuid("region_id").notNull(),
+    device: seoDevice("device").notNull(),
+    impressions: integer("impressions").notNull(),
+    clicks: integer("clicks").notNull(),
+    ctr: numeric("ctr", { precision: 9, scale: 8 }).notNull(),
+    averagePosition: numeric("average_position", { precision: 12, scale: 4 }).notNull(),
+    importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("seo_daily_metrics_observation_uq").on(
+      table.observationDate,
+      table.source,
+      table.queryId,
+      table.pagePath,
+      table.regionId,
+      table.device,
+    ),
+    index("seo_daily_metrics_slice_idx").on(table.observationDate, table.source, table.regionId, table.device),
+    index("seo_daily_metrics_query_date_idx").on(table.queryId, table.observationDate),
+    index("seo_daily_metrics_page_date_idx").on(table.pagePath, table.observationDate),
+    foreignKey({
+      columns: [table.source, table.regionId],
+      foreignColumns: [seoRegions.source, seoRegions.id],
+      name: "seo_daily_metrics_source_region_fk",
+    }).onDelete("restrict"),
+    check("seo_daily_metrics_page_path_valid", sql`${table.pagePath} LIKE '/%'`),
+    check("seo_daily_metrics_impressions_non_negative", sql`${table.impressions} >= 0`),
+    check("seo_daily_metrics_clicks_valid", sql`${table.clicks} >= 0 AND ${table.clicks} <= ${table.impressions}`),
+    check("seo_daily_metrics_ctr_valid", sql`${table.ctr} >= 0 AND ${table.ctr} <= 1`),
+    check("seo_daily_metrics_position_positive", sql`${table.averagePosition} > 0`),
+  ],
+);
+
+export const seoCollectionRuns = pgTable(
+  "seo_collection_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    source: seoSource("source")
+      .notNull()
+      .references(() => seoSources.id, { onDelete: "restrict" }),
+    requestedFrom: date("requested_from", { mode: "string" }).notNull(),
+    requestedTo: date("requested_to", { mode: "string" }).notNull(),
+    status: seoRunStatus("status").notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    receivedCount: integer("received_count").notNull().default(0),
+    storedCount: integer("stored_count").notNull().default(0),
+    errorCode: varchar("error_code", { length: 120 }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    index("seo_collection_runs_source_started_idx").on(table.source, table.startedAt),
+    check("seo_collection_runs_date_range_valid", sql`${table.requestedTo} >= ${table.requestedFrom}`),
+    check("seo_collection_runs_counts_non_negative", sql`${table.receivedCount} >= 0 AND ${table.storedCount} >= 0`),
+    check("seo_collection_runs_completed_after_start", sql`${table.completedAt} IS NULL OR ${table.completedAt} >= ${table.startedAt}`),
+    check("seo_collection_runs_metadata_object", sql`jsonb_typeof(${table.metadata}) = 'object'`),
+  ],
+);
+
+export const seoChanges = pgTable(
+  "seo_changes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    pagePath: varchar("page_path", { length: 500 }).notNull(),
+    summary: text("summary").notNull(),
+    type: seoChangeType("type").notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
+    contentEntryId: uuid("content_entry_id").references(() => contentEntries.id, { onDelete: "set null" }),
+    contentVersion: integer("content_version"),
+    actorAdminUserId: uuid("actor_admin_user_id").references(() => adminUsers.id, { onDelete: "set null" }),
+    actorMcpTokenId: uuid("actor_mcp_token_id").references(() => mcpTokens.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("seo_changes_page_applied_idx").on(table.pagePath, table.appliedAt),
+    check("seo_changes_page_path_valid", sql`${table.pagePath} LIKE '/%'`),
+    check("seo_changes_summary_nonempty", sql`length(btrim(${table.summary})) > 0`),
+    check("seo_changes_content_version_positive", sql`${table.contentVersion} IS NULL OR ${table.contentVersion} > 0`),
+  ],
+);
+
+export const seoRecommendations = pgTable(
+  "seo_recommendations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    rationale: text("rationale").notNull(),
+    pagePath: varchar("page_path", { length: 500 }),
+    queryId: uuid("query_id").references(() => seoQueries.id, { onDelete: "set null" }),
+    issueType: varchar("issue_type", { length: 120 }).notNull(),
+    evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+    confidence: seoRecommendationConfidence("confidence").notNull(),
+    status: seoRecommendationStatus("status").notNull().default("new"),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    createdByMcpTokenId: uuid("created_by_mcp_token_id").references(() => mcpTokens.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("seo_recommendations_status_created_idx").on(table.status, table.createdAt),
+    index("seo_recommendations_fingerprint_idx").on(table.fingerprint),
+    check("seo_recommendations_title_nonempty", sql`length(btrim(${table.title})) > 0`),
+    check("seo_recommendations_rationale_nonempty", sql`length(btrim(${table.rationale})) > 0`),
+    check("seo_recommendations_issue_type_nonempty", sql`length(btrim(${table.issueType})) > 0`),
+    check("seo_recommendations_page_path_valid", sql`${table.pagePath} IS NULL OR ${table.pagePath} LIKE '/%'`),
+    check("seo_recommendations_evidence_object", sql`jsonb_typeof(${table.evidence}) = 'object'`),
+    check("seo_recommendations_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
 export const schema = {
   adminUsers,
   adminSessions,
@@ -404,4 +618,11 @@ export const schema = {
   leadAttachments,
   leadDeliveryJobs,
   leadRateLimits,
+  seoSources,
+  seoRegions,
+  seoQueries,
+  seoDailyMetrics,
+  seoCollectionRuns,
+  seoChanges,
+  seoRecommendations,
 };
