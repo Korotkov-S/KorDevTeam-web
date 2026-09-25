@@ -51,7 +51,11 @@ test("read-only validation gates a separate trusted main publisher", () => {
   const clamavSmoke = steps.find(step => step.name === "Smoke-test pinned local ClamAV");
   assert.ok(clamavSmoke);
   assert.match(clamavSmoke.run, /docker compose up -d --wait clamav/);
-  assert.match(clamavSmoke.run, /docker compose port clamav 3310/);
+  assert.match(clamavSmoke.run, /docker compose ps -q clamav/);
+  assert.match(clamavSmoke.run, /NetworkSettings\.Ports/);
+  assert.match(clamavSmoke.run, /3310\/tcp/);
+  assert.match(clamavSmoke.run, /test "\$port_binding" = null/);
+  assert.doesNotMatch(clamavSmoke.run, /docker compose port clamav 3310/);
   assert.match(clamavSmoke.run, /docker compose rm -s -f clamav/);
   const runtimeSmoke = steps.find(step => step.name === "Smoke-test production lead runtime");
   assert.ok(runtimeSmoke);

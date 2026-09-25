@@ -112,8 +112,10 @@ jobs:
           cleanup() { docker compose rm -s -f clamav; }
           trap cleanup EXIT
           docker compose up -d --wait clamav
-          published="$(docker compose port clamav 3310 2>/dev/null || true)"
-          test -z "$published"
+          container_id="$(docker compose ps -q clamav)"
+          test -n "$container_id"
+          port_binding="$(docker inspect "$container_id" --format '{{json (index .NetworkSettings.Ports "3310/tcp")}}')"
+          test "$port_binding" = null
 
       - name: Smoke-test production lead runtime
         run: |
