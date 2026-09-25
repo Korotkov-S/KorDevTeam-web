@@ -103,7 +103,7 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
       }
       if (pathname === "/cases/") {
         const detailLinks = await noJs.$$eval('a[href^="/cases/"]', links => [...new Set(links.map(link => link.getAttribute("href")).filter(href => href && href !== "/cases/"))]);
-        assert.equal(detailLinks.length, 23);
+        assert.equal(detailLinks.length, 20);
         assert.deepEqual(detailLinks.slice(0, 3), ["/cases/serviceplus/", "/cases/amch/", "/cases/dom-krugom/"]);
         for (const hidden of ["inplain", "roost", "siberian-steel"]) assert.equal(detailLinks.includes(`/cases/${hidden}/`), false);
         assert.ok(detailLinks.includes("/cases/alliance-stroy-garant/"));

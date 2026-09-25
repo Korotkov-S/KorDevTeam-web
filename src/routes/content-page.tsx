@@ -21,8 +21,17 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     ]);
     const mediaMaps = await getEntryMediaMaps([entry, ...relatedCases, ...relatedArticles].map(value => value.id));
     const media = Object.assign({}, ...Object.values(mediaMaps));
-    return data({ type: "service" as const, seo: entrySeo(entry, pathname, mediaMaps[entry.id]), pathname,
-      service: servicePage(entry, media, relatedCases, relatedArticles, faqEntries) }, { headers: documentHeaders });
+    const service = servicePage(entry, media, relatedCases, relatedArticles, faqEntries);
+    const seo = {
+      ...entrySeo(entry, pathname, mediaMaps[entry.id]),
+      breadcrumbs: [
+        { name: "Главная", pathname: "/" },
+        { name: "Услуги", pathname: "/services/" },
+        { name: service.h1, pathname },
+      ],
+      faq: service.faq,
+    };
+    return data({ type: "service" as const, seo, pathname, service }, { headers: documentHeaders });
   }
   const media = await getEntryMediaMap(entry.id);
   return data({ type: "page" as const, seo: entrySeo(entry, pathname, media), title: String(entry.payload.h1 || entry.title), bodyMd: entry.bodyMd, excerpt: entry.excerpt, media }, { headers: documentHeaders });

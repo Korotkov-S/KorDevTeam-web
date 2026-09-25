@@ -41,9 +41,51 @@ test("service presentation omits empty optional blocks and preserves confirmed p
   assert.deepEqual(view.processSteps, [{ title: "Discovery", description: "Map workflows" }]);
 });
 
+test("service presentation preserves structured process expertise and trims its content", () => {
+  const view = servicePage(serviceFixture({
+    readinessIntro: "  Повторяемый процесс можно измерить. ",
+    readinessConclusion: "  Сначала стабилизируем правила. ",
+    readiness: [{ title: "  Работа повторяется ", description: " Сценарий выполняется регулярно. " }],
+    deliverables: ["  Карта AS IS ", " "],
+    methodologies: [{ title: "  BPMN 2.0 ", description: " Единая нотация. ", href: "https://www.omg.org/bpmn/" }],
+    benefits: [{ title: "  Освобождает время ", description: " Убирает рутинные операции. " }],
+    methodologyPrinciples: ["  Рассматриваем процесс целиком ", " "],
+    impactMetrics: [{ title: "  Время цикла ", description: " Сравниваем до и после. " }],
+    recommendedReading: [{ title: "  Учитесь видеть ", description: " Майк Ротер и Джон Шук. " }],
+  }));
+
+  assert.equal(view.readinessIntro, "Повторяемый процесс можно измерить.");
+  assert.equal(view.readinessConclusion, "Сначала стабилизируем правила.");
+  assert.deepEqual(view.readiness, [{ title: "Работа повторяется", description: "Сценарий выполняется регулярно." }]);
+  assert.deepEqual(view.deliverables, ["Карта AS IS"]);
+  assert.deepEqual(view.methodologies, [{ title: "BPMN 2.0", description: "Единая нотация.", href: "https://www.omg.org/bpmn/" }]);
+  assert.deepEqual((view as unknown as { benefits: unknown }).benefits, [{ title: "Освобождает время", description: "Убирает рутинные операции." }]);
+  assert.deepEqual((view as unknown as { methodologyPrinciples: unknown }).methodologyPrinciples, ["Рассматриваем процесс целиком"]);
+  assert.deepEqual(view.impactMetrics, [{ title: "Время цикла", description: "Сравниваем до и после." }]);
+  assert.deepEqual(view.recommendedReading, [{ title: "Учитесь видеть", description: "Майк Ротер и Джон Шук." }]);
+});
+
 test("service presentation does not create price without confirmed fields", () => {
   const view = servicePage(serviceFixture({ priceFrom: null, priceFactors: [" "], timeRange: " " }), {}, [], [], []);
   assert.equal(view.price, null);
+});
+
+test("service presentation preserves a monthly hour package and hourly rate", () => {
+  const view = servicePage(serviceFixture({
+    priceFrom: 38000,
+    pricePackageHours: 20,
+    priceHourlyRate: 1900,
+    priceFactors: ["Состояние кода"],
+    timeRange: "по согласованному SLA",
+  }));
+
+  assert.deepEqual(view.price, {
+    from: 38000,
+    factors: ["Состояние кода"],
+    timeRange: "по согласованному SLA",
+    packageHours: 20,
+    hourlyRate: 1900,
+  });
 });
 
 test("case card never invents an impact metric", () => {

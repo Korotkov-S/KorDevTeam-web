@@ -118,6 +118,7 @@
     "lead:retention": "node server/lead-retention.mjs",
     "content:migrate": "tsx scripts/migrate-content-to-postgres.ts",
     "content:verify": "tsx scripts/verify-content-migration.ts",
+    "content:services": "tsx scripts/sync-commercial-services.ts",
     "content:articles": "tsx scripts/sync-articles.ts",
     "seo:crawl": "tsx scripts/seo-crawl.ts",
     "admin:create": "tsx scripts/create-admin.ts",

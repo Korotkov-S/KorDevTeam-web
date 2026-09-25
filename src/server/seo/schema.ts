@@ -20,5 +20,25 @@ export function buildStructuredData(input: RouteSeoInput): JsonLdNode[] {
   ];
   if (input.breadcrumbs?.length) nodes.push({ "@context": "https://schema.org", "@type": "BreadcrumbList",
     itemListElement: input.breadcrumbs.map((crumb, index) => ({ "@type": "ListItem", position: index + 1, name: crumb.name, item: canonicalUrl(crumb) })) });
+  if (input.kind === "service") nodes.push({
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "@id": `${url}#service`,
+    name: input.title,
+    description: input.description,
+    url,
+    areaServed: { "@type": "Country", name: "Россия" },
+    provider: organization,
+  });
+  if (input.faq?.length) nodes.push({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "@id": `${url}#faq`,
+    mainEntity: input.faq.map(item => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  });
   return nodes;
 }

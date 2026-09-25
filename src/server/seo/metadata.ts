@@ -10,6 +10,7 @@ export type RouteSeoInput = {
   ogImage?: string;
   kind: "home" | "service" | "case" | "article" | "page";
   breadcrumbs?: Array<{ name: string; pathname: string }>;
+  faq?: Array<{ question: string; answer: string }>;
   updatedAt?: string;
   publishedAt?: string;
   manualCanonicalPath?: string | null;

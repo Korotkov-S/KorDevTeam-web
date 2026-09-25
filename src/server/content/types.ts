@@ -6,6 +6,7 @@ export type ContentKind = "service" | "case" | "article" | "page" | "faq";
 export type RelationType = "related_case" | "related_article" | "related_faq" | "related_service";
 export type ContentEntry = typeof contentEntries.$inferSelect;
 export type BlockView = { title: string; description: string };
+export type LinkedBlockView = BlockView & { href: string };
 export type CtaType = "form" | "telegram" | "email" | "phone";
 export type CtaView = { title: string | null; text: string | null; type: CtaType | null };
 export type ServiceCardView = { slug: string; title: string; summary: string; priority: boolean };
@@ -14,10 +15,44 @@ export type CaseCategory = z.output<typeof caseCategory>;
 export type CaseCardView = { slug: string; title: string; summary: string; result: string | null; image: ResolvedMediaAsset | null; tags: string[]; categories?: CaseCategory[]; catalogOrder?: number | null; catalogVisible?: boolean };
 export type ContentCardView = { slug: string; title: string; summary: string; image: ResolvedMediaAsset | null; tags: string[] };
 export type FaqView = { question: string; answer: string };
-export type ServicePageView = { h1: string; lead: string; bodyMd: string; media: MediaPresentationMap; problems: string[]; solutions: string[]; integrations: string[]; technologies: string[]; processSteps: BlockView[]; price: { from: number | null; factors: string[]; timeRange: string | null } | null; results: BlockView[]; guarantees: BlockView[]; relatedCases: CaseCardView[]; relatedArticles: ContentCardView[]; faq: FaqView[]; cta: CtaView };
+export type ServicePageView = {
+  h1: string;
+  lead: string;
+  bodyMd: string;
+  media: MediaPresentationMap;
+  problems: string[];
+  solutions: string[];
+  integrations: string[];
+  technologies: string[];
+  processSteps: BlockView[];
+  readinessIntro: string | null;
+  readinessConclusion: string | null;
+  readiness: BlockView[];
+  benefits: BlockView[];
+  automationExamples: string[];
+  deliverables: string[];
+  methodologies: LinkedBlockView[];
+  methodologyPrinciples: string[];
+  impactMetrics: BlockView[];
+  recommendedReading: BlockView[];
+  price: {
+    from: number | null;
+    factors: string[];
+    timeRange: string | null;
+    packageHours?: number;
+    hourlyRate?: number;
+  } | null;
+  results: BlockView[];
+  guarantees: BlockView[];
+  relatedCases: CaseCardView[];
+  relatedArticles: ContentCardView[];
+  faq: FaqView[];
+  cta: CtaView;
+};
 export type CommercialCaseView = { slug: string; h1: string; summary: string; problem: string | null; constraints: string[]; solution: string | null; architecture: string | null; integrations: string[]; technologies: string[]; features: string[]; stages: BlockView[]; team: string[]; screenshots: ResolvedMediaAsset[]; media: MediaPresentationMap; results: BlockView[]; testimonial: string | null; bodyMd: string; demoUrl: string | null; githubUrl: string | null; relatedServices: ServiceCardView[]; relatedCases: CaseCardView[]; cta: CtaView };
 
 const block = z.strictObject({ title: z.string(), description: z.string() });
+const linkedBlock = block.extend({ href: z.url() });
 const cta = z.strictObject({ copy: z.string(), type: z.enum(["form", "telegram", "email", "phone"]) });
 const staticCaseImage = z.strictObject({
   src: z.string().regex(/^\/projects\/portfolio\/[a-z0-9-]+\/[a-z0-9-]+\.(?:webp|png|jpe?g)$/),
@@ -34,7 +69,19 @@ const servicePayload = z.strictObject({
   integrations: z.array(z.string()).optional(),
   technologies: z.array(z.string()).optional(),
   processSteps: z.array(block).optional(),
+  readinessIntro: z.string().optional(),
+  readinessConclusion: z.string().optional(),
+  readiness: z.array(block).optional(),
+  benefits: z.array(block).optional(),
+  automationExamples: z.array(z.string()).optional(),
+  deliverables: z.array(z.string()).optional(),
+  methodologies: z.array(linkedBlock).optional(),
+  methodologyPrinciples: z.array(z.string()).optional(),
+  impactMetrics: z.array(block).optional(),
+  recommendedReading: z.array(block).optional(),
   priceFrom: z.number().finite().nonnegative().nullable().optional(),
+  pricePackageHours: z.number().int().positive().optional(),
+  priceHourlyRate: z.number().int().positive().optional(),
   priceFactors: z.array(z.string()).optional(),
   timeRange: z.string().optional(),
   ctaTitle: z.string().optional(),
@@ -118,11 +165,13 @@ const nonempty = z.string().trim().min(1);
 const publishedBlock = z.strictObject({ title: nonempty, description: nonempty });
 const publishedServicePayload = servicePayload.extend({
   h1: nonempty, lead: nonempty,
-  problems: z.array(nonempty).min(1), solutions: z.array(nonempty).min(1),
+  problems: z.array(nonempty).min(1).optional(), benefits: z.array(publishedBlock).min(1).optional(), solutions: z.array(nonempty).min(1),
   integrations: z.array(nonempty).min(1), technologies: z.array(nonempty).min(1),
   processSteps: z.array(publishedBlock).min(1), priceFactors: z.array(nonempty).min(1),
   timeRange: nonempty, ctaTitle: nonempty, ctaText: nonempty, ctaType: cta.shape.type,
   results: z.array(publishedBlock).min(1), guarantees: z.array(publishedBlock).min(1),
+}).refine(payload => Boolean(payload.problems?.length || payload.benefits?.length), {
+  message: "Either problems or benefits must be provided",
 });
 
 export function validatePublication(entry: ContentEntry): void {

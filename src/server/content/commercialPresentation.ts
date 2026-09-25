@@ -10,6 +10,7 @@ import type {
   CtaType,
   CtaView,
   FaqView,
+  LinkedBlockView,
   ServiceCardView,
   ServicePageView,
 } from "./types";
@@ -43,6 +44,24 @@ function blocks(value: unknown): BlockView[] {
     const title = text(record.title);
     const description = text(record.description);
     return title && description ? [{ title, description }] : [];
+  });
+}
+
+function linkedBlocks(value: unknown): LinkedBlockView[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(item => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const record = item as Record<string, unknown>;
+    const title = text(record.title);
+    const description = text(record.description);
+    const href = text(record.href);
+    if (!title || !description || !href) return [];
+    try {
+      const url = new URL(href);
+      return url.protocol === "https:" ? [{ title, description, href: url.href }] : [];
+    } catch {
+      return [];
+    }
   });
 }
 
@@ -171,6 +190,10 @@ export function servicePage(
 ): ServicePageView {
   const priceFrom = typeof entry.payload.priceFrom === "number" && Number.isFinite(entry.payload.priceFrom)
     ? entry.payload.priceFrom : null;
+  const packageHours = typeof entry.payload.pricePackageHours === "number" && Number.isInteger(entry.payload.pricePackageHours) && entry.payload.pricePackageHours > 0
+    ? entry.payload.pricePackageHours : null;
+  const hourlyRate = typeof entry.payload.priceHourlyRate === "number" && Number.isInteger(entry.payload.priceHourlyRate) && entry.payload.priceHourlyRate > 0
+    ? entry.payload.priceHourlyRate : null;
   const priceFactors = strings(entry.payload.priceFactors);
   const timeRange = text(entry.payload.timeRange);
   return {
@@ -183,7 +206,25 @@ export function servicePage(
     integrations: strings(entry.payload.integrations),
     technologies: strings(entry.payload.technologies),
     processSteps: blocks(entry.payload.processSteps),
-    price: priceFrom !== null || priceFactors.length || timeRange ? { from: priceFrom, factors: priceFactors, timeRange } : null,
+    readinessIntro: text(entry.payload.readinessIntro),
+    readinessConclusion: text(entry.payload.readinessConclusion),
+    readiness: blocks(entry.payload.readiness),
+    benefits: blocks(entry.payload.benefits),
+    automationExamples: strings(entry.payload.automationExamples),
+    deliverables: strings(entry.payload.deliverables),
+    methodologies: linkedBlocks(entry.payload.methodologies),
+    methodologyPrinciples: strings(entry.payload.methodologyPrinciples),
+    impactMetrics: blocks(entry.payload.impactMetrics),
+    recommendedReading: blocks(entry.payload.recommendedReading),
+    price: priceFrom !== null || priceFactors.length || timeRange || packageHours !== null || hourlyRate !== null
+      ? {
+        from: priceFrom,
+        factors: priceFactors,
+        timeRange,
+        ...(packageHours !== null ? { packageHours } : {}),
+        ...(hourlyRate !== null ? { hourlyRate } : {}),
+      }
+      : null,
     results: blocks(entry.payload.results),
     guarantees: blocks(entry.payload.guarantees),
     relatedCases: relatedCases.filter(entry => isPublished(entry) && entry.kind === "case").map(entry => caseCard(entry, media)),
