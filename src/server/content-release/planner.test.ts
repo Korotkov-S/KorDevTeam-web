@@ -18,7 +18,7 @@ import {
   planContentRelease,
   recordReleaseState,
 } from "./planner";
-import { databaseItemChecksum } from "./state";
+import { databaseItemChecksum, desiredDatabaseItemChecksum } from "./state";
 import type { ContentReleaseItem, ContentReleaseManifest } from "./types";
 
 const databaseUrl = process.env.TEST_DATABASE_URL ?? "";
@@ -173,6 +173,33 @@ databaseTest("database checksum tracks managed service relation order but ignore
   const second = await db.transaction(tx => databaseItemChecksum(tx, serviceEntry, service));
 
   assert.notEqual(first, second);
+});
+
+databaseTest("database checksum detects managed relation types absent from the manifest", async () => {
+  await resetTestDatabase(databaseUrl);
+  const db = createDb(databaseUrl);
+  const service = item("service", "service-with-unexpected-relation");
+  const target = item("case", "unexpected-target");
+  const [serviceEntry] = await db.insert(contentEntries).values({
+    ...service.command,
+    status: "published",
+    publishedAt: new Date(),
+  }).returning();
+  const [targetEntry] = await db.insert(contentEntries).values({
+    ...target.command,
+    status: "published",
+    publishedAt: new Date(),
+  }).returning();
+  await db.insert(contentRelations).values({
+    sourceId: serviceEntry.id,
+    targetId: targetEntry.id,
+    type: "related_case",
+    sortOrder: 0,
+  });
+
+  const current = await db.transaction(tx => databaseItemChecksum(tx, serviceEntry, service));
+
+  assert.notEqual(current, desiredDatabaseItemChecksum(service));
 });
 
 databaseTest("recording identical release ownership twice is a no-op", async () => {

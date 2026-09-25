@@ -6,6 +6,12 @@ import type { ContentEntry } from "../content/types";
 import { contentEntries, contentRelations } from "../db/schema";
 import type { ContentReleaseItem, ContentReleaseRelation } from "./types";
 
+const managedRelationTypes: ContentReleaseRelation["type"][] = [
+  "related_case",
+  "related_article",
+  "related_faq",
+];
+
 function relationOrder(left: ContentReleaseRelation, right: ContentReleaseRelation): number {
   return left.type.localeCompare(right.type, "en")
     || left.sortOrder - right.sortOrder
@@ -68,8 +74,7 @@ export async function databaseItemChecksum(
   if (entry.status === "published" && !entry.publishedAt) {
     throw new Error("content_release_published_at_missing");
   }
-  const managedTypes = [...new Set(manifestItem.relations.map(relation => relation.type))];
-  const rows = managedTypes.length
+  const rows = manifestItem.kind === "service"
     ? await tx.select({
       type: contentRelations.type,
       sortOrder: contentRelations.sortOrder,
@@ -79,7 +84,7 @@ export async function databaseItemChecksum(
       .innerJoin(contentEntries, eq(contentRelations.targetId, contentEntries.id))
       .where(and(
         eq(contentRelations.sourceId, entry.id),
-        inArray(contentRelations.type, managedTypes),
+        inArray(contentRelations.type, managedRelationTypes),
       ))
     : [];
   const relations = rows.map(row => ({
