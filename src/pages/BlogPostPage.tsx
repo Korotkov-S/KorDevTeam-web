@@ -200,7 +200,7 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
                 ) : null}
               </div>
 
-              <h1 className="mt-7 max-w-[18ch] text-balance text-[clamp(3rem,7vw,7.2rem)] font-semibold leading-[.91] tracking-[-0.065em] text-[var(--public-ink)]" itemProp="headline">
+              <h1 className="mt-7 max-w-[18ch] break-words text-balance text-[clamp(2.625rem,7vw,7.2rem)] font-semibold leading-[.91] tracking-[-0.065em] text-[var(--public-ink)] sm:text-[clamp(3rem,7vw,7.2rem)]" itemProp="headline">
                 {meta.title}
               </h1>
 

@@ -133,3 +133,26 @@ test("article content column can shrink around a wide markdown table", () => {
   const articleBody = document.querySelector('[itemprop="articleBody"]');
   assert.ok(articleBody?.parentElement?.classList.contains("min-w-0"));
 });
+
+test("article title can wrap an unbroken long word on a narrow screen", () => {
+  render(
+    <MemoryRouter initialEntries={["/blog/editorial/"]}>
+      <Routes>
+        <Route path="/blog/:slug/" element={<BlogPostPage article={{
+          title: "CRM для предпринимателя",
+          excerpt: "Практический разбор.",
+          bodyMd: "Основной текст.",
+          publishedAt: "2026-09-01T00:00:00.000Z",
+          readTime: "3 мин",
+          tags: [],
+          coverUrl: "",
+          imageUrls: [],
+          media: {},
+        }} />}/>
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const title = screen.getByRole("heading", { name: "CRM для предпринимателя", level: 1 });
+  assert.ok(title.classList.contains("break-words"));
+});
