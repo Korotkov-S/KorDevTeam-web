@@ -50,3 +50,17 @@ test("article payload media identifiers resolve only through the supplied media 
   assert.deepEqual(article.imageUrls, ["https://cdn.example/cover.webp", "https://legacy.example/image.jpg"]);
   assert.equal(articlePresentation({ ...value, payload: { coverUrl: "00000000-0000-4000-8000-000000000099" } }, media).coverUrl, "");
 });
+
+test("article cards expose only approved blog category slugs", () => {
+  const valid = articleCard({
+    ...entry("categorized", "Материал с категорией", "2026-09-18T08:00:00.000Z"),
+    payload: { category: "crm-sales" },
+  });
+  const stale = articleCard({
+    ...entry("stale", "Материал со старой категорией", "2026-09-17T08:00:00.000Z"),
+    payload: { category: "old-category" },
+  });
+
+  assert.equal(valid.category, "crm-sales");
+  assert.equal(stale.category, null);
+});

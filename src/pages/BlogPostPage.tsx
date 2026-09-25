@@ -12,6 +12,7 @@ import {
   type CarouselApi,
 } from "../components/ui/carousel";
 import type { MediaPresentationMap } from "../server/media/presentation";
+import type { BlogCategorySlug } from "../lib/blogCategories";
 
 interface BlogPostMeta {
   title: string;
@@ -141,6 +142,7 @@ function PostImageCarousel({
 export type ArticlePresentation = {
   title: string; excerpt: string; bodyMd: string; publishedAt?: string; updatedAt?: string;
   readTime: string; tags: string[]; coverUrl: string; imageUrls: string[]; media?: MediaPresentationMap;
+  category: BlogCategorySlug | null;
 };
 export function BlogPostPage({ article }: { article: ArticlePresentation }) {
   const { slug } = useParams<{ slug: string }>();
