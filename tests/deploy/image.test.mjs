@@ -33,6 +33,24 @@ test('production image packages SSR, migrations and production dependencies unde
   assert.match(dockerfile, /ENTRYPOINT \["\/app\/scripts\/runtime-entrypoint\.sh"\]/);
 });
 
+test('content release image is a minimal compiled Node 22 runtime with immutable provenance', () => {
+  const dockerfile = readFileSync('Dockerfile', 'utf8');
+  assert.match(dockerfile, /FROM dependencies AS content-release-build/);
+  assert.match(dockerfile, /RUN yarn build:content-release/);
+  const target = dockerfile.split('FROM node:22.22.0-alpine AS content-release\n')[1]?.split('\nFROM ')[0] ?? '';
+  assert.ok(target, 'content-release target is missing');
+  assert.match(target, /org\.opencontainers\.image\.revision/);
+  assert.match(target, /org\.opencontainers\.image\.source/);
+  assert.match(target, /test .*RELEASE_SHA/);
+  assert.match(target, /USER node/);
+  assert.match(target, /CMD \["node","\/app\/content-release\.mjs","manifest"\]/);
+  for (const source of ['public/content/blog.ru.json', 'public/blog/*.md', 'content/portfolio/cases/*.json', 'content/services.ru.json']) {
+    assert.ok(target.includes(source), `content-release target must copy ${source}`);
+  }
+  assert.doesNotMatch(target, /content\.sqlite|tsx|COPY .*\/src(?:\s|\/)/);
+  assert.doesNotMatch(dockerfile, /AS content-migration/);
+});
+
 test('runtime entrypoint rejects redirected or incorrectly-owned private lead temp roots', () => {
   const script = readFileSync('scripts/runtime-entrypoint.sh', 'utf8');
   assert.match(script, /LEAD_TEMP_ROOT.*\/tmp\/kordev-leads/);
@@ -56,8 +74,9 @@ test('local topology has private shared PostgreSQL and distinct blue green ports
 });
 test('production compose resolves both immutable slots without a public database port', () => {
   const ref = 'ghcr.io/example/kordevteam:' + 'a'.repeat(40);
-  const r = spawnSync('docker', ['compose', '--env-file', 'tests/fixtures/deploy-leads.env', '-f', 'deploy/docker-compose.team.yml', 'config', '--format', 'json'], {
-    encoding: 'utf8', env: deployFixtureEnvironment(),
+  const contentImage = 'ghcr.io/example/kordevteam-content:' + 'e'.repeat(40);
+  const r = spawnSync('docker', ['compose', '--env-file', 'tests/fixtures/deploy-leads.env', '-f', 'deploy/docker-compose.team.yml', '--profile', 'content-release', 'config', '--format', 'json'], {
+    encoding: 'utf8', env: { ...deployFixtureEnvironment(), CONTENT_RELEASE_IMAGE: contentImage, CONTENT_MANIFEST_SHA256: 'd'.repeat(64), RELEASE_SHA: 'e'.repeat(40) },
   });
   assert.equal(r.status, 0, r.stderr);
   const { services } = JSON.parse(r.stdout);
@@ -74,6 +93,17 @@ test('production compose resolves both immutable slots without a public database
     assert.equal(services[`kordevteam-${color}`].environment.PUBLIC_MEDIA_S3_BUCKET, 'kordev-public-fixture');
     assert.equal(services[`kordevteam-${color}`].read_only, true);
   }
+  const release = services['content-release'];
+  assert.equal(release.image, contentImage);
+  assert.deepEqual(release.networks, { backend: null });
+  assert.equal(release.read_only, true);
+  assert.equal(release.user, '1000:1000');
+  assert.equal(release.ports, undefined);
+  assert.deepEqual(Object.keys(release.environment).sort(), ['CONTENT_MANIFEST_SHA256', 'DATABASE_URL', 'RELEASE_SHA']);
+  assert.equal(release.environment.DATABASE_URL, services['kordevteam-blue'].environment.DATABASE_URL);
+  assert.ok(release.tmpfs.includes('/tmp:size=32m,noexec,nosuid'));
+  assert.deepEqual(release.cap_drop, ['ALL']);
+  assert.ok(release.security_opt.includes('no-new-privileges:true'));
 });
 test('production compose refuses missing admin secrets', () => {
   const base = deployFixtureEnvironment();

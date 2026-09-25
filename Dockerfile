@@ -5,24 +5,12 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --immutable
 
-FROM dependencies AS content-migration
+FROM dependencies AS content-release-build
 ARG RELEASE_SHA
 ENV RELEASE_SHA=$RELEASE_SHA
-LABEL org.opencontainers.image.revision=$RELEASE_SHA
-COPY --chown=node:node tsconfig.json tsconfig.server.json ./
-COPY --chown=node:node src/server/content/repository.ts src/server/content/types.ts src/server/content/migration.ts ./src/server/content/
-COPY --chown=node:node src/server/db/client.ts src/server/db/schema.ts ./src/server/db/
-COPY --chown=node:node src/lib/blogPresentation.mjs ./src/lib/blogPresentation.mjs
-COPY --chown=node:node server/utils/contentMeta.js ./server/utils/contentMeta.js
-COPY --chown=node:node server/data/content.sqlite ./server/data/content.sqlite
-COPY --chown=node:node public/blog/*.md ./public/blog/
-COPY --chown=node:node public/content/blog.ru.json public/content/projects.ru.json ./public/content/
-COPY --chown=node:node src/blog/*.md ./src/blog/
-COPY --chown=node:node scripts/migrate-content-to-postgres.ts scripts/verify-content-migration.ts scripts/bootstrap-content-check.mjs scripts/release-files.mjs ./scripts/
-RUN chmod 0600 /app/server/data/content.sqlite
+COPY . .
 RUN test "${#RELEASE_SHA}" = 40 && printf '%s' "$RELEASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
-USER node
-CMD ["node", "--import", "tsx", "scripts/migrate-content-to-postgres.ts", "--dry-run"]
+RUN yarn build:content-release
 
 FROM dependencies AS media-migration
 WORKDIR /app
@@ -49,6 +37,23 @@ RUN test -n "$RELEASE_SHA" && yarn build
 
 FROM dependencies AS production-dependencies
 RUN yarn plugin import workspace-tools && yarn workspaces focus --all --production
+
+FROM node:22.22.0-alpine AS content-release
+WORKDIR /app
+ENV NODE_ENV=production
+ARG RELEASE_SHA
+ENV RELEASE_SHA=$RELEASE_SHA
+LABEL org.opencontainers.image.revision=$RELEASE_SHA
+LABEL org.opencontainers.image.source="https://github.com/Korotkov-S/KorDevTeam-web"
+COPY --from=production-dependencies --chown=node:node /app/node_modules /app/node_modules
+COPY --from=content-release-build --chown=node:node /app/build/content-release/content-release.mjs /app/content-release.mjs
+COPY --from=content-release-build --chown=node:node /app/public/content/blog.ru.json /app/public/content/blog.ru.json
+COPY --from=content-release-build --chown=node:node /app/public/blog/*.md /app/public/blog/
+COPY --from=content-release-build --chown=node:node /app/content/portfolio/cases/*.json /app/content/portfolio/cases/
+COPY --from=content-release-build --chown=node:node /app/content/services.ru.json /app/content/services.ru.json
+RUN test "${#RELEASE_SHA}" = 40 && printf '%s' "$RELEASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
+USER node
+CMD ["node","/app/content-release.mjs","manifest"]
 
 FROM node:22.22.0-alpine AS production
 WORKDIR /app

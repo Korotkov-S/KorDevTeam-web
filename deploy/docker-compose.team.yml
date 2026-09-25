@@ -56,14 +56,17 @@ x-web: &web
       condition: service_healthy
 
 services:
-  content-migration:
-    image: ${CONTENT_MIGRATION_IMAGE:-kordevteam-content:unconfigured}
-    profiles: [content-migration]
+  content-release:
+    image: ${CONTENT_RELEASE_IMAGE:-kordevteam-content:unconfigured}
+    profiles: [content-release]
+    user: "1000:1000"
     environment:
+      CONTENT_MANIFEST_SHA256: ${CONTENT_MANIFEST_SHA256:-0000000000000000000000000000000000000000000000000000000000000000}
       DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
+      RELEASE_SHA: ${RELEASE_SHA:-0000000000000000000000000000000000000000}
     networks: [backend]
     read_only: true
-    tmpfs: [/tmp]
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
   media-migration:
