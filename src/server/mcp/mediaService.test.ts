@@ -110,6 +110,7 @@ test("valid upload decodes bytes, allows decorative images, and resolves the pre
     altText: "",
     decorative: true,
     version: 1,
+    createdAt: "2026-09-25T10:00:00.000Z",
   });
 });
 
@@ -133,6 +134,7 @@ test("media list searches alt text case-insensitively and paginates", async () =
   }));
   const first = await service.list({ query: "КОМАНДА", limit: 1 });
   assert.equal(first.items.length, 1);
+  assert.equal(first.items[0]?.createdAt, "2026-09-25T10:00:00.000Z");
   assert.ok(first.nextCursor);
   const second = await service.list({ query: "команда", limit: 1, cursor: first.nextCursor });
   assert.equal(second.items.length, 1);

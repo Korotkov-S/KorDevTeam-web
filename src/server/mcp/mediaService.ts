@@ -29,6 +29,7 @@ function present(asset: PresentedAsset) {
     altText: asset.altText,
     decorative: asset.decorative,
     version: asset.version,
+    createdAt: asset.createdAt.toISOString(),
   };
 }
 

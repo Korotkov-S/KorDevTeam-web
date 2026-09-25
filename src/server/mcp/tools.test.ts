@@ -41,8 +41,8 @@ function services(overrides: { content?: Partial<McpServices["content"]>; media?
     ...overrides.content,
   };
   const media = {
-    async list() { return { items: [{ id: "media-id", publicUrl: "https://cdn.kordev.team/image.png" }] }; },
-    async uploadImage() { return { id: "media-id", publicUrl: "https://cdn.kordev.team/image.png", width: 10, height: 10, mimeType: "image/png", altText: "Команда", decorative: false, version: 1 }; },
+    async list() { return { items: [{ id: "media-id", publicUrl: "https://cdn.kordev.team/image.png", createdAt: "2026-09-25T10:00:00.000Z" }] }; },
+    async uploadImage() { return { id: "media-id", publicUrl: "https://cdn.kordev.team/image.png", width: 10, height: 10, mimeType: "image/png", altText: "Команда", decorative: false, version: 1, createdAt: "2026-09-25T10:00:00.000Z" }; },
     ...overrides.media,
   };
   return { content, media } as McpServices;

@@ -93,6 +93,7 @@ const mediaAssetOutput = z.strictObject({
   altText: z.string().optional(),
   decorative: z.boolean().optional(),
   version: z.number().int().positive().optional(),
+  createdAt: z.string(),
 });
 const annotations = (readOnlyHint: boolean) => ({
   readOnlyHint,
