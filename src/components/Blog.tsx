@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -29,12 +29,14 @@ export function Blog({
   posts = [],
   heading,
   serviceLink,
+  breadcrumbs,
 }: {
   withId?: boolean;
   mode?: "preview" | "index" | "category";
   posts?: BlogPostCardView[];
   heading?: BlogHeading;
   serviceLink?: { href: string; label: string };
+  breadcrumbs?: ReactNode;
 } = {}) {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -117,6 +119,7 @@ export function Blog({
       <div ref={sectionRef} tabIndex={-1} itemScope itemType="https://schema.org/Blog">
         <meta itemProp="name" content={t("blog.title")} />
         <meta itemProp="description" content={t("blog.subtitle")} />
+        {breadcrumbs}
         <div className="mb-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <SectionHeading
             level={mode === "preview" ? 2 : 1}
