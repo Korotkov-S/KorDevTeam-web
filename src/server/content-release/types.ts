@@ -36,3 +36,28 @@ export type ContentReleaseBundle = {
   portfolioSources: PortfolioCaseSource[];
   serviceSources: CommercialServiceSource[];
 };
+
+export type ContentReleaseAction =
+  | "insert"
+  | "update"
+  | "unchanged"
+  | "conflict"
+  | "unowned-conflict"
+  | "orphaned-owned";
+
+export type ContentReleasePlanItem = {
+  key: string;
+  action: ContentReleaseAction;
+  entryId: string | null;
+  expectedVersion: number | null;
+  expectedDatabaseChecksum: string | null;
+  desiredSourceChecksum: string | null;
+};
+
+export type ContentReleasePlan = {
+  manifestChecksum: string;
+  blocked: boolean;
+  counts: Record<ContentReleaseAction, number>;
+  items: ContentReleasePlanItem[];
+  planChecksum: string;
+};
