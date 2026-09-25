@@ -1,0 +1,29 @@
+{
+  "count": 2,
+  "text_indicator_to_statistics": [
+    {
+      "text_indicator": { "type": "QUERY", "value": "Внедрение CRM" },
+      "popular_complementary_indicator": { "type": "URL", "value": "https://example.test/services/crm/" },
+      "statistics": [
+        { "date": "2026-09-22", "field": "IMPRESSIONS", "value": 100 },
+        { "date": "2026-09-22", "field": "CLICKS", "value": 8 },
+        { "date": "2026-09-22", "field": "CTR", "value": 8 },
+        { "date": "2026-09-22", "field": "POSITION", "value": 6.5 },
+        { "date": "2026-09-23", "field": "IMPRESSIONS", "value": 120 },
+        { "date": "2026-09-23", "field": "CLICKS", "value": 12 },
+        { "date": "2026-09-23", "field": "CTR", "value": 10 },
+        { "date": "2026-09-23", "field": "POSITION", "value": 5.25 }
+      ]
+    },
+    {
+      "text_indicator": { "type": "QUERY", "value": "CRM для продаж" },
+      "popular_complementary_indicator": { "type": "URL", "value": "https://example.test/services/crm/" },
+      "statistics": [
+        { "date": "2026-09-23", "field": "IMPRESSIONS", "value": 40 },
+        { "date": "2026-09-23", "field": "CLICKS", "value": 2 },
+        { "date": "2026-09-23", "field": "CTR", "value": 5 },
+        { "date": "2026-09-23", "field": "POSITION", "value": 11 }
+      ]
+    }
+  ]
+}
