@@ -311,10 +311,13 @@ export function createSeoRepository(db: SeoDatabase) {
       return change;
     },
 
-    async listChanges(filters: { pagePath?: string }, page: { limit: number; cursor: string | null }) {
+    async listChanges(filters: { pagePath?: string; dateFrom?: string; dateTo?: string }, page: { limit: number; cursor: string | null }) {
       const offset = cursorOffset(page.cursor);
-      const where = filters.pagePath ? eq(seoChanges.pagePath, filters.pagePath) : undefined;
-      const rows = await db.select().from(seoChanges).where(where).orderBy(desc(seoChanges.appliedAt), desc(seoChanges.id))
+      const conditions = [];
+      if (filters.pagePath) conditions.push(eq(seoChanges.pagePath, filters.pagePath));
+      if (filters.dateFrom) conditions.push(gte(seoChanges.appliedAt, new Date(`${filters.dateFrom}T00:00:00.000Z`)));
+      if (filters.dateTo) conditions.push(lte(seoChanges.appliedAt, new Date(`${filters.dateTo}T23:59:59.999Z`)));
+      const rows = await db.select().from(seoChanges).where(and(...conditions)).orderBy(desc(seoChanges.appliedAt), desc(seoChanges.id))
         .limit(page.limit + 1).offset(offset);
       return { items: rows.slice(0, page.limit), nextCursor: rows.length > page.limit ? String(offset + page.limit) : null };
     },
@@ -355,11 +358,13 @@ export function createSeoRepository(db: SeoDatabase) {
       });
     },
 
-    async listRecommendations(filters: { status?: RecommendationStatus; pagePath?: string }, page: { limit: number; cursor: string | null }) {
+    async listRecommendations(filters: { status?: RecommendationStatus; pagePath?: string; dateFrom?: string; dateTo?: string }, page: { limit: number; cursor: string | null }) {
       const offset = cursorOffset(page.cursor);
       const conditions = [];
       if (filters.status) conditions.push(eq(seoRecommendations.status, filters.status));
       if (filters.pagePath) conditions.push(eq(seoRecommendations.pagePath, filters.pagePath));
+      if (filters.dateFrom) conditions.push(gte(seoRecommendations.createdAt, new Date(`${filters.dateFrom}T00:00:00.000Z`)));
+      if (filters.dateTo) conditions.push(lte(seoRecommendations.createdAt, new Date(`${filters.dateTo}T23:59:59.999Z`)));
       const rows = await db.select().from(seoRecommendations).where(and(...conditions))
         .orderBy(desc(seoRecommendations.createdAt), desc(seoRecommendations.id)).limit(page.limit + 1).offset(offset);
       return { items: rows.slice(0, page.limit), nextCursor: rows.length > page.limit ? String(offset + page.limit) : null };

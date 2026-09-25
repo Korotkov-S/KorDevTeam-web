@@ -30,7 +30,7 @@ function snapshot(bodyMd = "Текст") {
   };
 }
 
-function services(overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]> } = {}): McpServices {
+function services(overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]>; seo?: Partial<McpServices["seo"]> } = {}): McpServices {
   const content = {
     async list() { return { items: [{ id: ENTRY_ID, kind: "article", slug: "mcp-article", status: "draft", title: "MCP статья", version: 1, updatedAt: new Date("2026-09-25T10:00:00.000Z"), publishedAt: null }] }; },
     async get() { return { entry: { id: ENTRY_ID, ...snapshot(), status: "draft", version: 1 }, relations: [], mediaRefs: [] }; },
@@ -45,7 +45,17 @@ function services(overrides: { content?: Partial<McpServices["content"]>; media?
     async uploadImage() { return { id: "media-id", publicUrl: "https://cdn.kordev.team/image.png", width: 10, height: 10, mimeType: "image/png", altText: "Команда", decorative: false, version: 1, createdAt: "2026-09-25T10:00:00.000Z" }; },
     ...overrides.media,
   };
-  return { content, media } as McpServices;
+  const seo = {
+    async getOverview() { return { impressions: 10, clicks: 1, ctr: 0.1, averagePosition: 5 }; },
+    async listQueries() { return { items: [], nextCursor: null }; },
+    async listChanges() { return { items: [], nextCursor: null }; },
+    async listRecommendations() { return { items: [], nextCursor: null }; },
+    async createRecommendation() { return { id: ENTRY_ID, status: "new" }; },
+    async recordChange() { return { id: ENTRY_ID }; },
+    async updateRecommendationStatus() { return { id: ENTRY_ID, status: "accepted" }; },
+    ...overrides.seo,
+  };
+  return { content, media, seo } as McpServices;
 }
 
 async function connected(scopes: McpScope[], provided = services(), logger?: (record: McpAuditRecord) => void) {
@@ -77,6 +87,9 @@ test("scope combinations register only their exact tool surface", async t => {
     [["content:publish"], ["publish_content", "unpublish_content"]],
     [["media:write"], ["upload_image"]],
     [["media:read", "media:write"], ["list_media", "upload_image"]],
+    [["seo:read"], ["get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations"]],
+    [["seo:write"], []],
+    [["seo:read", "seo:write"], ["create_seo_recommendation", "get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "record_seo_change", "update_seo_recommendation_status"]],
     [["content:read", "content:write", "content:publish", "media:read", "media:write"], [
       "create_content_draft", "get_content", "list_content", "list_media", "publish_content",
       "unpublish_content", "update_content_draft", "upload_image",
@@ -86,6 +99,29 @@ test("scope combinations register only their exact tool surface", async t => {
     const connection = await connected(scopes);
     t.after(async () => { await connection.client.close(); await connection.server.close(); });
     assert.deepEqual((await connection.client.listTools()).tools.map(tool => tool.name).sort(), expected);
+  }
+});
+
+test("SEO-only scopes never expose content mutation and crafted hidden calls do not reach services", async t => {
+  let writes = 0;
+  const connection = await connected(["seo:read"], services({ seo: { async createRecommendation() { writes++; return {}; } } }));
+  t.after(async () => { await connection.client.close(); await connection.server.close(); });
+  const names = (await connection.client.listTools()).tools.map(tool => tool.name);
+  assert.equal(names.some(name => name.includes("content") || name.includes("publish")), false);
+  await assert.rejects(connection.client.callTool({ name: "create_seo_recommendation", arguments: {} }), /not found|Method not found/u);
+  assert.equal(writes, 0);
+});
+
+test("SEO list schemas enforce hard limits, ISO date bounds, and cursors", async t => {
+  const connection = await connected(["seo:read"]);
+  t.after(async () => { await connection.client.close(); await connection.server.close(); });
+  for (const args of [
+    { dateFrom: "2026-09-01", dateTo: "2026-09-25", limit: 101 },
+    { dateFrom: "bad", dateTo: "2026-09-25", limit: 10 },
+    { dateFrom: "2026-09-01", dateTo: "2026-09-25", cursor: "-1" },
+  ]) {
+    const result = await connection.client.callTool({ name: "list_seo_queries", arguments: args });
+    assert.equal(result.isError, true);
   }
 });
 

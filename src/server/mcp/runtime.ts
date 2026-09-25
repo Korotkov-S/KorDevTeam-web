@@ -6,6 +6,8 @@ import { createMcpContentService } from "./contentService";
 import { createMcpMediaService } from "./mediaService";
 import { createMcpTokenRepository, type McpTokenRepository } from "./tokenRepository";
 import { createMcpTokenService, type McpTokenService } from "./tokenService";
+import { getSeoMonitoringService } from "../seo-monitoring/runtime";
+import { createMcpSeoService } from "../seo-monitoring/mcpService";
 
 let repository: McpTokenRepository | undefined;
 let service: McpTokenService | undefined;
@@ -16,6 +18,7 @@ function buildMcpServices() {
     token: getMcpTokenService(),
     content: createMcpContentService(getAdminContentService()),
     media: createMcpMediaService(getMediaService()),
+    seoForToken: (tokenId: string) => createMcpSeoService(getSeoMonitoringService(), tokenId),
   };
 }
 

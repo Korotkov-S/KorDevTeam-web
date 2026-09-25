@@ -5,10 +5,12 @@ import type { ContentEntry, ContentKind } from "../content/types";
 import type { McpPrincipal, McpScope } from "./contracts";
 import type { McpContentSelector, McpContentService, McpContentSnapshot } from "./contentService";
 import type { McpMediaService } from "./mediaService";
+import type { McpSeoService } from "../seo-monitoring/mcpService";
 
 export type McpServices = {
   content: McpContentService;
   media: McpMediaService;
+  seo: McpSeoService;
 };
 
 export type McpAuditRecord = {
@@ -46,8 +48,35 @@ const snapshotSchema = z.strictObject({
 });
 const pageFields = {
   limit: z.number().int().min(1).max(100).optional(),
-  cursor: z.string().min(1).optional(),
+  cursor: z.string().regex(/^(?:0|[1-9]\d*)$/).optional(),
 };
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const seoFilterFields = {
+  dateFrom: isoDate,
+  dateTo: isoDate,
+  source: z.enum(["yandex_webmaster", "google_search_console"]).optional(),
+  regionId: z.uuid().optional(),
+  device: z.enum(["desktop", "mobile", "tablet", "all"]).optional(),
+  frequencyBand: z.enum(["high", "medium", "low", "unclassified"]).optional(),
+  pagePath: z.string().max(500).regex(/^\//).optional(),
+};
+function validateSeoRange(value: { dateFrom: string; dateTo: string }, context: z.RefinementCtx) {
+    const from = new Date(`${value.dateFrom}T00:00:00Z`);
+    const to = new Date(`${value.dateTo}T00:00:00Z`);
+    const days = (+to - +from) / 86_400_000 + 1;
+    if (!Number.isFinite(+from) || !Number.isFinite(+to) || days < 1 || days > 366
+      || from.toISOString().slice(0, 10) !== value.dateFrom || to.toISOString().slice(0, 10) !== value.dateTo) {
+      context.addIssue({ code: "custom", message: "Date range must contain 1–366 valid ISO dates" });
+    }
+}
+const seoOverviewInput = z.strictObject(seoFilterFields).superRefine(validateSeoRange);
+const seoQueryListInput = z.strictObject({ ...seoFilterFields, ...pageFields }).superRefine(validateSeoRange);
+const seoChangeListInput = z.strictObject({ dateFrom: isoDate, dateTo: isoDate, pagePath: z.string().max(500).regex(/^\//).optional(), ...pageFields }).superRefine(validateSeoRange);
+const seoRecommendationListInput = z.strictObject({ dateFrom: isoDate, dateTo: isoDate,
+  status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]).optional(),
+  pagePath: z.string().max(500).regex(/^\//).optional(), ...pageFields }).superRefine(validateSeoRange);
+const genericRecord = z.record(z.string(), z.unknown());
+const genericPage = z.strictObject({ items: z.array(genericRecord), nextCursor: z.string().nullable().optional() });
 const listContentInput = z.strictObject({
   kind: contentKindSchema.optional(),
   status: z.enum(["draft", "published"]).optional(),
@@ -116,6 +145,12 @@ const errorMessages: Record<string, string> = {
   media_type_invalid: "Поддерживаются только JPG, PNG и WebP.",
   mcp_pagination_invalid: "Некорректные параметры страницы.",
   mcp_scope_required: "Для этой операции недостаточно прав токена.",
+  seo_evidence_invalid: "Доказательства рекомендации содержат некорректные метрики или даты.",
+  seo_date_invalid: "Укажите корректную дату в формате YYYY-MM-DD.",
+  seo_date_range_invalid: "Диапазон SEO-данных должен содержать от 1 до 366 дней.",
+  seo_cursor_invalid: "Некорректный курсор списка SEO-данных.",
+  seo_recommendation_status_conflict: "Рекомендация уже изменилась. Сначала прочитайте актуальное состояние.",
+  seo_recommendation_transition_invalid: "Недопустимый переход состояния рекомендации.",
 };
 
 function compactEntry(entry: Pick<ContentEntry, "id" | "slug" | "status" | "version"> & Partial<Pick<ContentEntry, "kind" | "title" | "updatedAt" | "publishedAt">>) {
@@ -303,6 +338,69 @@ export function createKordevMcpServer(
       outputSchema: withError(mediaAssetOutput),
       annotations: annotations(false),
     }, input => run("upload_image", () => services.media.uploadImage(input, principal.adminUserId)));
+  }
+
+  if (has("seo:read")) {
+    server.registerTool("get_seo_overview", {
+      title: "Сводка SEO",
+      description: "Возвращает агрегированные показы, клики, CTR и среднюю позицию за ограниченный период.",
+      inputSchema: seoOverviewInput,
+      outputSchema: withError(genericRecord),
+      annotations: annotations(true),
+    }, input => run("get_seo_overview", () => services.seo.getOverview(input)));
+    server.registerTool("list_seo_queries", {
+      title: "Список поисковых запросов",
+      description: "Возвращает ограниченную страницу запросов и их агрегированных метрик.",
+      inputSchema: seoQueryListInput,
+      outputSchema: withError(genericPage),
+      annotations: annotations(true),
+    }, input => run("list_seo_queries", () => services.seo.listQueries(input)));
+    server.registerTool("list_seo_changes", {
+      title: "Журнал SEO-изменений",
+      description: "Возвращает ограниченную страницу зарегистрированных изменений сайта.",
+      inputSchema: seoChangeListInput,
+      outputSchema: withError(genericPage),
+      annotations: annotations(true),
+    }, input => run("list_seo_changes", () => services.seo.listChanges(input)));
+    server.registerTool("list_seo_recommendations", {
+      title: "SEO-рекомендации",
+      description: "Возвращает ограниченную страницу рекомендаций агента и их состояния.",
+      inputSchema: seoRecommendationListInput,
+      outputSchema: withError(genericPage),
+      annotations: annotations(true),
+    }, input => run("list_seo_recommendations", () => services.seo.listRecommendations(input)));
+  }
+
+  if (has("seo:read", "seo:write")) {
+    server.registerTool("create_seo_recommendation", {
+      title: "Создать SEO-рекомендацию",
+      description: "Сохраняет аналитическую рекомендацию с серверной дедупликацией; не изменяет публичный контент.",
+      inputSchema: z.strictObject({
+        title: z.string().trim().min(1).max(300), rationale: z.string().trim().min(1).max(5_000),
+        pagePath: z.string().max(500).regex(/^\//).optional(), queryId: z.uuid().optional(),
+        issueType: z.string().trim().min(1).max(120), evidence: genericRecord,
+        confidence: z.enum(["low", "medium", "high"]),
+      }),
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("create_seo_recommendation", () => services.seo.createRecommendation(input)));
+    server.registerTool("record_seo_change", {
+      title: "Записать SEO-изменение",
+      description: "Регистрирует уже выполненное изменение для последующей оценки влияния.",
+      inputSchema: z.strictObject({ pagePath: z.string().max(500).regex(/^\//), summary: z.string().trim().min(1).max(2_000),
+        type: z.enum(["content", "metadata", "structure", "interlinking", "technical", "other"]),
+        appliedAt: z.iso.datetime().optional(), contentEntryId: z.uuid().optional(), contentVersion: z.number().int().positive().optional() }),
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("record_seo_change", () => {
+      const { appliedAt, ...command } = input;
+      return services.seo.recordChange({ ...command, ...(appliedAt ? { appliedAt: new Date(appliedAt) } : {}) });
+    }));
+    server.registerTool("update_seo_recommendation_status", {
+      title: "Изменить состояние SEO-рекомендации",
+      description: "Меняет состояние рекомендации с проверкой ожидаемого текущего состояния.",
+      inputSchema: z.strictObject({ id: z.uuid(), expectedStatus: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]),
+        status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]) }),
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("update_seo_recommendation_status", () => services.seo.updateRecommendationStatus(input)));
   }
 
   return server;

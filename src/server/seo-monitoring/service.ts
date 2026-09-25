@@ -85,17 +85,23 @@ export function createSeoService(repository: SeoRepository) {
       return repository.listQueries(filters(input.filters), page(input));
     },
 
-    listChanges(input: { pagePath?: string; limit?: number; cursor?: string | null }) {
+    listChanges(input: { pagePath?: string; dateFrom?: string; dateTo?: string; limit?: number; cursor?: string | null }) {
+      if ((input.dateFrom ? 1 : 0) !== (input.dateTo ? 1 : 0)) throw new Error("seo_date_range_invalid");
+      if (input.dateFrom && input.dateTo) filters({ dateFrom: input.dateFrom, dateTo: input.dateTo });
       return repository.listChanges({
         ...(input.pagePath ? { pagePath: normalizeSitePath(input.pagePath) } : {}),
+        ...(input.dateFrom ? { dateFrom: input.dateFrom, dateTo: input.dateTo! } : {}),
       }, page(input));
     },
 
-    listRecommendations(input: { status?: RecommendationStatus; pagePath?: string; limit?: number; cursor?: string | null }) {
+    listRecommendations(input: { status?: RecommendationStatus; pagePath?: string; dateFrom?: string; dateTo?: string; limit?: number; cursor?: string | null }) {
       if (input.status && !recommendationStatuses.has(input.status)) throw new Error("seo_recommendation_status_invalid");
+      if ((input.dateFrom ? 1 : 0) !== (input.dateTo ? 1 : 0)) throw new Error("seo_date_range_invalid");
+      if (input.dateFrom && input.dateTo) filters({ dateFrom: input.dateFrom, dateTo: input.dateTo });
       return repository.listRecommendations({
         ...(input.status ? { status: input.status } : {}),
         ...(input.pagePath ? { pagePath: normalizeSitePath(input.pagePath) } : {}),
+        ...(input.dateFrom ? { dateFrom: input.dateFrom, dateTo: input.dateTo! } : {}),
       }, page(input));
     },
 

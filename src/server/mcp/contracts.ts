@@ -4,6 +4,8 @@ export const MCP_SCOPES = [
   "content:publish",
   "media:read",
   "media:write",
+  "seo:read",
+  "seo:write",
 ] as const;
 
 export type McpScope = typeof MCP_SCOPES[number];

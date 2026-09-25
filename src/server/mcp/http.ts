@@ -70,7 +70,6 @@ function exactOrigin(trustedOrigin: URL): RequestHandler {
 export function createMcpRouter(dependencies: McpHttpDependencies = {}) {
   const runtime = dependencies.tokenService && dependencies.services ? undefined : getMcpServices();
   const tokenService = dependencies.tokenService ?? runtime!.token;
-  const services = dependencies.services ?? runtime!;
   const trustedOrigin = dependencies.trustedOrigin ?? readAdminAuthConfig(process.env).trustedOrigin;
   const verifier: OAuthTokenVerifier = {
     async verifyAccessToken(rawToken: string): Promise<AuthInfo> {
@@ -87,11 +86,15 @@ export function createMcpRouter(dependencies: McpHttpDependencies = {}) {
     },
   };
   const handler = createMcpHandler(
-    ({ authInfo }) => createKordevMcpServer(
-      principalFromAuthInfo(authInfo),
-      services,
-      dependencies.logger,
-    ),
+    ({ authInfo }) => {
+      const principal = principalFromAuthInfo(authInfo);
+      const scopedServices = dependencies.services ?? {
+        content: runtime!.content,
+        media: runtime!.media,
+        seo: runtime!.seoForToken(principal.tokenId),
+      };
+      return createKordevMcpServer(principal, scopedServices, dependencies.logger);
+    },
     { legacy: "stateless", responseMode: "json", maxRequestBodySize: MCP_MAX_REQUEST_BYTES },
   );
   const nodeHandler = toNodeHandler(handler, { maxRequestBodySize: MCP_MAX_REQUEST_BYTES });
