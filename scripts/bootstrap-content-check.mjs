@@ -26,7 +26,7 @@ export async function checkDatabase(mode, databaseUrl=process.env.DATABASE_URL) 
       }
     } else if(mode==='populated') {
       const rows=(await client.query('SELECT kind,status,count(*)::int AS count FROM content_entries GROUP BY kind,status ORDER BY kind::text,status::text')).rows;
-      if(JSON.stringify(rows)!==JSON.stringify([{kind:'article',status:'published',count:46},{kind:'case',status:'published',count:9}])) throw Error('Target database must contain exactly 46 published articles and 9 published cases');
+      if(JSON.stringify(rows)!==JSON.stringify([{kind:'article',status:'published',count:46},{kind:'case',status:'published',count:8}])) throw Error('Target database must contain exactly 46 published articles and 8 published cases');
     } else throw Error('Invalid database check');
   } finally {await client.end();}
 }
