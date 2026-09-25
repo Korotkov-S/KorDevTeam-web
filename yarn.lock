@@ -6613,7 +6613,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"esbuild@npm:^0.25.0":
+"esbuild@npm:0.25.11, esbuild@npm:^0.25.0":
   version: 0.25.11
   resolution: "esbuild@npm:0.25.11"
   dependencies:
@@ -7931,6 +7931,7 @@ __metadata:
     drizzle-kit: ^0.31.10
     drizzle-orm: ^0.45.2
     embla-carousel-react: ^8.6.0
+    esbuild: 0.25.11
     express: ^5.2.1
     hono: 4.13.9
     i18next: ^25.6.0
