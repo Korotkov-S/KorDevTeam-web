@@ -44,6 +44,12 @@ test("read-only validation gates a separate trusted main publisher", () => {
     assert.notEqual(stepIndex(steps, name), -1, `${name} must exist`);
     if (index) assert.ok(stepIndex(steps, gates[index - 1]) < stepIndex(steps, name), `${gates[index - 1]} must precede ${name}`);
   }
+  const crawlerDatabase = steps.find(step => step.name === "Prepare crawler database");
+  assert.match(crawlerDatabase.run, /yarn content:migrate/);
+  assert.match(crawlerDatabase.run, /yarn content:services/);
+  assert.match(crawlerDatabase.run, /yarn portfolio:import/);
+  assert.ok(crawlerDatabase.run.indexOf("yarn portfolio:import") < crawlerDatabase.run.indexOf("yarn content:services"),
+    "portfolio relation targets must exist before commercial services are synchronized");
   const validationBuild = steps.find(step => step.name === "Build image without publishing");
   assert.ok(validationBuild);
   assert.equal(validationBuild.with.push, false);
