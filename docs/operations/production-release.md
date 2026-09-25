@@ -1,6 +1,6 @@
 # Production release and restore operations
 
-Production changes only after an operator starts `workflow_dispatch` with an exact GHCR digest. A push to `main` validates and publishes an image but cannot change production. Never substitute a tag, including a commit tag, for the canonical `ghcr.io/<owner>/<repository>@sha256:<64 lowercase hex>` reference recorded by the build.
+Production changes only after an operator starts `workflow_dispatch` with exact GHCR digests for both the web and `content-release` images. A push to `main` validates and publishes both images plus `release-manifest.json`, but cannot change production. Never substitute a tag, including a commit tag, for either canonical `ghcr.io/<owner>/<repository>@sha256:<64 lowercase hex>` reference recorded by the build.
 
 Published-content reads bypass the process-local cache in production. The Docker image and both blue/green services in production and rehearsal Compose set `CONTENT_CACHE_TTL_SECONDS=0`. Every entry/list request reads PostgreSQL, so a prewarmed inactive slot sees committed publication changes immediately when traffic switches; sitemap lists use the same reads. This adds database reads but avoids cross-process stale content without a distributed invalidation mechanism.
 
@@ -38,11 +38,13 @@ curl --fail --silent --show-error --dump-header - --output /dev/null "$PUBLIC_OR
 
 The public response must be ready and its `X-Kordev-Slot` header must equal `current`. Reject the release if route metadata, the recorded image, container image, local health, public header, backup evidence, or build evidence disagree.
 
-## Approve or reject an exact digest release
+## Approve or reject an exact atomic release
 
-Open the successful **Validate and publish immutable image** run for the intended `main` commit. Copy `release-image-ref.txt` from the `release-image-<commit>` artifact and compare it with the exact reference and digest in the job summary. Confirm that the commit passed typecheck, tests, application build, built-runtime SEO crawl, and Docker build.
+Open the successful **Validate and publish immutable image** run for the intended `main` commit. Download `release-manifest.json` from the `release-manifest-<commit>` artifact; do not copy values from an untrusted comment or local build. Review its `gitSha`, exact `webImage`, exact `contentImage`, `contentManifestSha256`, numeric `ciRunId`, and UTC `builtAt`. Compare all non-secret identifiers with the job summary and confirm that the commit passed typecheck, tests, application build, built-runtime SEO crawl, and both multi-architecture Docker builds.
 
-To proceed, review the exact checked-out `src/routes/legal.tsx` and calculate `sha256sum src/routes/legal.tsx`. Open **Run workflow**, paste the image reference into `image_ref`, paste that owner-reviewed digest into `privacy_policy_sha256`, and explicitly enable `persist_test_lead`. The opt-in authorizes one clearly marked no-file test lead to be stored through the inactive slot; it may create ordinary outbox work and must be ignored/removed by the operator as a release test. If GitHub presents **Review deployments**, compare the inputs again and choose **Approve and deploy**. Choose **Reject**, cancel the waiting run, or do not start `workflow_dispatch` when any evidence is missing. Approval authorizes the job to deploy/check the inactive slot, run the evidence gate, explicitly run `switch-slot.sh`, and then prune only eligible release directories.
+To proceed, copy `webImage` to `image_ref`, `contentImage` to `content_image_ref`, and `contentManifestSha256` to `content_manifest_sha256` in the protected **Run workflow** form. Review the exact checked-out `src/routes/legal.tsx`, calculate `sha256sum src/routes/legal.tsx`, paste that owner-reviewed digest into `privacy_policy_sha256`, and explicitly enable `persist_test_lead`. The opt-in authorizes one clearly marked no-file test lead to be stored through the inactive slot; it may create ordinary outbox work and must be ignored/removed by the operator as a release test. If GitHub presents **Review deployments**, compare all four digests again and choose **Approve and deploy**. Choose **Reject**, cancel the waiting run, or do not start `workflow_dispatch` when any evidence is missing. Approval authorizes the job to deploy/check the inactive slot, run the evidence gate, explicitly run `switch-slot.sh`, and then prune only eligible release directories.
+
+The deploy writes private mode-`0600` reports below `$DEPLOY_STATE_DIR/content-releases/<slot>/`. If `plan.json` has `blocked:true`, stop before apply and inspect every item with `conflict`, `unowned-conflict`, or `orphaned-owned`. A conflict commonly means that an administrator or MCP client changed production after the source snapshot was prepared. Resolve it deliberately: either move the accepted production text or metadata back into the repository source and build a new release, or explicitly restore the reviewed source in the admin/MCP workflow and rerun from a new plan. Never edit the report, waive its checksum, or force apply against a different plan.
 
 For an operator rehearsal, the exact sequence run over SSH is:
 
@@ -53,9 +55,11 @@ set -a
 source /etc/kordevteam/operations.env
 set +a
 IMAGE_REF='ghcr.io/<owner>/<repository>@sha256:<64 lowercase hex>'
+CONTENT_IMAGE_REF='ghcr.io/<owner>/<repository>@sha256:<different 64 lowercase hex>'
+CONTENT_MANIFEST_SHA256='<contentManifestSha256 from release-manifest.json>'
 current="$(sed -n 's/^# current-slot: //p' "$TRAEFIK_DYNAMIC_FILE")"
 case "$current" in blue) inactive=green ;; green) inactive=blue ;; *) exit 1 ;; esac
-bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF"
+bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF" "$CONTENT_IMAGE_REF" "$CONTENT_MANIFEST_SHA256"
 PRIVACY_POLICY_SHA256='<reviewed SHA-256 of src/routes/legal.tsx>' \
   RELEASE_FORM_SMOKE_OPT_IN=persist-clearly-marked-test-lead \
   bash scripts/release-gate.sh "$inactive"
@@ -63,11 +67,13 @@ bash scripts/switch-slot.sh "$inactive"
 bash scripts/prune-releases.sh "$RELEASES_DIR"
 ```
 
-`deploy-slot.sh` performs the required encrypted pre-release backup before migrations, runs migrations, starts only the inactive service, and checks its health/SSR routes. `release-gate.sh` rechecks readiness under the release lock, confirms the supplied digest is exactly the deployed `src/routes/legal.tsx`, performs the explicitly authorized persistent inactive-slot form smoke, and only after acceptance writes private mode-`0600` evidence bound to the candidate image and slot record. Evidence expires after one hour; missing, malformed, stale, symlinked, overly permissive, policy-mismatched, or image-mismatched evidence blocks `switch-slot.sh` before routing changes. Do not run Compose pull/up/restart commands as a release substitute. `switch-slot.sh` then validates both exact recorded images, changes the Traefik route atomically, checks `X-Kordev-Slot` and public SSR pages, and automatically restores the previous route if public smoke fails.
+`deploy-slot.sh` validates both digest references, their common repository and matching revision labels before touching the database. It verifies the content manifest, performs the required encrypted pre-release backup, runs migrations, creates a fresh content plan, applies it atomically, verifies the result, and only then starts the inactive service and checks its health/SSR routes. Because both colors use общая PostgreSQL, a successful apply can become visible through the old active slot before route switch. Schedule the release accordingly and do not treat the blue/green route as a database isolation boundary.
+
+`release-gate.sh` rechecks readiness under the release lock, confirms the supplied privacy digest is exactly the deployed `src/routes/legal.tsx`, performs the explicitly authorized persistent inactive-slot form smoke, and only after acceptance writes private mode-`0600` evidence version 2 bound to the web image, content image, manifest checksum, plan checksum and slot record. Evidence expires after one hour; missing, malformed, stale, symlinked, overly permissive, policy-mismatched, image-mismatched, manifest-mismatched or plan-mismatched evidence blocks `switch-slot.sh` before routing changes. Do not run Compose pull/up/restart commands as a release substitute. `switch-slot.sh` then validates both exact recorded images, changes the Traefik route atomically, checks `X-Kordev-Slot` and public SSR pages, and automatically restores the previous route if public smoke fails.
 
 ## Verify production and canonical redirects
 
-After the workflow succeeds, record the Actions run URL, commit, image digest, old/new colors, pre-release backup object, and smoke results in the change record. Check direct canonical pages and every redirect hop manually:
+After the workflow succeeds, record the Actions run URL, `release-manifest.json`, both image digests, content manifest/plan checksums, old/new colors, pre-release backup object, persisted release-gate lead ID, and smoke results in the change record. Check direct canonical pages and every redirect hop manually:
 
 ```bash
 curl --fail --silent --show-error --dump-header - --output /dev/null "$PUBLIC_ORIGIN/api/health/ready"
@@ -80,6 +86,8 @@ curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap.xml"
 ```
 
 The final canonical URLs are HTTPS, non-`www`, and trailing-slash URLs; each redirect must point straight to that final form. Final pages and `sitemap.xml` must return 200 without a redirect. The canonical link must name the same final URL.
+
+Also confirm that `X-Kordev-Slot` equals the new color on the public ready response and that the clearly marked form lead recorded by `release-gate.sh` is visible in the admin lead list/outbox with the recorded lead ID. This verifies sitemap, canonical URLs, form lead and route identity as separate pieces of post-switch evidence; never submit an unmarked real-looking test request.
 
 Admin and automated API clients must use only the canonical HTTPS origin. The runtime returns `426` for privileged credentials received through the trusted HTTP proxy path and emits a one-year HSTS header on HTTPS responses; an HTTP response must never be accepted as evidence that an authenticated API call succeeded.
 
@@ -94,7 +102,7 @@ curl --fail --silent --show-error --dump-header - --output /dev/null "$PUBLIC_OR
 curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap.xml" >/dev/null
 ```
 
-Confirm that `X-Kordev-Slot` is the recorded previous color. Rollback changes only the application route/image; shared-database migrations must be backward-compatible expand migrations and are not reversed by this command.
+Confirm that `X-Kordev-Slot` is the recorded previous color. Rollback changes only the application route/image; shared-database migrations and an already committed content apply are not reversed by this command. The deployment contract is deliberately **без автоматического восстановления** общей БД: for a runtime failure use route rollback first. Consider manual `restore-postgres.sh` only after incident analysis proves that restoring the pre-release snapshot is safer than preserving post-backup writes, and document the data-loss decision before touching production.
 
 ## Backup manifests and restore drill
 

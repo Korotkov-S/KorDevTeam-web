@@ -50,6 +50,7 @@ test("read-only validation gates a separate trusted main publisher", () => {
   assert.match(crawlerDatabase.run, /yarn db:migrate/);
   for (const command of ["manifest", "plan", "apply", "verify"]) assert.match(crawlerDatabase.run, new RegExp(`content:release ${command}`));
   assert.match(crawlerDatabase.run, /RELEASE_SHA="\$GITHUB_SHA"/);
+  assert.doesNotMatch(crawlerDatabase.run, /yarn -s\b/, "the pinned Yarn 3 CLI does not support the Yarn 1 -s flag");
   assert.doesNotMatch(crawlerDatabase.run, /content:migrate|content:services|portfolio:import/);
   const webValidationBuild = steps.find(step => step.name === "Build web image without publishing");
   const contentValidationBuild = steps.find(step => step.name === "Build content image without publishing");
@@ -232,6 +233,15 @@ test("operator runbook covers approval, exact switching, rollback and public evi
   assert.match(source, /PRODUCTION_DATABASE_NAME[^\n]+non-secret[^\n]+environment variable/i);
   assert.doesNotMatch(source, /`PRODUCTION_DATABASE_URL`[^\n]+secret/i);
   assert.doesNotMatch(source, /staging/i);
+});
+
+test("operator runbook explains atomic content evidence and shared database recovery", () => {
+  const source = readFileSync("docs/operations/production-release.md", "utf8");
+  for (const term of [
+    "content_image_ref", "content_manifest_sha256", "release-manifest.json",
+    "content-release", "unowned-conflict", "orphaned-owned",
+    "общая PostgreSQL", "без автоматического восстановления",
+  ]) assert.match(source, new RegExp(term, "i"), `production runbook must cover ${term}`);
 });
 
 test("operator rehearsal loads trusted config before variables and fails before switch", () => {

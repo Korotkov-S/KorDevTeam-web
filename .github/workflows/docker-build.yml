@@ -185,12 +185,12 @@ jobs:
         run: |
           set -euo pipefail
           yarn db:migrate
-          manifest_report="$(RELEASE_SHA="$GITHUB_SHA" yarn -s content:release manifest)"
+          manifest_report="$(RELEASE_SHA="$GITHUB_SHA" yarn content:release manifest)"
           manifest_sha="$(node -e 'const x=JSON.parse(process.argv[1]); process.stdout.write(x.manifestChecksum)' "$manifest_report")"
-          plan_report="$(RELEASE_SHA="$GITHUB_SHA" yarn -s content:release plan)"
+          plan_report="$(RELEASE_SHA="$GITHUB_SHA" yarn content:release plan)"
           plan_sha="$(node -e 'const x=JSON.parse(process.argv[1]); process.stdout.write(x.planChecksum)' "$plan_report")"
-          RELEASE_SHA="$GITHUB_SHA" yarn -s content:release apply --release-sha "$GITHUB_SHA" --manifest-sha256 "$manifest_sha" --plan-sha256 "$plan_sha"
-          RELEASE_SHA="$GITHUB_SHA" yarn -s content:release verify
+          RELEASE_SHA="$GITHUB_SHA" yarn content:release apply --release-sha "$GITHUB_SHA" --manifest-sha256 "$manifest_sha" --plan-sha256 "$plan_sha"
+          RELEASE_SHA="$GITHUB_SHA" yarn content:release verify
           echo "manifest_sha256=$manifest_sha" >> "$GITHUB_OUTPUT"
 
       - name: Crawl built site

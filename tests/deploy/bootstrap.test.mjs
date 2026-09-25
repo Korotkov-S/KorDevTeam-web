@@ -128,3 +128,12 @@ test('content release target is backend-only and bootstrap checks dynamic totals
   assert.match(dockerfile, /FROM node:22\.22\.0-alpine AS content-release/);
   assert.doesNotMatch(readFileSync('scripts/bootstrap-content-check.mjs', 'utf8'), /(?:articles\s*[:=]\s*46|cases\s*[:=]\s*8)/);
 });
+
+test('deployment readme documents atomic content evidence and shared database recovery', () => {
+  const source = readFileSync('deploy/README.md', 'utf8');
+  for (const term of [
+    'content_image_ref', 'content_manifest_sha256', 'release-manifest.json',
+    'content-release', 'unowned-conflict', 'orphaned-owned',
+    'общая PostgreSQL', 'без автоматического восстановления',
+  ]) assert.match(source, new RegExp(term, 'i'), `deployment readme must cover ${term}`);
+});

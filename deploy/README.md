@@ -1,10 +1,10 @@
 # Production release operations
 
-These files are a deployment toolkit, not an installed production environment. No DNS, VPS, S3, timer, bucket policy, or Traefik changes are applied by the repository. CI image automation belongs to Task 8; production switching remains manual. There is no staging domain.
+These files are a deployment toolkit, not an installed production environment. No DNS, VPS, S3, timer, bucket policy, or Traefik changes are applied by the repository. CI publishes an atomic web/content release; production switching remains a protected manual dispatch. There is no staging domain.
 
 ## Image and local rehearsal
 
-Build an immutable image with `docker build --target production --build-arg RELEASE_SHA=<40-character-commit> -t <registry/image>:<same-commit> .` from a clean checkout at that commit. Node is pinned to 22.22.0 and the existing React Router/Vite pins are unchanged. The runtime includes SSR client/server output, PostgreSQL migrations and production dependencies, and runs as UID 1000. Build tooling and local SQLite data/secrets are excluded from production. The separate `content-migration` target includes locked full dependencies and the sanitized Russian migration sources. `/api/health` is liveness; `/api/health/ready` executes `SELECT 1` through the same Drizzle singleton as SSR and returns only `ready` or `not_ready`.
+Build the web image with `docker build --target production --build-arg RELEASE_SHA=<40-character-commit> ...` and the separate `content-release` image with the same build argument from a clean checkout at that commit. Node is pinned to 22.22.0 and the existing React Router/Vite pins are unchanged. The web runtime includes SSR client/server output, PostgreSQL migrations and production dependencies, and runs as UID 1000. The hardened content image contains the compiled release CLI plus only its declared catalog inputs; both images carry the same revision label and are published as distinct immutable digests. Build tooling and local SQLite data/secrets are excluded from production. `/api/health` is liveness; `/api/health/ready` executes `SELECT 1` through the same Drizzle singleton as SSR and returns only `ready` or `not_ready`.
 
 For the local rehearsal: `docker compose up -d --wait postgres clamav`, `docker compose build`, `docker compose run --rm --no-deps kordevteam-blue node scripts/migrate-production.mjs`, then `docker compose up -d kordevteam-blue lead-worker`. PostgreSQL is shared, with development-only credentials and the existing test database initializer. Readiness is `http://127.0.0.1:8081/api/health/ready`; green uses 8082. Only web slots publish loopback ports; PostgreSQL, ClamAV and the worker publish no host ports. Local development pins `clamav/clamav:1.4.3`; production must use a reviewed digest. Local image tag `kordevteam:local` is deliberately rejected by production release scripts.
 
@@ -55,34 +55,33 @@ docker compose -f deploy/docker-compose.team.yml exec -T lead-worker node server
 
 ## First installation: reviewed Russian content before traffic
 
-The tooling container interface is its default CMD (source dry-run) or direct `node --import tsx scripts/migrate-content-to-postgres.ts ...` / `node --import tsx scripts/verify-content-migration.ts ...`, as used by bootstrap. It runs read-only with a noexec `/tmp` tmpfs. Yarn commands are supported in the host developer checkout, not inside this hardened container; do not enable executable tmpfs to run Yarn.
+The content container interface is the compiled `/app/content-release.mjs` CLI with `manifest`, `plan`, `apply`, and `verify` commands, as used by bootstrap. It runs as a non-root user with a read-only filesystem and a noexec `/tmp` tmpfs. Yarn commands and a TypeScript loader are neither required nor available inside this hardened image.
 
-Use a clean, exact 40-character release checkout with locked dependencies (`yarn install --immutable`). Build/pull both immutable images for that same SHA. The guarded tooling build rejects a dirty checkout and tags/labels its image with the exact SHA:
+Use a clean, exact 40-character release checkout with locked dependencies (`yarn install --immutable`). Download and review the CI `release-manifest.json`, then pull the exact `webImage` and `contentImage` digests recorded for that same SHA. For a local pre-CI rehearsal, the guarded content build rejects a dirty checkout and labels its image with the exact SHA:
 
 ```bash
 RELEASE_SHA="$(git rev-parse HEAD)"
 WEB_IMAGE="registry.example/team:$RELEASE_SHA"
-TOOL_IMAGE="registry.example/team-content:$RELEASE_SHA"
+CONTENT_IMAGE="registry.example/team-content:$RELEASE_SHA"
 docker build --target production --build-arg "RELEASE_SHA=$RELEASE_SHA" -t "$WEB_IMAGE" .
-bash scripts/build-content-migration.sh "$RELEASE_SHA" "$TOOL_IMAGE"
+bash scripts/build-content-release.sh "$RELEASE_SHA" "$CONTENT_IMAGE"
 ```
 
 Run the workflow on the prepared host using an exact clean operations checkout, loaded images, Node/Docker Compose/curl and the private environment described above. `DATABASE_URL` must address `postgres:5432`, match `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`, and have no URL query override. The admin HMAC and public-media environment described above must be present because the web runtime fails closed on invalid configuration. The existing external proxy network must exist, but **the site route must not**. `DEPLOY_STATE_DIR` must be absent or empty. Reports must use a dedicated resolved directory outside the checkout (for example `/var/lib/kordevteam/first-import-<SHA>`).
 
 ```bash
 REPORT_DIR="/var/lib/kordevteam/first-import-$RELEASE_SHA"
-bash scripts/bootstrap-production-content.sh dry-run "$RELEASE_SHA" "$WEB_IMAGE" "$TOOL_IMAGE" "$REPORT_DIR"
+bash scripts/bootstrap-production-content.sh dry-run "$RELEASE_SHA" "$WEB_IMAGE" "$CONTENT_IMAGE" "$REPORT_DIR"
 ```
 
-This starts only PostgreSQL, rejects a database containing application data, runs schema migrations with the immutable web image, then runs the importer through the tooling service on the internal Compose backend. No host PostgreSQL port or host tsx installation is used. It writes a mode-0600 `dry-run.json`, requiring exactly 46 Russian articles / 8 cases with no collisions or invalid records. Review the full report, sources, batch and SHA-256. Approval must be copied explicitly from that reviewed report; do not auto-derive approval flags in the same command as apply:
+This starts only PostgreSQL, rejects a database containing application data, runs schema migrations with the immutable web image, then runs the compiled release CLI through the backend-only content service. No host PostgreSQL port or host TypeScript loader is used. It writes mode-0600 `manifest.json` and `dry-run.json`; dynamic totals must cover every manifest item and `blocked` must be false. Review both reports and the manifest SHA-256. Approval must be copied explicitly from the reviewed report; do not auto-derive approval flags in the same command as apply:
 
 ```bash
-bash scripts/bootstrap-production-content.sh apply "$RELEASE_SHA" "$WEB_IMAGE" "$TOOL_IMAGE" "$REPORT_DIR" \
-  --approved-batch 'first-<exact-40-character-SHA>' \
-  --approved-checksum '<reviewed-64-character-SHA256>'
+bash scripts/bootstrap-production-content.sh apply "$RELEASE_SHA" "$WEB_IMAGE" "$CONTENT_IMAGE" "$REPORT_DIR" \
+  --approved-manifest '<reviewed-64-character-SHA256>'
 ```
 
-Apply rechecks the empty route/state/database, exact checkout and both image revision labels. A fresh dry-run must match both the reviewed report and the supplied approval. Only then does it import, run source/target verification, check the actual database has exactly 46 published articles / 8 published cases, start blue locally, and check readiness, rendered catalogs and sitemap. It records the immutable image in `DEPLOY_STATE_DIR/slots/blue` after those checks. `import.json`, `verify.json` and `apply-dry-run.json` are private and never overwrite prior reports. A failure retains reports and database state for inspection; it does not delete content, tear down PostgreSQL or install routing. Partial successful imports require operator investigation, not an automatic reset. A stale bootstrap lock is likewise inspected manually.
+Apply rechecks the empty route/state/database, exact checkout and both image revision labels. A fresh manifest and plan must match the reviewed report and supplied approval. Only then does it apply the exact plan, verify every managed record, start blue locally, and check readiness, rendered catalogs and sitemap. It records the immutable web image in `DEPLOY_STATE_DIR/slots/blue` after those checks. `apply-manifest.json`, `apply-dry-run.json`, `apply.json` and `verify.json` are private and never overwrite prior reports. A failure retains reports and database state for inspection; it does not delete content, tear down PostgreSQL or install routing. A partial successful apply requires operator investigation, not an automatic reset. A stale bootstrap lock is likewise inspected manually.
 
 **Public Traefik installation/switching is a separate manual operation.** After successful local blue verification, prepare a candidate from `deploy/traefik/kordevteam-dynamic.yml` outside the watched directory. Set the intended canonical hostname and its www alias, TLS names and exact `current-image`; current slot is blue and previous slot is none. Validate the candidate against the recorded state:
 
@@ -106,13 +105,26 @@ The HTTPS router requests a certificate covering both canonical and `www` names 
 
 ## Deploy, switch and rollback
 
-`bash scripts/deploy-slot.sh green <immutable-image-ref>` acquires the host operation lock, rejects the active color, pulls only the inactive image, requires a successfully encrypted/uploaded pre-release snapshot, and runs migrations under a PostgreSQL advisory lock on the exact same connection that executes the migrations. Only backward-compatible expand migrations are permitted with a shared database: application rollback does not undo schema changes. После миграции кандидат обязательно выполняет `node server/lead-worker.mjs --check`; эта проверка только валидирует конфигурацию и делает `SELECT 1`, не забирая задания и не меняя данные. The script archives both web containers' logs before replacement, starts only the inactive service, and verifies readiness, representative rendered catalogs and the dynamic sitemap before recording its image. It never changes the active route or running worker.
+Download and review the successful CI `release-manifest.json`. Copy its exact `webImage`, `contentImage`, and `contentManifestSha256` values into the protected workflow inputs `image_ref`, `content_image_ref`, and `content_manifest_sha256`; do not reconstruct digest references from tags. The equivalent host command is:
 
-После deploy владелец проверяет точную редакцию `src/routes/legal.tsx`, вычисляет её SHA-256 и отдельно разрешает сохраняющий данные smoke: `PRIVACY_POLICY_SHA256=<reviewed-64-hex> RELEASE_FORM_SMOKE_OPT_IN=persist-clearly-marked-test-lead bash scripts/release-gate.sh green`. Команда держит deploy lock, повторяет немутирующую проверку активного и неактивного слотов, затем отправляет в неактивный `/api/leads` заявку без файла с пометкой «РЕЛИЗНЫЙ ТЕСТ — НЕ ОБРАБАТЫВАТЬ». Это намеренно создаёт настоящую строку заявки/outbox, поэтому без точной opt-in фразы команда завершается до POST. Только после HTTP 201 она атомарно пишет mode-0600 `$DEPLOY_STATE_DIR/release-gates/green.json`, привязанный к image, policy digest, consent version и текущему slot-record.
+```bash
+bash scripts/deploy-slot.sh green \
+  'ghcr.io/<owner>/<repo>@sha256:<web-digest>' \
+  'ghcr.io/<owner>/<repo>@sha256:<content-digest>' \
+  '<content-manifest-sha256>'
+```
+
+`deploy-slot.sh` acquires the host operation lock, rejects the active color, validates both exact digest references, their common repository, matching revision labels and approved manifest before any database operation. It then requires a successfully encrypted/uploaded pre-release snapshot, runs migrations, obtains a fresh plan from `content-release`, atomically applies that exact plan and verifies it before starting the inactive slot. Only backward-compatible expand migrations are permitted with a shared database. После миграции кандидат обязательно выполняет `node server/lead-worker.mjs --check`; эта проверка только валидирует конфигурацию и делает `SELECT 1`, не забирая задания и не меняя данные. The script archives both web containers' logs before replacement, starts only the inactive service, and verifies readiness, representative rendered catalogs and the dynamic sitemap before recording its image. It never changes the active route or running worker.
+
+Private mode-0600 reports are stored in `$DEPLOY_STATE_DIR/content-releases/green/`. If `plan.json` says `blocked:true`, inspect all `conflict`, `unowned-conflict`, and `orphaned-owned` items. An administrator or MCP client may have changed production after the source snapshot. Either move the accepted production edit into the repository and build a new release, or explicitly restore the approved repository text through admin/MCP and generate a fresh plan. Never edit evidence JSON or reuse an old plan checksum.
+
+Оба слота используют **общая PostgreSQL**, поэтому подтверждённый apply может быть виден через старый активный слот ещё до переключения Traefik. После apply сбой smoke не запускает восстановление БД: это режим **без автоматического восстановления**. Сначала используйте route rollback для ошибки runtime. Ручной restore pre-release snapshot допустим только после анализа инцидента и оценки записей, появившихся после backup.
+
+После deploy владелец проверяет точную редакцию `src/routes/legal.tsx`, вычисляет её SHA-256 и отдельно разрешает сохраняющий данные smoke: `PRIVACY_POLICY_SHA256=<reviewed-64-hex> RELEASE_FORM_SMOKE_OPT_IN=persist-clearly-marked-test-lead bash scripts/release-gate.sh green`. Команда держит deploy lock, повторяет немутирующую проверку активного и неактивного слотов, затем отправляет в неактивный `/api/leads` заявку без файла с пометкой «РЕЛИЗНЫЙ ТЕСТ — НЕ ОБРАБАТЫВАТЬ». Это намеренно создаёт настоящую строку заявки/outbox, поэтому без точной opt-in фразы команда завершается до POST. Только после HTTP 201 она атомарно пишет mode-0600 `$DEPLOY_STATE_DIR/release-gates/green.json` версии 2, привязанный к web/content images, manifest/plan checksums, policy digest, consent version и текущему slot-record.
 
 After reviewing checks, run `bash scripts/switch-slot.sh green`. Both target and previous containers must match their recorded immutable images and pass local smoke. The complete Traefik YAML, including current/previous colors and image refs, is fsynced and renamed atomically. Public checks wait for the matching `X-Kordev-Slot` response header and rendered pages. Только после успешного public smoke единственный worker пересоздаётся на образе целевого слота, проверяется healthcheck и атомарно записывается в `$DEPLOY_STATE_DIR/worker-image`. Public smoke failure не трогает worker. Ошибка активации или записи worker восстанавливает точные прежние байты маршрута, прежний worker и точные байты/mode-0600 worker state; standalone rollback выполняет симметричную последовательность. `bash scripts/rollback-slot.sh` separately restores the previously recorded image/color only after verification. A redeployed previous color must first be redeployed with its recorded historical image. This prevents an accidental roll-forward masquerading as rollback.
 
-До изменения Traefik `switch-slot.sh` под lock проверяет release evidence: обычный mode-0600 файл без symlink, полный JSON, возраст не более часа, точное совпадение image, consent version, SHA-256 текущего `src/routes/legal.tsx` и mtime slot-record. Missing, malformed, stale, exposed or mismatched evidence блокирует switch.
+До изменения Traefik `switch-slot.sh` под lock проверяет release evidence: обычный mode-0600 файл без symlink, полный JSON, возраст не более часа, точное совпадение web/content images, manifest/plan checksums, consent version, SHA-256 текущего `src/routes/legal.tsx` и mtime slot-record. Missing, malformed, stale, exposed or mismatched evidence блокирует switch. После переключения отдельно проверьте `sitemap.xml`, canonical URLs, `X-Kordev-Slot` нового цвета и сохранённую тестовую form lead по `leadId` из gate evidence.
 
 Для диагностики используйте `docker compose -f deploy/docker-compose.team.yml ps lead-worker`, `docker logs kordevteam-lead-worker` и защищённые таблицы outbox. Задания в состоянии `manual_action` не перезапускайте вслепую: сопоставьте `lead_id`, канал, код/класс последней ошибки и результат в CRM/почте, затем примите ручное решение без повторного создания клиентской заявки. Ежедневное удаление локальных и S3-копий старше 30 дней запускает `kordevteam-lead-retention.timer`; unit вызывает host-wrapper `scripts/run-lead-retention.sh`, который при каждом запуске заново проверяет mode-0600 `$DEPLOY_STATE_DIR/worker-image` и игнорирует устаревший `WORKER_IMAGE` из operations.env. Rate-limit бакеты дренируются пакетами до bounded ceiling; остаток возвращает ненулевой код, и systemd повторяет задачу через 5 минут. Включите timer, проверяйте `systemctl status`/journal и уведомления о сбоях.
 
