@@ -13,6 +13,7 @@ active="$(current_slot)"
 verify_active
 verify_slot "$target"
 candidate_image="$(recorded_image "$target")"
+read -r content_image content_manifest_checksum content_plan_checksum < <(node "$SCRIPT_DIR/release-boundary.mjs" content-evidence "$DEPLOY_STATE_DIR" "$target" "$candidate_image") || fail 'Candidate content release evidence is missing or invalid'
 submission_key="$(node -e "process.stdout.write(require('node:crypto').randomUUID())")"
 response="$(curl --fail --silent --show-error --max-time 20 --request POST \
   -H "Origin: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN is required}" \
@@ -27,5 +28,5 @@ response="$(curl --fail --silent --show-error --max-time 20 --request POST \
   --form-string 'pagePath=/__release-smoke__/' \
   "$(slot_origin "$target")/api/leads")" || fail 'Inactive-slot persistent form smoke failed'
 lead_id="$(printf '%s' "$response" | node "$SCRIPT_DIR/release-boundary.mjs" lead-id)" || fail 'Inactive-slot persistent form smoke returned invalid evidence'
-node "$SCRIPT_DIR/release-boundary.mjs" record "$DEPLOY_STATE_DIR" "$target" "$candidate_image" "$privacy_source" "$PRIVACY_POLICY_SHA256" "$lead_id" "${LEAD_CONSENT_VERSION:?LEAD_CONSENT_VERSION is required}" || fail 'Unable to record release approval evidence'
+node "$SCRIPT_DIR/release-boundary.mjs" record "$DEPLOY_STATE_DIR" "$target" "$candidate_image" "$content_image" "$content_manifest_checksum" "$content_plan_checksum" "$privacy_source" "$PRIVACY_POLICY_SHA256" "$lead_id" "${LEAD_CONSENT_VERSION:?LEAD_CONSENT_VERSION is required}" || fail 'Unable to record release approval evidence'
 printf 'Release gate recorded for %s (%s); persisted test lead %s.\n' "$target" "$candidate_image" "$lead_id"

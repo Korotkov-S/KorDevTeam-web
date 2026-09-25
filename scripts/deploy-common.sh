@@ -11,6 +11,9 @@ slot_valid() { [[ "${1:-}" == blue || "${1:-}" == green ]] || fail 'Invalid slot
 image_valid() {
   [[ "${1:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*(@sha256:[a-f0-9]{64}|:[a-f0-9]{40})$ ]] || fail 'An immutable image digest or exact 40-character commit tag is required';
 }
+digest_ref_valid() {
+  [[ "${1:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*@sha256:[a-f0-9]{64}$ ]] || fail 'An exact immutable image digest is required';
+}
 digest_image_valid() {
   [[ "${1:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:\-]*@sha256:[a-f0-9]{64}$ ]] || fail 'CLAMAV_IMAGE must be an immutable image digest';
 }

@@ -7,31 +7,68 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 const root = process.cwd();
-const image = `ghcr.io/example/team:${'a'.repeat(40)}`;
-const oldImage = `ghcr.io/example/team:${'b'.repeat(40)}`;
+const image = `ghcr.io/example/team@sha256:${'a'.repeat(64)}`;
+const oldImage = `ghcr.io/example/team@sha256:${'b'.repeat(64)}`;
+const contentImage = `ghcr.io/example/team@sha256:${'d'.repeat(64)}`;
+const contentManifestSha256 = 'e'.repeat(64);
+const contentPlanSha256 = 'f'.repeat(64);
+const releaseSha = '1'.repeat(40);
 const scripts = ['deploy-slot', 'switch-slot', 'rollback-slot', 'release-gate', 'validate-runtime-compose', 'run-lead-retention', 'backup-postgres', 'restore-postgres', 'prune-releases'];
 const privacyPolicySha256 = createHash('sha256').update(readFileSync('src/routes/legal.tsx')).digest('hex');
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'kordev-deploy-')));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  for (const name of ['bin', 'state/slots', 'state/release-gates', 'traefik', 'releases', 'logs']) mkdirSync(path.join(dir, name), { recursive: true });
+  for (const name of ['bin', 'state/slots', 'state/release-gates', 'state/content-releases/green', 'traefik', 'releases', 'logs']) mkdirSync(path.join(dir, name), { recursive: true });
   const route = path.join(dir, 'traefik/kordevteam-dynamic.yml');
   writeFileSync(route, `# current-slot: blue\n# previous-slot: none\n# current-image: ${oldImage}\nhttp:\n  routers:\n    kordevteam:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [websecure]\n      tls:\n        certResolver: letsencrypt\n        domains:\n          - main: example.com\n            sans: [www.example.com]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n    kordevteam-http:\n      rule: "Host(\`example.com\`) || Host(\`www.example.com\`)"\n      entryPoints: [web]\n      service: kordevteam-active\n      middlewares: [kordevteam-slot]\n  middlewares:\n    kordevteam-slot:\n      headers:\n        customResponseHeaders:\n          X-Kordev-Slot: blue\n  services:\n    kordevteam-active:\n      loadBalancer:\n        servers:\n          - url: http://kordevteam-blue:3001\n`);
   writeFileSync(path.join(dir, 'state/slots/blue'), oldImage + '\n');
   writeFileSync(path.join(dir, 'state/slots/green'), image + '\n');
   writeFileSync(path.join(dir, 'state/worker-image'), oldImage + '\n', { mode: 0o600 });
   chmodSync(path.join(dir, 'state/release-gates'), 0o700);
+  chmodSync(path.join(dir, 'state/content-releases'), 0o700);
+  chmodSync(path.join(dir, 'state/content-releases/green'), 0o700);
+  const contentDirectory = path.join(dir, 'state/content-releases/green');
+  const writeContentEvidence = () => {
+    const reports = {
+      'identity.json': { webImage: image, contentImage, releaseSha, contentManifestSha256, contentPlanSha256, total: 3 },
+      'manifest.json': { ok: true, command: 'manifest', releaseSha, manifestChecksum: contentManifestSha256, counts: { article: 1, case: 1, service: 1, faq: 0 } },
+      'plan.json': { ok: true, command: 'plan', manifestChecksum: contentManifestSha256, planChecksum: contentPlanSha256, blocked: false, counts: { insert: 3, update: 0, unchanged: 0, conflict: 0, 'unowned-conflict': 0, 'orphaned-owned': 0 }, items: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] },
+      'apply.json': { ok: true, command: 'apply', releaseSha, manifestChecksum: contentManifestSha256, planChecksum: contentPlanSha256, counts: { inserted: 3, updated: 0, unchanged: 0 } },
+      'verify.json': { ok: true, command: 'verify', releaseSha, manifestChecksum: contentManifestSha256, mismatches: [] },
+    };
+    for (const [name, report] of Object.entries(reports)) writeFileSync(path.join(contentDirectory, name), `${JSON.stringify(report)}\n`, { mode: 0o600 });
+  };
+  writeContentEvidence();
   const gate = path.join(dir, 'state/release-gates/green.json');
-  const writeGate = (overrides = {}) => writeFileSync(gate, JSON.stringify({ version: 1, slot: 'green', image,
+  const writeGate = (overrides = {}) => writeFileSync(gate, JSON.stringify({ version: 2, slot: 'green', image, contentImage,
+    contentManifestSha256, contentPlanSha256,
     privacyPolicySha256, leadId: '11111111-1111-4111-8111-111111111111', consentVersion: '2026-09-14',
     slotRecordMtimeMs: statSync(path.join(dir, 'state/slots/green')).mtimeMs, createdAt: new Date().toISOString(), ...overrides }) + '\n', { mode: 0o600 });
   writeGate();
   function stub(name, body) { writeFileSync(path.join(dir, 'bin', name), '#!/bin/bash\nset -eu\n' + body, { mode: 0o755 }); }
-  stub('docker', 'printf "WORKER_IMAGE=%s %s\\n" "${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/commands"\nprintf "docker WORKER_IMAGE=%s %s\\n" "${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_CANDIDATE_CHECK:-0}" == 1 && "$*" == *"run --rm --no-deps lead-worker node server/lead-worker.mjs --check"* && "${WORKER_IMAGE:-}" == "$TARGET_IMAGE" ]]; then exit 1; fi\nif [[ -n "${FAIL_WORKER_IMAGE:-}" && "$*" == *"up -d --no-deps lead-worker"* && "${WORKER_IMAGE:-}" == "$FAIL_WORKER_IMAGE" ]]; then exit 1; fi\nif [[ "$1" == inspect ]]; then\n  if [[ "$*" == *"{{.Config.Image}}"* ]]; then if [[ "$*" == *lead-worker* ]]; then printf "%s\\n" "${WORKER_IMAGE:-$OLD_IMAGE}"; elif [[ "$*" == *blue* ]]; then printf "%s\\n" "$OLD_IMAGE"; else printf "%s\\n" "$TARGET_IMAGE"; fi\n  elif [[ "$*" == *"{{.State.Health.Status}}"* ]]; then printf "healthy\\n"; fi\nfi\n');
+  stub('docker', `printf "WORKER_IMAGE=%s %s\\n" "\${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/commands"
+printf "docker WORKER_IMAGE=%s %s\\n" "\${WORKER_IMAGE:-unset}" "$*" >> "$TEST_DIR/events"
+if [[ "\${FAIL_CANDIDATE_CHECK:-0}" == 1 && "$*" == *"run --rm --no-deps lead-worker node server/lead-worker.mjs --check"* && "\${WORKER_IMAGE:-}" == "$TARGET_IMAGE" ]]; then exit 1; fi
+if [[ -n "\${FAIL_WORKER_IMAGE:-}" && "$*" == *"up -d --no-deps lead-worker"* && "\${WORKER_IMAGE:-}" == "$FAIL_WORKER_IMAGE" ]]; then exit 1; fi
+if [[ "$*" == *'image inspect'*'org.opencontainers.image.revision'* ]]; then
+  printf '%s\\n' "$RELEASE_SHA"
+elif [[ "$*" == *'content-release.mjs manifest'* ]]; then
+  printf '%s\\n' '${JSON.stringify({ ok: true, command: 'manifest', releaseSha, manifestChecksum: contentManifestSha256, counts: { article: 1, case: 1, service: 1, faq: 0 } })}'
+elif [[ "$*" == *'content-release.mjs plan'* ]]; then
+  printf '%s\\n' '${JSON.stringify({ ok: true, command: 'plan', manifestChecksum: contentManifestSha256, planChecksum: contentPlanSha256, blocked: false, counts: { insert: 3, update: 0, unchanged: 0, conflict: 0, 'unowned-conflict': 0, 'orphaned-owned': 0 }, items: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] })}'
+elif [[ "$*" == *'content-release.mjs apply'* ]]; then
+  printf '%s\\n' '${JSON.stringify({ ok: true, command: 'apply', releaseSha, manifestChecksum: contentManifestSha256, planChecksum: contentPlanSha256, counts: { inserted: 3, updated: 0, unchanged: 0 } })}'
+elif [[ "$*" == *'content-release.mjs verify'* ]]; then
+  printf '%s\\n' '${JSON.stringify({ ok: true, command: 'verify', releaseSha, manifestChecksum: contentManifestSha256, mismatches: [] })}'
+elif [[ "$1" == inspect ]]; then
+  if [[ "$*" == *"{{.Config.Image}}"* ]]; then if [[ "$*" == *lead-worker* ]]; then printf "%s\\n" "\${WORKER_IMAGE:-$OLD_IMAGE}"; elif [[ "$*" == *blue* ]]; then printf "%s\\n" "$OLD_IMAGE"; else printf "%s\\n" "$TARGET_IMAGE"; fi
+  elif [[ "$*" == *"{{.State.Health.Status}}"* ]]; then printf "healthy\\n"; fi
+fi
+`);
   stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nprintf "curl %s\\n" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *api/leads* ]]; then printf \'{"leadId":"22222222-2222-4222-8222-222222222222","status":"accepted"}\'; elif [[ "$*" == *--write-out* ]]; then printf "308 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir,
     DEPLOY_STATE_DIR: `${dir}/state`, TRAEFIK_DYNAMIC_FILE: route, PUBLIC_ORIGIN: 'https://example.com',
-    TARGET_IMAGE: image, OLD_IMAGE: oldImage, READINESS_ATTEMPTS: '1', READINESS_DELAY: '0',
+    TARGET_IMAGE: image, OLD_IMAGE: oldImage, CONTENT_IMAGE: contentImage, RELEASE_SHA: releaseSha, READINESS_ATTEMPTS: '1', READINESS_DELAY: '0',
     PRODUCTION_HOST: 'example.com', LOG_ARCHIVE_DIR: `${dir}/logs`, REAL_NODE: process.execPath,
     CLAMAV_IMAGE: `clamav/clamav@sha256:${'c'.repeat(64)}`, LEAD_TEMP_ROOT: '/tmp/kordev-leads',
     LEAD_CONSENT_VERSION: '2026-09-14', PRIVACY_POLICY_SHA256: privacyPolicySha256 };
@@ -54,16 +91,22 @@ test('route writes use a durable atomic replacement', () => {
 });
 test('invalid slots, mutable and malformed immutable image references fail before Docker', t => {
   const f = fixture(t);
-  for (const args of [['purple', image], ['green', 'ghcr.io/x/site:latest'], ['green', 'x@sha256:no'], ['green', `${image}:latest`], ['green', '-x:' + 'a'.repeat(40)]]) {
+  for (const args of [
+    ['purple', image, contentImage, contentManifestSha256],
+    ['green', 'ghcr.io/x/site:latest', contentImage, contentManifestSha256],
+    ['green', image, 'x@sha256:no', contentManifestSha256],
+    ['green', image, contentImage, 'not-a-checksum'],
+    ['green', image, `ghcr.io/other/team@sha256:${'d'.repeat(64)}`, contentManifestSha256],
+  ]) {
     const r = f.run('deploy-slot', args);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /slot|immutable/i);
+    assert.match(r.stderr, /slot|immutable|digest|sha|repository/i);
   }
   assert.equal(existsSync(`${f.dir}/commands`), false);
 });
 test('deploy refuses the active slot before commands or route changes', t => {
   const f = fixture(t); const before = readFileSync(f.route, 'utf8');
-  const r = f.run('deploy-slot', ['blue', image]);
+  const r = f.run('deploy-slot', ['blue', image, contentImage, contentManifestSha256]);
   assert.notEqual(r.status, 0); assert.match(r.stderr, /active/i);
   assert.equal(readFileSync(f.route, 'utf8'), before);
   assert.equal(existsSync(`${f.dir}/commands`), false);
@@ -87,7 +130,11 @@ test('release gate requires reviewed privacy digest and explicit persistent test
   assert.match(requests, /РЕЛИЗНЫЙ ТЕСТ — НЕ ОБРАБАТЫВАТЬ/);
   assert.equal(statSync(f.gate).mode & 0o777, 0o600);
   const evidence = JSON.parse(readFileSync(f.gate, 'utf8'));
+  assert.equal(evidence.version, 2);
   assert.equal(evidence.image, image);
+  assert.equal(evidence.contentImage, contentImage);
+  assert.equal(evidence.contentManifestSha256, contentManifestSha256);
+  assert.equal(evidence.contentPlanSha256, contentPlanSha256);
   assert.equal(evidence.privacyPolicySha256, privacyPolicySha256);
   assert.equal(evidence.leadId, '22222222-2222-4222-8222-222222222222');
 });
@@ -100,8 +147,8 @@ test('release gate rejects an unreviewed privacy digest before persisting a test
   assert.equal(existsSync(`${f.dir}/requests`), false);
 });
 
-test('switch fails closed on missing, malformed, stale, exposed, symlinked or image-mismatched release evidence', async t => {
-  for (const kind of ['missing', 'malformed', 'stale', 'mode', 'directory-mode', 'symlink', 'image']) await t.test(kind, t => {
+test('switch fails closed on missing, malformed, stale, exposed, symlinked or identity-mismatched release evidence', async t => {
+  for (const kind of ['missing', 'malformed', 'stale', 'mode', 'directory-mode', 'symlink', 'image', 'content-image', 'content-manifest', 'content-plan']) await t.test(kind, t => {
     const f = fixture(t);
     if (kind === 'missing') rmSync(f.gate);
     if (kind === 'malformed') writeFileSync(f.gate, '{no}\n', { mode: 0o600 });
@@ -110,6 +157,9 @@ test('switch fails closed on missing, malformed, stale, exposed, symlinked or im
     if (kind === 'directory-mode') chmodSync(path.dirname(f.gate), 0o755);
     if (kind === 'symlink') { const target = `${f.gate}.real`; writeFileSync(target, '{}\n', { mode: 0o600 }); rmSync(f.gate); symlinkSync(target, f.gate); }
     if (kind === 'image') f.writeGate({ image: oldImage });
+    if (kind === 'content-image') f.writeGate({ contentImage: oldImage });
+    if (kind === 'content-manifest') f.writeGate({ contentManifestSha256: '9'.repeat(64) });
+    if (kind === 'content-plan') f.writeGate({ contentPlanSha256: '9'.repeat(64) });
     const before = readFileSync(f.route);
     const result = f.run('switch-slot', ['green']);
     assert.notEqual(result.status, 0, `${kind} evidence must fail`);
@@ -185,7 +235,7 @@ test('backup and restore require explicit encryption, private destination and no
 test('inactive deploy backs up and migrates before replacement, records verified image and never edits routing', t => {
   const f = fixture(t); const before = readFileSync(f.route, 'utf8');
   f.stub('node', 'if [[ "$1" == *postgres-backup.mjs ]]; then printf "backup\\n" >> "$TEST_DIR/commands"; elif [[ "$1" == *archive-web-logs.mjs ]]; then printf "archive-logs\\n" >> "$TEST_DIR/commands"; else exec "$REAL_NODE" "$@"; fi\n');
-  const r = f.run('deploy-slot', ['green', image]); assert.equal(r.status, 0, r.stderr);
+  const r = f.run('deploy-slot', ['green', image, contentImage, contentManifestSha256]); assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(f.route, 'utf8'), before);
   assert.equal(readFileSync(`${f.dir}/state/slots/green`, 'utf8').trim(), image);
   const commands = readFileSync(`${f.dir}/commands`, 'utf8');
@@ -199,7 +249,7 @@ test('inactive deploy backs up and migrates before replacement, records verified
 test('failed candidate worker check leaves active route, worker and slot record untouched', t => {
   const f = fixture(t); const before = readFileSync(f.route); const workerBefore = readFileSync(`${f.dir}/state/worker-image`);
   f.stub('node', 'if [[ "$1" == *postgres-backup.mjs ]]; then exit 0; elif [[ "$1" == *archive-web-logs.mjs ]]; then exit 0; else exec "$REAL_NODE" "$@"; fi\n');
-  const result = f.run('deploy-slot', ['green', image], { FAIL_CANDIDATE_CHECK: '1' });
+  const result = f.run('deploy-slot', ['green', image, contentImage, contentManifestSha256], { FAIL_CANDIDATE_CHECK: '1' });
   assert.notEqual(result.status, 0);
   assert.deepEqual(readFileSync(f.route), before);
   assert.deepEqual(readFileSync(`${f.dir}/state/worker-image`), workerBefore);
@@ -314,7 +364,7 @@ test('host retention wrapper rejects missing invalid symlinked or exposed state 
 test('backup failure prevents migrations, replacement and slot record update', t => {
   const f = fixture(t); const before = readFileSync(f.route, 'utf8');
   f.stub('node', 'if [[ "$1" == *postgres-backup.mjs ]]; then exit 1; elif [[ "$1" == *archive-web-logs.mjs ]]; then exit 0; else exec "$REAL_NODE" "$@"; fi\n');
-  assert.notEqual(f.run('deploy-slot', ['green', image]).status, 0);
+  assert.notEqual(f.run('deploy-slot', ['green', image, contentImage, contentManifestSha256]).status, 0);
   assert.equal(readFileSync(f.route, 'utf8'), before);
   assert.doesNotMatch(readFileSync(`${f.dir}/commands`, 'utf8'), /migrate-production|up -d/);
 });
@@ -335,7 +385,7 @@ test('public smoke rejects responses from a stale Traefik target and rolls back'
 test('rollback refuses a previous color that has been redeployed with another image', t => {
   const f = fixture(t);
   assert.equal(f.run('switch-slot', ['green']).status, 0);
-  const replacement = `ghcr.io/example/team:${'c'.repeat(40)}`;
+  const replacement = `ghcr.io/example/team@sha256:${'c'.repeat(64)}`;
   writeFileSync(`${f.dir}/state/slots/blue`, replacement + '\n');
   const before = readFileSync(f.route, 'utf8');
   const result = f.run('rollback-slot', [], { OLD_IMAGE: replacement });
@@ -345,7 +395,7 @@ test('rollback refuses a previous color that has been redeployed with another im
 test('deploy refuses missing or corrupt active state before any Docker command', t => {
   const f = fixture(t);
   writeFileSync(f.route, '# current-slot: purple\n');
-  const result = f.run('deploy-slot', ['green', image]);
+  const result = f.run('deploy-slot', ['green', image, contentImage, contentManifestSha256]);
   assert.notEqual(result.status, 0);
   assert.equal(existsSync(`${f.dir}/commands`), false);
 });
@@ -357,7 +407,7 @@ test('inconsistent active routing, slot headers and image records reject deploym
     if (mismatch === 'record') writeFileSync(`${f.dir}/state/slots/blue`, image + '\n');
     if (mismatch === 'public') f.stub('curl', 'if [[ "$*" == *--dump-header* ]]; then printf "X-Kordev-Slot: green\\r\\n"; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<html><title>Team</title><h1>Team</h1></html>\'; fi\n');
     const before = readFileSync(f.route, 'utf8');
-    assert.notEqual(f.run('deploy-slot', ['green', image], mismatch === 'container' ? { OLD_IMAGE: image } : {}).status, 0);
+    assert.notEqual(f.run('deploy-slot', ['green', image, contentImage, contentManifestSha256], mismatch === 'container' ? { OLD_IMAGE: image } : {}).status, 0);
     assert.equal(readFileSync(f.route, 'utf8'), before);
     const commands = existsSync(`${f.dir}/commands`) ? readFileSync(`${f.dir}/commands`, 'utf8') : '';
     assert.doesNotMatch(commands, /compose .* (pull|run|up) /);
