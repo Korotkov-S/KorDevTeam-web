@@ -25,7 +25,7 @@ export async function runSeoCollectCommand(args, loadBuild = loadProductionBuild
   const options = parseSeoCollectArgs(args);
   const build = await loadBuild();
   const report = options.check
-    ? await build.entry.module.checkSeoCollectionReady()
+    ? await build.entry.module.checkSeoCollectionReady(options.source ? { source: options.source } : {})
     : await build.entry.module.runSeoCollection(options.source ? { source: options.source } : {});
   const line = compact(report);
   if (report.failed || report.sources.some((source) => source.status === "failed")) {
@@ -46,4 +46,3 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exitCode = 1;
   });
 }
-

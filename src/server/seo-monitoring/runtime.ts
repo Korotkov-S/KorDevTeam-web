@@ -23,7 +23,7 @@ export async function runSeoCollection(options: { source?: SeoSourceId } = {}) {
   return collector.run(options.source);
 }
 
-export async function checkSeoCollectionReady() {
+export async function checkSeoCollectionReady(options: { source?: SeoSourceId } = {}) {
   const config = readSeoConfig(process.env);
   const summary = safeSeoConfigSummary(config);
   const sources: Array<{ source: SeoSourceId; status: "disabled" | "ready" | "failed"; errorCode?: string }> = [];
@@ -31,6 +31,7 @@ export async function checkSeoCollectionReady() {
     ["yandex_webmaster", config.yandex.enabled ? createYandexWebmasterProvider(config.yandex) : null],
     ["google_search_console", config.google.enabled ? createGoogleSearchConsoleProvider(config.google) : null],
   ] as const) {
+    if (options.source && source !== options.source) continue;
     if (!provider) { sources.push({ source, status: "disabled" }); continue; }
     try {
       await provider.check();

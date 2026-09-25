@@ -111,7 +111,8 @@ databaseTest("dashboard aggregates chart data and authoritative Yandex regions w
   const repository = createSeoRepository(db);
   await repository.upsertObservations([
     observation,
-    { ...observation, observationDate: "2026-09-24", device: "mobile", impressions: 50, clicks: 5, ctr: 0.1, averagePosition: 6 },
+    { ...observation, averagePosition: 2 },
+    { ...observation, observationDate: "2026-09-24", device: "mobile", impressions: 100, clicks: 5, ctr: 0.05, averagePosition: 12 },
   ]);
   const regions = await repository.syncYandexRegions([{ id: 213, name: "Москва" }]);
   assert.equal(regions.find((region) => region.code === "moscow")?.externalId, "213");
@@ -120,10 +121,11 @@ databaseTest("dashboard aggregates chart data and authoritative Yandex regions w
   const dashboard = await repository.getDashboard({
     dateFrom: "2026-09-23", dateTo: "2026-09-24", source: "google_search_console",
   });
-  assert.deepEqual(dashboard.overview, { impressions: 150, clicks: 15, ctr: 0.1, averagePosition: 7.333333333333333 });
+  assert.deepEqual(dashboard.overview, { impressions: 200, clicks: 15, ctr: 0.075, averagePosition: 7 });
   assert.equal(dashboard.daily.length, 2);
   assert.deepEqual(dashboard.devices.map((row) => row.label).sort(), ["Компьютеры", "Смартфоны"]);
   assert.equal(dashboard.positionBuckets.reduce((sum, row) => sum + row.count, 0), 1);
+  assert.deepEqual(dashboard.positionBuckets, [{ bucket: "4–10", count: 1 }]);
   assert.equal(dashboard.sources.find((source) => source.id === "google_search_console")?.latestDataDate, "2026-09-24");
 });
 

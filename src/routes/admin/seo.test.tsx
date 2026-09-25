@@ -106,12 +106,14 @@ test("SEO mutations require same origin and CSRF and map unexpected errors safel
 });
 
 test("dashboard renders all decision sections, reversed position chart, gaps, and wide tables", () => {
-  const withGap = { ...data, dashboard: { ...data.dashboard, daily: [...data.dashboard.daily, { date: "2026-09-24", impressions: 0, clicks: 0, ctr: null, averagePosition: null }] } };
+  const withGap = { ...data, queries: { ...data.queries, nextCursor: "50" }, dashboard: { ...data.dashboard, daily: [...data.dashboard.daily, { date: "2026-09-24", impressions: 0, clicks: 0, ctr: null, averagePosition: null }] } };
   const html = renderDashboard(withGap);
   for (const label of ["SEO-мониторинг", "Показы и клики", "CTR", "Средняя позиция", "Диапазоны позиций", "Регионы Яндекса", "Устройства", "Частотность", "Движение запросов", "Все запросы", "Изменения", "Рекомендации"]) assert.match(html, new RegExp(label, "u"));
   assert.match(html, /data-position-domain="reversed"/u);
   assert.match(html, /data-chart-gaps="preserved"/u);
   assert.match(html, /overflow-x-auto/u);
+  assert.match(html, /cursor=50/u);
+  assert.match(html, /name="from"/u);
 });
 
 test("Google dashboard does not render city selection and empty state is explicit", () => {

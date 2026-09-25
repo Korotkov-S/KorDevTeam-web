@@ -259,17 +259,21 @@ export function createSeoRepository(db: SeoDatabase) {
         clicks: sql<number>`sum(${seoDailyMetrics.clicks})::double precision`,
       }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition)
         .groupBy(seoQueries.frequencyBand).orderBy(asc(seoQueries.frequencyBand));
+      const queryPositions = db.select({
+        queryId: seoDailyMetrics.queryId,
+        averagePosition: sql<number>`sum(${seoDailyMetrics.impressions} * ${seoDailyMetrics.averagePosition})::double precision / nullif(sum(${seoDailyMetrics.impressions}), 0)`.as("average_position"),
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition)
+        .groupBy(seoDailyMetrics.queryId).as("seo_query_positions");
       const bucket = sql<string>`case
-        when ${seoDailyMetrics.averagePosition} <= 3 then '1–3'
-        when ${seoDailyMetrics.averagePosition} <= 10 then '4–10'
-        when ${seoDailyMetrics.averagePosition} <= 30 then '11–30'
-        when ${seoDailyMetrics.averagePosition} <= 50 then '31–50'
+        when ${queryPositions.averagePosition} <= 3 then '1–3'
+        when ${queryPositions.averagePosition} <= 10 then '4–10'
+        when ${queryPositions.averagePosition} <= 30 then '11–30'
+        when ${queryPositions.averagePosition} <= 50 then '31–50'
         else '>50' end`;
       const positionBuckets = await db.select({
         bucket,
-        count: sql<number>`count(distinct ${seoDailyMetrics.queryId})::integer`,
-      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition)
-        .groupBy(bucket);
+        count: sql<number>`count(*)::integer`,
+      }).from(queryPositions).where(sql`${queryPositions.averagePosition} is not null`).groupBy(bucket);
       const sourceRows = await db.select().from(seoSources).orderBy(asc(seoSources.displayName));
       const sources = await Promise.all(sourceRows.map(async (source) => {
         const [latest] = await db.select({ latestDataDate: sql<string | null>`max(${seoDailyMetrics.observationDate})` })
