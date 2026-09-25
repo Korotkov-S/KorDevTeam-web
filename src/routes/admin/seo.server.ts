@@ -22,7 +22,6 @@ function validDate(value: string | null): value is string {
   const date = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(+date) && date.toISOString().slice(0, 10) === value;
 }
-
 function formatDate(date: Date): string { return date.toISOString().slice(0, 10); }
 function shift(date: string, days: number): string { return formatDate(new Date(+new Date(`${date}T00:00:00Z`) + days * DAY_MS)); }
 
@@ -131,4 +130,3 @@ export function createSeoAdminAction(auth: Authenticator, service: Service, conf
 export const loader = (args: LoaderFunctionArgs) => createSeoAdminLoader(getAdminAuthService(), getSeoMonitoringService())(args);
 export const action = (args: ActionFunctionArgs) => createSeoAdminAction(getAdminAuthService(), getSeoMonitoringService(), readAdminAuthConfig(process.env))(args);
 export const headers = adminRouteHeaders;
-

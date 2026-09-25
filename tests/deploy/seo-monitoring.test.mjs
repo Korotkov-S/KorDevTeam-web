@@ -9,7 +9,6 @@ test("production image and package expose the SEO collector", () => {
   assert.equal(pkg.scripts["seo:collect"], "node server/seo-collect.mjs");
   assert.match(dockerfile, /test -f \/app\/server\/seo-collect\.mjs/u);
 });
-
 test("SEO job is isolated, read-only, and receives only its own provider credentials", () => {
   const compose = readFileSync("deploy/docker-compose.team.yml", "utf8");
   const block = compose.match(/  seo-job:\n[\s\S]*?(?=\n  [a-z][a-z0-9-]+:|\nnetworks:)/u)?.[0] ?? "";
@@ -34,4 +33,3 @@ test("systemd schedules collection before the 09:00 Moscow analysis", (t) => {
   const result = spawnSync("systemd-analyze", ["verify", "deploy/systemd/kordevteam-seo-collect.service", "deploy/systemd/kordevteam-seo-collect.timer"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
 });
-

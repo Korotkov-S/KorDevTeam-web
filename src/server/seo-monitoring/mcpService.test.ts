@@ -27,7 +27,6 @@ test("MCP SEO reads stay date-bounded and compact", async () => {
   assert.equal(b.calls[0][0], "overview");
   assert.deepEqual(b.calls[1][1], { filters: { dateFrom: "2026-09-01", dateTo: "2026-09-25" }, limit: 100, cursor: "0" });
 });
-
 test("recommendation evidence requires finite metrics and ISO dates", async () => {
   const b = backing();
   const service = createMcpSeoService(b.service as never, tokenId);
@@ -49,4 +48,3 @@ test("recommendation fingerprint is stable, server-generated, and actor-bound", 
   assert.equal(first.command.fingerprint, second.command.fingerprint);
   assert.deepEqual(first.actor, { mcpTokenId: tokenId });
 });
-
