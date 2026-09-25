@@ -1,5 +1,8 @@
 import type { NormalizedSeoObservation, SeoDevice, YandexSeoConfig } from "../contracts";
 import { normalizeSeoQuery, normalizeSitePath } from "../normalization";
+import { boundedRetryAfter, SeoProviderError } from "./provider-error";
+
+export { SeoProviderError } from "./provider-error";
 
 const API_ORIGIN = "https://api.webmaster.yandex.net";
 const PAGE_LIMIT = 500;
@@ -8,30 +11,12 @@ const REQUEST_TIMEOUT_MS = 15_000;
 export type YandexRegion = { id: number; name: string };
 export type SeoCollectionWindow = { from: string; to: string };
 
-export class SeoProviderError extends Error {
-  constructor(
-    code: string,
-    readonly retryable: boolean,
-    readonly retryAfterSeconds?: number,
-  ) {
-    super(code);
-    this.name = "SeoProviderError";
-  }
-}
-
 function invalidResponse(): never {
   throw new SeoProviderError("seo_yandex_response_invalid", false);
 }
 
 function plainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function retryAfter(response: Response): number | undefined {
-  const value = response.headers.get("retry-after");
-  if (!value || !/^\d+$/u.test(value)) return undefined;
-  const seconds = Number(value);
-  return Number.isSafeInteger(seconds) && seconds >= 1 && seconds <= 3_600 ? seconds : undefined;
 }
 
 function hostOrigin(hostId: string): string {
@@ -169,7 +154,7 @@ export function createYandexWebmasterProvider(
       throw new SeoProviderError("seo_yandex_auth_failed", false);
     }
     if (response.status === 429 || response.status >= 500) {
-      throw new SeoProviderError("seo_yandex_retryable", true, retryAfter(response));
+      throw new SeoProviderError("seo_yandex_retryable", true, boundedRetryAfter(response));
     }
     if (!response.ok) throw new SeoProviderError("seo_yandex_request_failed", false);
     try {
