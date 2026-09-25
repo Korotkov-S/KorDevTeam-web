@@ -11,6 +11,8 @@ import {
   adminUsers,
   contentEntries,
   contentMediaRefs,
+  contentReleaseItems,
+  contentReleaseRuns,
   contentRelations,
   contentRevisions,
   leadAttachments,
@@ -183,6 +185,46 @@ databaseTest("MCP tokens keep only a digest and cascade with their administrator
   assert.equal("token" in token, false);
   await db.delete(adminUsers).where(eq(adminUsers.id, admin.id));
   assert.equal((await db.select().from(mcpTokens)).length, 0);
+});
+
+databaseTest("content release state binds one owned entry to one committed manifest", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const [entry] = await db.insert(contentEntries).values({
+    kind: "article",
+    slug: "release-owned",
+    title: "Release owned",
+  }).returning();
+  const [run] = await db.insert(contentReleaseRuns).values({
+    releaseSha: "a".repeat(40),
+    manifestChecksum: "b".repeat(64),
+    insertedCount: 1,
+    updatedCount: 0,
+    unchangedCount: 0,
+  }).returning();
+
+  await db.insert(contentReleaseItems).values({
+    entryId: entry.id,
+    kind: "article",
+    slug: entry.slug,
+    releaseId: run.id,
+    sourceChecksum: "c".repeat(64),
+    databaseChecksum: "d".repeat(64),
+    databaseVersion: 1,
+  });
+  await assertConstraintViolation(() => db.insert(contentReleaseItems).values({
+    entryId: entry.id,
+    kind: "article",
+    slug: entry.slug,
+    releaseId: run.id,
+    sourceChecksum: "e".repeat(64),
+    databaseChecksum: "f".repeat(64),
+    databaseVersion: 1,
+  }));
+
+  await db.delete(contentEntries).where(eq(contentEntries.id, entry.id));
+  assert.equal((await db.select().from(contentReleaseItems)).length, 0);
+  assert.equal((await db.select().from(contentReleaseRuns)).length, 1);
 });
 
 databaseTest("SEO observations are unique and reject impossible search metrics", async () => {
@@ -378,6 +420,7 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
   const db = createDb(TEST_DATABASE_URL);
   const [lead] = await db.insert(leads).values(leadFixture).returning();
   await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });
+  await db.execute(sql`DROP TABLE content_release_items, content_release_runs`);
   await db.execute(sql`DROP TABLE seo_daily_metrics, seo_recommendations, seo_changes, seo_collection_runs, seo_regions, seo_queries, seo_sources`);
   await db.execute(sql`DROP TYPE seo_change_type, seo_device, seo_frequency_band, seo_query_origin, seo_recommendation_confidence, seo_recommendation_status, seo_region_scope, seo_run_status, seo_source`);
   await db.execute(sql`DROP TABLE mcp_tokens, content_media_refs, admin_sessions, admin_auth_limits`);

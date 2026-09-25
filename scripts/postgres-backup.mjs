@@ -44,12 +44,16 @@ async function migrationRows(client) {
 }
 const coreRequiredTables = ['drizzle.__drizzle_migrations', 'public.admin_users', 'public.content_entries', 'public.content_relations', 'public.content_revisions', 'public.mcp_tokens', 'public.media_assets', 'public.redirects', 'public.site_settings'];
 const seoRequiredTables = ['public.seo_changes', 'public.seo_collection_runs', 'public.seo_daily_metrics', 'public.seo_queries', 'public.seo_recommendations', 'public.seo_regions', 'public.seo_sources'];
-const requiredTables = [...coreRequiredTables, ...seoRequiredTables];
+const contentReleaseRequiredTables = ['public.content_release_items', 'public.content_release_runs'];
+const requiredTables = [...coreRequiredTables, ...seoRequiredTables, ...contentReleaseRequiredTables];
 const seoMigrationCreatedAt = '1790333729506';
+const contentReleaseMigrationCreatedAt = '1790350786115';
 const migrationSeedCounts = { 'public.seo_regions': '9', 'public.seo_sources': '2' };
-const requiredTablesForHistory = history => history.some(row => row.created_at === seoMigrationCreatedAt)
-  ? requiredTables
-  : coreRequiredTables;
+const requiredTablesForHistory = history => [
+  ...coreRequiredTables,
+  ...(history.some(row => row.created_at === seoMigrationCreatedAt) ? seoRequiredTables : []),
+  ...(history.some(row => row.created_at === contentReleaseMigrationCreatedAt) ? contentReleaseRequiredTables : []),
+];
 const quoteIdentifier = value => `"${value.replaceAll('"', '""')}"`;
 export async function databaseInventory(client, requiredInventoryTables = requiredTables) {
   const { rows } = await client.query("SELECT n.nspname AS schema, c.relname AS name FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname IN ('public', 'drizzle') AND c.relkind IN ('r', 'p') ORDER BY n.nspname, c.relname");

@@ -216,6 +216,48 @@ export const contentRevisions = pgTable(
   ],
 );
 
+export const contentReleaseRuns = pgTable(
+  "content_release_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    releaseSha: varchar("release_sha", { length: 40 }).notNull(),
+    manifestChecksum: varchar("manifest_checksum", { length: 64 }).notNull(),
+    insertedCount: integer("inserted_count").notNull(),
+    updatedCount: integer("updated_count").notNull(),
+    unchangedCount: integer("unchanged_count").notNull(),
+    committedAt: timestamp("committed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("content_release_runs_sha_manifest_uq").on(table.releaseSha, table.manifestChecksum),
+    check("content_release_runs_sha_format", sql`${table.releaseSha} ~ '^[0-9a-f]{40}$'`),
+    check("content_release_runs_manifest_sha256", sql`${table.manifestChecksum} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "content_release_runs_counts_non_negative",
+      sql`${table.insertedCount} >= 0 AND ${table.updatedCount} >= 0 AND ${table.unchangedCount} >= 0`,
+    ),
+  ],
+);
+
+export const contentReleaseItems = pgTable(
+  "content_release_items",
+  {
+    entryId: uuid("entry_id").primaryKey().references(() => contentEntries.id, { onDelete: "cascade" }),
+    kind: contentKind("kind").notNull(),
+    slug: varchar("slug", { length: 160 }).notNull(),
+    releaseId: uuid("release_id").notNull().references(() => contentReleaseRuns.id, { onDelete: "restrict" }),
+    sourceChecksum: varchar("source_checksum", { length: 64 }).notNull(),
+    databaseChecksum: varchar("database_checksum", { length: 64 }).notNull(),
+    databaseVersion: integer("database_version").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("content_release_items_kind_slug_uq").on(table.kind, table.slug),
+    check("content_release_items_source_sha256", sql`${table.sourceChecksum} ~ '^[0-9a-f]{64}$'`),
+    check("content_release_items_database_sha256", sql`${table.databaseChecksum} ~ '^[0-9a-f]{64}$'`),
+    check("content_release_items_version_positive", sql`${table.databaseVersion} > 0`),
+  ],
+);
+
 export const mediaAssets = pgTable(
   "media_assets",
   {
@@ -609,6 +651,8 @@ export const schema = {
   adminAuthLimits,
   contentEntries,
   contentMediaRefs,
+  contentReleaseItems,
+  contentReleaseRuns,
   contentRelations,
   contentRevisions,
   mediaAssets,

@@ -43,6 +43,13 @@
       "when": 1790333729506,
       "tag": "0005_seo_monitoring",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790350786115,
+      "tag": "0006_content_release",
+      "breakpoints": true
     }
   ]
 }
