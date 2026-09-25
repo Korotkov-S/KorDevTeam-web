@@ -3,6 +3,12 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
+function deployFixtureEnvironment() {
+  const fixture = Object.fromEntries(readFileSync('tests/fixtures/deploy-leads.env', 'utf8')
+    .trim().split('\n').map(line => line.split(/=(.*)/s).slice(0, 2)));
+  return { ...process.env, ...fixture };
+}
+
 test('every literal Docker COPY input exists in a clean tracked checkout', () => {
   const files = spawnSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).stdout.split('\0');
   for (const line of readFileSync('Dockerfile', 'utf8').split('\n')) {
@@ -50,7 +56,9 @@ test('local topology has private shared PostgreSQL and distinct blue green ports
 });
 test('production compose resolves both immutable slots without a public database port', () => {
   const ref = 'ghcr.io/example/kordevteam:' + 'a'.repeat(40);
-  const r = spawnSync('docker', ['compose', '--env-file', 'tests/fixtures/deploy-leads.env', '-f', 'deploy/docker-compose.team.yml', 'config', '--format', 'json'], { encoding: 'utf8' });
+  const r = spawnSync('docker', ['compose', '--env-file', 'tests/fixtures/deploy-leads.env', '-f', 'deploy/docker-compose.team.yml', 'config', '--format', 'json'], {
+    encoding: 'utf8', env: deployFixtureEnvironment(),
+  });
   assert.equal(r.status, 0, r.stderr);
   const { services } = JSON.parse(r.stdout);
   assert.equal(services.postgres.ports, undefined);
@@ -68,7 +76,7 @@ test('production compose resolves both immutable slots without a public database
   }
 });
 test('production compose refuses missing admin secrets', () => {
-  const base = { ...process.env, ...Object.fromEntries(readFileSync('tests/fixtures/deploy-leads.env', 'utf8').trim().split('\n').map(line => line.split(/=(.*)/s).slice(0, 2))) };
+  const base = deployFixtureEnvironment();
   for (const key of ['ADMIN_SESSION_HMAC_KEY', 'ADMIN_RATE_LIMIT_HMAC_KEY', 'ADMIN_TRUSTED_ORIGIN',
     'PUBLIC_MEDIA_S3_ENDPOINT', 'PUBLIC_MEDIA_S3_REGION', 'PUBLIC_MEDIA_S3_BUCKET',
     'PUBLIC_MEDIA_S3_ACCESS_KEY_ID', 'PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY', 'PUBLIC_MEDIA_S3_PREFIX',

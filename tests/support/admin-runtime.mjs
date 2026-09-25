@@ -21,8 +21,15 @@ async function port() {
   });
 }
 
+export function createDatabaseResetSource(moduleUrl) {
+  return `const imported = await import(${JSON.stringify(moduleUrl)});
+const resetTestDatabase = imported.resetTestDatabase ?? imported.default?.resetTestDatabase;
+if (typeof resetTestDatabase !== "function") throw new Error("resetTestDatabase export is unavailable");
+await resetTestDatabase(process.env.TEST_DATABASE_URL);`;
+}
+
 export function resetAdminTestDatabase(databaseUrl) {
-  const code = `import { resetTestDatabase } from ${JSON.stringify(new URL("../../src/server/db/testDatabase.ts", import.meta.url).href)}; await resetTestDatabase(process.env.TEST_DATABASE_URL);`;
+  const code = createDatabaseResetSource(new URL("../../src/server/db/testDatabase.ts", import.meta.url).href);
   const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "--eval", code], {
     cwd: process.cwd(), env: { ...process.env, TEST_DATABASE_URL: databaseUrl }, encoding: "utf8",
   });

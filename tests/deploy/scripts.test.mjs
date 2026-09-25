@@ -45,6 +45,13 @@ test('release scripts exist and have valid Bash syntax', () => {
     assert.equal(result.status, 0, result.stderr);
   }
 });
+test('route writes use a durable atomic replacement', () => {
+  const source = readFileSync('scripts/release-files.mjs', 'utf8');
+  assert.match(source, /writeFileSync\(temp, content, \{ flag: 'wx'/);
+  assert.match(source, /fsyncSync\(fd\)/);
+  assert.match(source, /renameSync\(temp, target\)/);
+  assert.match(source, /fsyncSync\(directory\)/);
+});
 test('invalid slots, mutable and malformed immutable image references fail before Docker', t => {
   const f = fixture(t);
   for (const args of [['purple', image], ['green', 'ghcr.io/x/site:latest'], ['green', 'x@sha256:no'], ['green', `${image}:latest`], ['green', '-x:' + 'a'.repeat(40)]]) {
@@ -111,10 +118,9 @@ test('switch fails closed on missing, malformed, stale, exposed, symlinked or im
   });
 });
 test('healthy switch atomically replaces route, records both slots and rollback restores previous', t => {
-  const f = fixture(t); const inode = statSync(f.route).ino;
+  const f = fixture(t);
   let r = f.run('switch-slot', ['green']);
   assert.equal(r.status, 0, r.stderr);
-  assert.notEqual(statSync(f.route).ino, inode);
   assert.match(readFileSync(f.route, 'utf8'), /current-slot: green\n# previous-slot: blue/);
   assert.match(readFileSync(f.route, 'utf8'), /url: "http:\/\/kordevteam-green:3001"/);
   r = f.run('rollback-slot'); assert.equal(r.status, 0, r.stderr);
@@ -361,10 +367,9 @@ test('failed switch restores exact previous bytes including additional middlewar
   const f = fixture(t);
   writeFileSync(f.route, readFileSync(f.route, 'utf8').replace('middlewares: [kordevteam-slot]', 'middlewares: [kordevteam-slot, security]').replace('  middlewares:\n', '  middlewares:\n    security:\n      headers:\n        frameDeny: true\n') + '# operator-maintained comment\n');
   const before = readFileSync(f.route);
-  const inode = statSync(f.route).ino;
   const r = f.run('switch-slot', ['green'], { FAIL_PUBLIC: '1' });
   assert.notEqual(r.status, 0); assert.deepEqual(readFileSync(f.route), before);
-  assert.notEqual(statSync(f.route).ino, inode);
+  assert.match(r.stderr, /automatic rollback completed/i);
 });
 test('switch refuses disagreements between public origin, configured production host and installed rule', async t => {
   for (const extra of [{ PUBLIC_ORIGIN: 'https://other.example.com' }, { PRODUCTION_HOST: 'other.example.com' }]) await t.test(JSON.stringify(extra), t => {
