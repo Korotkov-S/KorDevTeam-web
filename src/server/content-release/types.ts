@@ -61,3 +61,37 @@ export type ContentReleasePlan = {
   items: ContentReleasePlanItem[];
   planChecksum: string;
 };
+
+export type ApplyReleaseApproval = {
+  releaseSha: string;
+  manifestChecksum: string;
+  planChecksum: string;
+};
+
+export type ContentReleaseResult = {
+  inserted: number;
+  updated: number;
+  unchanged: number;
+};
+
+export type ContentReleaseVerificationItem = {
+  key: string;
+  entryId: string;
+  databaseChecksum: string;
+  databaseVersion: number;
+};
+
+export type ContentReleaseVerificationIssue = {
+  key: string;
+  code: string;
+};
+
+export type ContentReleaseVerification = {
+  ok: boolean;
+  manifestChecksum: string;
+  releaseSha: string | null;
+  latestManifestChecksum: string | null;
+  counts: { valid: number; invalid: number };
+  items: ContentReleaseVerificationItem[];
+  issues: ContentReleaseVerificationIssue[];
+};

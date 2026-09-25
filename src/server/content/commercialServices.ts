@@ -191,18 +191,41 @@ export async function applyCommercialServiceSourcesInTransaction(
     for (const target of targets) entryIds.set(`${target.kind}:${target.slug}`, target.id);
     for (const key of requestedTargets) if (!entryIds.has(key)) throw new Error(`commercial_service_relation_target_missing:${key}`);
 
-    for (const source of sources) {
-      const sourceId = entryIds.get(`service:${source.slug}`)!;
-      await tx.delete(contentRelations).where(and(
+  for (const source of sources) {
+    const sourceId = entryIds.get(`service:${source.slug}`)!;
+    const relations = [
+      ...source.relatedCases.map((slug, sortOrder) => ({ sourceId, targetId: entryIds.get(`case:${slug}`)!, type: "related_case" as const, sortOrder })),
+      ...source.relatedArticles.map((slug, sortOrder) => ({ sourceId, targetId: entryIds.get(`article:${slug}`)!, type: "related_article" as const, sortOrder })),
+      ...source.faq.map((item, sortOrder) => ({ sourceId, targetId: entryIds.get(`faq:${item.slug}`)!, type: "related_faq" as const, sortOrder })),
+    ];
+    const desiredRelations = [
+      ...source.relatedCases.map((slug, sortOrder) => ({ type: "related_case", targetKey: `case:${slug}`, sortOrder })),
+      ...source.relatedArticles.map((slug, sortOrder) => ({ type: "related_article", targetKey: `article:${slug}`, sortOrder })),
+      ...source.faq.map((item, sortOrder) => ({ type: "related_faq", targetKey: `faq:${item.slug}`, sortOrder })),
+    ].sort((left, right) => left.type.localeCompare(right.type, "en")
+      || left.sortOrder - right.sortOrder
+      || left.targetKey.localeCompare(right.targetKey, "en"));
+    const currentRelations = (await tx.select({
+      type: contentRelations.type,
+      sortOrder: contentRelations.sortOrder,
+      targetKind: contentEntries.kind,
+      targetSlug: contentEntries.slug,
+    }).from(contentRelations)
+      .innerJoin(contentEntries, eq(contentRelations.targetId, contentEntries.id))
+      .where(and(
         eq(contentRelations.sourceId, sourceId),
         inArray(contentRelations.type, ["related_case", "related_article", "related_faq"]),
-      ));
-      const relations = [
-        ...source.relatedCases.map((slug, sortOrder) => ({ sourceId, targetId: entryIds.get(`case:${slug}`)!, type: "related_case" as const, sortOrder })),
-        ...source.relatedArticles.map((slug, sortOrder) => ({ sourceId, targetId: entryIds.get(`article:${slug}`)!, type: "related_article" as const, sortOrder })),
-        ...source.faq.map((item, sortOrder) => ({ sourceId, targetId: entryIds.get(`faq:${item.slug}`)!, type: "related_faq" as const, sortOrder })),
-      ];
-      if (relations.length) await tx.insert(contentRelations).values(relations);
-    }
+      )))
+      .map(row => ({ type: row.type, targetKey: `${row.targetKind}:${row.targetSlug}`, sortOrder: row.sortOrder }))
+      .sort((left, right) => left.type.localeCompare(right.type, "en")
+        || left.sortOrder - right.sortOrder
+        || left.targetKey.localeCompare(right.targetKey, "en"));
+    if (checksum(currentRelations) === checksum(desiredRelations)) continue;
+    await tx.delete(contentRelations).where(and(
+      eq(contentRelations.sourceId, sourceId),
+      inArray(contentRelations.type, ["related_case", "related_article", "related_faq"]),
+    ));
+    if (relations.length) await tx.insert(contentRelations).values(relations);
+  }
   return { inserted, updated, unchanged };
 }
