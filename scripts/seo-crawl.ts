@@ -75,8 +75,8 @@ export async function crawlSite(origin: string, { maxUrls = 5000 }: { maxUrls?: 
       const lastmod = $(element).find("lastmod").text();
       if (!/^https:\/\/kordev\.team\/(?:[^?#]*\/)?$/.test(url)) { fail(child, "sitemap-location", `Noncanonical location: ${url}`); continue; }
       if (urls.has(url)) fail(url, "sitemap-overlap", "URL occurs more than once");
-      const isArticle = /^\/blog\/[^/]+\/$/.test(new URL(url).pathname);
-      if (child.endsWith("sitemap-blog.xml") !== isArticle) fail(url, "sitemap-partition", "Articles belong exclusively in the blog sitemap");
+      const isBlogEntry = /^\/blog\/(?:category\/[^/]+|[^/]+)\/$/.test(new URL(url).pathname);
+      if (child.endsWith("sitemap-blog.xml") !== isBlogEntry) fail(url, "sitemap-partition", "Blog entries belong exclusively in the blog sitemap");
       if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(lastmod) || !Number.isFinite(Date.parse(lastmod)) || Date.parse(lastmod) > Date.now()) fail(url, "lastmod", "Expected a real, non-future ISO timestamp");
       urls.add(url);
     }

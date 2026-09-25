@@ -5,6 +5,7 @@ import { serviceCard, caseCard, contentCard, curateCaseCards } from "../server/c
 import { buildRouteMeta, type RouteSeoInput } from "../server/seo/metadata";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMaps } from "../server/media/presentation";
+import { isBlogCategorySlug } from "../lib/blogCategories";
 export { headers } from "../server/http/cacheHeaders";
 
 export const PRIORITY_SERVICE_SLUGS = ["business-process-automation", "web-services", "mobile-app-development"] as const;
@@ -13,7 +14,7 @@ export async function loader() {
   const [services, cases, articles] = await Promise.all([
     listPublishedEntries("service"), listPublishedEntries("case"), listPublishedEntries("article"),
   ]);
-  const selectedArticles = [...articles].sort((left, right) =>
+  const selectedArticles = articles.filter(entry => entry.indexable && isBlogCategorySlug(entry.payload.category)).sort((left, right) =>
     (right.publishedAt?.getTime() ?? 0) - (left.publishedAt?.getTime() ?? 0) || left.slug.localeCompare(right.slug),
   ).slice(0, 3);
   const media = await getEntryMediaMaps([...selectedArticles, ...cases].map(entry => entry.id));

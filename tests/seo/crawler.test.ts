@@ -78,6 +78,18 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   const pages = await getXml("/sitemap-pages.xml");
   const blog = await getXml("/sitemap-blog.xml");
   const locations = [pages, blog].map($ => $("url > loc").map((_, el) => $(el).text()).get());
+  const categoryPaths = [
+    "/blog/category/business-automation/",
+    "/blog/category/crm-sales/",
+    "/blog/category/digital-products/",
+    "/blog/category/technical-support/",
+    "/blog/category/ai-for-business/",
+    "/blog/category/it-project-management/",
+  ];
+  assert.deepEqual(
+    new Set(locations[1].filter(location => location.includes("/blog/category/")).map(location => new URL(location).pathname)),
+    new Set(categoryPaths),
+  );
   assert.equal(locations[0].filter(loc => locations[1].includes(loc)).length, 0);
   const caseLocations = locations[0].filter(location => /^https:\/\/kordev\.team\/cases\/[^/]+\/$/.test(location));
   assert.equal(caseLocations.length, 23);
@@ -93,8 +105,15 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
       const lastmod = $(element).find("lastmod").text();
       assert.match(loc, /^https:\/\/kordev\.team\/(?:[^?#]*\/)?$/);
       assert.match(lastmod, /^\d{4}-\d{2}-\d{2}T/);
-      const record = records.find(entry => loc.endsWith(`/${entry.slug}/`));
-      if (record) assert.equal(lastmod, record.updatedAt.toISOString());
+      const categoryMatch = new URL(loc).pathname.match(/^\/blog\/category\/([^/]+)\/$/);
+      if (categoryMatch) {
+        const members = records.filter(entry => entry.kind === "article" && entry.payload.category === categoryMatch[1]);
+        assert.ok(members.length > 0, loc);
+        assert.equal(lastmod, new Date(Math.max(...members.map(entry => entry.updatedAt.getTime()))).toISOString());
+      } else {
+        const record = records.find(entry => loc.endsWith(`/${entry.slug}/`));
+        if (record) assert.equal(lastmod, record.updatedAt.toISOString());
+      }
       const response = await fetch(runtime.origin + new URL(loc).pathname, { redirect: "manual", headers: { accept: "text/html" } });
       assert.equal(response.status, 200, loc);
       const document = load(await response.text());
@@ -104,6 +123,23 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   assert.equal(pages("url").filter((_, el) => pages(el).find("loc").text().endsWith("/about-test/")).find("lastmod").text(), published.updatedAt.toISOString());
   const again = load(await (await fetch(runtime.origin + "/sitemap-pages.xml")).text(), { xml: true });
   assert.deepEqual(again("lastmod").map((_, el) => again(el).text()).get(), pages("lastmod").map((_, el) => pages(el).text()).get());
+  const categoryLastmods = Object.fromEntries(blog("url").toArray()
+    .map(element => [blog(element).find("loc").text(), blog(element).find("lastmod").text()])
+    .filter(([location]) => location.includes("/blog/category/")));
+  const blogAgain = load(await (await fetch(runtime.origin + "/sitemap-blog.xml")).text(), { xml: true });
+  const repeatedCategoryLastmods = Object.fromEntries(blogAgain("url").toArray()
+    .map(element => [blogAgain(element).find("loc").text(), blogAgain(element).find("lastmod").text()])
+    .filter(([location]) => location.includes("/blog/category/")));
+  assert.deepEqual(repeatedCategoryLastmods, categoryLastmods);
+  for (const pathname of categoryPaths) {
+    const response = await fetch(runtime.origin + pathname, { headers: { accept: "text/html" } });
+    assert.equal(response.status, 200, pathname);
+    const document = load(await response.text());
+    assert.equal(document("h1").length, 1, pathname);
+    assert.equal(document('meta[name="robots"]').attr("content"), "index, follow", pathname);
+    assert.equal(document('link[rel="canonical"]').attr("href"), `https://kordev.team${pathname}`, pathname);
+    assert.ok(document('article a[href^="/blog/"]').length > 0, pathname);
+  }
   const robots = await fetch(runtime.origin + "/robots.txt");
   assert.equal(robots.status, 200);
   assert.match(await robots.text(), /Disallow: \/admin\/\n[\s\S]*Sitemap: https:\/\/kordev\.team\/sitemap\.xml\n/);
