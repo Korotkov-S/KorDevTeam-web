@@ -17,11 +17,52 @@ import { applyArticleSources, loadArticleSources, type ArticleSource } from "./a
 
 type Metadata = Record<string, unknown>;
 
-async function articleFixture(metadata: Metadata[], markdown?: string): Promise<string> {
+const taxonomySeeds: Metadata[] = [
+  {
+    slug: "related-one",
+    lang: "ru",
+    category: "crm-sales",
+    relatedArticleSlugs: ["process-description", "related-two", "related-three"],
+  },
+  {
+    slug: "related-two",
+    lang: "ru",
+    category: "digital-products",
+    relatedArticleSlugs: ["process-description", "related-one", "related-three"],
+  },
+  {
+    slug: "related-three",
+    lang: "ru",
+    category: "technical-support",
+    relatedArticleSlugs: ["process-description", "related-one", "related-two"],
+  },
+  {
+    slug: "ai-seed",
+    lang: "ru",
+    category: "ai-for-business",
+    relatedArticleSlugs: ["process-description", "related-one", "related-two"],
+  },
+  {
+    slug: "project-seed",
+    lang: "ru",
+    category: "it-project-management",
+    relatedArticleSlugs: ["process-description", "related-one", "related-two"],
+  },
+];
+
+async function articleFixture(
+  metadata: Metadata[],
+  markdown?: string,
+  options: { completeTaxonomy?: boolean } = {},
+): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "kordev-article-source-"));
   await mkdir(path.join(root, "public", "content"), { recursive: true });
   await mkdir(path.join(root, "public", "blog"), { recursive: true });
-  await writeFile(path.join(root, "public", "content", "blog.ru.json"), JSON.stringify(metadata), "utf8");
+  const slugs = new Set(metadata.map(item => item.slug));
+  const completedMetadata = options.completeTaxonomy === false
+    ? metadata
+    : [...metadata, ...taxonomySeeds.filter(item => !slugs.has(item.slug))];
+  await writeFile(path.join(root, "public", "content", "blog.ru.json"), JSON.stringify(completedMetadata), "utf8");
   if (markdown !== undefined && typeof metadata[0]?.slug === "string") {
     await writeFile(path.join(root, "public", "blog", `${metadata[0].slug}.md`), markdown, "utf8");
   }
@@ -41,6 +82,8 @@ const validMetadata = {
   tags: ["Бизнес-процессы"],
   coverUrl: "/cover.webp",
   imageUrls: ["/cover.webp"],
+  category: "business-automation",
+  relatedArticleSlugs: ["related-one", "related-two", "related-three"],
 };
 
 test("article source loader combines curated metadata with the matching markdown body", async t => {
@@ -60,6 +103,8 @@ test("article source loader combines curated metadata with the matching markdown
   assert.equal(source.payload.author, "Геннадий Коротков");
   assert.deepEqual(source.payload.tags, ["Бизнес-процессы"]);
   assert.equal(source.payload.coverUrl, "/cover.webp");
+  assert.equal(source.payload.category, "business-automation");
+  assert.deepEqual(source.payload.relatedArticleSlugs, ["related-one", "related-two", "related-three"]);
 });
 
 test("article source loader validates full fields only for requested legacy-catalog records", async t => {
@@ -72,6 +117,8 @@ test("article source loader validates full fields only for requested legacy-cata
       seoTitle: "Старая статья",
       readTime: "3 мин",
       tags: [],
+      category: "crm-sales",
+      relatedArticleSlugs: ["process-description", "related-two", "related-three"],
     }],
     "# Описание бизнес-процессов\n\nПолный практический текст статьи.",
   );
@@ -120,6 +167,34 @@ test("article source loader rejects metadata that disagrees with the markdown H1
   await assert.rejects(loadArticleSources(["process-description"], root), /article_source_invalid/);
 });
 
+for (const [name, taxonomy] of Object.entries({
+  "unknown category": { category: "unknown", relatedArticleSlugs: ["related-one", "related-two", "related-three"] },
+  "self relation": { category: "business-automation", relatedArticleSlugs: ["process-description", "related-two", "related-three"] },
+  "duplicate relation": { category: "business-automation", relatedArticleSlugs: ["related-one", "related-one", "related-three"] },
+  "missing relation target": { category: "business-automation", relatedArticleSlugs: ["related-one", "missing", "related-three"] },
+})) {
+  test(`article source loader rejects ${name}`, async t => {
+    const root = await articleFixture(
+      [{ ...validMetadata, ...taxonomy }],
+      "# Описание бизнес-процессов\n\nПолный практический текст статьи.",
+    );
+    t.after(() => rm(root, { recursive: true, force: true }));
+
+    await assert.rejects(loadArticleSources(["process-description"], root), /article_source_invalid/);
+  });
+}
+
+test("article source loader rejects a catalog that leaves an approved category empty", async t => {
+  const root = await articleFixture(
+    [validMetadata, ...taxonomySeeds.filter(item => item.category !== "ai-for-business")],
+    "# Описание бизнес-процессов\n\nПолный практический текст статьи.",
+    { completeTaxonomy: false },
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  await assert.rejects(loadArticleSources(["process-description"], root), /article_source_invalid/);
+});
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const updatedSource: ArticleSource = {
   slug: "process-description",
@@ -135,6 +210,8 @@ const updatedSource: ArticleSource = {
     coverUrl: "/cover.webp",
     imageUrls: ["/cover.webp"],
     readTime: "9 мин",
+    category: "business-automation",
+    relatedArticleSlugs: ["related-one", "related-two", "related-three"],
   },
 };
 

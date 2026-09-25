@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { createDb } from "../db/client";
 import { contentEntries, contentRevisions } from "../db/schema";
+import { BLOG_CATEGORY_SLUGS, type BlogCategorySlug } from "../../lib/blogCategories";
 import { checksum } from "./migration";
 import { parseContentCommand, validatePublication } from "./types";
 
@@ -21,14 +22,20 @@ export type ArticleSource = {
     coverUrl: string;
     imageUrls: string[];
     readTime: string;
+    category: BlogCategorySlug;
+    relatedArticleSlugs: string[];
   };
 };
 
 const slug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const nonempty = z.string().trim().min(1);
-const articleMetadata = z.object({
+const articleCatalogItem = z.object({
   slug,
   lang: z.string().optional(),
+  category: z.enum(BLOG_CATEGORY_SLUGS),
+  relatedArticleSlugs: z.array(slug).length(3),
+}).passthrough();
+const articleMetadata = articleCatalogItem.extend({
   title: nonempty,
   excerpt: nonempty,
   seoTitle: nonempty.max(180),
@@ -37,10 +44,6 @@ const articleMetadata = z.object({
   tags: z.array(nonempty).min(1),
   coverUrl: z.string().default(""),
   imageUrls: z.array(z.string()).default([]),
-}).passthrough();
-const articleCatalogItem = z.object({
-  slug,
-  lang: z.string().optional(),
 }).passthrough();
 
 function assertUnique(values: readonly string[], code: string): void {
@@ -54,6 +57,18 @@ async function readMetadata(root: string): Promise<z.output<typeof articleCatalo
     if (!parsed.success) throw parsed.error;
     const russian = parsed.data.filter(item => item.lang === undefined || item.lang === "ru");
     assertUnique(russian.map(item => item.slug), "article_source_duplicate_slug");
+    const catalogSlugs = new Set(russian.map(item => item.slug));
+    for (const item of russian) {
+      const related = item.relatedArticleSlugs;
+      if (
+        related.includes(item.slug)
+        || new Set(related).size !== related.length
+        || related.some(target => !catalogSlugs.has(target))
+      ) throw new Error("article_source_invalid");
+    }
+    for (const category of BLOG_CATEGORY_SLUGS) {
+      if (!russian.some(item => item.category === category)) throw new Error("article_source_invalid");
+    }
     return russian;
   } catch (error) {
     if (error instanceof Error && error.message === "article_source_duplicate_slug") throw error;
@@ -104,6 +119,8 @@ export async function loadArticleSources(
         coverUrl: item.coverUrl,
         imageUrls: item.imageUrls,
         readTime: item.readTime,
+        category: item.category,
+        relatedArticleSlugs: item.relatedArticleSlugs,
       },
     };
     const command = parseContentCommand({ kind: "article", ...source });

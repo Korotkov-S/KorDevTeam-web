@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { contentEntries } from "../db/schema";
 import type { MediaPresentationMap, ResolvedMediaAsset } from "../media/presentation";
+import { BLOG_CATEGORY_SLUGS } from "../../lib/blogCategories";
 
 export type ContentKind = "service" | "case" | "article" | "page" | "faq";
 export type RelationType = "related_case" | "related_article" | "related_faq" | "related_service";
@@ -86,6 +87,8 @@ export const saveContentSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...base, kind: z.literal("article"), payload: z.strictObject({
     h1: z.string().optional(), author: z.string().optional(), tags: z.array(z.string()).optional(),
     coverUrl: z.string().optional(), imageUrls: z.array(z.string()).optional(), readTime: z.string().optional(),
+    category: z.enum(BLOG_CATEGORY_SLUGS).optional(),
+    relatedArticleSlugs: z.array(z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)).length(3).optional(),
   }).default({}) }),
   z.strictObject({ ...base, kind: z.literal("page"), payload: z.strictObject({
     h1: z.string().optional(), sections: z.array(block).optional(), cta: cta.optional(),
