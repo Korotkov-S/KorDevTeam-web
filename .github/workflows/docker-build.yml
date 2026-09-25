@@ -11,6 +11,14 @@ on:
         description: Exact GHCR image reference (ghcr.io/owner/repository@sha256:...)
         required: true
         type: string
+      content_image_ref:
+        description: Exact GHCR content image reference (ghcr.io/owner/repository@sha256:...)
+        required: true
+        type: string
+      content_manifest_sha256:
+        description: Exact content manifest SHA-256 emitted by the approved content image
+        required: true
+        type: string
       privacy_policy_sha256:
         description: Owner-reviewed SHA-256 of src/routes/legal.tsx in the deployed checkout
         required: true
@@ -30,6 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      content-manifest-sha256: ${{ steps.release_content.outputs.manifest_sha256 }}
     env:
       DATABASE_URL: postgresql://kordev_ci:kordev_ci@127.0.0.1:5432/kordev_ci
       TEST_DATABASE_URL: postgresql://kordev_ci:kordev_ci@127.0.0.1:5432/kordev_test
@@ -171,11 +181,17 @@ jobs:
         run: yarn build
 
       - name: Prepare crawler database
+        id: release_content
         run: |
+          set -euo pipefail
           yarn db:migrate
-          yarn content:migrate --batch-id "ci-${GITHUB_SHA}"
-          yarn portfolio:import
-          yarn content:services
+          manifest_report="$(RELEASE_SHA="$GITHUB_SHA" yarn -s content:release manifest)"
+          manifest_sha="$(node -e 'const x=JSON.parse(process.argv[1]); process.stdout.write(x.manifestChecksum)' "$manifest_report")"
+          plan_report="$(RELEASE_SHA="$GITHUB_SHA" yarn -s content:release plan)"
+          plan_sha="$(node -e 'const x=JSON.parse(process.argv[1]); process.stdout.write(x.planChecksum)' "$plan_report")"
+          RELEASE_SHA="$GITHUB_SHA" yarn -s content:release apply --release-sha "$GITHUB_SHA" --manifest-sha256 "$manifest_sha" --plan-sha256 "$plan_sha"
+          RELEASE_SHA="$GITHUB_SHA" yarn -s content:release verify
+          echo "manifest_sha256=$manifest_sha" >> "$GITHUB_OUTPUT"
 
       - name: Crawl built site
         run: |
@@ -207,13 +223,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image without publishing
+      - name: Build web image without publishing
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: false
           tags: kordevteam-validation:${{ github.sha }}
+          build-args: RELEASE_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build content image without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: content-release
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: kordevteam-content-validation:${{ github.sha }}
           build-args: RELEASE_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -228,6 +256,9 @@ jobs:
     outputs:
       image-digest: ${{ steps.release.outputs.image_digest }}
       image-ref: ${{ steps.release.outputs.image_ref }}
+      content-image-digest: ${{ steps.release.outputs.content_image_digest }}
+      content-image-ref: ${{ steps.release.outputs.content_image_ref }}
+      content-manifest-sha256: ${{ steps.release.outputs.content_manifest_sha256 }}
 
     steps:
       - name: Checkout validated commit
@@ -252,8 +283,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish immutable image
-        id: build
+      - name: Build and publish immutable web image
+        id: build_web
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -264,32 +295,66 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Capture canonical pushed digest
+      - name: Build and publish immutable content image
+        id: build_content
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: content-release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}-content
+          build-args: RELEASE_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Capture canonical pushed digests
         id: release
         env:
           IMAGE_NAME: ${{ steps.image.outputs.name }}
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.build_web.outputs.digest }}
+          CONTENT_IMAGE_DIGEST: ${{ steps.build_content.outputs.digest }}
+          CONTENT_MANIFEST_SHA256: ${{ needs.validate.outputs.content-manifest-sha256 }}
         run: |
           set -euo pipefail
           [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$CONTENT_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$CONTENT_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$IMAGE_DIGEST" != "$CONTENT_IMAGE_DIGEST" ]]
           image_ref="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          content_image_ref="${IMAGE_NAME}@${CONTENT_IMAGE_DIGEST}"
           echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
           echo "image_ref=$image_ref" >> "$GITHUB_OUTPUT"
+          echo "content_image_digest=$CONTENT_IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "content_image_ref=$content_image_ref" >> "$GITHUB_OUTPUT"
+          echo "content_manifest_sha256=$CONTENT_MANIFEST_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release manifest
+        env:
+          RELEASE_GIT_SHA: ${{ github.sha }}
+          RELEASE_WEB_IMAGE: ${{ steps.release.outputs.image_ref }}
+          RELEASE_CONTENT_IMAGE: ${{ steps.release.outputs.content_image_ref }}
+          RELEASE_CONTENT_MANIFEST_SHA256: ${{ steps.release.outputs.content_manifest_sha256 }}
+          RELEASE_CI_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
           umask 077
-          printf '%s\n' "$image_ref" > release-image-ref.txt
+          export RELEASE_BUILT_AT="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
+          node scripts/release-manifest.mjs > release-manifest.json
           {
-            echo "## Immutable image published"
+            echo "## Immutable release published"
             echo
             echo "Commit: \`${GITHUB_SHA}\`"
-            echo "Digest: \`${IMAGE_DIGEST}\`"
-            echo "Exact reference: \`${image_ref}\`"
+            echo "Web image: \`${RELEASE_WEB_IMAGE}\`"
+            echo "Content image: \`${RELEASE_CONTENT_IMAGE}\`"
+            echo "Content manifest: \`${RELEASE_CONTENT_MANIFEST_SHA256}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload release evidence
         uses: actions/upload-artifact@v4
         with:
-          name: release-image-${{ github.sha }}
-          path: release-image-ref.txt
+          name: release-manifest-${{ github.sha }}
+          path: release-manifest.json
           if-no-files-found: error
           retention-days: 30
 
@@ -305,15 +370,21 @@ jobs:
       packages: read
     env:
       IMAGE_REF: ${{ inputs.image_ref }}
+      CONTENT_IMAGE_REF: ${{ inputs.content_image_ref }}
+      CONTENT_MANIFEST_SHA256: ${{ inputs.content_manifest_sha256 }}
       PRIVACY_POLICY_SHA256: ${{ inputs.privacy_policy_sha256 }}
       PERSIST_TEST_LEAD: ${{ inputs.persist_test_lead }}
 
     steps:
-      - name: Validate immutable production image
+      - name: Validate immutable production release
         run: |
           set -euo pipefail
           [[ "$IMAGE_REF" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]]
+          [[ "$CONTENT_IMAGE_REF" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]]
+          [[ "$CONTENT_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]]
           [[ "${IMAGE_REF%@*}" == "ghcr.io/${GITHUB_REPOSITORY,,}" ]]
+          [[ "${CONTENT_IMAGE_REF%@*}" == "ghcr.io/${GITHUB_REPOSITORY,,}" ]]
+          [[ "$IMAGE_REF" != "$CONTENT_IMAGE_REF" ]]
           [[ "$PRIVACY_POLICY_SHA256" =~ ^[0-9a-f]{64}$ ]]
           [[ "$PERSIST_TEST_LEAD" == true ]]
 
@@ -328,7 +399,9 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Verify published manifest
-        run: docker buildx imagetools inspect "$IMAGE_REF" >/dev/null
+        run: |
+          docker buildx imagetools inspect "$IMAGE_REF" >/dev/null
+          docker buildx imagetools inspect "$CONTENT_IMAGE_REF" >/dev/null
 
       - name: Deploy checked inactive slot and switch production
         uses: appleboy/ssh-action@v1
@@ -336,7 +409,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: IMAGE_REF,PRIVACY_POLICY_SHA256,PERSIST_TEST_LEAD
+          envs: IMAGE_REF,CONTENT_IMAGE_REF,CONTENT_MANIFEST_SHA256,PRIVACY_POLICY_SHA256,PERSIST_TEST_LEAD
           script: |
             bash -se <<'KORDEV_RELEASE'
             set -euo pipefail
@@ -350,7 +423,7 @@ jobs:
               green) inactive=blue ;;
               *) echo "Invalid current-slot state" >&2; exit 1 ;;
             esac
-            bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF"
+            bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF" "$CONTENT_IMAGE_REF" "$CONTENT_MANIFEST_SHA256"
             [[ "$PERSIST_TEST_LEAD" == true ]]
             RELEASE_FORM_SMOKE_OPT_IN=persist-clearly-marked-test-lead \
               PRIVACY_POLICY_SHA256="$PRIVACY_POLICY_SHA256" \

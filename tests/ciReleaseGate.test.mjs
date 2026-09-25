@@ -21,6 +21,8 @@ test("read-only validation gates a separate trusted main publisher", () => {
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.deepEqual(workflow.on.pull_request.branches, ["main"]);
   assert.equal(workflow.on.workflow_dispatch.inputs.image_ref.required, true);
+  assert.equal(workflow.on.workflow_dispatch.inputs.content_image_ref.required, true);
+  assert.equal(workflow.on.workflow_dispatch.inputs.content_manifest_sha256.required, true);
   assert.equal(workflow.on.workflow_dispatch.inputs.privacy_policy_sha256.required, true);
   assert.equal(workflow.on.workflow_dispatch.inputs.persist_test_lead.type, "boolean");
   assert.equal(workflow.on.workflow_dispatch.inputs.persist_test_lead.default, false);
@@ -45,15 +47,21 @@ test("read-only validation gates a separate trusted main publisher", () => {
     if (index) assert.ok(stepIndex(steps, gates[index - 1]) < stepIndex(steps, name), `${gates[index - 1]} must precede ${name}`);
   }
   const crawlerDatabase = steps.find(step => step.name === "Prepare crawler database");
-  assert.match(crawlerDatabase.run, /yarn content:migrate/);
-  assert.match(crawlerDatabase.run, /yarn content:services/);
-  assert.match(crawlerDatabase.run, /yarn portfolio:import/);
-  assert.ok(crawlerDatabase.run.indexOf("yarn portfolio:import") < crawlerDatabase.run.indexOf("yarn content:services"),
-    "portfolio relation targets must exist before commercial services are synchronized");
-  const validationBuild = steps.find(step => step.name === "Build image without publishing");
-  assert.ok(validationBuild);
-  assert.equal(validationBuild.with.push, false);
-  assert.ok(stepIndex(steps, "Crawl built site") < stepIndex(steps, validationBuild.name));
+  assert.match(crawlerDatabase.run, /yarn db:migrate/);
+  for (const command of ["manifest", "plan", "apply", "verify"]) assert.match(crawlerDatabase.run, new RegExp(`content:release ${command}`));
+  assert.match(crawlerDatabase.run, /RELEASE_SHA="\$GITHUB_SHA"/);
+  assert.doesNotMatch(crawlerDatabase.run, /content:migrate|content:services|portfolio:import/);
+  const webValidationBuild = steps.find(step => step.name === "Build web image without publishing");
+  const contentValidationBuild = steps.find(step => step.name === "Build content image without publishing");
+  assert.ok(webValidationBuild);
+  assert.ok(contentValidationBuild);
+  assert.equal(webValidationBuild.with.push, false);
+  assert.equal(contentValidationBuild.with.push, false);
+  assert.equal(contentValidationBuild.with.target, "content-release");
+  assert.equal(webValidationBuild.with.platforms, "linux/amd64,linux/arm64");
+  assert.equal(contentValidationBuild.with.platforms, "linux/amd64,linux/arm64");
+  assert.ok(stepIndex(steps, "Crawl built site") < stepIndex(steps, webValidationBuild.name));
+  assert.ok(stepIndex(steps, webValidationBuild.name) < stepIndex(steps, contentValidationBuild.name));
   const clamavSmoke = steps.find(step => step.name === "Smoke-test pinned local ClamAV");
   assert.ok(clamavSmoke);
   assert.match(clamavSmoke.run, /docker compose up -d --wait clamav/);
@@ -80,17 +88,33 @@ test("read-only validation gates a separate trusted main publisher", () => {
   assert.deepEqual(publisher.permissions, { contents: "read", packages: "write" });
   const checkout = publisher.steps.find(step => /actions\/checkout@v4$/.test(step.uses));
   assert.equal(checkout.with.ref, "${{ github.sha }}");
-  const publish = publisher.steps.find(step => step.name === "Build and publish immutable image");
-  assert.equal(publish.with.push, true);
-  assert.match(publish.with.tags, /\$\{\{ github\.sha \}\}/);
-  assert.doesNotMatch(publish.with.tags, /(?:^|:)latest(?:$|\s)/m);
+  const publishWeb = publisher.steps.find(step => step.name === "Build and publish immutable web image");
+  const publishContent = publisher.steps.find(step => step.name === "Build and publish immutable content image");
+  for (const publish of [publishWeb, publishContent]) {
+    assert.equal(publish.with.push, true);
+    assert.equal(publish.with.platforms, "linux/amd64,linux/arm64");
+    assert.match(publish.with["build-args"], /RELEASE_SHA=\$\{\{ github\.sha \}\}/);
+    assert.doesNotMatch(publish.with.tags, /(?:^|:)latest(?:$|\s)/m);
+  }
+  assert.match(publishWeb.with.tags, /\$\{\{ github\.sha \}\}/);
+  assert.equal(publishContent.with.target, "content-release");
+  assert.match(publishContent.with.tags, /\$\{\{ github\.sha \}\}-content/);
   assert.ok(publisher.outputs["image-digest"]);
   assert.ok(publisher.outputs["image-ref"]);
+  assert.ok(publisher.outputs["content-image-digest"]);
+  assert.ok(publisher.outputs["content-image-ref"]);
+  assert.ok(publisher.outputs["content-manifest-sha256"]);
+  const manifest = publisher.steps.find(step => step.name === "Generate release manifest");
+  assert.match(manifest.run, /scripts\/release-manifest\.mjs/);
+  assert.match(manifest.run, /release-manifest\.json/);
+  const upload = publisher.steps.find(step => /upload-artifact@v4$/.test(step.uses));
+  assert.match(upload.with.path, /release-manifest\.json/);
+  assert.equal(upload.with["retention-days"], 30);
   assert.match(source, /upload-artifact@v4/);
   assert.match(source, /GITHUB_STEP_SUMMARY/);
 });
 
-test("production deployment is dispatch-only, protected, digest-exact and uses Task 7 entrypoints", () => {
+test("production deployment is dispatch-only, protected, digest-exact and passes both release artifacts", () => {
   const { source, value: workflow } = loadWorkflow(".github/workflows/docker-build.yml");
   const job = workflow.jobs["deploy-production"];
   assert.ok(job, "deploy-production job must exist");
@@ -100,10 +124,14 @@ test("production deployment is dispatch-only, protected, digest-exact and uses T
   assert.deepEqual(job.concurrency, { group: "kordevteam-production", "cancel-in-progress": false });
   assert.equal(job.needs, undefined, "manual deployment must not depend on a new mutable build");
 
-  const validate = job.steps.find(step => step.name === "Validate immutable production image");
+  const validate = job.steps.find(step => step.name === "Validate immutable production release");
   assert.match(validate.run, /\^ghcr\\\.io\/.+@sha256:\[0-9a-f\]\{64\}\$/);
+  assert.match(validate.run, /CONTENT_IMAGE_REF/);
+  assert.match(validate.run, /CONTENT_MANIFEST_SHA256/);
   const remote = job.steps.find(step => /ssh-action@v1$/.test(step.uses));
   assert.match(remote.with.envs, /IMAGE_REF/);
+  assert.match(remote.with.envs, /CONTENT_IMAGE_REF/);
+  assert.match(remote.with.envs, /CONTENT_MANIFEST_SHA256/);
   assert.match(remote.with.envs, /PRIVACY_POLICY_SHA256/);
   assert.match(remote.with.envs, /PERSIST_TEST_LEAD/);
   const script = remote.with.script;
@@ -113,6 +141,7 @@ test("production deployment is dispatch-only, protected, digest-exact and uses T
   const switchSlot = script.indexOf("scripts/switch-slot.sh");
   const prune = script.indexOf("scripts/prune-releases.sh");
   assert.ok(deploy >= 0 && deploy < releaseGate && releaseGate < switchSlot && switchSlot < prune, "deploy, release gate, switch and prune must be explicit and ordered");
+  assert.match(script, /deploy-slot\.sh "\$inactive" "\$IMAGE_REF" "\$CONTENT_IMAGE_REF" "\$CONTENT_MANIFEST_SHA256"/);
   assert.match(script, /persist-clearly-marked-test-lead/);
   assert.match(script, /PERSIST_TEST_LEAD.*true/);
   assert.match(script, /current-slot/);
