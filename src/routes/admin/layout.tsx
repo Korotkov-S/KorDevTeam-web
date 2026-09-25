@@ -12,6 +12,7 @@ const navigation = [
   ["/admin/content/faq/", "FAQ"],
   ["/admin/content/page/", "Страницы"],
   ["/admin/media/", "Медиатека"],
+  ["/admin/mcp/", "MCP-доступ"],
   ["/admin/settings/", "Настройки"],
 ] as const;
 
