@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
@@ -13,6 +13,8 @@ import {
 } from "../components/ui/carousel";
 import type { MediaPresentationMap } from "../server/media/presentation";
 import type { BlogCategorySlug } from "../lib/blogCategories";
+import { blogCategoryPath, type BlogCategoryDefinition } from "../lib/blogCategories";
+import { BlogCard, type BlogPostCardView } from "../components/BlogCard";
 
 interface BlogPostMeta {
   title: string;
@@ -144,7 +146,15 @@ export type ArticlePresentation = {
   readTime: string; tags: string[]; coverUrl: string; imageUrls: string[]; media?: MediaPresentationMap;
   category: BlogCategorySlug | null;
 };
-export function BlogPostPage({ article }: { article: ArticlePresentation }) {
+export function BlogPostPage({
+  article,
+  category,
+  relatedArticles,
+}: {
+  article: ArticlePresentation;
+  category: Pick<BlogCategoryDefinition, "slug" | "title">;
+  relatedArticles: BlogPostCardView[];
+}) {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -172,25 +182,20 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
   return (
     <main className="min-h-screen pt-20">
       <div className="mx-auto w-full max-w-[1320px] px-5 py-10 sm:px-8 lg:px-10 lg:py-16">
-        <Button
-          variant="ghost"
-          onClick={(event) => {
-            event.preventDefault();
-            navigateGoBack();
-          }}
-          className="-ml-4 gap-2 rounded-full px-4 text-[var(--public-subtle)]"
-        >
-          <ArrowLeft className="size-4" />
-          {t("blog.backToBlog")}
-        </Button>
+        <nav aria-label="Хлебные крошки" className="flex flex-wrap items-center gap-2 text-sm text-[var(--public-subtle)]">
+          <Link to="/blog/" className="underline underline-offset-4">Блог</Link>
+          <span aria-hidden="true">→</span>
+          <Link to={blogCategoryPath(category.slug)} className="underline underline-offset-4">{category.title}</Link>
+        </nav>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="size-12 animate-spin rounded-full border-b-2 border-primary" />
           </div>
         ) : (
-          <article className="mt-9" itemScope itemType="https://schema.org/BlogPosting">
-            <header>
+          <>
+            <article className="mt-9" itemScope itemType="https://schema.org/BlogPosting">
+              <header>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium uppercase tracking-[0.1em] text-[var(--public-subtle)]">
                 <span>Практика KorDevTeam</span>
                 <time dateTime={parseDateToISO(meta.date)} itemProp="datePublished">{displayDate(meta.date)}</time>
@@ -213,15 +218,15 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
                   ))}
                 </ul>
               ) : null}
-            </header>
+              </header>
 
-            {heroImages.length ? (
+              {heroImages.length ? (
               <div className="relative mt-12 aspect-[16/8.5] w-full overflow-hidden rounded-[2rem] bg-secondary sm:rounded-[3rem]">
                 <PostImageCarousel images={heroImages} />
               </div>
-            ) : null}
+              ) : null}
 
-            <div className="mt-12 grid gap-12 lg:grid-cols-12 lg:gap-8">
+              <div className="mt-12 grid gap-12 lg:grid-cols-12 lg:gap-8">
               <div className="min-w-0 lg:col-span-8 lg:col-start-1">
                 <p className="mb-14 max-w-4xl text-balance text-2xl leading-[1.35] tracking-[-0.02em] text-[var(--public-ink)] sm:text-3xl" itemProp="description">
                   {meta.excerpt}
@@ -245,7 +250,26 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
                   <meta itemProp="url" content="https://kordev.team" />
                 </div>
               </aside>
-            </div>
+              </div>
+            </article>
+
+            {relatedArticles.length ? (
+              <section className="mt-20 border-t border-border pt-12" aria-labelledby="related-articles-title">
+                <h2 id="related-articles-title" className="text-3xl font-semibold tracking-[-0.04em] text-[var(--public-ink)] sm:text-4xl">
+                  Читайте также
+                </h2>
+                <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" itemScope itemType="https://schema.org/ItemList">
+                  {relatedArticles.map((relatedArticle, index) => (
+                    <BlogCard
+                      key={relatedArticle.id}
+                      post={relatedArticle}
+                      fallbackSrc={["/opengraphlogo.jpeg", "/projects/wowbanner.png", "/projects/harmonizeMe.png"][index % 3]}
+                      actionLabel={t("blog.readMore")}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <div className="mt-16 border-t border-border pt-8">
               <Button onClick={navigateGoBack} className="gap-2 rounded-full bg-[var(--public-ink)] px-6 text-background hover:bg-[var(--public-violet)] hover:text-white">
@@ -253,7 +277,7 @@ export function BlogPostPage({ article }: { article: ArticlePresentation }) {
                 {t("blog.backToBlog")}
               </Button>
             </div>
-          </article>
+          </>
         )}
       </div>
     </main>
