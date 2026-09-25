@@ -3,9 +3,14 @@ import type { SeoSourceId } from "./contracts";
 import { createSeoCollector } from "./collector";
 import { getDb } from "../db/client";
 import { createSeoRepository } from "./repository";
+import { createSeoService } from "./service";
 import { createGoogleSearchConsoleProvider } from "./providers/google";
 import { createYandexWebmasterProvider } from "./providers/yandex";
 import { SeoProviderError } from "./providers/provider-error";
+
+export function getSeoMonitoringService() {
+  return createSeoService(createSeoRepository(getDb()));
+}
 
 export async function runSeoCollection(options: { source?: SeoSourceId } = {}) {
   const config = readSeoConfig(process.env);
@@ -36,4 +41,3 @@ export async function checkSeoCollectionReady() {
   }
   return { config: summary, sources, failed: sources.some((source) => source.status === "failed") };
 }
-

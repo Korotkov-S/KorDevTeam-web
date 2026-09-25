@@ -105,6 +105,28 @@ databaseTest("query listing is paginated and applies every dashboard dimension",
   assert.notEqual(second.items[0].id, allDesktop.items[0].id);
 });
 
+databaseTest("dashboard aggregates chart data and authoritative Yandex regions without inventing IDs", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await repository.upsertObservations([
+    observation,
+    { ...observation, observationDate: "2026-09-24", device: "mobile", impressions: 50, clicks: 5, ctr: 0.1, averagePosition: 6 },
+  ]);
+  const regions = await repository.syncYandexRegions([{ id: 213, name: "Москва" }]);
+  assert.equal(regions.find((region) => region.code === "moscow")?.externalId, "213");
+  assert.equal(regions.find((region) => region.code === "kazan")?.externalId, null);
+
+  const dashboard = await repository.getDashboard({
+    dateFrom: "2026-09-23", dateTo: "2026-09-24", source: "google_search_console",
+  });
+  assert.deepEqual(dashboard.overview, { impressions: 150, clicks: 15, ctr: 0.1, averagePosition: 7.333333333333333 });
+  assert.equal(dashboard.daily.length, 2);
+  assert.deepEqual(dashboard.devices.map((row) => row.label).sort(), ["Компьютеры", "Смартфоны"]);
+  assert.equal(dashboard.positionBuckets.reduce((sum, row) => sum + row.count, 0), 1);
+  assert.equal(dashboard.sources.find((source) => source.id === "google_search_console")?.latestDataDate, "2026-09-24");
+});
+
 databaseTest("active recommendation fingerprints deduplicate and status transitions are optimistic", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);

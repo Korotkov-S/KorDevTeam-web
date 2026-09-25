@@ -223,8 +223,84 @@ export function createSeoRepository(db: SeoDatabase) {
       return overview;
     },
 
+    async getDashboard(filters: SeoMetricFilters) {
+      const condition = whereFilters(filters);
+      const overviewRows = await db.select({
+        impressions: sql<number>`coalesce(sum(${seoDailyMetrics.impressions}), 0)::double precision`,
+        clicks: sql<number>`coalesce(sum(${seoDailyMetrics.clicks}), 0)::double precision`,
+        ctr: sql<number | null>`sum(${seoDailyMetrics.clicks})::double precision / nullif(sum(${seoDailyMetrics.impressions}), 0)`,
+        averagePosition: sql<number | null>`sum(${seoDailyMetrics.impressions} * ${seoDailyMetrics.averagePosition})::double precision / nullif(sum(${seoDailyMetrics.impressions}), 0)`,
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition);
+      const daily = await db.select({
+        date: seoDailyMetrics.observationDate,
+        impressions: sql<number>`sum(${seoDailyMetrics.impressions})::double precision`,
+        clicks: sql<number>`sum(${seoDailyMetrics.clicks})::double precision`,
+        ctr: sql<number | null>`sum(${seoDailyMetrics.clicks})::double precision / nullif(sum(${seoDailyMetrics.impressions}), 0)`,
+        averagePosition: sql<number | null>`sum(${seoDailyMetrics.impressions} * ${seoDailyMetrics.averagePosition})::double precision / nullif(sum(${seoDailyMetrics.impressions}), 0)`,
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition)
+        .groupBy(seoDailyMetrics.observationDate).orderBy(asc(seoDailyMetrics.observationDate));
+      const devices = await db.select({
+        key: seoDailyMetrics.device,
+        impressions: sql<number>`sum(${seoDailyMetrics.impressions})::double precision`,
+        clicks: sql<number>`sum(${seoDailyMetrics.clicks})::double precision`,
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition)
+        .groupBy(seoDailyMetrics.device).orderBy(asc(seoDailyMetrics.device));
+      const regions = await db.select({
+        key: seoRegions.code,
+        label: seoRegions.displayName,
+        impressions: sql<number>`sum(${seoDailyMetrics.impressions})::double precision`,
+        clicks: sql<number>`sum(${seoDailyMetrics.clicks})::double precision`,
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId))
+        .innerJoin(seoRegions, and(eq(seoRegions.id, seoDailyMetrics.regionId), eq(seoRegions.source, seoDailyMetrics.source)))
+        .where(condition).groupBy(seoRegions.code, seoRegions.displayName, seoRegions.sortOrder).orderBy(asc(seoRegions.sortOrder));
+      const frequencies = await db.select({
+        key: seoQueries.frequencyBand,
+        impressions: sql<number>`sum(${seoDailyMetrics.impressions})::double precision`,
+        clicks: sql<number>`sum(${seoDailyMetrics.clicks})::double precision`,
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition)
+        .groupBy(seoQueries.frequencyBand).orderBy(asc(seoQueries.frequencyBand));
+      const bucket = sql<string>`case
+        when ${seoDailyMetrics.averagePosition} <= 3 then '1–3'
+        when ${seoDailyMetrics.averagePosition} <= 10 then '4–10'
+        when ${seoDailyMetrics.averagePosition} <= 30 then '11–30'
+        when ${seoDailyMetrics.averagePosition} <= 50 then '31–50'
+        else '>50' end`;
+      const positionBuckets = await db.select({
+        bucket,
+        count: sql<number>`count(distinct ${seoDailyMetrics.queryId})::integer`,
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId)).where(condition)
+        .groupBy(bucket);
+      const sourceRows = await db.select().from(seoSources).orderBy(asc(seoSources.displayName));
+      const sources = await Promise.all(sourceRows.map(async (source) => {
+        const [latest] = await db.select({ latestDataDate: sql<string | null>`max(${seoDailyMetrics.observationDate})` })
+          .from(seoDailyMetrics).where(eq(seoDailyMetrics.source, source.id));
+        return { ...source, latestDataDate: latest?.latestDataDate ?? null };
+      }));
+      const availableRegions = await db.select().from(seoRegions).where(eq(seoRegions.active, true)).orderBy(asc(seoRegions.sortOrder));
+      const deviceLabels = { desktop: "Компьютеры", mobile: "Смартфоны", tablet: "Планшеты", all: "Все устройства" } as const;
+      const frequencyLabels = { high: "ВЧ", medium: "СЧ", low: "НЧ", unclassified: "Не классифицировано" } as const;
+      const order = new Map([["1–3", 1], ["4–10", 2], ["11–30", 3], ["31–50", 4], [">50", 5]]);
+      return {
+        overview: overviewRows[0],
+        daily,
+        positionBuckets: positionBuckets.sort((a, b) => (order.get(a.bucket) ?? 99) - (order.get(b.bucket) ?? 99)),
+        devices: devices.map((row) => ({ ...row, label: deviceLabels[row.key] })),
+        regions,
+        frequencies: frequencies.map((row) => ({ ...row, label: frequencyLabels[row.key] })),
+        sources,
+        availableRegions,
+      };
+    },
+
     async saveQueryTarget(queryId: string, targetPath: string | null) {
       const [query] = await db.update(seoQueries).set({ targetPath, updatedAt: new Date() })
+        .where(eq(seoQueries.id, queryId)).returning();
+      if (!query) throw new Error("seo_query_not_found");
+      return query;
+    },
+
+    async saveQueryClassification(queryId: string, targetPath: string | null, frequencyBand: FrequencyBand) {
+      const [query] = await db.update(seoQueries).set({ targetPath, frequencyBand, updatedAt: new Date() })
         .where(eq(seoQueries.id, queryId)).returning();
       if (!query) throw new Error("seo_query_not_found");
       return query;

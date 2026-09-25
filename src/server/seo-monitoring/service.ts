@@ -77,6 +77,10 @@ export function createSeoService(repository: SeoRepository) {
       return repository.getOverview(filters(input));
     },
 
+    getDashboard(input: SeoMetricFilters) {
+      return repository.getDashboard(filters(input));
+    },
+
     listQueries(input: { filters: SeoMetricFilters; limit?: number; cursor?: string | null }) {
       return repository.listQueries(filters(input.filters), page(input));
     },
@@ -99,6 +103,15 @@ export function createSeoService(repository: SeoRepository) {
       return repository.saveQueryTarget(
         uuid(command.queryId, "seo_query_invalid"),
         command.targetPath === null ? null : normalizeSitePath(command.targetPath),
+      );
+    },
+
+    saveQueryClassification(command: { queryId: string; targetPath: string | null; frequencyBand: FrequencyBand }) {
+      if (!frequencyBands.has(command.frequencyBand)) throw new Error("seo_frequency_band_invalid");
+      return repository.saveQueryClassification(
+        uuid(command.queryId, "seo_query_invalid"),
+        command.targetPath === null ? null : normalizeSitePath(command.targetPath),
+        command.frequencyBand,
       );
     },
 

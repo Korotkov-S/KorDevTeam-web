@@ -19,6 +19,10 @@ export default function AdminIndex() {
           <h2 className="font-medium">Медиатека</h2>
           <p className="mt-1 text-sm text-muted-foreground">Изображения и варианты</p>
         </Link>
+        <Link to="/admin/seo/" className="rounded-xl border border-border bg-card p-5 hover:bg-muted">
+          <h2 className="font-medium">SEO-мониторинг</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Состояние сборщиков, позиции, трафик и рекомендации</p>
+        </Link>
       </div>
     </section>
   );
