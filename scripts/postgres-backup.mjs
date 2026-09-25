@@ -42,7 +42,7 @@ async function publishedCounts(client) {
 async function migrationRows(client) {
   return (await client.query('SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY id')).rows;
 }
-const requiredTables = ['drizzle.__drizzle_migrations', 'public.admin_users', 'public.content_entries', 'public.content_relations', 'public.content_revisions', 'public.media_assets', 'public.redirects', 'public.site_settings'];
+const requiredTables = ['drizzle.__drizzle_migrations', 'public.admin_users', 'public.content_entries', 'public.content_relations', 'public.content_revisions', 'public.mcp_tokens', 'public.media_assets', 'public.redirects', 'public.site_settings'];
 const quoteIdentifier = value => `"${value.replaceAll('"', '""')}"`;
 export async function databaseInventory(client) {
   const { rows } = await client.query("SELECT n.nspname AS schema, c.relname AS name FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname IN ('public', 'drizzle') AND c.relkind IN ('r', 'p') ORDER BY n.nspname, c.relname");

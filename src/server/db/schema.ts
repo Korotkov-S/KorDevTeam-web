@@ -76,6 +76,36 @@ export const adminSessions = pgTable(
   ],
 );
 
+export const mcpTokens = pgTable(
+  "mcp_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    tokenPrefix: varchar("token_prefix", { length: 24 }).notNull(),
+    scopes: text("scopes").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("mcp_tokens_token_hash_uq").on(table.tokenHash),
+    index("mcp_tokens_admin_user_id_idx").on(table.adminUserId),
+    index("mcp_tokens_active_idx").on(table.revokedAt, table.expiresAt),
+    check("mcp_tokens_token_hash_sha256", sql`${table.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("mcp_tokens_name_nonempty", sql`length(btrim(${table.name})) > 0`),
+    check("mcp_tokens_scopes_nonempty", sql`cardinality(${table.scopes}) > 0`),
+    check(
+      "mcp_tokens_expiry_valid",
+      sql`${table.expiresAt} IS NULL OR ${table.expiresAt} > ${table.createdAt}`,
+    ),
+  ],
+);
+
 export const adminAuthLimits = pgTable(
   "admin_auth_limits",
   {

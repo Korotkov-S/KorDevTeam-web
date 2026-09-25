@@ -18,6 +18,7 @@ import {
   leadRateLimits,
   leads,
   mediaAssets,
+  mcpTokens,
   siteSettings,
 } from "./schema";
 import { resetTestDatabase } from "./testDatabase";
@@ -114,6 +115,29 @@ databaseTest("admin schema supports expiring sessions and versioned media settin
   assert.equal((await db.select().from(contentMediaRefs)).length, 0);
   await db.delete(adminUsers).where(eq(adminUsers.id, admin.id));
   assert.equal((await db.select().from(adminSessions)).length, 0);
+});
+
+databaseTest("MCP tokens keep only a digest and cascade with their administrator", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const [admin] = await db.insert(adminUsers).values({
+    login: "mcp-owner",
+    passwordDigest: "digest",
+    passwordSalt: "salt",
+  }).returning();
+  const [token] = await db.insert(mcpTokens).values({
+    adminUserId: admin.id,
+    name: "Codex MacBook",
+    tokenHash: "a".repeat(64),
+    tokenPrefix: "kdt_mcp_abcd1234",
+    scopes: ["content:read", "content:write"],
+    expiresAt: new Date(Date.now() + 86_400_000),
+  }).returning();
+
+  assert.equal(token.tokenHash, "a".repeat(64));
+  assert.equal("token" in token, false);
+  await db.delete(adminUsers).where(eq(adminUsers.id, admin.id));
+  assert.equal((await db.select().from(mcpTokens)).length, 0);
 });
 
 databaseTest("admin counters and optimistic versions reject invalid values", async () => {
@@ -243,7 +267,7 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
   const db = createDb(TEST_DATABASE_URL);
   const [lead] = await db.insert(leads).values(leadFixture).returning();
   await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });
-  await db.execute(sql`DROP TABLE content_media_refs, admin_sessions, admin_auth_limits`);
+  await db.execute(sql`DROP TABLE mcp_tokens, content_media_refs, admin_sessions, admin_auth_limits`);
   await db.execute(sql`DROP TYPE admin_auth_limit_kind`);
   await db.execute(sql`DROP INDEX media_assets_checksum_visibility_processing_uq`);
   await db.execute(sql`ALTER TABLE media_assets
