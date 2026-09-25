@@ -158,6 +158,32 @@ services:
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     logging: *logging
+  seo-job:
+    image: ${WORKER_IMAGE:?Provide immutable WORKER_IMAGE}
+    profiles: [seo]
+    init: true
+    read_only: true
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
+      SEO_YANDEX_ENABLED: ${SEO_YANDEX_ENABLED:-false}
+      YANDEX_WEBMASTER_OAUTH_TOKEN: ${YANDEX_WEBMASTER_OAUTH_TOKEN:-}
+      YANDEX_WEBMASTER_HOST_ID: ${YANDEX_WEBMASTER_HOST_ID:-}
+      SEO_GOOGLE_ENABLED: ${SEO_GOOGLE_ENABLED:-false}
+      GOOGLE_SEARCH_CONSOLE_SITE_URL: ${GOOGLE_SEARCH_CONSOLE_SITE_URL:-}
+      GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL: ${GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL:-}
+      GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64: ${GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      backend: {}
+      egress:
+        gw_priority: 1
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging: *logging
   kordevteam-blue:
     <<: *web
     image: ${BLUE_IMAGE:?Provide immutable BLUE_IMAGE}

@@ -1,0 +1,16 @@
+[Unit]
+Description=Collect KorDevTeam first-party SEO metrics
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=kordevteam
+WorkingDirectory=/opt/kordevteam/current
+EnvironmentFile=/etc/kordevteam/operations.env
+ExecStart=/bin/bash /opt/kordevteam/current/scripts/run-seo-collect.sh
+Restart=on-failure
+RestartSec=10m
+UMask=0077
+NoNewPrivileges=true

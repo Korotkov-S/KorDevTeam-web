@@ -16,6 +16,7 @@ export { checkDatabaseReady } from "./server/db/client";
 export { createLeadRouter } from "./server/leads/http";
 export { checkLeadWorkerReady, createLeadWorker } from "./server/leads/worker";
 export { createMcpRouter } from "./server/mcp/http";
+export { runSeoCollection, checkSeoCollectionReady } from "./server/seo-monitoring/runtime";
 
 export async function runLeadRetention(options: { limit?: number } = {}): Promise<RetentionReport> {
   const config = readLeadWebConfig(process.env);

@@ -70,6 +70,29 @@ async function regionFor(tx: Transaction, observation: NormalizedSeoObservation)
 
 export function createSeoRepository(db: SeoDatabase) {
   return {
+    async setSourceEnabled(source: SeoSourceId, enabled: boolean) {
+      const [row] = await db.update(seoSources).set({ enabled, updatedAt: new Date() })
+        .where(eq(seoSources.id, source)).returning();
+      if (!row) throw new Error("seo_source_not_found");
+      return row;
+    },
+
+    async syncYandexRegions(regions: readonly { id: number; name: string }[]) {
+      const byName = new Map(regions.map((region) => [region.name.trim().toLocaleLowerCase("ru-RU"), String(region.id)]));
+      return db.transaction(async (tx) => {
+        const desired = await tx.select().from(seoRegions).where(eq(seoRegions.source, "yandex_webmaster"));
+        await tx.update(seoRegions).set({ externalId: null, updatedAt: new Date() })
+          .where(eq(seoRegions.source, "yandex_webmaster"));
+        for (const region of desired) {
+          const externalId = byName.get(region.displayName.trim().toLocaleLowerCase("ru-RU"));
+          if (externalId) {
+            await tx.update(seoRegions).set({ externalId, updatedAt: new Date() }).where(eq(seoRegions.id, region.id));
+          }
+        }
+        return tx.select().from(seoRegions).where(eq(seoRegions.source, "yandex_webmaster")).orderBy(asc(seoRegions.sortOrder));
+      });
+    },
+
     async withSourceLock<T>(source: SeoSourceId, operation: () => Promise<T>): Promise<T> {
       return db.transaction(async (tx) => {
         const result = await tx.execute(sql`select pg_try_advisory_xact_lock(hashtext(${'seo-collector:' + source})) as acquired`);

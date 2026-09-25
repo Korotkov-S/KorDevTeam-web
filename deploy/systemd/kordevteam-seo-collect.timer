@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily KorDevTeam first-party SEO collection
+
+[Timer]
+OnCalendar=*-*-* 07:30:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=10m
+Unit=kordevteam-seo-collect.service
+
+[Install]
+WantedBy=timers.target
