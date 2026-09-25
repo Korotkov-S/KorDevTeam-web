@@ -24,6 +24,7 @@ app.use((req, res, next) => {
   if (req.secure) res.set("Strict-Transport-Security", "max-age=31536000");
   next();
 });
+app.use("/mcp", build.entry.module.createMcpRouter());
 app.use(async (req, res, next) => {
   const request = new Request(`${req.protocol}://${req.get("host")}${req.originalUrl}`, {
     method: req.method,

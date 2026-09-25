@@ -28,9 +28,10 @@ test('missing database probe fails closed', async t => {
   assert.equal((await fetch(`${origin}/api/health/ready`)).status, 503);
 });
 
-test('application readiness awaits SELECT 1 and only structurally validates web config without external or mutating work', async t => {
+test('application readiness awaits database and MCP schema probes before structurally validating web config', async t => {
   const { entry } = await import('../../build/server/index.js');
   assert.equal(typeof entry.module.checkApplicationReady, 'function');
+  assert.equal(typeof entry.module.createMcpRouter, 'function');
   const environment = {
     DATABASE_URL: 'postgresql://unused:unused@unreachable.invalid/kordev_test',
     LEAD_CONSENT_VERSION: 'v1', LEAD_HASH_KEY: Buffer.alloc(32, 7).toString('base64'),
@@ -53,19 +54,27 @@ test('application readiness awaits SELECT 1 and only structurally validates web 
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   const queries = [];
+  let rejectMcpProbe = false;
   t.mock.method(pg.Pool.prototype, 'query', async query => {
-    queries.push(typeof query === 'string' ? query : query.text);
-    await gate;
+    const sql = typeof query === 'string' ? query : query.text;
+    queries.push(sql);
+    if (sql === 'SELECT 1') await gate;
+    if (rejectMcpProbe && sql.includes('"mcp_tokens"')) throw Error('mcp_tokens_missing');
     return { rows: [{ '?column?': 1 }], rowCount: 1 };
   });
   let completed = false;
   const ready = entry.module.checkApplicationReady().then(() => { completed = true; });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(completed, false); release(); await ready;
-  assert.deepEqual(queries, ['SELECT 1']);
+  assert.equal(queries[0], 'SELECT 1');
+  assert.match(queries[1], /"mcp_tokens"/);
+  rejectMcpProbe = true;
+  await assert.rejects(entry.module.checkApplicationReady(), /mcp_tokens/);
+  rejectMcpProbe = false;
   delete process.env.LEAD_HASH_KEY;
   await assert.rejects(entry.module.checkApplicationReady(), /lead_config_invalid/);
-  assert.deepEqual(queries, ['SELECT 1', 'SELECT 1']);
+  assert.equal(queries.filter(query => query === 'SELECT 1').length, 3);
+  assert.equal(queries.filter(query => query.includes('"mcp_tokens"')).length, 3);
   const origin = await app(t, entry.module.checkApplicationReady);
   const response = await fetch(`${origin}/api/health/ready`);
   assert.equal(response.status, 503); assert.equal(response.headers.get('cache-control'), 'no-store');

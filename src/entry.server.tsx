@@ -9,11 +9,13 @@ import { createLeadRepository } from "./server/leads/repository";
 import { runLeadRetention as executeLeadRetention, type RetentionReport } from "./server/leads/retention";
 import { readAdminAuthConfig } from "./server/auth/config";
 import { readPublicMediaConfig } from "./server/media/config";
+import { checkMcpReady } from "./server/mcp/runtime";
 export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
 export { createLeadRouter } from "./server/leads/http";
 export { checkLeadWorkerReady, createLeadWorker } from "./server/leads/worker";
+export { createMcpRouter } from "./server/mcp/http";
 
 export async function runLeadRetention(options: { limit?: number } = {}): Promise<RetentionReport> {
   const config = readLeadWebConfig(process.env);
@@ -29,6 +31,7 @@ export async function runLeadRetention(options: { limit?: number } = {}): Promis
 
 export async function checkApplicationReady(): Promise<void> {
   await checkDatabaseReady();
+  await checkMcpReady();
   assertLeadWebConfig(process.env);
   readAdminAuthConfig(process.env);
   readPublicMediaConfig(process.env);
