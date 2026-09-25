@@ -7,7 +7,8 @@ import { listPublishedRelations } from "./relations";
 import type { ContentEntry, ContentKind, RelationType, ValidatedContentCommand } from "./types";
 
 export type ContentDatabase = ReturnType<typeof createDb>;
-type Transaction = Parameters<Parameters<ContentDatabase["transaction"]>[0]>[0];
+export type ContentTransaction = Parameters<Parameters<ContentDatabase["transaction"]>[0]>[0];
+export type ContentReader = Pick<ContentDatabase, "select">;
 export type WriteResult = { before?: ContentEntry; after?: ContentEntry; relatedSourceIds: string[]; relatedKinds: ContentKind[] };
 type RevisionState = {
   entry: ContentEntry;
@@ -15,7 +16,7 @@ type RevisionState = {
   mediaRefs: Array<{ mediaId: string; fieldPath: string }>;
 };
 
-async function revisionState(tx: Transaction, entry: ContentEntry): Promise<RevisionState> {
+async function revisionState(tx: ContentTransaction, entry: ContentEntry): Promise<RevisionState> {
   const relations = await tx.select({
     targetId: contentRelations.targetId, type: contentRelations.type, sortOrder: contentRelations.sortOrder,
   }).from(contentRelations).where(eq(contentRelations.sourceId, entry.id)).orderBy(asc(contentRelations.sortOrder));
@@ -35,7 +36,7 @@ function decodedEntry(snapshot: Record<string, unknown>): ContentEntry {
   } as ContentEntry;
 }
 
-async function references(tx: Transaction, id: string) {
+async function references(tx: ContentTransaction, id: string) {
   const rows = await tx.select({ sourceId: contentRelations.sourceId, kind: contentEntries.kind })
     .from(contentRelations).innerJoin(contentEntries, eq(contentRelations.sourceId, contentEntries.id))
     .where(or(eq(contentRelations.targetId, id), eq(contentRelations.sourceId, id)));

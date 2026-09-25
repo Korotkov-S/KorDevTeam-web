@@ -4,7 +4,11 @@ import { and, eq } from "drizzle-orm";
 import { createDb } from "../db/client";
 import { resetTestDatabase } from "../db/testDatabase";
 import { contentEntries } from "../db/schema";
-import { applyCommercialServiceSources, loadCommercialServiceSources } from "./commercialServices";
+import {
+  applyCommercialServiceSources,
+  applyCommercialServiceSourcesInTransaction,
+  loadCommercialServiceSources,
+} from "./commercialServices";
 import { listPublishedRelations } from "./relations";
 
 test("business automation source qualifies repeatable processes and cites primary methods", async () => {
@@ -507,4 +511,33 @@ test("commercial service sync publishes researched content and ordered internal 
     eq(contentEntries.slug, "crm-development"),
   ));
   assert.equal(unchangedCrm.version, 2);
+});
+
+test("commercial service transaction writer rolls back with its caller", async () => {
+  const databaseUrl = process.env.TEST_DATABASE_URL;
+  assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
+  await resetTestDatabase(databaseUrl);
+  const db = createDb(databaseUrl);
+  const [source] = await loadCommercialServiceSources();
+  const targets = new Map<string, "case" | "article">();
+  for (const slug of source.relatedCases) targets.set(slug, "case");
+  for (const slug of source.relatedArticles) targets.set(slug, "article");
+  await db.insert(contentEntries).values([...targets].map(([slug, kind]) => ({
+    kind,
+    slug,
+    title: slug,
+    seoTitle: slug,
+    seoDescription: `${slug} description`,
+    status: "published" as const,
+    publishedAt: new Date("2026-09-01T00:00:00.000Z"),
+    payload: {},
+  })));
+
+  await assert.rejects(db.transaction(async tx => {
+    await applyCommercialServiceSourcesInTransaction(tx, [source]);
+    throw new Error("rollback_outer_transaction");
+  }), /rollback_outer_transaction/);
+
+  assert.equal((await db.select().from(contentEntries).where(eq(contentEntries.kind, "service"))).length, 0);
+  assert.equal((await db.select().from(contentEntries).where(eq(contentEntries.kind, "faq"))).length, 0);
 });

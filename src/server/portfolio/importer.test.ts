@@ -8,6 +8,7 @@ import { resetTestDatabase } from "../db/testDatabase";
 import type { PortfolioCaseSource } from "./schema";
 import {
   applyPortfolioImport,
+  applyPortfolioImportInTransaction,
   assertPortfolioDatabaseAllowed,
   planPortfolioImport,
 } from "./importer";
@@ -127,4 +128,15 @@ databaseTest("canonical and legacy rows collide instead of silently deleting eit
 
   await assert.rejects(planPortfolioImport(db, [record]), /portfolio_slug_collision/);
   assert.equal((await db.select().from(contentEntries)).length, 2);
+});
+
+databaseTest("portfolio transaction writer rolls back with its caller", async () => {
+  await assert.rejects(db.transaction(async tx => {
+    const plan = await planPortfolioImport(tx, [sourceFixture()]);
+    await applyPortfolioImportInTransaction(tx, plan);
+    throw new Error("rollback_outer_transaction");
+  }), /rollback_outer_transaction/);
+
+  assert.equal((await db.select().from(contentEntries)).length, 0);
+  assert.equal((await db.select().from(contentRevisions)).length, 0);
 });

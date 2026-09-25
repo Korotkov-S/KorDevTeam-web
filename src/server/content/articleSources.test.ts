@@ -13,7 +13,13 @@ import {
   mediaAssets,
 } from "../db/schema";
 import { resetTestDatabase } from "../db/testDatabase";
-import { applyArticleSources, loadArticleSources, type ArticleSource } from "./articleSources";
+import {
+  applyArticleSources,
+  applyArticleSourcesInTransaction,
+  loadAllArticleSources,
+  loadArticleSources,
+  type ArticleSource,
+} from "./articleSources";
 
 type Metadata = Record<string, unknown>;
 
@@ -105,6 +111,15 @@ test("article source loader combines curated metadata with the matching markdown
   assert.equal(source.payload.coverUrl, "/cover.webp");
   assert.equal(source.payload.category, "business-automation");
   assert.deepEqual(source.payload.relatedArticleSlugs, ["related-one", "related-two", "related-three"]);
+});
+
+test("all article sources include stable publication dates and every Russian catalog slug", async () => {
+  const sources = await loadAllArticleSources();
+
+  assert.equal(sources.length, 46);
+  assert.equal(new Set(sources.map(source => source.slug)).size, 46);
+  assert.ok(sources.every(source => source.publishedAt.toISOString().endsWith("Z")));
+  assert.ok(sources.every(source => source.updatedAt.toISOString().endsWith("Z")));
 });
 
 test("article source loader validates full fields only for requested legacy-catalog records", async t => {
@@ -203,6 +218,8 @@ const updatedSource: ArticleSource = {
   bodyMd: "# Описание бизнес-процессов\n\nНовый полный практический текст статьи.",
   seoTitle: "Описание бизнес-процессов перед автоматизацией",
   seoDescription: "Пошагово описываем процесс AS IS и готовим требования к автоматизации.",
+  publishedAt: new Date("2026-07-09T00:00:00.000Z"),
+  updatedAt: new Date("2026-09-24T00:00:00.000Z"),
   payload: {
     h1: "Описание бизнес-процессов",
     author: "Геннадий Коротков",
@@ -268,7 +285,7 @@ test("article sync updates only the requested article while preserving publicati
   }).returning();
   await db.insert(contentMediaRefs).values({ entryId: before.id, mediaId: media.id, fieldPath: "payload.coverUrl" });
 
-  assert.deepEqual(await applyArticleSources(db, [updatedSource]), { updated: 1, unchanged: 0 });
+  assert.deepEqual(await applyArticleSources(db, [updatedSource]), { inserted: 0, updated: 1, unchanged: 0 });
 
   const [changed] = await db.select().from(contentEntries).where(eq(contentEntries.id, before.id));
   const [otherAfter] = await db.select().from(contentEntries).where(eq(contentEntries.id, untouched.id));
@@ -281,7 +298,7 @@ test("article sync updates only the requested article while preserving publicati
   assert.equal((await db.select().from(contentMediaRefs).where(eq(contentMediaRefs.entryId, before.id))).length, 1);
   assert.equal((await db.select().from(contentRevisions).where(eq(contentRevisions.entryId, before.id))).length, 1);
 
-  assert.deepEqual(await applyArticleSources(db, [updatedSource]), { updated: 0, unchanged: 1 });
+  assert.deepEqual(await applyArticleSources(db, [updatedSource]), { inserted: 0, updated: 0, unchanged: 1 });
   assert.equal((await db.select().from(contentRevisions).where(eq(contentRevisions.entryId, before.id))).length, 1);
 });
 
@@ -291,4 +308,46 @@ test("article sync rejects a source whose published target is missing", { skip: 
 
   await assert.rejects(applyArticleSources(db, [updatedSource]), /article_source_target_missing/);
   assert.equal((await db.select().from(contentEntries)).length, 0);
+});
+
+test("article sync can create a published article with historical source dates", { skip: !databaseUrl }, async () => {
+  await resetTestDatabase(databaseUrl!);
+  const db = createDb(databaseUrl!);
+
+  assert.deepEqual(
+    await db.transaction(tx => applyArticleSourcesInTransaction(tx, [updatedSource], { insertMissing: true })),
+    { inserted: 1, updated: 0, unchanged: 0 },
+  );
+
+  const [entry] = await db.select().from(contentEntries).where(eq(contentEntries.slug, updatedSource.slug));
+  assert.equal(entry.status, "published");
+  assert.equal(entry.version, 2);
+  assert.equal(entry.createdAt.toISOString(), updatedSource.publishedAt.toISOString());
+  assert.equal(entry.updatedAt.toISOString(), updatedSource.updatedAt.toISOString());
+  assert.equal(entry.publishedAt?.toISOString(), updatedSource.publishedAt.toISOString());
+  const [revision] = await db.select().from(contentRevisions).where(eq(contentRevisions.entryId, entry.id));
+  assert.equal(revision.version, 1);
+  assert.equal((revision.snapshot as { entry?: { status?: string } }).entry?.status, "draft");
+});
+
+test("article transaction writer rolls back with its caller", { skip: !databaseUrl }, async () => {
+  await resetTestDatabase(databaseUrl!);
+  const db = createDb(databaseUrl!);
+  await db.insert(contentEntries).values({
+    kind: "article",
+    slug: updatedSource.slug,
+    status: "published",
+    title: "Исходный заголовок",
+    publishedAt: updatedSource.publishedAt,
+  });
+
+  await assert.rejects(db.transaction(async tx => {
+    await applyArticleSourcesInTransaction(tx, [updatedSource]);
+    throw new Error("rollback_outer_transaction");
+  }), /rollback_outer_transaction/);
+
+  const [entry] = await db.select().from(contentEntries).where(eq(contentEntries.slug, updatedSource.slug));
+  assert.equal(entry.title, "Исходный заголовок");
+  assert.equal(entry.version, 1);
+  assert.equal((await db.select().from(contentRevisions)).length, 0);
 });

@@ -2,10 +2,11 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { createDb } from "../db/client";
 import { contentEntries, contentRevisions } from "../db/schema";
 import { BLOG_CATEGORY_SLUGS, type BlogCategorySlug } from "../../lib/blogCategories";
+import { parseBlogDate } from "../../lib/blogPresentation.mjs";
 import { checksum } from "./migration";
+import type { ContentDatabase, ContentTransaction } from "./repository";
 import { parseContentCommand, validatePublication } from "./types";
 
 export type ArticleSource = {
@@ -15,6 +16,8 @@ export type ArticleSource = {
   bodyMd: string;
   seoTitle: string;
   seoDescription: string;
+  publishedAt: Date;
+  updatedAt: Date;
   payload: {
     h1: string;
     author: string;
@@ -42,12 +45,27 @@ const articleMetadata = articleCatalogItem.extend({
   seoDescription: nonempty.max(320),
   readTime: nonempty,
   tags: z.array(nonempty).min(1),
+  date: nonempty,
+  updatedDate: nonempty,
   coverUrl: z.string().default(""),
   imageUrls: z.array(z.string()).default([]),
 }).passthrough();
 
 function assertUnique(values: readonly string[], code: string): void {
   if (new Set(values).size !== values.length) throw new Error(code);
+}
+
+function articleCommand(source: ArticleSource) {
+  return parseContentCommand({
+    kind: "article",
+    slug: source.slug,
+    title: source.title,
+    excerpt: source.excerpt,
+    bodyMd: source.bodyMd,
+    seoTitle: source.seoTitle,
+    seoDescription: source.seoDescription,
+    payload: source.payload,
+  });
 }
 
 async function readMetadata(root: string): Promise<z.output<typeof articleCatalogItem>[]> {
@@ -102,6 +120,9 @@ export async function loadArticleSources(
     const parsedItem = articleMetadata.safeParse(catalogItem);
     if (!parsedItem.success) throw new Error("article_source_invalid", { cause: parsedItem.error });
     const item = parsedItem.data;
+    const publishedTimestamp = parseBlogDate(item.date);
+    const updatedTimestamp = parseBlogDate(item.updatedDate);
+    if (publishedTimestamp === null || updatedTimestamp === null) throw new Error("article_source_invalid");
     const bodyMd = await readMarkdown(root, articleSlug);
     const h1 = bodyMd.match(/^#\s+(.+)$/m)?.[1]?.trim();
     if (!h1 || h1 !== item.title) throw new Error("article_source_invalid");
@@ -112,6 +133,8 @@ export async function loadArticleSources(
       bodyMd,
       seoTitle: item.seoTitle,
       seoDescription: item.seoDescription,
+      publishedAt: new Date(publishedTimestamp),
+      updatedAt: new Date(updatedTimestamp),
       payload: {
         h1,
         author: "Геннадий Коротков",
@@ -123,69 +146,114 @@ export async function loadArticleSources(
         relatedArticleSlugs: item.relatedArticleSlugs,
       },
     };
-    const command = parseContentCommand({ kind: "article", ...source });
+    const command = articleCommand(source);
     validatePublication(command as typeof contentEntries.$inferSelect);
     return source;
   }));
 }
 
-export async function applyArticleSources(
-  db: ReturnType<typeof createDb>,
+export async function loadAllArticleSources(root = process.cwd()): Promise<ArticleSource[]> {
+  const metadata = await readMetadata(root);
+  return loadArticleSources(metadata.map(item => item.slug), root);
+}
+
+export async function applyArticleSourcesInTransaction(
+  tx: ContentTransaction,
   sources: readonly ArticleSource[],
-): Promise<{ updated: number; unchanged: number }> {
-  const commands = sources.map(source => parseContentCommand({ kind: "article", ...source }));
+  options: { insertMissing: boolean } = { insertMissing: false },
+): Promise<{ inserted: number; updated: number; unchanged: number }> {
+  const commands = sources.map(articleCommand);
   for (const command of commands) validatePublication(command as typeof contentEntries.$inferSelect);
 
-  return db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(706007)`);
-    let updated = 0;
-    let unchanged = 0;
+  let inserted = 0;
+  let updated = 0;
+  let unchanged = 0;
 
-    for (const command of commands) {
-      const [existing] = await tx.select().from(contentEntries).where(and(
-        eq(contentEntries.kind, "article"),
-        eq(contentEntries.slug, command.slug),
-      )).for("update");
-      if (!existing) throw new Error("article_source_target_missing");
+  for (const [index, command] of commands.entries()) {
+    const source = sources[index];
+    const [existing] = await tx.select().from(contentEntries).where(and(
+      eq(contentEntries.kind, "article"),
+      eq(contentEntries.slug, command.slug),
+    )).for("update");
 
-      const fields = {
-        title: command.title,
-        excerpt: command.excerpt,
-        bodyMd: command.bodyMd,
-        seoTitle: command.seoTitle,
-        seoDescription: command.seoDescription,
-        payload: command.payload,
-      };
-      const current = {
-        title: existing.title,
-        excerpt: existing.excerpt,
-        bodyMd: existing.bodyMd,
-        seoTitle: existing.seoTitle,
-        seoDescription: existing.seoDescription,
-        payload: existing.payload,
-      };
-      if (checksum(current) === checksum(fields)) {
-        unchanged++;
-        continue;
-      }
-
-      await tx.insert(contentRevisions).values({
-        entryId: existing.id,
-        version: existing.version,
-        snapshot: { entry: existing },
-      }).onConflictDoNothing();
-      const [changed] = await tx.update(contentEntries).set({
+    const fields = {
+      title: command.title,
+      excerpt: command.excerpt,
+      bodyMd: command.bodyMd,
+      seoTitle: command.seoTitle,
+      seoDescription: command.seoDescription,
+      payload: command.payload,
+    };
+    if (!existing) {
+      if (!options.insertMissing) throw new Error("article_source_target_missing");
+      const [draft] = await tx.insert(contentEntries).values({
+        kind: "article",
+        slug: command.slug,
         ...fields,
-        version: existing.version + 1,
-        updatedAt: new Date(),
+        status: "draft",
+        version: 1,
+        createdAt: source.publishedAt,
+        updatedAt: source.updatedAt,
+        publishedAt: null,
+      }).returning();
+      await tx.insert(contentRevisions).values({
+        entryId: draft.id,
+        version: 1,
+        snapshot: { entry: draft },
+      });
+      const [published] = await tx.update(contentEntries).set({
+        status: "published",
+        version: 2,
+        publishedAt: source.publishedAt,
+        updatedAt: source.updatedAt,
       }).where(and(
-        eq(contentEntries.id, existing.id),
-        eq(contentEntries.version, existing.version),
+        eq(contentEntries.id, draft.id),
+        eq(contentEntries.version, 1),
       )).returning();
-      if (!changed) throw new Error("article_source_version_conflict");
-      updated++;
+      if (!published) throw new Error("article_source_version_conflict");
+      inserted++;
+      continue;
     }
 
-    return { updated, unchanged };
+    const current = {
+      title: existing.title,
+      excerpt: existing.excerpt,
+      bodyMd: existing.bodyMd,
+      seoTitle: existing.seoTitle,
+      seoDescription: existing.seoDescription,
+      payload: existing.payload,
+    };
+    if (checksum(current) === checksum(fields)) {
+      unchanged++;
+      continue;
+    }
+
+    await tx.insert(contentRevisions).values({
+      entryId: existing.id,
+      version: existing.version,
+      snapshot: { entry: existing },
+    }).onConflictDoNothing();
+    const [changed] = await tx.update(contentEntries).set({
+      ...fields,
+      version: existing.version + 1,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(contentEntries.id, existing.id),
+      eq(contentEntries.version, existing.version),
+    )).returning();
+    if (!changed) throw new Error("article_source_version_conflict");
+    updated++;
+  }
+
+  return { inserted, updated, unchanged };
+}
+
+export async function applyArticleSources(
+  db: ContentDatabase,
+  sources: readonly ArticleSource[],
+): Promise<{ inserted: number; updated: number; unchanged: number }> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(706007)`);
+    return applyArticleSourcesInTransaction(tx, sources);
   });
 }

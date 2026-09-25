@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 
-import type { ContentDatabase } from "../content/repository";
+import type { ContentDatabase, ContentReader, ContentTransaction } from "../content/repository";
 import type { ContentEntry, ValidatedContentCommand } from "../content/types";
 import { parseContentCommand } from "../content/types";
 import { contentEntries, contentMediaRefs, contentRelations, contentRevisions } from "../db/schema";
@@ -81,7 +81,7 @@ export function assertPortfolioDatabaseAllowed(
 }
 
 export async function planPortfolioImport(
-  db: ContentDatabase,
+  db: ContentReader,
   records: readonly PortfolioCaseSource[],
 ): Promise<PortfolioImportItem[]> {
   const validated = validatePortfolioSources(records);
@@ -117,70 +117,77 @@ export async function applyPortfolioImport(
 ): Promise<PortfolioImportResult> {
   return db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(706026)`);
-    const result: PortfolioImportResult = { inserted: 0, updated: 0, unchanged: 0, published: 0 };
-    for (const item of plan) {
-      const candidateSlugs = [...new Set([item.command.slug, ...item.legacySlugs])];
-      const candidates = await tx.select().from(contentEntries).where(and(
-        eq(contentEntries.kind, "case"),
-        inArray(contentEntries.slug, candidateSlugs),
-      )).for("update");
-      if (candidates.length > 1) throw new Error("portfolio_slug_collision");
+    return applyPortfolioImportInTransaction(tx, plan);
+  });
+}
 
-      if (item.action === "insert") {
-        if (candidates.length) throw new Error("portfolio_version_conflict");
-        const fields = commandFields(item.command);
-        await tx.insert(contentEntries).values({
-          ...fields,
-          status: "published",
-          version: 1,
-          publishedAt: new Date(),
-        });
-        result.inserted++;
-        result.published++;
-        continue;
-      }
+export async function applyPortfolioImportInTransaction(
+  tx: ContentTransaction,
+  plan: readonly PortfolioImportItem[],
+): Promise<PortfolioImportResult> {
+  const result: PortfolioImportResult = { inserted: 0, updated: 0, unchanged: 0, published: 0 };
+  for (const item of plan) {
+    const candidateSlugs = [...new Set([item.command.slug, ...item.legacySlugs])];
+    const candidates = await tx.select().from(contentEntries).where(and(
+      eq(contentEntries.kind, "case"),
+      inArray(contentEntries.slug, candidateSlugs),
+    )).for("update");
+    if (candidates.length > 1) throw new Error("portfolio_slug_collision");
 
-      const current = candidates[0];
-      if (!current || current.id !== item.existingId || current.version !== item.expectedVersion) {
-        throw new Error("portfolio_version_conflict");
-      }
-      if (item.action === "unchanged") {
-        if (current.slug !== item.command.slug || current.status !== "published" || !matchesCommand(current, item.command)) {
-          throw new Error("portfolio_version_conflict");
-        }
-        result.unchanged++;
-        continue;
-      }
-
-      const relations = await tx.select({
-        targetId: contentRelations.targetId,
-        type: contentRelations.type,
-        sortOrder: contentRelations.sortOrder,
-      }).from(contentRelations).where(eq(contentRelations.sourceId, current.id));
-      const mediaRefs = await tx.select({
-        mediaId: contentMediaRefs.mediaId,
-        fieldPath: contentMediaRefs.fieldPath,
-      }).from(contentMediaRefs).where(eq(contentMediaRefs.entryId, current.id));
-      await tx.insert(contentRevisions).values({
-        entryId: current.id,
-        version: current.version,
-        snapshot: { entry: current, relations, mediaRefs },
-      });
+    if (item.action === "insert") {
+      if (candidates.length) throw new Error("portfolio_version_conflict");
       const fields = commandFields(item.command);
-      const [updated] = await tx.update(contentEntries).set({
+      await tx.insert(contentEntries).values({
         ...fields,
         status: "published",
-        version: current.version + 1,
-        publishedAt: current.publishedAt ?? new Date(),
-        updatedAt: new Date(),
-      }).where(and(
-        eq(contentEntries.id, current.id),
-        eq(contentEntries.version, item.expectedVersion!),
-      )).returning({ id: contentEntries.id });
-      if (!updated) throw new Error("portfolio_version_conflict");
-      result.updated++;
-      if (current.status !== "published") result.published++;
+        version: 1,
+        publishedAt: new Date(),
+      });
+      result.inserted++;
+      result.published++;
+      continue;
     }
-    return result;
-  });
+
+    const current = candidates[0];
+    if (!current || current.id !== item.existingId || current.version !== item.expectedVersion) {
+      throw new Error("portfolio_version_conflict");
+    }
+    if (item.action === "unchanged") {
+      if (current.slug !== item.command.slug || current.status !== "published" || !matchesCommand(current, item.command)) {
+        throw new Error("portfolio_version_conflict");
+      }
+      result.unchanged++;
+      continue;
+    }
+
+    const relations = await tx.select({
+      targetId: contentRelations.targetId,
+      type: contentRelations.type,
+      sortOrder: contentRelations.sortOrder,
+    }).from(contentRelations).where(eq(contentRelations.sourceId, current.id));
+    const mediaRefs = await tx.select({
+      mediaId: contentMediaRefs.mediaId,
+      fieldPath: contentMediaRefs.fieldPath,
+    }).from(contentMediaRefs).where(eq(contentMediaRefs.entryId, current.id));
+    await tx.insert(contentRevisions).values({
+      entryId: current.id,
+      version: current.version,
+      snapshot: { entry: current, relations, mediaRefs },
+    });
+    const fields = commandFields(item.command);
+    const [updated] = await tx.update(contentEntries).set({
+      ...fields,
+      status: "published",
+      version: current.version + 1,
+      publishedAt: current.publishedAt ?? new Date(),
+      updatedAt: new Date(),
+    }).where(and(
+      eq(contentEntries.id, current.id),
+      eq(contentEntries.version, item.expectedVersion!),
+    )).returning({ id: contentEntries.id });
+    if (!updated) throw new Error("portfolio_version_conflict");
+    result.updated++;
+    if (current.status !== "published") result.published++;
+  }
+  return result;
 }

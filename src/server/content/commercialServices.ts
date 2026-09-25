@@ -2,9 +2,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { createDb } from "../db/client";
 import { contentEntries, contentRelations, contentRevisions } from "../db/schema";
 import { checksum } from "./migration";
+import type { ContentDatabase, ContentTransaction } from "./repository";
 import { parseContentCommand, validatePublication } from "./types";
 
 export type CommercialServiceSource = {
@@ -75,7 +75,17 @@ export async function loadCommercialServiceSources(
 }
 
 export async function applyCommercialServiceSources(
-  db: ReturnType<typeof createDb>,
+  db: ContentDatabase,
+  sources: readonly CommercialServiceSource[],
+): Promise<{ inserted: number; updated: number; unchanged: number }> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(706006)`);
+    return applyCommercialServiceSourcesInTransaction(tx, sources);
+  });
+}
+
+export async function applyCommercialServiceSourcesInTransaction(
+  tx: ContentTransaction,
   sources: readonly CommercialServiceSource[],
 ): Promise<{ inserted: number; updated: number; unchanged: number }> {
   const serviceCommands = sources.map(source => parseContentCommand({
@@ -100,13 +110,11 @@ export async function applyCommercialServiceSources(
   for (const command of serviceCommands) validatePublication(command as typeof contentEntries.$inferSelect);
   for (const command of faqCommands) validatePublication(command as typeof contentEntries.$inferSelect);
 
-  return db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(706006)`);
-    let inserted = 0;
-    let updated = 0;
-    let unchanged = 0;
-    const entryIds = new Map<string, string>();
-    const upsert = async (command: (typeof serviceCommands)[number] | (typeof faqCommands)[number]) => {
+  let inserted = 0;
+  let updated = 0;
+  let unchanged = 0;
+  const entryIds = new Map<string, string>();
+  const upsert = async (command: (typeof serviceCommands)[number] | (typeof faqCommands)[number]) => {
       const [existing] = await tx.select().from(contentEntries).where(and(
         eq(contentEntries.kind, command.kind),
         eq(contentEntries.slug, command.slug),
@@ -164,10 +172,10 @@ export async function applyCommercialServiceSources(
       updated++;
       entryIds.set(`${command.kind}:${command.slug}`, changed.id);
       return changed;
-    };
+  };
 
-    for (const command of serviceCommands) await upsert(command);
-    for (const command of faqCommands) await upsert(command);
+  for (const command of serviceCommands) await upsert(command);
+  for (const command of faqCommands) await upsert(command);
 
     const requestedTargets = [...new Set(sources.flatMap(source => [
       ...source.relatedCases.map(slug => `case:${slug}`),
@@ -196,6 +204,5 @@ export async function applyCommercialServiceSources(
       ];
       if (relations.length) await tx.insert(contentRelations).values(relations);
     }
-    return { inserted, updated, unchanged };
-  });
+  return { inserted, updated, unchanged };
 }
