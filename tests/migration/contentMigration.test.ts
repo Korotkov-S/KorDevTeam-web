@@ -87,7 +87,12 @@ test("normalization collisions and malformed records are data errors with machin
   const result = await importLegacyContent({ fixtureRoot, dryRun: true });
   assert.equal(result.collisions.length, 1);
   assert.equal(result.invalidRecords.length, 1);
-  const cli = spawnSync(process.execPath, ["--import", "tsx", "scripts/migrate-content-to-postgres.ts", "--dry-run", "--root", fixtureRoot], { encoding: "utf8" });
+  const cli = spawnSync(process.execPath, ["--import", "tsx", "scripts/migrate-content-to-postgres.ts", "--dry-run", "--root", fixtureRoot], {
+    encoding: "utf8",
+    // This assertion covers source-data validation only. Keep an unrelated CI
+    // DATABASE_URL from turning the dry run into a database comparison.
+    env: { ...process.env, DATABASE_URL: "" },
+  });
   assert.equal(cli.status, 2, cli.stderr);
   assert.equal(JSON.parse(cli.stdout).collisions.length, 1);
 });
