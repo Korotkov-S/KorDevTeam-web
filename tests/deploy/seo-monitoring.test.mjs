@@ -17,6 +17,8 @@ test("SEO job is isolated, read-only, and receives only its own provider credent
   assert.match(block, /DATABASE_URL:/u);
   assert.match(block, /YANDEX_WEBMASTER_OAUTH_TOKEN:/u);
   assert.match(block, /GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64:/u);
+  assert.match(block, /LEAD_TEMP_ROOT:/u);
+  assert.match(block, /\$\{LEAD_TEMP_ROOT:\?Provide LEAD_TEMP_ROOT\}:.*mode=0700.*uid=1000.*gid=1000/u);
   assert.doesNotMatch(block, /SMTP_PASSWORD|LEAD_S3_SECRET_ACCESS_KEY|ADMIN_SESSION_HMAC_KEY/u);
   assert.match(block, /backend:/u);
   assert.match(block, /egress:/u);

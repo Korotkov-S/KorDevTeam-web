@@ -8,6 +8,17 @@ const API_ORIGIN = "https://api.webmaster.yandex.net";
 const PAGE_LIMIT = 500;
 const REQUEST_TIMEOUT_MS = 15_000;
 
+const SUPPORTED_QUERY_REGIONS: YandexRegion[] = [
+  { id: 225, name: "Россия" },
+  { id: 213, name: "Москва" },
+  { id: 2, name: "Санкт-Петербург" },
+  { id: 65, name: "Новосибирск" },
+  { id: 54, name: "Екатеринбург" },
+  { id: 43, name: "Казань" },
+  { id: 47, name: "Нижний Новгород" },
+  { id: 35, name: "Краснодар" },
+];
+
 export type YandexRegion = { id: number; name: string };
 export type SeoCollectionWindow = { from: string; to: string };
 
@@ -182,8 +193,10 @@ export function createYandexWebmasterProvider(
     async listAvailableRegions(): Promise<YandexRegion[]> {
       const currentUserId = await userId();
       // The official regions-directory contract exposes `filter` and `limit`, but no offset/cursor.
-      const payload = await request(`/v4/user/${currentUserId}/hosts/${encodeURIComponent(config.hostId)}/pro/regions`);
-      const regions = parseRegions(payload);
+      const payload = await request(`/v4/user/${currentUserId}/hosts/${encodeURIComponent(config.hostId)}/pro/regions?limit=10000`);
+      const byId = new Map(parseRegions(payload).map((region) => [region.id, region]));
+      for (const region of SUPPORTED_QUERY_REGIONS) byId.set(region.id, region);
+      const regions = [...byId.values()];
       availableRegionIds = new Set(regions.map((region) => region.id));
       return regions;
     },

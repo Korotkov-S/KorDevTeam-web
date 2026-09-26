@@ -100,6 +100,25 @@ test("Yandex refreshes authoritative regions and collects only resolved desired 
   assert.ok(f.events.includes("regions:1"));
 });
 
+test("Yandex reimports a three-day-lag rolling window", async () => {
+  const f = fixture();
+  const windows: Array<{ from: string; to: string }> = [];
+  f.yandex.collect = async (window, region) => {
+    windows.push(window);
+    return [observation("yandex_webmaster", window.to, String(region.id))];
+  };
+  const collector = createSeoCollector({ config: { ...enabledConfig, google: { enabled: false } }, repository: f.repository,
+    yandex: f.yandex, clock: () => new Date("2026-09-26T06:00:00Z"), sleep: async () => {}, random: () => 0 });
+
+  const report = await collector.run();
+
+  assert.deepEqual(windows, [
+    { from: "2026-09-10", to: "2026-09-23" },
+    { from: "2026-09-10", to: "2026-09-23" },
+  ]);
+  assert.equal(report.sources[0].latestObservationDate, "2026-09-23");
+});
+
 test("a failed Yandex slice keeps completed batches and marks the run partial", async () => {
   const f = fixture();
   f.yandex.collect = async (_window, region, device) => {

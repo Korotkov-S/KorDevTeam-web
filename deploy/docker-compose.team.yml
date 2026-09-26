@@ -176,6 +176,7 @@ services:
       GOOGLE_SEARCH_CONSOLE_SITE_URL: ${GOOGLE_SEARCH_CONSOLE_SITE_URL:-}
       GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL: ${GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL:-}
       GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64: ${GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64:-}
+      LEAD_TEMP_ROOT: ${LEAD_TEMP_ROOT:?Provide LEAD_TEMP_ROOT}
     depends_on:
       postgres:
         condition: service_healthy
@@ -183,7 +184,9 @@ services:
       backend: {}
       egress:
         gw_priority: 1
-    tmpfs: [/tmp]
+    tmpfs:
+      - /tmp
+      - "${LEAD_TEMP_ROOT:?Provide LEAD_TEMP_ROOT}:size=1m,mode=0700,uid=1000,gid=1000"
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     logging: *logging

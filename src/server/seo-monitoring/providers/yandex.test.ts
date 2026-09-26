@@ -41,7 +41,7 @@ test("check sends OAuth authorization while failures expose only stable safe cod
   assert.equal(authorization, `OAuth ${config.oauthToken}`);
 });
 
-test("host regions are authoritative and unknown IDs never reach analytics", async () => {
+test("known regions are authoritative and unknown IDs never reach analytics", async () => {
   const urls: string[] = [];
   const provider = createYandexWebmasterProvider(config, async (input) => {
     const url = String(input);
@@ -51,16 +51,45 @@ test("host regions are authoritative and unknown IDs never reach analytics", asy
     throw new Error("analytics request must not happen");
   });
 
-  assert.deepEqual(await provider.listAvailableRegions(), [
-    { id: 225, name: "Россия" },
-    { id: 213, name: "Москва" },
-  ]);
+  const regions = await provider.listAvailableRegions();
+  assert.ok(regions.some((region) => region.id === 225 && region.name === "Россия"));
+  assert.ok(regions.some((region) => region.id === 213 && region.name === "Москва"));
   await assert.rejects(provider.collect(
     { from: "2026-09-20", to: "2026-09-23" },
     { id: 999, name: "Выдуманный регион" },
     "desktop",
   ), { message: "seo_yandex_region_unavailable" });
   assert.equal(urls.some((url) => url.includes("query-analytics")), false);
+});
+
+test("region discovery requests the full directory and includes supported city GeoIDs", async () => {
+  let regionsUrl = "";
+  const provider = createYandexWebmasterProvider(config, async (input) => {
+    const url = String(input);
+    if (url.endsWith("/v4/user")) return json({ user_id: 42 });
+    if (url.includes("/pro/regions")) {
+      regionsUrl = url;
+      return json({ regions: [
+        { id: 225, name: "Россия" },
+        { id: 1, name: "Москва и Московская область" },
+      ] });
+    }
+    throw new Error("analytics request must not happen");
+  });
+
+  const regions = await provider.listAvailableRegions();
+
+  assert.equal(new URL(regionsUrl).searchParams.get("limit"), "10000");
+  assert.deepEqual(regions.filter((region) => [225, 213, 2, 65, 54, 43, 47, 35].includes(region.id)), [
+    { id: 225, name: "Россия" },
+    { id: 213, name: "Москва" },
+    { id: 2, name: "Санкт-Петербург" },
+    { id: 65, name: "Новосибирск" },
+    { id: 54, name: "Екатеринбург" },
+    { id: 43, name: "Казань" },
+    { id: 47, name: "Нижний Новгород" },
+    { id: 35, name: "Краснодар" },
+  ]);
 });
 
 test("collect sends requested region/device/date filters and maps every actual daily row", async () => {

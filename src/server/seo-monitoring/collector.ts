@@ -108,7 +108,7 @@ export function createSeoCollector(dependencies: {
     const source = "yandex_webmaster" as const;
     const provider = dependencies.yandex;
     if (!provider) return { source, status: "failed", receivedCount: 0, storedCount: 0, latestObservationDate: null, errorCode: "seo_yandex_provider_missing" };
-    const window = windowEnding(clock(), 1);
+    const window = windowEnding(clock(), 3);
     return dependencies.repository.withSourceLock(source, async () => {
       const run = await dependencies.repository.startRun(source, window.from, window.to);
       let receivedCount = 0;
