@@ -46,6 +46,7 @@ export const seoDevice = pgEnum("seo_device", ["desktop", "mobile", "tablet", "a
 export const seoFrequencyBand = pgEnum("seo_frequency_band", ["high", "medium", "low", "unclassified"]);
 export const seoQueryOrigin = pgEnum("seo_query_origin", ["manual", "api", "import"]);
 export const seoRunStatus = pgEnum("seo_run_status", ["running", "success", "partial", "failed"]);
+export const seoRankStatus = pgEnum("seo_rank_status", ["found", "not_found"]);
 export const seoRegionScope = pgEnum("seo_region_scope", ["country", "city"]);
 export const seoChangeType = pgEnum("seo_change_type", [
   "content",
@@ -568,6 +569,60 @@ export const seoDailyMetrics = pgTable(
   ],
 );
 
+export const seoRankRuns = pgTable(
+  "seo_rank_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    checkDate: date("check_date", { mode: "string" }).notNull(),
+    status: seoRunStatus("status").notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    plannedCount: integer("planned_count").notNull().default(0),
+    completedCount: integer("completed_count").notNull().default(0),
+    storedCount: integer("stored_count").notNull().default(0),
+    errorCode: varchar("error_code", { length: 120 }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    index("seo_rank_runs_date_started_idx").on(table.checkDate, table.startedAt),
+    check("seo_rank_runs_counts_non_negative", sql`${table.plannedCount} >= 0 AND ${table.completedCount} >= 0 AND ${table.storedCount} >= 0`),
+    check("seo_rank_runs_completed_after_start", sql`${table.completedAt} IS NULL OR ${table.completedAt} >= ${table.startedAt}`),
+    check("seo_rank_runs_metadata_object", sql`jsonb_typeof(${table.metadata}) = 'object'`),
+  ],
+);
+
+export const seoRankChecks = pgTable(
+  "seo_rank_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    checkDate: date("check_date", { mode: "string" }).notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull(),
+    queryId: uuid("query_id").notNull().references(() => seoQueries.id, { onDelete: "restrict" }),
+    regionId: uuid("region_id").notNull(),
+    device: seoDevice("device").notNull(),
+    status: seoRankStatus("status").notNull(),
+    position: integer("position"),
+    resultUrl: text("result_url"),
+    resultLimit: integer("result_limit").notNull().default(100),
+    importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("seo_rank_checks_daily_uq").on(table.checkDate, table.queryId, table.regionId, table.device),
+    index("seo_rank_checks_query_date_idx").on(table.queryId, table.checkDate),
+    index("seo_rank_checks_slice_idx").on(table.checkDate, table.regionId, table.device),
+    foreignKey({
+      columns: [table.regionId],
+      foreignColumns: [seoRegions.id],
+      name: "seo_rank_checks_region_fk",
+    }).onDelete("restrict"),
+    check("seo_rank_checks_device_supported", sql`${table.device} IN ('desktop', 'mobile')`),
+    check("seo_rank_checks_position_range", sql`${table.position} IS NULL OR (${table.position} >= 1 AND ${table.position} <= ${table.resultLimit})`),
+    check("seo_rank_checks_limit_range", sql`${table.resultLimit} >= 1 AND ${table.resultLimit} <= 100`),
+    check("seo_rank_checks_result_coherent", sql`(${table.status} = 'found' AND ${table.position} IS NOT NULL AND ${table.resultUrl} IS NOT NULL) OR (${table.status} = 'not_found' AND ${table.position} IS NULL AND ${table.resultUrl} IS NULL)`),
+    check("seo_rank_checks_result_url_http", sql`${table.resultUrl} IS NULL OR ${table.resultUrl} ~ '^https?://'`),
+  ],
+);
+
 export const seoCollectionRuns = pgTable(
   "seo_collection_runs",
   {
@@ -666,6 +721,8 @@ export const schema = {
   seoRegions,
   seoQueries,
   seoDailyMetrics,
+  seoRankChecks,
+  seoRankRuns,
   seoCollectionRuns,
   seoChanges,
   seoRecommendations,

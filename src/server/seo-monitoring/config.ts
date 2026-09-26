@@ -1,6 +1,12 @@
 import { createPrivateKey } from "node:crypto";
 
-import type { GoogleSeoConfig, SafeSeoConfigSummary, SeoConfig, YandexSeoConfig } from "./contracts";
+import type {
+  GoogleSeoConfig,
+  SafeSeoConfigSummary,
+  SeoConfig,
+  YandexSearchConfig,
+  YandexSeoConfig,
+} from "./contracts";
 
 type SeoEnvironment = Record<string, string | undefined>;
 
@@ -76,10 +82,24 @@ function readGoogleConfig(env: SeoEnvironment): GoogleSeoConfig {
   return { enabled: true, siteUrl, clientEmail, privateKey: decodeGooglePrivateKey(encodedKey) };
 }
 
+function readYandexSearchConfig(env: SeoEnvironment): YandexSearchConfig {
+  if (!sourceEnabled(env.SEO_YANDEX_SEARCH_ENABLED, "seo_yandex_search_enabled_invalid")) {
+    return { enabled: false };
+  }
+  const apiKey = required(env.YANDEX_SEARCH_API_KEY, "seo_yandex_search_api_key_required");
+  const folderId = required(env.YANDEX_SEARCH_FOLDER_ID, "seo_yandex_search_folder_id_required");
+  if (!/^[a-z0-9]{1,50}$/u.test(folderId)) return fail("seo_yandex_search_folder_id_invalid");
+  const targetHost = required(env.SEO_TARGET_HOST, "seo_target_host_required").toLocaleLowerCase("en-US");
+  if (targetHost.length > 253 || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/u.test(targetHost)
+    || !targetHost.includes(".") || targetHost.includes("..")) return fail("seo_target_host_invalid");
+  return { enabled: true, apiKey, folderId, targetHost };
+}
+
 export function readSeoConfig(env: SeoEnvironment = process.env): SeoConfig {
   return {
     yandex: readYandexConfig(env),
     google: readGoogleConfig(env),
+    yandexSearch: readYandexSearchConfig(env),
   };
 }
 
@@ -90,6 +110,9 @@ export function safeSeoConfigSummary(config: SeoConfig): SafeSeoConfigSummary {
       : { enabled: false },
     google: config.google.enabled
       ? { enabled: true, siteUrl: config.google.siteUrl }
+      : { enabled: false },
+    yandexSearch: config.yandexSearch.enabled
+      ? { enabled: true, targetHost: config.yandexSearch.targetHost }
       : { enabled: false },
   };
 }

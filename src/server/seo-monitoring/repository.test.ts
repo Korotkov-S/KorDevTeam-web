@@ -8,6 +8,7 @@ import {
   seoCollectionRuns,
   seoDailyMetrics,
   seoQueries,
+  seoRankChecks,
   seoRecommendations,
   seoRegions,
 } from "../db/schema";
@@ -60,6 +61,33 @@ databaseTest("source collection runs finish independently", async () => {
   assert.equal(rows.find((row) => row.id === yandex.id)?.status, "partial");
   assert.equal(rows.find((row) => row.id === google.id)?.status, "success");
   assert.equal(rows.every((row) => row.completedAt instanceof Date), true);
+});
+
+databaseTest("rank checks upsert one daily query-region-device snapshot without deleting other slices", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  const [region] = await db.select().from(seoRegions).where(and(
+    eq(seoRegions.source, "yandex_webmaster"),
+    eq(seoRegions.code, "moscow"),
+  ));
+  const [query] = await db.insert(seoQueries).values({ queryText: "Внедрение CRM", normalizedQuery: "внедрение crm" }).returning();
+  const base = {
+    checkDate: "2026-09-26",
+    checkedAt: new Date("2026-09-26T06:00:00.000Z"),
+    queryId: query.id,
+    regionId: region.id,
+    device: "desktop" as const,
+    status: "found" as const,
+    position: 31,
+    resultUrl: "https://kordev.team/services/crm-development/",
+    resultLimit: 100,
+  };
+
+  assert.equal(await repository.upsertRankChecks([base]), 1);
+  assert.equal(await repository.upsertRankChecks([{ ...base, position: 24 }]), 1);
+  assert.deepEqual(await db.select({ position: seoRankChecks.position }).from(seoRankChecks), [{ position: 24 }]);
+  assert.equal(await repository.upsertRankChecks([]), 0);
 });
 
 databaseTest("query listing is paginated and applies every dashboard dimension", async () => {

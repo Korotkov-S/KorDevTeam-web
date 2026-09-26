@@ -12,7 +12,7 @@ import { adminHeaders, adminRouteHeaders, requestCspNonce } from "./headers";
 
 type Authenticator = Pick<AdminAuthService, "authenticate">;
 type Service = Pick<SeoService, "getDashboard" | "getOverview" | "listQueries" | "listChanges" | "listRecommendations"
-  | "saveQueryClassification" | "recordChange" | "updateRecommendationStatus">;
+  | "listRankChecks" | "saveQueryClassification" | "recordChange" | "updateRecommendationStatus">;
 type Range = "7" | "28" | "90" | "custom";
 const DAY_MS = 86_400_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -83,10 +83,13 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
       const previousTo = shift(parsed.ui.dateFrom, -1);
       const previousFrom = shift(previousTo, -(parsed.duration - 1));
       const previousFilters = { ...parsed.service, dateFrom: previousFrom, dateTo: previousTo };
-      const [dashboard, previousOverview, queries, previousQueries, changes, recommendations] = await Promise.all([
+      const [dashboard, previousOverview, queries, previousQueries, rankChecks, changes, recommendations] = await Promise.all([
         service.getDashboard(parsed.service), service.getOverview(previousFilters),
         service.listQueries({ filters: parsed.service, limit: 50, cursor: new URL(request.url).searchParams.get("cursor") }),
         service.listQueries({ filters: previousFilters, limit: 100, cursor: null }),
+        parsed.ui.source === "yandex_webmaster"
+          ? service.listRankChecks({ filters: parsed.service, limit: 100, cursor: null })
+          : Promise.resolve({ items: [], nextCursor: null }),
         service.listChanges({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 20 }),
         service.listRecommendations({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 20 }),
       ]);
@@ -96,7 +99,7 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
         if (!previous || previous.averagePosition === null || item.averagePosition === null) return [];
         return [{ queryText: item.queryText, averagePosition: item.averagePosition, delta: item.averagePosition - previous.averagePosition }];
       }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 10);
-      return Response.json({ filters: parsed.ui, dashboard, previousOverview, queries, movers, changes, recommendations },
+      return Response.json({ filters: parsed.ui, dashboard, previousOverview, queries, movers, rankChecks, changes, recommendations },
         { headers: adminHeaders(requestCspNonce(request)) });
     } catch (error) { return safeResponse(request, error); }
   };

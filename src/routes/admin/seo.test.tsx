@@ -35,6 +35,10 @@ const data: SeoAdminLoaderData = {
   previousOverview: { impressions: 1000, clicks: 60, ctr: 0.06, averagePosition: 9.2 },
   queries: { items: [{ id: queryId, queryText: "внедрение crm", targetPath: "/services/crm/", frequencyBand: "high", impressions: 1000, clicks: 80, ctr: 0.08, averagePosition: 6.4 }], nextCursor: null },
   movers: [{ queryText: "внедрение crm", delta: -2.8, averagePosition: 6.4 }],
+  rankChecks: { items: [
+    { id: "rank-1", queryText: "внедрение crm", targetPath: "/services/crm/", frequencyBand: "high", regionName: "Москва", regionCode: "moscow", device: "desktop", status: "found", position: 18, previousPosition: 25, delta: -7, resultUrl: "https://kordev.team/services/crm/", resultLimit: 100, checkDate: "2026-09-26", checkedAt: "2026-09-26T06:00:00.000Z" },
+    { id: "rank-2", queryText: "разработка crm", targetPath: "/services/crm/", frequencyBand: "medium", regionName: "Россия", regionCode: "ru", device: "mobile", status: "not_found", position: null, previousPosition: null, delta: null, resultUrl: null, resultLimit: 100, checkDate: "2026-09-26", checkedAt: "2026-09-26T06:01:00.000Z" },
+  ], nextCursor: null },
   changes: { items: [{ id: "change-1", pagePath: "/services/crm/", summary: "Обновлён title", type: "metadata", appliedAt: "2026-09-20T10:00:00Z" }], nextCursor: null },
   recommendations: { items: [{ id: recommendationId, title: "Усилить сниппет", rationale: "CTR ниже ожидаемого", status: "new", confidence: "high", pagePath: "/services/crm/" }], nextCursor: null },
 };
@@ -46,6 +50,7 @@ function service() {
     async listQueries() { return data.queries; },
     async listChanges() { return data.changes; },
     async listRecommendations() { return data.recommendations; },
+    async listRankChecks() { return data.rankChecks; },
     async saveQueryClassification() { return {}; },
     async recordChange() { return {}; },
     async updateRecommendationStatus() { return {}; },
@@ -112,12 +117,24 @@ test("SEO mutations require same origin and CSRF and map unexpected errors safel
 test("dashboard renders all decision sections, reversed position chart, gaps, and wide tables", () => {
   const withGap = { ...data, queries: { ...data.queries, nextCursor: "50" }, dashboard: { ...data.dashboard, daily: [...data.dashboard.daily, { date: "2026-09-24", impressions: 0, clicks: 0, ctr: null, averagePosition: null }] } };
   const html = renderDashboard(withGap);
-  for (const label of ["SEO-мониторинг", "Показы и клики", "CTR", "Средняя позиция", "Диапазоны позиций", "Регионы Яндекса", "Устройства", "Частотность", "Движение запросов", "Все запросы", "Изменения", "Рекомендации"]) assert.match(html, new RegExp(label, "u"));
+  for (const label of ["SEO-мониторинг", "Показы и клики", "CTR", "Средняя позиция", "Диапазоны позиций", "Регионы Яндекса", "Устройства", "Частотность", "Движение запросов", "Все запросы", "Контрольные позиции Яндекса", "Изменения", "Рекомендации"]) assert.match(html, new RegExp(label, "u"));
   assert.match(html, /data-position-domain="reversed"/u);
   assert.match(html, /data-chart-gaps="preserved"/u);
   assert.match(html, /overflow-x-auto/u);
   assert.match(html, /cursor=50/u);
   assert.match(html, /name="from"/u);
+});
+
+test("dashboard separates exact Yandex control ranks from averages and formats dates as dd.mm.yyyy", () => {
+  const html = renderDashboard(data);
+  assert.match(html, /Контрольная позиция/u);
+  assert.match(html, /Средняя позиция по показам/u);
+  assert.match(html, /не найден в топ-100/u);
+  assert.match(html, /лучше на 7/u);
+  assert.match(html, /26\.09\.2026/u);
+  assert.match(html, /Последние данные: 23\.09\.2026/u);
+  assert.match(html, /Показы: 1[\s ]?000/u);
+  assert.match(html, /Клики: 80/u);
 });
 
 test("Google dashboard does not render city selection and empty state is explicit", () => {

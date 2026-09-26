@@ -30,6 +30,21 @@
 
 Google собирается только по стране `RUS` и устройствам. Городских срезов Search Console не предоставляет, поэтому в Google-режиме их нет ни в запросах, ни в интерфейсе.
 
+### Контрольные позиции Яндекса
+
+Контрольный снимок органической выдачи собирается отдельно от Яндекс Вебмастера через официальный Yandex Search API. Создайте сервисный аккаунт с ролью `search-api.webSearch.user`, выпустите API-ключ с областью действия `yc.search-api.execute` и укажите:
+
+```bash
+SEO_YANDEX_SEARCH_ENABLED=false
+YANDEX_SEARCH_API_KEY=
+YANDEX_SEARCH_FOLDER_ID=
+SEO_TARGET_HOST=kordev.team
+```
+
+Сначала оставьте переключатель выключенным. После заполнения защищённого environment-файла выполните `--check --source=yandex-rank`, затем включите `SEO_YANDEX_SEARCH_ENABLED=true`. Ключ нельзя печатать в журнал, передавать в argv или сохранять в базе.
+
+Search API снимает первые 100 органических результатов отдельно для России, Москвы, Санкт-Петербурга, Новосибирска, Екатеринбурга, Казани, Нижнего Новгорода и Краснодара, для desktop и mobile. Это контрольный снимок конкретного запуска, а не средняя позиция по показам. Google таким способом не проверяется.
+
 Файл `/etc/kordevteam/operations.env` должен принадлежать оператору и иметь mode `0600`. Не передавайте OAuth-токен, PEM/base64-ключ или MCP-токен в Git, задачи, чат или командную строку, которая сохраняется в общей истории.
 
 ## Проверка и первый импорт
@@ -51,6 +66,7 @@ bash scripts/run-seo-collect.sh
 ```bash
 docker compose -f deploy/docker-compose.team.yml --profile seo run --rm --no-deps seo-job node server/seo-collect.mjs --source=yandex
 docker compose -f deploy/docker-compose.team.yml --profile seo run --rm --no-deps seo-job node server/seo-collect.mjs --source=google
+docker compose -f deploy/docker-compose.team.yml --profile seo run --rm --no-deps seo-job node server/seo-collect.mjs --source=yandex-rank
 ```
 
 Backfill намеренно ограничен скользящим окном: Яндекс повторно импортирует 14 дней до вчерашней даты, Google — 14 финализированных дней с отставанием в три дня. Повторный запуск обновляет те же строки и не удаляет ранее сохранённые наблюдения. Произвольного многолетнего backfill в production-команде нет: для него требуется отдельный проверенный одноразовый запуск, чтобы не превысить квоты источника.
@@ -92,6 +108,6 @@ journalctl -u kordevteam-seo-collect.service --since today
 
 Для безопасной ротации сначала подготовьте новый доступ, замените секрет в mode-0600 environment-файле, выполните `--check`, запустите один source-specific импорт и только затем отзовите старый доступ. Секреты не сохраняются в PostgreSQL и не попадают в ответы админки/MCP.
 
-Чтобы временно остановить источник, установите соответствующий флаг `SEO_YANDEX_ENABLED=false` или `SEO_GOOGLE_ENABLED=false` и повторно запустите `--check`. Это не удаляет историю метрик, изменений или рекомендаций. Не очищайте таблицы ради повторного импорта: upsert рассчитан на безопасный повтор.
+Чтобы временно остановить источник, установите соответствующий флаг `SEO_YANDEX_ENABLED=false`, `SEO_GOOGLE_ENABLED=false` или `SEO_YANDEX_SEARCH_ENABLED=false` и повторно запустите `--check`. Это не удаляет историю метрик, контрольных позиций, изменений или рекомендаций. Не очищайте таблицы ради повторного импорта: upsert рассчитан на безопасный повтор.
 
 После изменения расписания или credentials проверьте `/admin/seo/`, дату последних данных, `systemctl status` и безопасные коды ошибок в журнале. Реальные метрики считаются подключёнными только после успешного `--check` и первого импорта против подтверждённых production-свойств.

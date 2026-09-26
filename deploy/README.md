@@ -138,7 +138,7 @@ Install/enable the example backup systemd timer after configuring the host. It r
 
 ### SEO monitoring job
 
-The `seo-job` Compose profile runs the read-only first-party importer from the recorded immutable worker image. Provider switches default to `false`; keep credentials empty while a source is disabled. Check credentials with `docker compose -f deploy/docker-compose.team.yml --profile seo run --rm --no-deps seo-job node server/seo-collect.mjs --check`, then enable `kordevteam-seo-collect.timer`. It runs at 07:30 Europe/Moscow with a bounded randomized delay, before the 09:00 analysis heartbeat. PostgreSQL advisory locks prevent overlapping imports; provider failures are reported independently.
+The `seo-job` Compose profile runs the read-only first-party importer from the recorded immutable worker image. Provider switches default to `false`; keep credentials empty while a source is disabled. The job imports Webmaster and Search Console metrics and, when `SEO_YANDEX_SEARCH_ENABLED=true`, stores official Yandex Search API top-100 control ranks for tracked queries. Check credentials with `docker compose -f deploy/docker-compose.team.yml --profile seo run --rm --no-deps seo-job node server/seo-collect.mjs --check`, then enable `kordevteam-seo-collect.timer`. It runs at 07:30 Europe/Moscow with a bounded randomized delay, before the 09:00 analysis heartbeat. PostgreSQL advisory locks prevent overlapping imports; provider failures are reported independently.
 
 Credential setup, first import, MCP scopes, diagnosis and rotation are documented in [`docs/runbooks/seo-monitoring.md`](../docs/runbooks/seo-monitoring.md).
 

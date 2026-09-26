@@ -17,11 +17,23 @@ test("SEO job is isolated, read-only, and receives only its own provider credent
   assert.match(block, /DATABASE_URL:/u);
   assert.match(block, /YANDEX_WEBMASTER_OAUTH_TOKEN:/u);
   assert.match(block, /GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64:/u);
+  assert.match(block, /SEO_YANDEX_SEARCH_ENABLED:/u);
+  assert.match(block, /YANDEX_SEARCH_API_KEY:/u);
+  assert.match(block, /YANDEX_SEARCH_FOLDER_ID:/u);
+  assert.match(block, /SEO_TARGET_HOST:/u);
   assert.match(block, /LEAD_TEMP_ROOT:/u);
   assert.match(block, /\$\{LEAD_TEMP_ROOT:\?Provide LEAD_TEMP_ROOT\}:.*mode=0700.*uid=1000.*gid=1000/u);
   assert.doesNotMatch(block, /SMTP_PASSWORD|LEAD_S3_SECRET_ACCESS_KEY|ADMIN_SESSION_HMAC_KEY/u);
   assert.match(block, /backend:/u);
   assert.match(block, /egress:/u);
+});
+
+test("Yandex Search API key is not exposed to web or lead-worker services", () => {
+  const compose = readFileSync("deploy/docker-compose.team.yml", "utf8");
+  const webBlock = compose.match(/x-web: &web[\s\S]*?(?=\nservices:)/u)?.[0] ?? "";
+  const leadBlock = compose.match(/  lead-worker:\n[\s\S]*?(?=\n  [a-z][a-z0-9-]+:)/u)?.[0] ?? "";
+  assert.doesNotMatch(webBlock, /YANDEX_SEARCH_API_KEY/u);
+  assert.doesNotMatch(leadBlock, /YANDEX_SEARCH_API_KEY/u);
 });
 
 test("systemd schedules collection before the 09:00 Moscow analysis", (t) => {

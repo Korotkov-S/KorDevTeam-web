@@ -24,6 +24,8 @@ import {
   seoChanges,
   seoDailyMetrics,
   seoQueries,
+  seoRankChecks,
+  seoRankRuns,
   seoRegions,
   seoSources,
   siteSettings,
@@ -32,6 +34,14 @@ import { resetTestDatabase } from "./testDatabase";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
+
+test("SEO schema exposes separate Yandex control-rank checks and runs", () => {
+  assert.ok(seoRankChecks);
+  assert.ok(seoRankRuns);
+  assert.equal("position" in seoRankChecks, true);
+  assert.equal("checkedAt" in seoRankChecks, true);
+  assert.equal("plannedCount" in seoRankRuns, true);
+});
 
 const leadFixture = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -266,6 +276,42 @@ databaseTest("Google SEO observations require an explicit Russia region", async 
     ...metric,
     regionId: yandexRussia.id,
   }), "23503");
+});
+
+databaseTest("Yandex control ranks are daily-idempotent and never use position zero", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const [region] = await db.select().from(seoRegions).where(and(
+    eq(seoRegions.source, "yandex_webmaster"),
+    eq(seoRegions.code, "moscow"),
+  ));
+  const [query] = await db.insert(seoQueries).values({
+    queryText: "внедрение crm",
+    normalizedQuery: "внедрение crm",
+    origin: "manual",
+  }).returning();
+  const check = {
+    checkDate: "2026-09-26",
+    checkedAt: new Date("2026-09-26T06:00:00.000Z"),
+    queryId: query.id,
+    regionId: region.id,
+    device: "desktop" as const,
+    status: "found" as const,
+    position: 17,
+    resultUrl: "https://kordev.team/services/crm-development/",
+    resultLimit: 100,
+  };
+
+  await db.insert(seoRankChecks).values(check);
+  await assertConstraintViolation(() => db.insert(seoRankChecks).values(check));
+  await assertConstraintViolation(() => db.insert(seoRankChecks).values({ ...check, device: "mobile", position: 0 }));
+  await assertConstraintViolation(() => db.insert(seoRankChecks).values({
+    ...check,
+    device: "mobile",
+    status: "not_found",
+    position: 12,
+    resultUrl: null,
+  }));
 });
 
 databaseTest("content deletion preserves SEO change history and clears only its optional link", async () => {

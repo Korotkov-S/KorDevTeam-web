@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
 import {
@@ -6,11 +6,13 @@ import {
   seoCollectionRuns,
   seoDailyMetrics,
   seoQueries,
+  seoRankChecks,
+  seoRankRuns,
   seoRecommendations,
   seoRegions,
   seoSources,
 } from "../db/schema";
-import type { NormalizedSeoObservation, SeoDevice, SeoSourceId } from "./contracts";
+import type { NormalizedRankCheck, NormalizedSeoObservation, SeoDevice, SeoSourceId } from "./contracts";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
@@ -101,6 +103,70 @@ export function createSeoRepository(db: SeoDatabase) {
       });
     },
 
+    async withRankLock<T>(operation: () => Promise<T>): Promise<T> {
+      return db.transaction(async (tx) => {
+        const result = await tx.execute(sql`select pg_try_advisory_xact_lock(hashtext(${'seo-rank-collector:yandex'})) as acquired`);
+        if (result.rows[0]?.acquired !== true) throw new Error("seo_rank_locked");
+        return operation();
+      });
+    },
+
+    async listTrackedQueries() {
+      return db.select({ id: seoQueries.id, queryText: seoQueries.queryText }).from(seoQueries)
+        .where(eq(seoQueries.tracked, true)).orderBy(asc(seoQueries.createdAt), asc(seoQueries.id));
+    },
+
+    async listRankRegions() {
+      return db.select({ id: seoRegions.id, externalId: seoRegions.externalId, displayName: seoRegions.displayName })
+        .from(seoRegions).where(and(
+          eq(seoRegions.source, "yandex_webmaster"),
+          eq(seoRegions.active, true),
+          isNotNull(seoRegions.externalId),
+        )).orderBy(asc(seoRegions.sortOrder)) as Promise<Array<{ id: string; externalId: string; displayName: string }>>;
+    },
+
+    async startRankRun(checkDate: string, plannedCount: number) {
+      const [run] = await db.insert(seoRankRuns).values({ checkDate, plannedCount, startedAt: new Date() }).returning();
+      return run;
+    },
+
+    async finishRankRun(
+      id: string,
+      status: Exclude<typeof seoRankRuns.$inferSelect.status, "running">,
+      result: { completedCount: number; storedCount: number; errorCode?: string; metadata?: Record<string, unknown> },
+    ) {
+      const [run] = await db.update(seoRankRuns).set({
+        status,
+        completedAt: new Date(),
+        completedCount: result.completedCount,
+        storedCount: result.storedCount,
+        errorCode: result.errorCode ?? null,
+        metadata: result.metadata ?? {},
+      }).where(eq(seoRankRuns.id, id)).returning();
+      if (!run) throw new Error("seo_rank_run_not_found");
+      return run;
+    },
+
+    async upsertRankChecks(checks: readonly NormalizedRankCheck[]): Promise<number> {
+      if (checks.length === 0) return 0;
+      return db.transaction(async (tx) => {
+        for (const check of checks) {
+          await tx.insert(seoRankChecks).values(check).onConflictDoUpdate({
+            target: [seoRankChecks.checkDate, seoRankChecks.queryId, seoRankChecks.regionId, seoRankChecks.device],
+            set: {
+              checkedAt: check.checkedAt,
+              status: check.status,
+              position: check.position,
+              resultUrl: check.resultUrl,
+              resultLimit: check.resultLimit,
+              importedAt: new Date(),
+            },
+          });
+        }
+        return checks.length;
+      });
+    },
+
     async startRun(source: SeoSourceId, requestedFrom: string, requestedTo: string) {
       return db.transaction(async (tx) => {
         const now = new Date();
@@ -184,6 +250,58 @@ export function createSeoRepository(db: SeoDatabase) {
         }
         return stored;
       });
+    },
+
+    async listRankChecks(filters: SeoMetricFilters, page: { limit: number; cursor: string | null }) {
+      const offset = cursorOffset(page.cursor);
+      const conditions = [
+        gte(seoRankChecks.checkDate, filters.dateFrom),
+        lte(seoRankChecks.checkDate, filters.dateTo),
+      ];
+      if (filters.regionId) conditions.push(eq(seoRankChecks.regionId, filters.regionId));
+      if (filters.device) conditions.push(eq(seoRankChecks.device, filters.device));
+      if (filters.frequencyBand) conditions.push(eq(seoQueries.frequencyBand, filters.frequencyBand));
+      if (filters.pagePath) conditions.push(eq(seoQueries.targetPath, filters.pagePath));
+      const rows = await db.select({
+        id: seoRankChecks.id,
+        queryId: seoQueries.id,
+        queryText: seoQueries.queryText,
+        targetPath: seoQueries.targetPath,
+        frequencyBand: seoQueries.frequencyBand,
+        regionId: seoRegions.id,
+        regionName: seoRegions.displayName,
+        regionCode: seoRegions.code,
+        regionSortOrder: seoRegions.sortOrder,
+        device: seoRankChecks.device,
+        status: seoRankChecks.status,
+        position: seoRankChecks.position,
+        resultUrl: seoRankChecks.resultUrl,
+        resultLimit: seoRankChecks.resultLimit,
+        checkDate: seoRankChecks.checkDate,
+        checkedAt: seoRankChecks.checkedAt,
+      }).from(seoRankChecks)
+        .innerJoin(seoQueries, eq(seoQueries.id, seoRankChecks.queryId))
+        .innerJoin(seoRegions, eq(seoRegions.id, seoRankChecks.regionId))
+        .where(and(...conditions))
+        .orderBy(asc(seoQueries.queryText), asc(seoRegions.sortOrder), asc(seoRankChecks.device),
+          desc(seoRankChecks.checkDate), desc(seoRankChecks.checkedAt));
+      const grouped = new Map<string, typeof rows>();
+      for (const row of rows) {
+        const key = `${row.queryId}:${row.regionId}:${row.device}`;
+        const entries = grouped.get(key) ?? [];
+        if (entries.length < 2) entries.push(row);
+        grouped.set(key, entries);
+      }
+      const items = [...grouped.values()].map(([current, previous]) => ({
+        ...current,
+        previousPosition: previous?.position ?? null,
+        delta: current.position === null || previous?.position === null || previous?.position === undefined
+          ? null : current.position - previous.position,
+      }));
+      return {
+        items: items.slice(offset, offset + page.limit),
+        nextCursor: items.length > offset + page.limit ? String(offset + page.limit) : null,
+      };
     },
 
     async listQueries(filters: SeoMetricFilters, page: { limit: number; cursor: string | null }) {

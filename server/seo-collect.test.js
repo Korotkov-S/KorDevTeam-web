@@ -7,6 +7,7 @@ test("CLI accepts only --check and exact source selection", () => {
   assert.deepEqual(parseSeoCollectArgs([]), { check: false });
   assert.deepEqual(parseSeoCollectArgs(["--check", "--source=yandex"]), { check: true, source: "yandex_webmaster" });
   assert.deepEqual(parseSeoCollectArgs(["--source=google"]), { check: false, source: "google_search_console" });
+  assert.deepEqual(parseSeoCollectArgs(["--source=yandex-rank"]), { check: false, source: "yandex_search" });
   assert.throws(() => parseSeoCollectArgs(["--source=bing"]), /seo_collect_arguments_invalid/u);
   assert.throws(() => parseSeoCollectArgs(["--check", "--check"]), /seo_collect_arguments_invalid/u);
 });
@@ -24,4 +25,21 @@ test("check and collection emit compact summaries and return nonzero on failure"
   assert.equal(await runSeoCollectCommand(["--source=google"], async () => build, logger), 1);
   assert.match(lines.join("\n"), /google_search_console:failed received=0 stored=0 error=seo_google_auth_failed/u);
   assert.doesNotMatch(lines.join("\n"), /token|private.key/u);
+});
+
+test("Yandex rank target is forwarded and reports its planned matrix compactly", async () => {
+  const lines = [];
+  let collectedWith;
+  const build = { entry: { module: {
+    checkSeoCollectionReady: async () => ({ sources: [] }),
+    runSeoCollection: async (options) => {
+      collectedWith = options;
+      return { sources: [{ source: "yandex_search", status: "success", plannedCount: 16, completedCount: 16, storedCount: 16 }] };
+    },
+  } } };
+  assert.equal(await runSeoCollectCommand(["--source=yandex-rank"], async () => build, {
+    info: (line) => lines.push(line), error: (line) => lines.push(line),
+  }), 0);
+  assert.deepEqual(collectedWith, { source: "yandex_search" });
+  assert.match(lines.join("\n"), /yandex_search:success planned=16 completed=16 stored=16/u);
 });

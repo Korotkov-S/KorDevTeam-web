@@ -18,6 +18,37 @@ test("disabled SEO sources do not require credentials", () => {
   assert.deepEqual(config, {
     yandex: { enabled: false },
     google: { enabled: false },
+    yandexSearch: { enabled: false },
+  });
+});
+
+test("enabled Yandex Search requires API key, folder and a bare target hostname", () => {
+  const base = {
+    SEO_YANDEX_ENABLED: "false",
+    SEO_GOOGLE_ENABLED: "false",
+    SEO_YANDEX_SEARCH_ENABLED: "true",
+  };
+  assert.throws(() => readSeoConfig(base), { message: "seo_yandex_search_api_key_required" });
+  assert.throws(() => readSeoConfig({ ...base, YANDEX_SEARCH_API_KEY: "secret-key" }), {
+    message: "seo_yandex_search_folder_id_required",
+  });
+  assert.throws(() => readSeoConfig({
+    ...base,
+    YANDEX_SEARCH_API_KEY: "secret-key",
+    YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
+    SEO_TARGET_HOST: "https://kordev.team/",
+  }), { message: "seo_target_host_invalid" });
+
+  assert.deepEqual(readSeoConfig({
+    ...base,
+    YANDEX_SEARCH_API_KEY: "secret-key",
+    YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
+    SEO_TARGET_HOST: "kordev.team",
+  }).yandexSearch, {
+    enabled: true,
+    apiKey: "secret-key",
+    folderId: "b1g1234567890abcdefg",
+    targetHost: "kordev.team",
   });
 });
 
@@ -65,6 +96,10 @@ test("enabled Google requires a property, service-account email, and valid base6
     GOOGLE_SEARCH_CONSOLE_SITE_URL: "https://kordev.team/",
     GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL: "seo@project.iam.gserviceaccount.com",
     GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64: privateKeyB64,
+    SEO_YANDEX_SEARCH_ENABLED: "true",
+    YANDEX_SEARCH_API_KEY: "search-secret-key",
+    YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
+    SEO_TARGET_HOST: "kordev.team",
   });
   assert.equal(config.google.enabled, true);
   if (config.google.enabled) assert.equal(config.google.privateKey, privateKey);
@@ -117,13 +152,18 @@ test("safe configuration summary contains source identifiers but no credentials"
     GOOGLE_SEARCH_CONSOLE_SITE_URL: "sc-domain:kordev.team",
     GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL: "seo@project.iam.gserviceaccount.com",
     GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64: privateKeyB64,
+    SEO_YANDEX_SEARCH_ENABLED: "true",
+    YANDEX_SEARCH_API_KEY: "search-secret-key",
+    YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
+    SEO_TARGET_HOST: "kordev.team",
   });
 
   const summary = safeSeoConfigSummary(config);
   assert.deepEqual(summary, {
     yandex: { enabled: true, hostId: "https:kordev.team:443" },
     google: { enabled: true, siteUrl: "sc-domain:kordev.team" },
+    yandexSearch: { enabled: true, targetHost: "kordev.team" },
   });
   const serialized = JSON.stringify(summary);
-  assert.doesNotMatch(serialized, /secret-token|PRIVATE KEY|gserviceaccount/);
+  assert.doesNotMatch(serialized, /secret-token|search-secret-key|PRIVATE KEY|gserviceaccount|b1g123/);
 });

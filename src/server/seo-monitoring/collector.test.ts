@@ -8,6 +8,7 @@ import { SeoProviderError } from "./providers/provider-error";
 const enabledConfig = {
   yandex: { enabled: true, oauthToken: "yandex-secret", hostId: "https:example.test:443" },
   google: { enabled: true, siteUrl: "sc-domain:example.test", clientEmail: "seo@example.test", privateKey: "private-secret" },
+  yandexSearch: { enabled: false },
 } satisfies SeoConfig;
 
 function observation(source: SeoSourceId, date = "2026-09-24", regionExternalId = "RUS"): NormalizedSeoObservation {
@@ -138,7 +139,7 @@ test("a failed Yandex slice keeps completed batches and marks the run partial", 
 
 test("disabled sources are explicit and make no provider request", async () => {
   const f = fixture();
-  const collector = createSeoCollector({ config: { yandex: { enabled: false }, google: { enabled: false } }, repository: f.repository,
+  const collector = createSeoCollector({ config: { yandex: { enabled: false }, google: { enabled: false }, yandexSearch: { enabled: false } }, repository: f.repository,
     clock: () => new Date("2026-09-25T06:00:00Z"), sleep: async () => {}, random: () => 0 });
   assert.deepEqual((await collector.run()).sources.map((item) => item.status), ["disabled", "disabled"]);
   assert.equal(f.events.some((event) => event.startsWith("start:")), false);

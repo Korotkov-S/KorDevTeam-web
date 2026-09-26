@@ -16,6 +16,7 @@ function fakeRepository() {
       listQueries: method("listQueries", { items: [], nextCursor: null }),
       listChanges: method("listChanges", { items: [], nextCursor: null }),
       listRecommendations: method("listRecommendations", { items: [], nextCursor: null }),
+      listRankChecks: method("listRankChecks", { items: [], nextCursor: null }),
       saveQueryTarget: method("saveQueryTarget"),
       recordChange: method("recordChange"),
       createRecommendation: method("createRecommendation"),
@@ -34,6 +35,9 @@ test("service bounds date windows and pagination before repository access", asyn
     filters: { dateFrom: "2026-09-01", dateTo: "2026-09-25" },
     limit: 101,
   }), { message: "seo_limit_invalid" });
+  assert.throws(() => service.listRankChecks({
+    filters: { dateFrom: "bad", dateTo: "2026-09-25" },
+  }), { message: "seo_date_invalid" });
   assert.equal(fake.calls.length, 0);
 });
 

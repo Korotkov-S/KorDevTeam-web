@@ -9,6 +9,7 @@ export function parseSeoCollectArgs(args) {
     if (argument === "--check" && !check) check = true;
     else if (argument === "--source=yandex" && source === undefined) source = "yandex_webmaster";
     else if (argument === "--source=google" && source === undefined) source = "google_search_console";
+    else if (argument === "--source=yandex-rank" && source === undefined) source = "yandex_search";
     else throw new Error("seo_collect_arguments_invalid");
   }
   return { check, ...(source ? { source } : {}) };
@@ -16,7 +17,11 @@ export function parseSeoCollectArgs(args) {
 
 function compact(report) {
   return report.sources.map((source) => {
-    const counts = source.receivedCount === undefined ? "" : ` received=${source.receivedCount} stored=${source.storedCount}`;
+    const counts = source.receivedCount !== undefined
+      ? ` received=${source.receivedCount} stored=${source.storedCount}`
+      : source.plannedCount !== undefined
+        ? ` planned=${source.plannedCount} completed=${source.completedCount} stored=${source.storedCount}`
+        : "";
     return `${source.source}:${source.status}${counts}${source.errorCode ? ` error=${source.errorCode}` : ""}`;
   }).join(" ");
 }
