@@ -36,3 +36,14 @@ test('web log archive rejects broad directories and symlink targets before docke
   for (const target of ['/', process.cwd(), process.env.HOME, '.', `${f.dir}/link`]) assert.notEqual(f.run(target).status, 0);
   assert.equal(existsSync(`${f.dir}/commands`), false);
 });
+
+test('web log archive systemd service loads the protected operations environment', () => {
+  const service = readFileSync('deploy/systemd/kordevteam-logs.service', 'utf8');
+  assert.match(service, /^EnvironmentFile=\/etc\/kordevteam\/operations\.env$/m);
+});
+
+test('web log archive systemd service creates its private log directory', () => {
+  const service = readFileSync('deploy/systemd/kordevteam-logs.service', 'utf8');
+  assert.match(service, /^LogsDirectory=kordevteam$/m);
+  assert.match(service, /^LogsDirectoryMode=0700$/m);
+});

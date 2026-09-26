@@ -4,6 +4,9 @@ After=docker.service
 
 [Service]
 Type=oneshot
+EnvironmentFile=/etc/kordevteam/operations.env
+LogsDirectory=kordevteam
+LogsDirectoryMode=0700
 WorkingDirectory=/opt/kordevteam/current
 ExecStart=/bin/bash /opt/kordevteam/current/scripts/archive-web-logs.sh /var/log/kordevteam
 UMask=0077
