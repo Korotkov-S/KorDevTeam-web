@@ -6,13 +6,14 @@ import { getAdminAuthService } from "../../server/auth/runtime";
 import type { AdminAuthService } from "../../server/auth/service";
 import type { SeoService } from "../../server/seo-monitoring/service";
 import { getSeoMonitoringService } from "../../server/seo-monitoring/runtime";
-import type { SeoDevice, SeoSourceId } from "../../server/seo-monitoring/contracts";
+import type { SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "../../server/seo-monitoring/contracts";
 import { requireAdminPage } from "./auth.server";
 import { adminHeaders, adminRouteHeaders, requestCspNonce } from "./headers";
 
 type Authenticator = Pick<AdminAuthService, "authenticate">;
 type Service = Pick<SeoService, "getDashboard" | "getOverview" | "listQueries" | "listChanges" | "listRecommendations"
-  | "listRankChecks" | "saveQueryClassification" | "recordChange" | "updateRecommendationStatus">;
+  | "listSemanticCore" | "createCandidate" | "updateSemanticQuery" | "listRankChecks" | "saveQueryClassification"
+  | "recordChange" | "updateRecommendationStatus">;
 type Range = "7" | "28" | "90" | "custom";
 const DAY_MS = 86_400_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -66,11 +67,16 @@ function parseFilters(url: URL, now: Date) {
 
 function safeResponse(request: Request, error: unknown): Response {
   const code = error instanceof Error ? error.message : "seo_dashboard_unavailable";
-  const validation = new Set(["seo_date_invalid", "seo_date_range_invalid", "seo_source_invalid", "seo_region_invalid", "seo_device_invalid", "seo_frequency_band_invalid", "seo_page_path_invalid", "seo_page_origin_invalid", "seo_cursor_invalid"]);
+  const validation = new Set(["seo_date_invalid", "seo_date_range_invalid", "seo_source_invalid", "seo_region_invalid", "seo_device_invalid", "seo_frequency_band_invalid", "seo_page_path_invalid", "seo_page_origin_invalid", "seo_cursor_invalid", "seo_query_text_invalid", "seo_query_invalid", "seo_query_status_invalid", "seo_query_kind_invalid", "seo_wordstat_frequency_invalid", "seo_query_priority_invalid", "seo_query_updated_at_invalid", "seo_action_invalid"]);
   const security = code === "admin_origin_invalid" || code === "admin_csrf_invalid";
+  const conflict = code === "seo_query_conflict" || code === "seo_query_exists";
   const known = validation.has(code) || security;
-  return Response.json({ error: security ? "Сессия формы устарела. Обновите страницу." : known ? "Проверьте параметры SEO-отчёта." : "SEO-аналитика временно недоступна." }, {
-    status: security ? 403 : validation.has(code) ? 422 : 503,
+  const message = security ? "Сессия формы устарела. Обновите страницу."
+    : code === "seo_query_conflict" ? "Запрос уже изменён. Обновите страницу и повторите действие."
+    : code === "seo_query_exists" ? "Такой запрос уже есть в семантическом ядре."
+    : known ? "Проверьте параметры SEO-отчёта." : "SEO-аналитика временно недоступна.";
+  return Response.json({ error: message }, {
+    status: security ? 403 : conflict ? 409 : validation.has(code) ? 422 : 503,
     headers: adminHeaders(requestCspNonce(request)),
   });
 }
@@ -83,10 +89,13 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
       const previousTo = shift(parsed.ui.dateFrom, -1);
       const previousFrom = shift(previousTo, -(parsed.duration - 1));
       const previousFilters = { ...parsed.service, dateFrom: previousFrom, dateTo: previousTo };
-      const [dashboard, previousOverview, queries, previousQueries, rankChecks, changes, recommendations] = await Promise.all([
+      const [dashboard, previousOverview, queries, previousQueries, activeCore, archivedCore, candidates, rankChecks, changes, recommendations] = await Promise.all([
         service.getDashboard(parsed.service), service.getOverview(previousFilters),
         service.listQueries({ filters: parsed.service, limit: 50, cursor: new URL(request.url).searchParams.get("cursor") }),
         service.listQueries({ filters: previousFilters, limit: 100, cursor: null }),
+        service.listSemanticCore({ status: "active", limit: 100, cursor: null }),
+        service.listSemanticCore({ status: "archived", limit: 100, cursor: null }),
+        service.listSemanticCore({ status: "candidate", limit: 100, cursor: null }),
         parsed.ui.source === "yandex_webmaster"
           ? service.listRankChecks({ filters: parsed.service, limit: 100, cursor: null })
           : Promise.resolve({ items: [], nextCursor: null }),
@@ -99,13 +108,22 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
         if (!previous || previous.averagePosition === null || item.averagePosition === null) return [];
         return [{ queryText: item.queryText, averagePosition: item.averagePosition, delta: item.averagePosition - previous.averagePosition }];
       }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 10);
-      return Response.json({ filters: parsed.ui, dashboard, previousOverview, queries, movers, rankChecks, changes, recommendations },
+      const semanticItems = [...new Map([...activeCore.items, ...archivedCore.items].map((item) => [item.id, item])).values()];
+      return Response.json({ filters: parsed.ui, dashboard, previousOverview, queries, movers,
+        semanticCore: { items: semanticItems, nextCursor: activeCore.nextCursor ?? archivedCore.nextCursor },
+        candidates, rankChecks, changes, recommendations },
         { headers: adminHeaders(requestCspNonce(request)) });
     } catch (error) { return safeResponse(request, error); }
   };
 }
 
 function value(form: FormData, key: string): string { const result = form.get(key); return typeof result === "string" ? result : ""; }
+function integerValue(form: FormData, key: string, nullable = false): number | null {
+  const raw = value(form, key).trim();
+  if (nullable && raw === "") return null;
+  if (!/^\d+$/u.test(raw)) throw new Error(key === "wordstatFrequency" ? "seo_wordstat_frequency_invalid" : "seo_query_priority_invalid");
+  return Number(raw);
+}
 
 export function createSeoAdminAction(auth: Authenticator, service: Service, config: AdminAuthConfig): ActionFunction {
   return async ({ request }: ActionFunctionArgs) => {
@@ -114,7 +132,20 @@ export function createSeoAdminAction(auth: Authenticator, service: Service, conf
       const form = await request.formData();
       verifyAdminMutationRequest(request, principal, value(form, "_csrf"), config);
       const intent = value(form, "intent");
-      if (intent === "save-query") {
+      if (intent === "create-query") {
+        const target = value(form, "targetPath").trim();
+        await service.createCandidate({ queryText: value(form, "queryText"), targetPath: target || null,
+          wordstatFrequency: integerValue(form, "wordstatFrequency", true),
+          frequencyBand: value(form, "frequencyBand") as "high" | "medium" | "low" | "unclassified",
+          kind: value(form, "kind") as SeoQueryKind, priority: integerValue(form, "priority")! });
+      } else if (intent === "update-query") {
+        const target = value(form, "targetPath").trim();
+        await service.updateSemanticQuery({ id: value(form, "id"), expectedUpdatedAt: value(form, "expectedUpdatedAt"),
+          targetPath: target || null, wordstatFrequency: integerValue(form, "wordstatFrequency", true),
+          frequencyBand: value(form, "frequencyBand") as "high" | "medium" | "low" | "unclassified",
+          kind: value(form, "kind") as SeoQueryKind, priority: integerValue(form, "priority")!,
+          status: value(form, "status") as SeoQueryStatus });
+      } else if (intent === "save-query") {
         const target = value(form, "targetPath").trim();
         await service.saveQueryClassification({ queryId: value(form, "queryId"), targetPath: target || null,
           frequencyBand: value(form, "frequencyBand") as "high" | "medium" | "low" | "unclassified" });

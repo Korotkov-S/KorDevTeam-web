@@ -1,7 +1,7 @@
 import React from "react";
 import { Form, Link, useActionData, useLoaderData, useMatches } from "react-router";
 
-import type { SeoDevice, SeoSourceId } from "../../server/seo-monitoring/contracts";
+import type { SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "../../server/seo-monitoring/contracts";
 import { BreakdownChart, CtrChart, PositionChart, TrafficChart } from "./seo-charts";
 
 export { action, headers, loader } from "./seo.server";
@@ -9,6 +9,9 @@ export { action, headers, loader } from "./seo.server";
 type Frequency = "high" | "medium" | "low" | "unclassified";
 type Overview = { impressions: number; clicks: number; ctr: number | null; averagePosition: number | null };
 type Page<T> = { items: T[]; nextCursor: string | null };
+type SemanticQuery = { id: string; queryText: string; normalizedQuery: string; targetPath: string | null; origin: string;
+  wordstatFrequency: number | null; frequencyBand: Frequency; status: SeoQueryStatus; kind: SeoQueryKind;
+  priority: number; tracked: boolean; createdAt: string | Date; updatedAt: string | Date };
 export type SeoAdminLoaderData = {
   filters: { range: "7" | "28" | "90" | "custom"; dateFrom: string; dateTo: string; source: SeoSourceId; regionId: string | null; device: SeoDevice | null; frequencyBand: Frequency | null; pagePath: string };
   dashboard: {
@@ -22,6 +25,8 @@ export type SeoAdminLoaderData = {
     availableRegions: Array<{ id: string; source: SeoSourceId; code: string; displayName: string; externalId: string | null; active: boolean }>;
   };
   previousOverview: Overview;
+  semanticCore: Page<SemanticQuery>;
+  candidates: Page<SemanticQuery>;
   queries: Page<{ id: string; queryText: string; targetPath: string | null; frequencyBand: Frequency; impressions: number; clicks: number; ctr: number | null; averagePosition: number | null }>;
   movers: Array<{ queryText: string; delta: number; averagePosition: number }>;
   rankChecks: Page<{ id: string; queryText: string; targetPath: string | null; frequencyBand: Frequency; regionName: string; regionCode: string; device: SeoDevice; status: "found" | "not_found"; position: number | null; previousPosition: number | null; delta: number | null; resultUrl: string | null; resultLimit: number; checkDate: string; checkedAt: string | Date }>;
@@ -31,6 +36,9 @@ export type SeoAdminLoaderData = {
 
 const integer = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
+const frequencyLabels: Record<Frequency, string> = { high: "ВЧ", medium: "СЧ", low: "НЧ", unclassified: "Не классифицирован" };
+const kindLabels: Record<SeoQueryKind, string> = { commercial: "Коммерческий", informational: "Информационный", other: "Другой" };
+const statusLabels: Record<SeoQueryStatus, string> = { candidate: "Кандидат", active: "Активен", archived: "Архив" };
 
 export function meta() { return [{ title: "SEO-мониторинг | KorDevTeam" }]; }
 
@@ -69,6 +77,24 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   return <section className="rounded-xl border border-border bg-card p-5"><h2 className="text-xl font-semibold">{title}</h2><div className="mt-4">{children}</div></section>;
 }
 
+function SemanticQueryForm({ query, csrfToken }: { query: SemanticQuery; csrfToken: string }) {
+  return <Form method="post" className="grid min-w-[760px] grid-cols-[minmax(170px,1fr)_110px_110px_150px_90px_130px_auto] gap-2">
+    <input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="intent" value="update-query" />
+    <input type="hidden" name="id" value={query.id} /><input type="hidden" name="expectedUpdatedAt" value={new Date(query.updatedAt).toISOString()} />
+    <input name="targetPath" defaultValue={query.targetPath ?? ""} placeholder="/целевая-страница/" className="rounded border border-input bg-background px-2 py-1" />
+    <input name="wordstatFrequency" type="number" min="0" defaultValue={query.wordstatFrequency ?? ""} placeholder="Wordstat" className="rounded border border-input bg-background px-2 py-1" />
+    <select name="frequencyBand" defaultValue={query.frequencyBand} className="rounded border border-input bg-background px-2"><option value="high">ВЧ</option><option value="medium">СЧ</option><option value="low">НЧ</option><option value="unclassified">—</option></select>
+    <select name="kind" defaultValue={query.kind} className="rounded border border-input bg-background px-2"><option value="commercial">Коммерческий</option><option value="informational">Информационный</option><option value="other">Другой</option></select>
+    <input name="priority" type="number" min="0" max="1000" defaultValue={query.priority} aria-label="Приоритет" className="rounded border border-input bg-background px-2 py-1" />
+    <select name="status" defaultValue={query.status} className="rounded border border-input bg-background px-2"><option value="candidate">Кандидат</option><option value="active">Активен</option><option value="archived">Архив</option></select>
+    <button className="rounded bg-primary px-3 py-1 text-primary-foreground">Сохранить</button>
+  </Form>;
+}
+
+function SemanticQueryTable({ queries, csrfToken }: { queries: SemanticQuery[]; csrfToken: string }) {
+  return queries.length ? <div className="overflow-x-auto"><table className="min-w-[1050px] text-left text-sm"><thead><tr><th className="p-2">Ключевой запрос</th><th className="p-2">Параметры</th><th className="p-2">Настройка</th></tr></thead><tbody>{queries.map((query) => <tr key={query.id} className="border-t border-border"><td className="p-2 align-top"><p className="font-medium">{query.queryText}</p><p className="mt-1 text-xs text-muted-foreground">{statusLabels[query.status]} · {kindLabels[query.kind]} · {frequencyLabels[query.frequencyBand]} · Wordstat: {query.wordstatFrequency === null ? "—" : integer.format(query.wordstatFrequency)}</p></td><td className="p-2 align-top"><p>{query.targetPath ?? "Целевая страница не назначена"}</p><p className="mt-1 text-xs text-muted-foreground">Приоритет: {query.priority}</p></td><td className="p-2"><SemanticQueryForm query={query} csrfToken={csrfToken} /></td></tr>)}</tbody></table></div> : <p className="text-muted-foreground">Запросов пока нет.</p>;
+}
+
 export function AdminSeoDashboard({ data, csrfToken }: { data: SeoAdminLoaderData; csrfToken: string }) {
   const { filters, dashboard } = data;
   const yandex = filters.source === "yandex_webmaster";
@@ -101,9 +127,16 @@ export function AdminSeoDashboard({ data, csrfToken }: { data: SeoAdminLoaderDat
       <div className="grid gap-6 xl:grid-cols-2"><Panel title="Диапазоны позиций"><BreakdownChart data={dashboard.positionBuckets} dataKey="count" /></Panel>{yandex ? <Panel title="Регионы Яндекса"><BreakdownChart data={dashboard.regions} /></Panel> : null}<Panel title="Устройства"><BreakdownChart data={dashboard.devices} /></Panel><Panel title="Частотность"><BreakdownChart data={dashboard.frequencies} /></Panel></div>
     </>}
 
+    <Panel title="Семантическое ядро"><p className="mb-4 text-sm text-muted-foreground">Утверждённые ключевые запросы сайта видны здесь ещё до первых показов. Активные запросы участвуют в ежедневном контроле позиций, архивные сохраняют историю.</p><SemanticQueryTable queries={data.semanticCore.items} csrfToken={csrfToken} /></Panel>
+
+    <Panel title="Кандидаты"><p className="mb-4 text-sm text-muted-foreground">Кандидат не включён в ежедневный контроль, пока вы не переведёте его в статус «Активен».</p>
+      <Form method="post" className="mb-5 grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.5fr)_minmax(180px,1fr)_120px_110px_160px_90px_auto]"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="intent" value="create-query" /><input name="queryText" required placeholder="Новый ключевой запрос" className="rounded border border-input bg-background px-2 py-1" /><input name="targetPath" placeholder="/целевая-страница/" className="rounded border border-input bg-background px-2 py-1" /><input name="wordstatFrequency" type="number" min="0" placeholder="Wordstat" className="rounded border border-input bg-background px-2 py-1" /><select name="frequencyBand" defaultValue="unclassified" className="rounded border border-input bg-background px-2"><option value="high">ВЧ</option><option value="medium">СЧ</option><option value="low">НЧ</option><option value="unclassified">—</option></select><select name="kind" defaultValue="other" className="rounded border border-input bg-background px-2"><option value="commercial">Коммерческий</option><option value="informational">Информационный</option><option value="other">Другой</option></select><input name="priority" type="number" min="0" max="1000" defaultValue="0" aria-label="Приоритет нового запроса" className="rounded border border-input bg-background px-2 py-1" /><button className="rounded bg-primary px-3 py-1 text-primary-foreground">Добавить</button></Form>
+      <SemanticQueryTable queries={data.candidates.items} csrfToken={csrfToken} />
+    </Panel>
+
     <Panel title="Движение запросов">{data.movers.length ? <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr><th className="p-2">Запрос</th><th className="p-2">Позиция</th><th className="p-2">Изменение</th></tr></thead><tbody>{data.movers.map((row) => <tr key={row.queryText} className="border-t border-border"><td className="p-2">{row.queryText}</td><td className="p-2">{position(row.averagePosition)}</td><td className="p-2">{row.delta > 0 ? "хуже " : "лучше "}{decimal.format(Math.abs(row.delta))}</td></tr>)}</tbody></table></div> : <p className="text-muted-foreground">Недостаточно двух сопоставимых периодов.</p>}</Panel>
 
-    <Panel title="Все запросы"><div className="overflow-x-auto"><table className="min-w-[900px] text-left text-sm"><thead><tr><th className="p-2">Запрос</th><th className="p-2">Метрики</th><th className="p-2">Целевая страница и частотность</th></tr></thead><tbody>{data.queries.items.map((query) => <tr key={query.id} className="border-t border-border"><td className="p-2 align-top font-medium">{query.queryText}</td><td className="p-2 align-top">Показы: {integer.format(query.impressions)} · Клики: {integer.format(query.clicks)} · CTR: {percent(query.ctr)} · Средняя позиция: {position(query.averagePosition)}</td><td className="p-2"><Form method="post" className="flex min-w-[420px] gap-2"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="intent" value="save-query" /><input type="hidden" name="queryId" value={query.id} /><input name="targetPath" defaultValue={query.targetPath ?? ""} placeholder="/целевая-страница/" className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-1" /><select name="frequencyBand" defaultValue={query.frequencyBand} className="rounded border border-input bg-background px-2"><option value="high">ВЧ</option><option value="medium">СЧ</option><option value="low">НЧ</option><option value="unclassified">—</option></select><button className="underline">Сохранить</button></Form></td></tr>)}</tbody></table></div>{data.queries.nextCursor ? <Link className="mt-4 inline-block underline" to={pageHref(filters, data.queries.nextCursor)}>Следующая страница запросов</Link> : null}</Panel>
+    <Panel title="Фактические запросы"><p className="mb-4 text-sm text-muted-foreground">Запросы, по которым поисковые системы уже зафиксировали показы или клики за выбранный период.</p><div className="overflow-x-auto"><table className="min-w-[900px] text-left text-sm"><thead><tr><th className="p-2">Запрос</th><th className="p-2">Метрики</th><th className="p-2">Целевая страница и частотность</th></tr></thead><tbody>{data.queries.items.map((query) => <tr key={query.id} className="border-t border-border"><td className="p-2 align-top font-medium">{query.queryText}</td><td className="p-2 align-top">Показы: {integer.format(query.impressions)} · Клики: {integer.format(query.clicks)} · CTR: {percent(query.ctr)} · Средняя позиция: {position(query.averagePosition)}</td><td className="p-2"><Form method="post" className="flex min-w-[420px] gap-2"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="intent" value="save-query" /><input type="hidden" name="queryId" value={query.id} /><input name="targetPath" defaultValue={query.targetPath ?? ""} placeholder="/целевая-страница/" className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-1" /><select name="frequencyBand" defaultValue={query.frequencyBand} className="rounded border border-input bg-background px-2"><option value="high">ВЧ</option><option value="medium">СЧ</option><option value="low">НЧ</option><option value="unclassified">—</option></select><button className="underline">Сохранить</button></Form></td></tr>)}</tbody></table></div>{data.queries.nextCursor ? <Link className="mt-4 inline-block underline" to={pageHref(filters, data.queries.nextCursor)}>Следующая страница запросов</Link> : null}</Panel>
 
     {yandex ? <Panel title="Контрольные позиции Яндекса"><p className="mb-4 text-sm text-muted-foreground">Контрольная позиция — место `kordev.team` в органическом топ-100 официального Search API на момент проверки. Она не равна средней позиции по реальным показам.</p>{data.rankChecks.items.length ? <div className="overflow-x-auto"><table className="min-w-[1050px] text-left text-sm"><thead><tr><th className="p-2">Запрос</th><th className="p-2">Регион</th><th className="p-2">Устройство</th><th className="p-2">Контрольная позиция</th><th className="p-2">Изменение</th><th className="p-2">Найденная страница</th><th className="p-2">Проверено</th></tr></thead><tbody>{data.rankChecks.items.map((row) => <tr key={row.id} className="border-t border-border"><td className="p-2 font-medium">{row.queryText}</td><td className="p-2">{row.regionName}</td><td className="p-2">{row.device === "mobile" ? "Смартфон" : "Компьютер"}</td><td className="p-2">{row.status === "found" ? integer.format(row.position!) : `не найден в топ-${row.resultLimit}`}</td><td className="p-2">{rankChange(row.delta)}</td><td className="max-w-[320px] truncate p-2">{row.resultUrl ? <a href={row.resultUrl} className="underline" target="_blank" rel="noreferrer">{new URL(row.resultUrl).pathname}</a> : "—"}</td><td className="p-2">{date(row.checkDate)}</td></tr>)}</tbody></table></div> : <p className="text-muted-foreground">Контрольных проверок за выбранный период пока нет.</p>}</Panel> : null}
 

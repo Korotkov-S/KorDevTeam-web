@@ -12,6 +12,7 @@ import { createSeoAdminAction, createSeoAdminLoader } from "./seo.server";
 const adminId = "00000000-0000-4000-8000-000000000001";
 const queryId = "00000000-0000-4000-8000-000000000002";
 const recommendationId = "00000000-0000-4000-8000-000000000003";
+const candidateId = "00000000-0000-4000-8000-000000000005";
 const csrf = "b".repeat(43);
 const principal = { userId: adminId, login: "owner", sessionId: queryId, csrfToken: csrf, expiresAt: new Date("2026-09-26") };
 const auth = { authenticate: async () => principal };
@@ -33,6 +34,14 @@ const data: SeoAdminLoaderData = {
   filters: { range: "28", dateFrom: "2026-08-29", dateTo: "2026-09-25", source: "yandex_webmaster", regionId: null, device: null, frequencyBand: null, pagePath: "" },
   dashboard,
   previousOverview: { impressions: 1000, clicks: 60, ctr: 0.06, averagePosition: 9.2 },
+  semanticCore: { items: [{ id: queryId, queryText: "автоматизация бизнес процессов", normalizedQuery: "автоматизация бизнес процессов",
+    targetPath: "/services/business-process-automation/", origin: "import", wordstatFrequency: 4311, frequencyBand: "high",
+    status: "active", kind: "commercial", priority: 100, tracked: true,
+    createdAt: "2026-09-26T07:00:00.000Z", updatedAt: "2026-09-26T07:00:00.000Z" }], nextCursor: null },
+  candidates: { items: [{ id: candidateId, queryText: "как автоматизировать отдел продаж", normalizedQuery: "как автоматизировать отдел продаж",
+    targetPath: null, origin: "api", wordstatFrequency: null, frequencyBand: "unclassified",
+    status: "candidate", kind: "other", priority: 0, tracked: false,
+    createdAt: "2026-09-26T07:05:00.000Z", updatedAt: "2026-09-26T07:05:00.000Z" }], nextCursor: null },
   queries: { items: [{ id: queryId, queryText: "внедрение crm", targetPath: "/services/crm/", frequencyBand: "high", impressions: 1000, clicks: 80, ctr: 0.08, averagePosition: 6.4 }], nextCursor: null },
   movers: [{ queryText: "внедрение crm", delta: -2.8, averagePosition: 6.4 }],
   rankChecks: { items: [
@@ -48,6 +57,9 @@ function service() {
     async getDashboard() { return dashboard; },
     async getOverview() { return dashboard.overview; },
     async listQueries() { return data.queries; },
+    async listSemanticCore(input: { status?: string }) { return input.status === "candidate" ? data.candidates : data.semanticCore; },
+    async createCandidate() { return {}; },
+    async updateSemanticQuery() { return {}; },
     async listChanges() { return data.changes; },
     async listRecommendations() { return data.recommendations; },
     async listRankChecks() { return data.rankChecks; },
@@ -83,6 +95,8 @@ test("SEO loader redirects unauthenticated users and accepts bounded shared filt
   assert.equal(body.filters.range, "90");
   assert.equal(body.filters.source, "google_search_console");
   assert.equal(body.filters.regionId, null);
+  assert.equal(body.semanticCore.items[0].queryText, "автоматизация бизнес процессов");
+  assert.equal(body.candidates.items[0].status, "candidate");
   assert.equal(response.headers.get("Cache-Control"), "no-store");
   assert.doesNotMatch(JSON.stringify(body), /oauth|private.?key|secret/iu);
 });
@@ -114,10 +128,48 @@ test("SEO mutations require same origin and CSRF and map unexpected errors safel
   assert.doesNotMatch(await unavailable.text(), /SQL|password|secret/u);
 });
 
-test("dashboard renders all decision sections, reversed position chart, gaps, and wide tables", () => {
+test("SEO admin creates candidates and updates lifecycle fields with optimistic locking", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const actions = {
+    ...service(),
+    async createCandidate(command: unknown) { calls.push(["create", command]); return {}; },
+    async updateSemanticQuery(command: unknown) { calls.push(["update", command]); return {}; },
+  };
+  const action = createSeoAdminAction(auth, actions, config);
+  const create = new FormData();
+  create.set("_csrf", csrf); create.set("intent", "create-query"); create.set("queryText", "Новый ключ");
+  create.set("targetPath", "/services/crm-development/"); create.set("wordstatFrequency", "25");
+  create.set("frequencyBand", "low"); create.set("kind", "commercial"); create.set("priority", "100");
+  assert.equal((await action({ request: request("/admin/seo/", create), params: {}, context: {} })).status, 200);
+  assert.deepEqual(calls[0], ["create", { queryText: "Новый ключ", targetPath: "/services/crm-development/",
+    wordstatFrequency: 25, frequencyBand: "low", kind: "commercial", priority: 100 }]);
+
+  const update = new FormData();
+  update.set("_csrf", csrf); update.set("intent", "update-query"); update.set("id", candidateId);
+  update.set("expectedUpdatedAt", "2026-09-26T07:05:00.000Z"); update.set("targetPath", "/blog/crm-implementation/");
+  update.set("wordstatFrequency", "1159"); update.set("frequencyBand", "high"); update.set("kind", "informational");
+  update.set("priority", "50"); update.set("status", "active");
+  assert.equal((await action({ request: request("/admin/seo/", update), params: {}, context: {} })).status, 200);
+  assert.deepEqual(calls[1], ["update", { id: candidateId, expectedUpdatedAt: "2026-09-26T07:05:00.000Z",
+    targetPath: "/blog/crm-implementation/", wordstatFrequency: 1159, frequencyBand: "high",
+    kind: "informational", priority: 50, status: "active" }]);
+
+  const conflict = createSeoAdminAction(auth, { ...actions, async updateSemanticQuery() { throw new Error("seo_query_conflict"); } }, config);
+  assert.equal((await conflict({ request: request("/admin/seo/", update), params: {}, context: {} })).status, 409);
+});
+
+test("dashboard renders semantic core, candidates, factual queries, and all decision sections", () => {
   const withGap = { ...data, queries: { ...data.queries, nextCursor: "50" }, dashboard: { ...data.dashboard, daily: [...data.dashboard.daily, { date: "2026-09-24", impressions: 0, clicks: 0, ctr: null, averagePosition: null }] } };
   const html = renderDashboard(withGap);
-  for (const label of ["SEO-мониторинг", "Показы и клики", "CTR", "Средняя позиция", "Диапазоны позиций", "Регионы Яндекса", "Устройства", "Частотность", "Движение запросов", "Все запросы", "Контрольные позиции Яндекса", "Изменения", "Рекомендации"]) assert.match(html, new RegExp(label, "u"));
+  for (const label of ["SEO-мониторинг", "Показы и клики", "CTR", "Средняя позиция", "Диапазоны позиций", "Регионы Яндекса", "Устройства", "Частотность", "Движение запросов", "Семантическое ядро", "Кандидаты", "Фактические запросы", "Контрольные позиции Яндекса", "Изменения", "Рекомендации"]) assert.match(html, new RegExp(label, "u"));
+  assert.match(html, /автоматизация бизнес процессов/u);
+  assert.match(html, /4[\s ]?311/u);
+  assert.match(html, /Коммерческий/u);
+  assert.match(html, /Активен/u);
+  assert.match(html, /как автоматизировать отдел продаж/u);
+  assert.match(html, /не включён в ежедневный контроль/u);
+  assert.match(html, /name="expectedUpdatedAt"/u);
+  assert.match(html, /name="status"/u);
   assert.match(html, /data-position-domain="reversed"/u);
   assert.match(html, /data-chart-gaps="preserved"/u);
   assert.match(html, /overflow-x-auto/u);
