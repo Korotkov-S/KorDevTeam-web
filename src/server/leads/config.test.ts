@@ -38,6 +38,11 @@ test("reads structurally valid production configuration without exposing values"
   assert.doesNotThrow(() => assertLeadWebConfig(productionEnvironment));
 });
 
+test("accepts provider-managed encryption for S3-compatible private storage", () => {
+  const web = readLeadWebConfig({ ...productionEnvironment, LEAD_S3_SSE: "provider" });
+  assert.equal(web.s3.serverSideEncryption, "provider");
+});
+
 test("rejects incomplete or unsafe lead configuration with stable errors", () => {
   const missingHash = { ...productionEnvironment, LEAD_HASH_KEY: "" };
   const shortHash = { ...productionEnvironment, LEAD_HASH_KEY: Buffer.alloc(31).toString("base64") };

@@ -5,7 +5,7 @@ export type LeadS3Config = {
   accessKeyId: string;
   secretAccessKey: string;
   prefix: string;
-  serverSideEncryption: "AES256";
+  serverSideEncryption: "AES256" | "provider";
 };
 
 export type LeadWebConfig = {
@@ -61,7 +61,7 @@ function base64Key(environment: LeadEnvironment): string {
 export function readLeadWebConfig(environment: LeadEnvironment): LeadWebConfig {
   const endpoint = httpsUrl(required(environment, "LEAD_S3_ENDPOINT"));
   const serverSideEncryption = required(environment, "LEAD_S3_SSE");
-  if (serverSideEncryption !== "AES256") configError();
+  if (serverSideEncryption !== "AES256" && serverSideEncryption !== "provider") configError();
   return {
     consentVersion: required(environment, "LEAD_CONSENT_VERSION"),
     hashKey: base64Key(environment),

@@ -32,7 +32,7 @@ SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASSWORD SMTP_FROM
 LEAD_EMAIL_TO WORKER_IMAGE CLAMAV_IMAGE
 ```
 
-`WORKER_IMAGE` должен совпадать с активным неизменяемым web-образом; `CLAMAV_IMAGE` принимается только как digest `@sha256:<64 hex>`. Приватные `LEAD_S3_*` не совпадают с публичными `S3_*`: бакет вложений закрыт от anonymous/public access, endpoint Timeweb — `https://s3.twcstorage.ru`, серверное шифрование — `AES256`. Настройте lifecycle как дополнительную защиту, но штатное удаление копий выполняет приложение.
+`WORKER_IMAGE` должен совпадать с активным неизменяемым web-образом; `CLAMAV_IMAGE` принимается только как digest `@sha256:<64 hex>`. Приватный `LEAD_S3_BUCKET` не совпадает с публичным media-бакетом и закрыт от anonymous/public access. Для Timeweb задайте endpoint `https://s3.twcstorage.ru` и `LEAD_S3_SSE=provider`: сервис отклоняет AWS-заголовок SSE-S3, поэтому приложение не отправляет его. `AES256` используйте только с S3-реализацией, которая принимает этот заголовок. Настройте lifecycle как дополнительную защиту, но штатное удаление копий выполняет приложение.
 
 `LEAD_TEMP_ROOT` имеет единственное допустимое значение `/tmp/kordev-leads`. Worker и оба web-слота работают с read-only root filesystem. Compose монтирует в lead temp root отдельный ограниченный 96 MiB tmpfs с uid 1000 и mode 0700, сохраняя отдельный общий `/tmp` mode-1777. `scripts/validate-runtime-compose.sh` и container entrypoint отклоняют другой путь или неверные owner/mode.
 

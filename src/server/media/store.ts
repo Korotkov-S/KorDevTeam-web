@@ -104,7 +104,7 @@ export function createPublicMediaStore(
           Body: bytes,
           ContentType: mimeType,
           CacheControl: "private, no-store",
-          ServerSideEncryption: config.serverSideEncryption,
+          ...(config.serverSideEncryption === "AES256" ? { ServerSideEncryption: "AES256" as const } : {}),
         }), { abortSignal: signal() });
         return key;
       } catch { throw storageError(); }
@@ -124,7 +124,7 @@ export function createPublicMediaStore(
           Body: bytes,
           ContentType: mimeType,
           CacheControl: "public, max-age=31536000, immutable",
-          ServerSideEncryption: config.serverSideEncryption,
+          ...(config.serverSideEncryption === "AES256" ? { ServerSideEncryption: "AES256" as const } : {}),
           Metadata: { sha256: checksum },
           IfNoneMatch: "*",
         }), { abortSignal: signal() });

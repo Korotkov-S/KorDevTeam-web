@@ -32,6 +32,18 @@ test("put streams the file with private cache and encryption, without public ACL
   await store.putFile({ objectKey: "intake/private/random", path, contentType: "application/pdf" });
 });
 
+test("omits the unsupported SSE header when private storage manages encryption", async t => {
+  const path = join(await root(t), "input"); await writeFile(path, "private bytes");
+  const store = createPrivateAttachmentStore({ ...config, serverSideEncryption: "provider" }, client(async command => {
+    assert.ok(command instanceof PutObjectCommand);
+    assert.equal(command.input.ServerSideEncryption, undefined);
+    for await (const _chunk of command.input.Body as Readable) { /* consume stream */ }
+    return {};
+  }));
+
+  await store.putFile({ objectKey: "intake/private/random", path, contentType: "application/pdf" });
+});
+
 test("materialize uses random 0600 files and an idempotent disposer", async t => {
   const tempRoot = await root(t);
   const store = createPrivateAttachmentStore(config, client(async command => {

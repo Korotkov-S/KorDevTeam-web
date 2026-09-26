@@ -141,7 +141,8 @@ export function createPrivateAttachmentStore(
       try {
         await client.send(new PutObjectCommand({
           Bucket: config.bucket, Key: objectKey, Body: body, ContentType: contentType,
-          CacheControl: "private, no-store", ServerSideEncryption: config.serverSideEncryption,
+          CacheControl: "private, no-store",
+          ...(config.serverSideEncryption === "AES256" ? { ServerSideEncryption: "AES256" as const } : {}),
         }), { abortSignal: operation.signal });
         if (readError) throw readError;
       } catch (error) { throw storageError(error); }

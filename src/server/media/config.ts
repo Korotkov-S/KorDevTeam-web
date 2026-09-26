@@ -6,7 +6,7 @@ export type PublicMediaConfig = {
   secretAccessKey: string;
   prefix: string;
   publicBaseUrl: URL;
-  serverSideEncryption: "AES256";
+  serverSideEncryption: "AES256" | "provider";
 };
 
 type MediaEnvironment = Readonly<Record<string, string | undefined>>;
@@ -34,7 +34,7 @@ export function readPublicMediaConfig(environment: MediaEnvironment): PublicMedi
   const prefix = required(environment, "PUBLIC_MEDIA_S3_PREFIX");
   if (!/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/.test(prefix)) configError();
   const serverSideEncryption = required(environment, "PUBLIC_MEDIA_S3_SSE");
-  if (serverSideEncryption !== "AES256") configError();
+  if (serverSideEncryption !== "AES256" && serverSideEncryption !== "provider") configError();
   return {
     endpoint: httpsUrl(required(environment, "PUBLIC_MEDIA_S3_ENDPOINT"), false),
     region: required(environment, "PUBLIC_MEDIA_S3_REGION"),

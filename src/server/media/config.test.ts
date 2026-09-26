@@ -22,6 +22,11 @@ test("reads a strict public media configuration", () => {
   assert.equal(config.serverSideEncryption, "AES256");
 });
 
+test("accepts provider-managed encryption for S3-compatible storage", () => {
+  const config = readPublicMediaConfig({ ...environment, PUBLIC_MEDIA_S3_SSE: "provider" });
+  assert.equal(config.serverSideEncryption, "provider");
+});
+
 test("rejects unsafe endpoint, base URL, prefix and encryption", () => {
   for (const patch of [
     { PUBLIC_MEDIA_S3_ENDPOINT: "http://s3.twcstorage.ru" },

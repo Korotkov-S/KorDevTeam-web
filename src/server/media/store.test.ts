@@ -43,6 +43,20 @@ test("stores temporary objects privately and final objects immutably", async () 
   assert.equal(puts[1].input.Metadata?.sha256, "a".repeat(64));
 });
 
+test("omits the unsupported SSE header when storage manages encryption", async () => {
+  const commands: PutObjectCommand[] = [];
+  const client = { async send(command: unknown) {
+    if (command instanceof PutObjectCommand) commands.push(command);
+    return {};
+  } };
+  const store = createPublicMediaStore({ ...config, serverSideEncryption: "provider" }, client, { randomId: () => "upload-id" });
+
+  await store.putTemporary(Buffer.from("source"), "image/png");
+
+  assert.equal(commands.length, 1);
+  assert.equal(commands[0].input.ServerSideEncryption, undefined);
+});
+
 test("reuses a matching final object and rejects foreign keys", async () => {
   const commands: unknown[] = [];
   const client = { async send(command: unknown) {
