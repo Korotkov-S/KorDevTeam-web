@@ -389,4 +389,3 @@ Keep 09:00 Europe/Moscow. Make it collect first, then analyze fresh official dat
 - [ ] **Step 8: Final report**
 
 Report the deployed commit/image, curated active/candidate counts, planned daily rank-check count, source freshness, verification commands, and any remaining data-latency limitation.
-
