@@ -12,7 +12,7 @@ import {
   seoRegions,
   seoSources,
 } from "../db/schema";
-import type { NormalizedRankCheck, NormalizedSeoObservation, SeoDevice, SeoSourceId } from "./contracts";
+import type { NormalizedRankCheck, NormalizedSeoObservation, SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "./contracts";
 import type { SemanticCoreEntry } from "./semanticCore";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
@@ -247,14 +247,18 @@ export function createSeoRepository(db: SeoDatabase) {
         let stored = 0;
         for (const observation of observations) {
           const now = new Date();
-          const [query] = await tx.insert(seoQueries).values({
+          const [changedQuery] = await tx.insert(seoQueries).values({
             queryText: observation.queryText,
             normalizedQuery: observation.normalizedQuery,
             origin: "api",
           }).onConflictDoUpdate({
             target: seoQueries.normalizedQuery,
             set: { queryText: observation.queryText, updatedAt: now },
+            setWhere: and(eq(seoQueries.origin, "api"), eq(seoQueries.status, "candidate")),
           }).returning();
+          const query = changedQuery ?? (await tx.select().from(seoQueries)
+            .where(eq(seoQueries.normalizedQuery, observation.normalizedQuery)).limit(1))[0];
+          if (!query) throw new Error("seo_query_not_found");
           const region = await regionFor(tx, observation);
           await tx.insert(seoDailyMetrics).values({
             observationDate: observation.observationDate,
@@ -341,6 +345,72 @@ export function createSeoRepository(db: SeoDatabase) {
         items: items.slice(offset, offset + page.limit),
         nextCursor: items.length > offset + page.limit ? String(offset + page.limit) : null,
       };
+    },
+
+    async listSemanticCore(filters: { status?: SeoQueryStatus; kind?: SeoQueryKind }, page: { limit: number; cursor: string | null }) {
+      const offset = cursorOffset(page.cursor);
+      const conditions = [];
+      if (filters.status) conditions.push(eq(seoQueries.status, filters.status));
+      if (filters.kind) conditions.push(eq(seoQueries.kind, filters.kind));
+      const rows = await db.select().from(seoQueries).where(and(...conditions))
+        .orderBy(
+          sql`case ${seoQueries.status} when 'active' then 0 when 'candidate' then 1 else 2 end`,
+          desc(seoQueries.priority),
+          asc(seoQueries.queryText),
+          asc(seoQueries.id),
+        )
+        .limit(page.limit + 1)
+        .offset(offset);
+      return {
+        items: rows.slice(0, page.limit),
+        nextCursor: rows.length > page.limit ? String(offset + page.limit) : null,
+      };
+    },
+
+    async createCandidate(command: {
+      queryText: string;
+      normalizedQuery: string;
+      targetPath: string | null;
+      wordstatFrequency: number | null;
+      frequencyBand: FrequencyBand;
+      kind: SeoQueryKind;
+      priority: number;
+    }) {
+      return db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'seo-query:' + command.normalizedQuery}))`);
+        const [existing] = await tx.select({ id: seoQueries.id }).from(seoQueries)
+          .where(eq(seoQueries.normalizedQuery, command.normalizedQuery)).limit(1);
+        if (existing) throw new Error("seo_query_exists");
+        const [created] = await tx.insert(seoQueries).values({
+          ...command,
+          origin: "manual",
+          status: "candidate",
+          tracked: false,
+        }).returning();
+        return created;
+      });
+    },
+
+    async updateSemanticQuery(id: string, expectedUpdatedAt: Date, command: {
+      targetPath: string | null;
+      wordstatFrequency: number | null;
+      frequencyBand: FrequencyBand;
+      kind: SeoQueryKind;
+      priority: number;
+      status: SeoQueryStatus;
+    }) {
+      const [updated] = await db.update(seoQueries).set({
+        ...command,
+        tracked: command.status === "active",
+        updatedAt: new Date(Math.max(Date.now(), expectedUpdatedAt.getTime() + 1)),
+      }).where(and(
+        eq(seoQueries.id, id),
+        sql`date_trunc('milliseconds', ${seoQueries.updatedAt}) = ${expectedUpdatedAt}`,
+      )).returning();
+      if (updated) return updated;
+      const [existing] = await db.select({ id: seoQueries.id }).from(seoQueries).where(eq(seoQueries.id, id)).limit(1);
+      if (!existing) throw new Error("seo_query_not_found");
+      throw new Error("seo_query_conflict");
     },
 
     async listQueries(filters: SeoMetricFilters, page: { limit: number; cursor: string | null }) {

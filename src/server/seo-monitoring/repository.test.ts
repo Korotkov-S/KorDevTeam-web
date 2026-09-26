@@ -267,3 +267,93 @@ databaseTest("semantic core sync inserts new rows, promotes API candidates, and 
   assert.equal(rows.find((row) => row.normalizedQuery === "импортированный запрос")?.targetPath, "/edited-after-import/");
   assert.equal(rows.find((row) => row.normalizedQuery === "новый запрос")?.status, "active");
 });
+
+databaseTest("semantic core listing includes zero-observation rows and separates active queries from candidates", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await db.insert(seoQueries).values([
+    { queryText: "Коммерческий ключ", normalizedQuery: "коммерческий ключ", origin: "manual",
+      status: "active", tracked: true, kind: "commercial", priority: 100 },
+    { queryText: "Информационный ключ", normalizedQuery: "информационный ключ", origin: "import",
+      status: "active", tracked: true, kind: "informational", priority: 50 },
+    { queryText: "Новый кандидат", normalizedQuery: "новый кандидат", origin: "api",
+      status: "candidate", tracked: false, kind: "other", priority: 0 },
+  ]);
+
+  const active = await repository.listSemanticCore({ status: "active" }, { limit: 10, cursor: null });
+  const candidates = await repository.listSemanticCore({ status: "candidate" }, { limit: 10, cursor: null });
+
+  assert.deepEqual(active.items.map((row) => row.queryText), ["Коммерческий ключ", "Информационный ключ"]);
+  assert.equal(active.items.every((row) => row.wordstatFrequency === null), true);
+  assert.deepEqual(candidates.items.map((row) => row.queryText), ["Новый кандидат"]);
+  await assert.rejects(repository.listSemanticCore({}, { limit: 10, cursor: "-1" }), { message: "seo_cursor_invalid" });
+});
+
+databaseTest("API observations create candidates and preserve an existing active query classification", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await repository.upsertObservations([observation]);
+  const [candidate] = await db.select().from(seoQueries).where(eq(seoQueries.normalizedQuery, "внедрение crm"));
+  assert.deepEqual({ status: candidate.status, tracked: candidate.tracked, origin: candidate.origin }, {
+    status: "candidate", tracked: false, origin: "api",
+  });
+
+  await db.update(seoQueries).set({ origin: "manual", status: "active", tracked: true,
+    queryText: "Внедрение CRM", targetPath: "/approved/", frequencyBand: "high", kind: "commercial", priority: 100 })
+    .where(eq(seoQueries.id, candidate.id));
+  const [approved] = await db.select().from(seoQueries).where(eq(seoQueries.id, candidate.id));
+  await repository.upsertObservations([{ ...observation, queryText: "ВНЕДРЕНИЕ CRM" }]);
+  const [preserved] = await db.select().from(seoQueries).where(eq(seoQueries.id, candidate.id));
+  assert.deepEqual({ queryText: preserved.queryText, targetPath: preserved.targetPath, frequencyBand: preserved.frequencyBand,
+    kind: preserved.kind, priority: preserved.priority, status: preserved.status, tracked: preserved.tracked }, {
+    queryText: "Внедрение CRM", targetPath: "/approved/", frequencyBand: "high", kind: "commercial", priority: 100,
+    status: "active", tracked: true,
+  });
+  assert.equal(preserved.updatedAt.getTime(), approved.updatedAt.getTime());
+});
+
+databaseTest("candidate creation is unique and semantic updates use optimistic timestamps", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  const created = await repository.createCandidate({
+    queryText: "Новая фраза",
+    normalizedQuery: "новая фраза",
+    targetPath: "/blog/new/",
+    wordstatFrequency: 10,
+    frequencyBand: "low",
+    kind: "informational",
+    priority: 5,
+  });
+  await assert.rejects(repository.createCandidate({
+    queryText: "Новая фраза",
+    normalizedQuery: "новая фраза",
+    targetPath: null,
+    wordstatFrequency: null,
+    frequencyBand: "unclassified",
+    kind: "other",
+    priority: 0,
+  }), { message: "seo_query_exists" });
+
+  const updated = await repository.updateSemanticQuery(created.id, created.updatedAt, {
+    targetPath: "/services/crm-development/",
+    wordstatFrequency: 573,
+    frequencyBand: "high",
+    kind: "commercial",
+    priority: 100,
+    status: "active",
+  });
+  assert.deepEqual({ status: updated.status, tracked: updated.tracked, targetPath: updated.targetPath }, {
+    status: "active", tracked: true, targetPath: "/services/crm-development/",
+  });
+  await assert.rejects(repository.updateSemanticQuery(created.id, created.updatedAt, {
+    targetPath: null,
+    wordstatFrequency: null,
+    frequencyBand: "unclassified",
+    kind: "other",
+    priority: 0,
+    status: "archived",
+  }), { message: "seo_query_conflict" });
+});

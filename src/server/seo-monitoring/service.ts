@@ -3,8 +3,8 @@ import type {
   seoQueries,
   seoRecommendations,
 } from "../db/schema";
-import type { SeoDevice, SeoSourceId } from "./contracts";
-import { normalizeSitePath } from "./normalization";
+import { SEO_QUERY_KINDS, SEO_QUERY_STATUSES, type SeoDevice, type SeoQueryKind, type SeoQueryStatus, type SeoSourceId } from "./contracts";
+import { normalizeSeoQuery, normalizeSitePath } from "./normalization";
 import type { SeoMetricFilters, SeoRepository } from "./repository";
 
 type FrequencyBand = typeof seoQueries.$inferSelect.frequencyBand;
@@ -17,6 +17,8 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const sources = new Set<SeoSourceId>(["yandex_webmaster", "google_search_console"]);
 const devices = new Set<SeoDevice>(["desktop", "mobile", "tablet", "all"]);
 const frequencyBands = new Set<FrequencyBand>(["high", "medium", "low", "unclassified"]);
+const queryStatuses = new Set<SeoQueryStatus>(SEO_QUERY_STATUSES);
+const queryKinds = new Set<SeoQueryKind>(SEO_QUERY_KINDS);
 const changeTypes = new Set<ChangeType>(["content", "metadata", "structure", "interlinking", "technical", "other"]);
 const recommendationConfidence = new Set<RecommendationConfidence>(["low", "medium", "high"]);
 const recommendationStatuses = new Set<RecommendationStatus>(["new", "accepted", "rejected", "implemented", "dismissed"]);
@@ -71,6 +73,18 @@ function boundedText(value: string, maximum: number, code: string): string {
   return normalized;
 }
 
+function optionalInteger(value: number | null | undefined, maximum: number, code: string): number | null {
+  if (value === undefined || value === null) return null;
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) throw new Error(code);
+  return value;
+}
+
+function instant(value: string): Date {
+  const parsed = new Date(value);
+  if (!value || Number.isNaN(+parsed)) throw new Error("seo_query_updated_at_invalid");
+  return parsed;
+}
+
 export function createSeoService(repository: SeoRepository) {
   return {
     getOverview(input: SeoMetricFilters) {
@@ -83,6 +97,66 @@ export function createSeoService(repository: SeoRepository) {
 
     listQueries(input: { filters: SeoMetricFilters; limit?: number; cursor?: string | null }) {
       return repository.listQueries(filters(input.filters), page(input));
+    },
+
+    listSemanticCore(input: { status?: SeoQueryStatus; kind?: SeoQueryKind; limit?: number; cursor?: string | null }) {
+      if (input.status && !queryStatuses.has(input.status)) throw new Error("seo_query_status_invalid");
+      if (input.kind && !queryKinds.has(input.kind)) throw new Error("seo_query_kind_invalid");
+      return repository.listSemanticCore({
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.kind ? { kind: input.kind } : {}),
+      }, page(input));
+    },
+
+    createCandidate(command: {
+      queryText: string;
+      targetPath?: string | null;
+      wordstatFrequency?: number | null;
+      frequencyBand?: FrequencyBand;
+      kind?: SeoQueryKind;
+      priority?: number;
+    }) {
+      const queryText = boundedText(command.queryText, 500, "seo_query_text_invalid");
+      const frequencyBand = command.frequencyBand ?? "unclassified";
+      const kind = command.kind ?? "other";
+      if (!frequencyBands.has(frequencyBand)) throw new Error("seo_frequency_band_invalid");
+      if (!queryKinds.has(kind)) throw new Error("seo_query_kind_invalid");
+      return repository.createCandidate({
+        queryText,
+        normalizedQuery: normalizeSeoQuery(queryText),
+        targetPath: command.targetPath ? normalizeSitePath(command.targetPath) : null,
+        wordstatFrequency: optionalInteger(command.wordstatFrequency, Number.MAX_SAFE_INTEGER, "seo_wordstat_frequency_invalid"),
+        frequencyBand,
+        kind,
+        priority: optionalInteger(command.priority ?? 0, 1_000, "seo_query_priority_invalid")!,
+      });
+    },
+
+    updateSemanticQuery(command: {
+      id: string;
+      expectedUpdatedAt: string;
+      targetPath: string | null;
+      wordstatFrequency: number | null;
+      frequencyBand: FrequencyBand;
+      kind: SeoQueryKind;
+      priority: number;
+      status: SeoQueryStatus;
+    }) {
+      if (!frequencyBands.has(command.frequencyBand)) throw new Error("seo_frequency_band_invalid");
+      if (!queryKinds.has(command.kind)) throw new Error("seo_query_kind_invalid");
+      if (!queryStatuses.has(command.status)) throw new Error("seo_query_status_invalid");
+      return repository.updateSemanticQuery(
+        uuid(command.id, "seo_query_invalid"),
+        instant(command.expectedUpdatedAt),
+        {
+          targetPath: command.targetPath === null ? null : normalizeSitePath(command.targetPath),
+          wordstatFrequency: optionalInteger(command.wordstatFrequency, Number.MAX_SAFE_INTEGER, "seo_wordstat_frequency_invalid"),
+          frequencyBand: command.frequencyBand,
+          kind: command.kind,
+          priority: optionalInteger(command.priority, 1_000, "seo_query_priority_invalid")!,
+          status: command.status,
+        },
+      );
     },
 
     listRankChecks(input: { filters: SeoMetricFilters; limit?: number; cursor?: string | null }) {

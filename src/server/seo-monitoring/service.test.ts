@@ -14,6 +14,9 @@ function fakeRepository() {
     repository: {
       getOverview: method("getOverview"),
       listQueries: method("listQueries", { items: [], nextCursor: null }),
+      listSemanticCore: method("listSemanticCore", { items: [], nextCursor: null }),
+      createCandidate: method("createCandidate"),
+      updateSemanticQuery: method("updateSemanticQuery"),
       listChanges: method("listChanges", { items: [], nextCursor: null }),
       listRecommendations: method("listRecommendations", { items: [], nextCursor: null }),
       listRankChecks: method("listRankChecks", { items: [], nextCursor: null }),
@@ -72,4 +75,60 @@ test("service binds change actors without allowing ambiguous identities", async 
     summary: "Обновили метаданные",
     type: "metadata",
   }, { ...actor, mcpTokenId: "00000000-0000-4000-8000-000000000002" }), { message: "seo_actor_invalid" });
+});
+
+test("service validates and normalizes semantic-core candidates", async () => {
+  const fake = fakeRepository();
+  const service = createSeoService(fake.repository as never);
+  await service.createCandidate({
+    queryText: "  Внедрение   CRM  ",
+    targetPath: "https://kordev.team/blog/crm-implementation/?utm_source=test",
+    wordstatFrequency: 1159,
+    frequencyBand: "high",
+    kind: "informational",
+    priority: 50,
+  });
+  assert.deepEqual(fake.calls[0], { method: "createCandidate", args: [{
+    queryText: "Внедрение   CRM",
+    normalizedQuery: "внедрение crm",
+    targetPath: "/blog/crm-implementation/",
+    wordstatFrequency: 1159,
+    frequencyBand: "high",
+    kind: "informational",
+    priority: 50,
+  }] });
+
+  for (const command of [
+    { queryText: " ", priority: 0 },
+    { queryText: "x", wordstatFrequency: -1, priority: 0 },
+    { queryText: "x", wordstatFrequency: 1.5, priority: 0 },
+    { queryText: "x", priority: 1001 },
+    { queryText: "x", priority: 0, frequencyBand: "popular" },
+    { queryText: "x", priority: 0, kind: "service" },
+  ]) {
+    assert.throws(() => service.createCandidate(command as never));
+  }
+});
+
+test("service validates semantic-core filters and optimistic updates", async () => {
+  const fake = fakeRepository();
+  const service = createSeoService(fake.repository as never);
+  await service.listSemanticCore({ status: "candidate", kind: "other", limit: 20, cursor: "0" });
+  assert.deepEqual(fake.calls[0], { method: "listSemanticCore", args: [{ status: "candidate", kind: "other" }, { limit: 20, cursor: "0" }] });
+  await service.updateSemanticQuery({
+    id: "00000000-0000-4000-8000-000000000001",
+    expectedUpdatedAt: "2026-09-26T07:00:00.000Z",
+    targetPath: "/services/crm-development/",
+    wordstatFrequency: 573,
+    frequencyBand: "high",
+    kind: "commercial",
+    priority: 100,
+    status: "active",
+  });
+  assert.equal((fake.calls[1].args[1] as Date).toISOString(), "2026-09-26T07:00:00.000Z");
+  assert.throws(() => service.listSemanticCore({ status: "enabled" as never }));
+  assert.throws(() => service.updateSemanticQuery({
+    id: "not-a-uuid", expectedUpdatedAt: "bad", targetPath: null, wordstatFrequency: null,
+    frequencyBand: "unclassified", kind: "other", priority: 0, status: "archived",
+  }));
 });
