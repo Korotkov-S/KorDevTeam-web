@@ -113,7 +113,11 @@ function assertCrmRateLimit(tokenHash: string, rateLimit: number, rateRemaining:
   }
 }
 
-const receiptKeys = ["requestId", "taskId", "taskCode", "taskStatus", "dueDate", "replayed", "rateLimit", "rateRemaining", "messageId"];
+const receiptKeys = [
+  "requestId", "taskId", "taskCode", "taskStatus", "dueDate",
+  "contactId", "contactReused", "dealId", "pipelineId", "stageId", "activityId", "activityDueAt",
+  "replayed", "rateLimit", "rateRemaining", "messageId",
+];
 
 // Adapters provide validated scalar receipts, never vendor bodies or headers.
 function metadataFields(input: Record<string, string>, keys: readonly string[]): Record<string, string> {

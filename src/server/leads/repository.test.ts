@@ -322,13 +322,51 @@ databaseTest("arbitrary vendor and scan metadata never become persisted credenti
   assert.deepEqual((await db.select().from(leadAttachments))[0].scanMetadata, { engine: "ClamAV", result: "clean" });
 });
 
+databaseTest("bounded CRM deal receipt metadata survives the persistence allowlist", async () => {
+  const { db, repository } = await fixture();
+  await repository.accept(command());
+  const jobs = await repository.claimDueJobs("owner", 2, 120_000);
+  const crm = jobs.find((job) => job.channel === "crm");
+  assert.ok(crm);
+  assert.equal(await repository.markDelivered({
+    jobId: crm.id,
+    ownerId: "owner",
+    attemptCount: crm.attemptCount,
+    responseMetadata: {
+      contactId: "72",
+      contactReused: "true",
+      dealId: "915",
+      pipelineId: "12",
+      stageId: "34",
+      activityId: "1502",
+      activityDueAt: "2026-09-15 18:00:00",
+      dealTitle: "Анна",
+      rawBody: "private CRM response",
+    },
+  }), true);
+
+  const [stored] = await db.select({ metadata: leadDeliveryJobs.responseMetadata })
+    .from(leadDeliveryJobs).where(eq(leadDeliveryJobs.id, crm.id));
+  assert.deepEqual(stored.metadata, {
+    contactId: "72",
+    contactReused: "true",
+    dealId: "915",
+    pipelineId: "12",
+    stageId: "34",
+    activityId: "1502",
+    activityDueAt: "2026-09-15 18:00:00",
+  });
+});
+
 databaseTest("escaped receipt fields stay within PostgreSQL's total metadata cap and complete delivery", async () => {
   const { db, repository } = await fixture();
   await repository.accept(command());
   const [job] = await repository.claimDueJobs("owner", 1, 120_000);
   const escapedValue = '"\\'.repeat(127) + "\\";
   const responseMetadata = Object.fromEntries([
-    "requestId", "taskId", "taskCode", "taskStatus", "dueDate", "replayed", "rateLimit", "rateRemaining", "messageId",
+    "requestId", "taskId", "taskCode", "taskStatus", "dueDate",
+    "contactId", "contactReused", "dealId", "pipelineId", "stageId", "activityId", "activityDueAt",
+    "replayed", "rateLimit", "rateRemaining", "messageId",
   ].map((key) => [key, escapedValue]));
 
   assert.equal(await repository.markDelivered({

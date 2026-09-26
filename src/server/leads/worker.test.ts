@@ -190,6 +190,38 @@ test("delivery persists only the bounded receipt projection", async () => {
   assert.ok(f.events.includes(`sync:${"f".repeat(64)}:20:19`));
 });
 
+test("CRM deal delivery persists only bounded contact, deal, and activity identifiers", async () => {
+  const crmJob = job("crm");
+  const f = fixture([crmJob]);
+  f.options.crm = async () => ({
+    requestId: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+    contactId: 72,
+    contactReused: true,
+    dealId: 915,
+    pipelineId: 12,
+    stageId: 34,
+    activityId: 1502,
+    activityDueAt: "2026-09-15 18:00:00",
+    replayed: false,
+    rateLimit: 20,
+    rateRemaining: 19,
+    dealTitle: "Анна",
+    activitySubject: "Связаться по заявке",
+  } as never);
+
+  await runWorkerBatch(f.options);
+
+  const delivery = f.events.find(value => value.startsWith(`delivered:${crmJob.id}:`)) ?? "";
+  assert.match(delivery, /"contactId":"72"/);
+  assert.match(delivery, /"contactReused":"true"/);
+  assert.match(delivery, /"dealId":"915"/);
+  assert.match(delivery, /"pipelineId":"12"/);
+  assert.match(delivery, /"stageId":"34"/);
+  assert.match(delivery, /"activityId":"1502"/);
+  assert.match(delivery, /"activityDueAt":"2026-09-15 18:00:00"/);
+  assert.doesNotMatch(delivery, /Анна|Связаться по заявке/u);
+});
+
 test("claimed jobs start concurrently and renew their leases while providers are in flight", async () => {
   const first = job("crm"), second = job("email");
   const f = fixture([first, second]);

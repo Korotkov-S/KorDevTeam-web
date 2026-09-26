@@ -237,7 +237,11 @@ async function processClaimedJob(job: ClaimedJob, options: WorkerOptions): Promi
       await requireLease(options.repository.markDelivered({
         ...claim,
         ...(receipt.requestId ? { vendorRequestId: receipt.requestId } : {}),
-        responseMetadata: receiptMetadata(receipt, ["requestId", "taskId", "taskCode", "taskStatus", "dueDate", "replayed", "rateLimit", "rateRemaining"]),
+        responseMetadata: receiptMetadata(receipt, [
+          "requestId", "taskId", "taskCode", "taskStatus", "dueDate",
+          "contactId", "contactReused", "dealId", "pipelineId", "stageId", "activityId", "activityDueAt",
+          "replayed", "rateLimit", "rateRemaining",
+        ]),
       }));
     } else {
       let receipt: EmailReceipt;

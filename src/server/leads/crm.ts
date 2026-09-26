@@ -16,28 +16,50 @@ export type DeliveryEnvelope = Readonly<{
   attachment: Readonly<{ path: string; originalName: string; mediaType: string; sha256: string }> | null;
 }>;
 
-export type CrmReceipt = {
+type CrmReceiptBase = {
   requestId: string | null;
-  taskId: number;
-  taskCode: string;
-  taskStatus: string;
-  dueDate: string;
   replayed: boolean;
   rateLimit: number | null;
   rateRemaining: number | null;
 };
+
+export type CrmReceipt = CrmReceiptBase & ({
+  taskId: number;
+  taskCode: string;
+  taskStatus: string;
+  dueDate: string;
+} | {
+  contactId: number;
+  contactReused: boolean;
+  dealId: number;
+  pipelineId: number;
+  stageId: number;
+  activityId: number;
+  activityDueAt: string;
+});
 
 const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/).refine((value) => {
   const iso = `${value.replace(" ", "T")}Z`;
   const date = new Date(iso);
   return Number.isFinite(+date) && date.toISOString().replace(".000Z", "Z") === iso;
 });
-const successSchema = z.strictObject({
+const taskSuccessSchema = z.strictObject({
   data: z.strictObject({
     request_id: z.uuid().nullable(),
     task: z.strictObject({ id: z.number().int().min(1), code: z.string(), title: z.string(), status: z.string(), due_date: localDateTime }),
   }),
 });
+const crmSuccessSchema = z.strictObject({
+  data: z.strictObject({
+    request_id: z.uuid().nullable(),
+    contact: z.strictObject({ id: z.number().int().min(1), reused: z.boolean() }),
+    deal: z.strictObject({
+      id: z.number().int().min(1), title: z.string(), pipeline_id: z.number().int().min(1), stage_id: z.number().int().min(1),
+    }),
+    activity: z.strictObject({ id: z.number().int().min(1), subject: z.string(), due_at: localDateTime }),
+  }),
+});
+const successSchema = z.union([taskSuccessSchema, crmSuccessSchema]);
 const errorSchema = z.strictObject({
   error: z.strictObject({
     code: z.string(), message: z.string(),
@@ -94,17 +116,33 @@ export async function sendToCrm(envelope: DeliveryEnvelope, config: LeadWorkerCo
     if (!parsed.success) invalidResponse();
     const trace = response.headers.get("X-Request-Id"), replayed = response.headers.get("Idempotency-Replayed");
     if (trace !== null && !z.uuid().safeParse(trace).success || replayed !== null && replayed !== "true") invalidResponse();
-    const { request_id, task } = parsed.data.data;
+    const shared = {
+      requestId: parsed.data.data.request_id,
+      replayed: replayed === "true",
+      rateLimit: integerHeader(response.headers.get("X-RateLimit-Limit")),
+      rateRemaining: integerHeader(response.headers.get("X-RateLimit-Remaining")),
+    };
+    if ("task" in parsed.data.data) {
+      const { task } = parsed.data.data;
+      return { ...shared, taskId: task.id, taskCode: task.code, taskStatus: task.status, dueDate: task.due_date };
+    }
+    const { contact, deal, activity } = parsed.data.data;
     return {
-      requestId: request_id, taskId: task.id, taskCode: task.code, taskStatus: task.status, dueDate: task.due_date,
-      replayed: replayed === "true", rateLimit: integerHeader(response.headers.get("X-RateLimit-Limit")), rateRemaining: integerHeader(response.headers.get("X-RateLimit-Remaining")),
+      ...shared,
+      contactId: contact.id,
+      contactReused: contact.reused,
+      dealId: deal.id,
+      pipelineId: deal.pipeline_id,
+      stageId: deal.stage_id,
+      activityId: activity.id,
+      activityDueAt: activity.due_at,
     };
   }
-  if (![400, 401, 403, 409, 413, 415].includes(response.status)) {
+  if (![400, 401, 403, 409, 413, 415, 422].includes(response.status)) {
     await response.body?.cancel().catch(() => undefined);
     throw new DeliveryFailure({ kind: "manual_action", code: "crm_unexpected_status" });
   }
-  const payloadRejected = [400, 413, 415].includes(response.status);
+  const payloadRejected = [400, 413, 415, 422].includes(response.status);
   const invalidError = (): never => {
     if (payloadRejected) throw new DeliveryFailure({ kind: "terminal", code: "crm_payload_rejected" });
     invalidResponse();
@@ -117,10 +155,16 @@ export async function sendToCrm(envelope: DeliveryEnvelope, config: LeadWorkerCo
   const codes: Record<number, readonly string[]> = {
     400: ["validation_error"], 401: ["invalid_token", "token_expired", "token_revoked"],
     403: ["scope_forbidden", "board_forbidden", "intake_disabled"],
-    409: ["configuration_invalid", "idempotency_in_progress", "idempotency_conflict"],
-    413: ["file_too_large"], 415: ["unsupported_file_type"],
+    409: ["configuration_invalid", "idempotency_in_progress", "idempotency_conflict", "contact_lock_timeout"],
+    413: ["file_too_large", "company_storage_quota_exceeded"],
+    415: ["unsupported_file_type"], 422: ["malware_detected"],
   };
   if (!codes[response.status].includes(code)) invalidError();
-  if (response.status === 409 && code === "idempotency_in_progress") throw new DeliveryFailure({ kind: "retry" });
+  if (response.status === 409 && ["idempotency_in_progress", "contact_lock_timeout"].includes(code)) {
+    throw new DeliveryFailure({ kind: "retry" });
+  }
+  if (response.status === 413 && code === "company_storage_quota_exceeded") {
+    throw new DeliveryFailure({ kind: "manual_action", code });
+  }
   throw new DeliveryFailure({ kind: payloadRejected ? "terminal" : "manual_action", code });
 }

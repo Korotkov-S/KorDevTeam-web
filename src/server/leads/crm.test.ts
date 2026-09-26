@@ -123,6 +123,32 @@ test("accepts null body request_id and arbitrary status, independently of option
   assert.equal(receipt.requestId, null); assert.equal(receipt.taskStatus, "custom_status");
 });
 
+test("accepts the documented CRM contact, deal, and activity success response without retaining titles", async () => {
+  const receipt = await sendToCrm(envelope, config, async () => Response.json({
+    data: {
+      request_id: requestId,
+      contact: { id: 72, reused: true },
+      deal: { id: 915, title: "Анна", pipeline_id: 12, stage_id: 34 },
+      activity: { id: 1502, subject: "Связаться по заявке", due_at: "2026-09-14 23:59:00" },
+    },
+  }, { status: 201 }));
+
+  assert.deepEqual(receipt, {
+    requestId,
+    contactId: 72,
+    contactReused: true,
+    dealId: 915,
+    pipelineId: 12,
+    stageId: 34,
+    activityId: 1502,
+    activityDueAt: "2026-09-14 23:59:00",
+    replayed: false,
+    rateLimit: null,
+    rateRemaining: null,
+  });
+  assert.doesNotMatch(JSON.stringify(receipt), /Анна|Связаться по заявке/u);
+});
+
 test("only 201 with strict documented schema is successful", async () => {
   const invalid: unknown[] = [null, {}, { ...body(), extra: true }, { data: { ...body().data, extra: true } }, { data: { ...body().data, task: { ...body().data.task, extra: true } } }];
   for (const key of ["request_id", "task"]) { const value = body(); delete (value.data as Record<string, unknown>)[key]; invalid.push(value); }
@@ -153,8 +179,9 @@ test("all documented HTTP error variants have immutable classifications", async 
   const rows: [number, string, "terminal" | "manual_action" | "retry"][] = [
     [400, "validation_error", "terminal"], [401, "invalid_token", "manual_action"], [401, "token_expired", "manual_action"], [401, "token_revoked", "manual_action"],
     [403, "scope_forbidden", "manual_action"], [403, "board_forbidden", "manual_action"], [403, "intake_disabled", "manual_action"],
-    [409, "configuration_invalid", "manual_action"], [409, "idempotency_in_progress", "retry"], [409, "idempotency_conflict", "manual_action"],
-    [413, "file_too_large", "terminal"], [415, "unsupported_file_type", "terminal"],
+    [409, "configuration_invalid", "manual_action"], [409, "idempotency_in_progress", "retry"], [409, "idempotency_conflict", "manual_action"], [409, "contact_lock_timeout", "retry"],
+    [413, "file_too_large", "terminal"], [413, "company_storage_quota_exceeded", "manual_action"],
+    [415, "unsupported_file_type", "terminal"], [422, "malware_detected", "terminal"],
     [429, "rate_limit_exceeded", "retry"], [429, "pre_auth_rate_limit_exceeded", "retry"], [500, "internal_error", "retry"], [503, "internal_error", "retry"],
   ];
   for (const [status, code, kind] of rows) {
