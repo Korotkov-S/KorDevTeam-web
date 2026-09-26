@@ -13,7 +13,7 @@ test('Traefik template routes HTTP and HTTPS canonical/www hosts through one sha
   const secure = config.http.routers.kordevteam;
   const plain = config.http.routers['kordevteam-http'];
   assert.equal(secure.rule, rule); assert.equal(plain.rule, rule);
-  assert.deepEqual(secure.entryPoints, ['websecure']); assert.deepEqual(plain.entryPoints, ['web']);
+  assert.deepEqual(secure.entryPoints, ['https']); assert.deepEqual(plain.entryPoints, ['http']);
   assert.equal(plain.tls, undefined); assert.equal(plain.service, secure.service);
   assert.deepEqual(secure.tls.domains, [{ main: host, sans: [`www.${host}`] }]);
   assert.ok(secure.tls.certResolver);
@@ -27,8 +27,8 @@ test('route validator rejects inconsistent HTTP/HTTPS graphs and incomplete cert
   const base = {
     http: {
       routers: {
-        kordevteam: { rule, entryPoints: ['websecure'], tls: { certResolver: 'letsencrypt', domains: [{ main: host, sans: [`www.${host}`] }] }, service: 'active', middlewares: ['kordevteam-slot'] },
-        'kordevteam-http': { rule, entryPoints: ['web'], service: 'active', middlewares: ['kordevteam-slot'] },
+        kordevteam: { rule, entryPoints: ['https'], tls: { certResolver: 'letsEncrypt', domains: [{ main: host, sans: [`www.${host}`] }] }, service: 'active', middlewares: ['kordevteam-slot'] },
+        'kordevteam-http': { rule, entryPoints: ['http'], service: 'active', middlewares: ['kordevteam-slot'] },
       },
       middlewares: { 'kordevteam-slot': { headers: { customResponseHeaders: { 'X-Kordev-Slot': 'blue' } } } },
       services: { active: { loadBalancer: { servers: [{ url: 'http://kordevteam-blue:3001' }] } } },

@@ -7,9 +7,9 @@ http:
   routers:
     kordevteam:
       rule: "Host(`kordevteam.example`) || Host(`www.kordevteam.example`)"
-      entryPoints: [websecure]
+      entryPoints: [https]
       tls:
-        certResolver: letsencrypt
+        certResolver: letsEncrypt
         domains:
           - main: kordevteam.example
             sans: [www.kordevteam.example]
@@ -17,7 +17,7 @@ http:
       middlewares: [kordevteam-slot]
     kordevteam-http:
       rule: "Host(`kordevteam.example`) || Host(`www.kordevteam.example`)"
-      entryPoints: [web]
+      entryPoints: [http]
       service: kordevteam-active
       middlewares: [kordevteam-slot]
   middlewares:

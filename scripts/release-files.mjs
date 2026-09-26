@@ -24,8 +24,8 @@ export function validateRoute(target, stateDirectory, host, origin) {
   const plain = document?.http?.routers?.['kordevteam-http'];
   const expectedRule = `Host(\`${host}\`) || Host(\`www.${host}\`)`;
   if (!secure || !plain || secure.rule !== expectedRule || plain.rule !== expectedRule || secure.service !== plain.service) throw Error('HTTP and HTTPS routes must cover the same canonical/www hosts and active service');
-  if (JSON.stringify(secure.entryPoints) !== '["websecure"]' || JSON.stringify(plain.entryPoints) !== '["web"]' || plain.tls !== undefined) throw Error('HTTP and HTTPS entrypoints must be separate');
-  if (typeof secure.tls?.certResolver !== 'string' || !secure.tls.certResolver || JSON.stringify(secure.tls.domains) !== JSON.stringify([{ main: host, sans: [`www.${host}`] }])) throw Error('TLS certificate must cover canonical and www hosts');
+  if (JSON.stringify(secure.entryPoints) !== '["https"]' || JSON.stringify(plain.entryPoints) !== '["http"]' || plain.tls !== undefined) throw Error('HTTP and HTTPS entrypoints must be separate');
+  if (secure.tls?.certResolver !== 'letsEncrypt' || JSON.stringify(secure.tls.domains) !== JSON.stringify([{ main: host, sans: [`www.${host}`] }])) throw Error('TLS certificate must cover canonical and www hosts');
   for (const router of [secure, plain]) {
     const service = document?.http?.services?.[router.service];
     if (service?.loadBalancer?.servers?.length !== 1 || service.loadBalancer.servers[0].url !== `http://kordevteam-${slot}:3001`) throw Error('Current slot disagrees with active backend');
