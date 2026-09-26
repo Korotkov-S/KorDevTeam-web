@@ -13,6 +13,7 @@ import {
   seoSources,
 } from "../db/schema";
 import type { NormalizedRankCheck, NormalizedSeoObservation, SeoDevice, SeoSourceId } from "./contracts";
+import type { SemanticCoreEntry } from "./semanticCore";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
@@ -72,6 +73,44 @@ async function regionFor(tx: Transaction, observation: NormalizedSeoObservation)
 
 export function createSeoRepository(db: SeoDatabase) {
   return {
+    async syncSemanticCore(entries: readonly SemanticCoreEntry[]) {
+      return db.transaction(async (tx) => {
+        const result = { inserted: 0, promoted: 0, preserved: 0 };
+        for (const entry of entries) {
+          const [existing] = await tx.select().from(seoQueries)
+            .where(eq(seoQueries.normalizedQuery, entry.normalizedQuery)).limit(1);
+          if (!existing) {
+            await tx.insert(seoQueries).values({
+              ...entry,
+              origin: "import",
+              status: "active",
+              tracked: true,
+            });
+            result.inserted++;
+            continue;
+          }
+          if (existing.origin === "api" && existing.status === "candidate") {
+            await tx.update(seoQueries).set({
+              queryText: entry.queryText,
+              targetPath: entry.targetPath,
+              origin: "import",
+              wordstatFrequency: entry.wordstatFrequency,
+              frequencyBand: entry.frequencyBand,
+              status: "active",
+              kind: entry.kind,
+              priority: entry.priority,
+              tracked: true,
+              updatedAt: new Date(),
+            }).where(eq(seoQueries.id, existing.id));
+            result.promoted++;
+            continue;
+          }
+          result.preserved++;
+        }
+        return result;
+      });
+    },
+
     async setSourceEnabled(source: SeoSourceId, enabled: boolean) {
       const [row] = await db.update(seoSources).set({ enabled, updatedAt: new Date() })
         .where(eq(seoSources.id, source)).returning();

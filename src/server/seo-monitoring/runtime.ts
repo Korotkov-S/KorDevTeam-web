@@ -9,9 +9,14 @@ import { createYandexWebmasterProvider } from "./providers/yandex";
 import { SeoProviderError } from "./providers/provider-error";
 import { createYandexSearchProvider } from "./providers/yandexSearch";
 import { createSeoRankCollector } from "./rankCollector";
+import { loadSemanticCore } from "./semanticCore";
 
 export function getSeoMonitoringService() {
   return createSeoService(createSeoRepository(getDb()));
+}
+
+export function syncSeoSemanticCore() {
+  return createSeoRepository(getDb()).syncSemanticCore(loadSemanticCore());
 }
 
 export async function runSeoCollection(options: { source?: SeoCollectionTarget } = {}) {

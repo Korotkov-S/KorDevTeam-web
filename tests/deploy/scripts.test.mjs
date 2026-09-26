@@ -260,6 +260,8 @@ test('inactive deploy backs up and migrates before replacement, records verified
   assert.equal(readFileSync(`${f.dir}/state/slots/green`, 'utf8').trim(), image);
   const commands = readFileSync(`${f.dir}/commands`, 'utf8');
   assert.ok(commands.indexOf('backup') < commands.indexOf('migrate-production.mjs'));
+  assert.ok(commands.indexOf('migrate-production.mjs') < commands.indexOf('seo-core-sync.mjs'));
+  assert.ok(commands.indexOf('seo-core-sync.mjs') < commands.indexOf('content-release.mjs plan'));
   assert.ok(commands.indexOf('migrate-production.mjs') < commands.indexOf('run --rm --no-deps lead-worker node server/lead-worker.mjs --check'));
   assert.match(commands, new RegExp(`WORKER_IMAGE=${image.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} compose .* run --rm --no-deps lead-worker node server/lead-worker.mjs --check`));
   assert.ok(commands.indexOf('migrate-production.mjs') < commands.indexOf('up -d --no-deps kordevteam-green'));

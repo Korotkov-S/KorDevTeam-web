@@ -185,6 +185,7 @@ jobs:
         run: |
           set -euo pipefail
           yarn db:migrate
+          yarn seo:core:sync
           manifest_report="$(RELEASE_SHA="$GITHUB_SHA" yarn content:release manifest)"
           manifest_sha="$(node -e 'const x=JSON.parse(process.argv[1]); process.stdout.write(x.manifestChecksum)' "$manifest_report")"
           plan_report="$(RELEASE_SHA="$GITHUB_SHA" yarn content:release plan)"

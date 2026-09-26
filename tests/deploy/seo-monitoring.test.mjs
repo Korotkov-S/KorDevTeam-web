@@ -8,6 +8,9 @@ test("production image and package expose the SEO collector", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   assert.equal(pkg.scripts["seo:collect"], "node server/seo-collect.mjs");
   assert.match(dockerfile, /test -f \/app\/server\/seo-collect\.mjs/u);
+  assert.equal(pkg.scripts["seo:core:sync"], "node server/seo-core-sync.mjs");
+  assert.match(dockerfile, /test -f \/app\/server\/seo-core-sync\.mjs/u);
+  assert.match(dockerfile, /content\/seo\/semantic-core\.ru\.json/u);
 });
 test("SEO job is isolated, read-only, and receives only its own provider credentials", () => {
   const compose = readFileSync("deploy/docker-compose.team.yml", "utf8");

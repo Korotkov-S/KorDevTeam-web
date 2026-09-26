@@ -187,3 +187,83 @@ databaseTest("active recommendation fingerprints deduplicate and status transiti
     { message: "seo_recommendation_transition_invalid" },
   );
 });
+
+databaseTest("semantic core sync inserts new rows, promotes API candidates, and preserves curated edits", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await repository.upsertObservations([observation]);
+  await db.insert(seoQueries).values([
+    {
+      queryText: "Ручной запрос",
+      normalizedQuery: "ручной запрос",
+      origin: "manual",
+      targetPath: "/manual/",
+      status: "active",
+      tracked: true,
+      kind: "commercial",
+      priority: 7,
+    },
+    {
+      queryText: "Импортированный запрос",
+      normalizedQuery: "импортированный запрос",
+      origin: "import",
+      targetPath: "/edited-after-import/",
+      status: "active",
+      tracked: true,
+      kind: "informational",
+      priority: 6,
+    },
+  ]);
+
+  const result = await repository.syncSemanticCore([
+    {
+      queryText: "Внедрение CRM",
+      normalizedQuery: "внедрение crm",
+      targetPath: "/blog/crm-implementation/",
+      wordstatFrequency: 1159,
+      frequencyBand: "high",
+      kind: "informational",
+      priority: 50,
+    },
+    {
+      queryText: "Ручной запрос",
+      normalizedQuery: "ручной запрос",
+      targetPath: "/must-not-overwrite/",
+      wordstatFrequency: 10,
+      frequencyBand: "low",
+      kind: "informational",
+      priority: 50,
+    },
+    {
+      queryText: "Импортированный запрос",
+      normalizedQuery: "импортированный запрос",
+      targetPath: "/must-not-overwrite/",
+      wordstatFrequency: 20,
+      frequencyBand: "low",
+      kind: "commercial",
+      priority: 100,
+    },
+    {
+      queryText: "Новый запрос",
+      normalizedQuery: "новый запрос",
+      targetPath: "/new/",
+      wordstatFrequency: 30,
+      frequencyBand: "medium",
+      kind: "commercial",
+      priority: 100,
+    },
+  ]);
+
+  assert.deepEqual(result, { inserted: 1, promoted: 1, preserved: 2 });
+  const rows = await db.select().from(seoQueries);
+  const promoted = rows.find((row) => row.normalizedQuery === "внедрение crm")!;
+  assert.deepEqual({ origin: promoted.origin, status: promoted.status, tracked: promoted.tracked,
+    targetPath: promoted.targetPath, priority: promoted.priority }, {
+    origin: "import", status: "active", tracked: true,
+    targetPath: "/blog/crm-implementation/", priority: 50,
+  });
+  assert.equal(rows.find((row) => row.normalizedQuery === "ручной запрос")?.targetPath, "/manual/");
+  assert.equal(rows.find((row) => row.normalizedQuery === "импортированный запрос")?.targetPath, "/edited-after-import/");
+  assert.equal(rows.find((row) => row.normalizedQuery === "новый запрос")?.status, "active");
+});
