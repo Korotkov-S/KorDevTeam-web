@@ -103,7 +103,18 @@ export function articlePresentation(entry: ContentEntry, media: MediaPresentatio
 
 export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {}) {
   const article = articlePresentation(entry, media);
-  return { ...article, id: entry.id, slug: entry.slug, date: article.publishedAt || "" };
+  return {
+    id: entry.id,
+    slug: entry.slug,
+    title: article.title,
+    excerpt: article.excerpt,
+    date: article.publishedAt || "",
+    readTime: article.readTime,
+    tags: article.tags,
+    category: article.category,
+    coverUrl: article.coverUrl,
+    imageUrls: article.imageUrls,
+  };
 }
 
 export function casePresentation(entry: ContentEntry, media: MediaPresentationMap = {}): Project {

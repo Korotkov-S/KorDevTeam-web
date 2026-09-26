@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import { createRequestHandler } from "@react-router/express";
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -12,6 +13,7 @@ const { createApiApp } = require("./api-app.js");
 const app = express();
 const build = await import("../build/server/index.js");
 app.disable("x-powered-by");
+app.use(compression({ threshold: 1024 }));
 configureProxy(app);
 app.use((req, _res, next) => {
   delete req.headers["x-kordev-client-ip"];

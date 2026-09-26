@@ -86,23 +86,34 @@ async function responseJson(response: Response): Promise<unknown> {
 }
 
 export async function sendToCrm(envelope: DeliveryEnvelope, config: LeadWorkerConfig["crm"], fetchImpl: typeof fetch = fetch): Promise<CrmReceipt> {
-  const form = new FormData();
-  form.set("name", envelope.name);
-  form.set("phone", envelope.phone);
-  if (envelope.description) form.set("description", envelope.description);
-  if (envelope.attachment) {
+  const request = async (withAttachment: boolean): Promise<Response> => {
+    const form = new FormData();
+    form.set("name", envelope.name);
+    form.set("phone", envelope.phone);
+    if (envelope.description) form.set("description", envelope.description);
+    if (withAttachment && envelope.attachment) {
+      try {
+        form.set("file", await openAsBlob(envelope.attachment.path, { type: envelope.attachment.mediaType }), envelope.attachment.originalName);
+      } catch { throw new DeliveryFailure({ kind: "manual_action", code: "attachment_read_failed" }); }
+    }
     try {
-      form.set("file", await openAsBlob(envelope.attachment.path, { type: envelope.attachment.mediaType }), envelope.attachment.originalName);
-    } catch { throw new DeliveryFailure({ kind: "manual_action", code: "attachment_read_failed" }); }
+      return await fetchImpl(config.endpoint, {
+        method: "POST", redirect: "manual",
+        headers: { Authorization: `Bearer ${config.token}`, "Idempotency-Key": envelope.leadId, "X-Request-Id": envelope.jobId },
+        body: form, signal: AbortSignal.timeout(15_000),
+      });
+    } catch { throw new DeliveryFailure({ kind: "retry" }); }
+  };
+
+  let response = await request(Boolean(envelope.attachment));
+  if (response.status === 503 && envelope.attachment) {
+    let errorBody: unknown;
+    try { errorBody = await response.json(); } catch { errorBody = null; }
+    const parsed = errorSchema.safeParse(errorBody);
+    if (parsed.success && parsed.data.error.code === "file_scan_unavailable") {
+      response = await request(false);
+    }
   }
-  let response: Response;
-  try {
-    response = await fetchImpl(config.endpoint, {
-      method: "POST", redirect: "manual",
-      headers: { Authorization: `Bearer ${config.token}`, "Idempotency-Key": envelope.leadId, "X-Request-Id": envelope.jobId },
-      body: form, signal: AbortSignal.timeout(15_000),
-    });
-  } catch { throw new DeliveryFailure({ kind: "retry" }); }
 
   if (response.status === 429 || response.status >= 500) {
     const seconds = integerHeader(response.headers.get("Retry-After"));

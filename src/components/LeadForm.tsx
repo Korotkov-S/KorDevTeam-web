@@ -24,6 +24,8 @@ type RetrySubmission = {
   snapshot: string;
 };
 
+type SubmissionState = "idle" | "invalid" | "sending" | "success" | "error";
+
 export type LeadFormProps = {
   pagePath?: string;
   className?: string;
@@ -64,6 +66,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   const [fields, setFields] = useState<FormFields>(emptyFields);
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState("");
+  const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [pending, setPending] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -72,8 +75,12 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   const inFlightRef = useRef(false);
   const openedRef = useRef(false);
   const startedRef = useRef(false);
+  const statusRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => setHydrated(true), []);
+  useEffect(() => {
+    if (submissionState === "success" || submissionState === "error") statusRef.current?.focus();
+  }, [submissionState]);
 
   const analyticsPayload = () => ({ path: normalizeSnapshotText(pagePath) });
 
@@ -97,12 +104,14 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
       setErrors((current) => ({ ...current, [key]: undefined }));
     }
     setStatus("");
+    setSubmissionState("idle");
   };
 
   const onFileChange = () => {
     trackStart();
     retryRef.current = null;
     setStatus("");
+    setSubmissionState("idle");
   };
 
   const validate = (): FormErrors => {
@@ -127,6 +136,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setStatus(t("contact.form.status.invalid"));
+      setSubmissionState("invalid");
       focusFirstError(nextErrors);
       track("form_submit_error", { ...analyticsPayload(), errorCode: "validation" });
       return;
@@ -151,6 +161,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
     inFlightRef.current = true;
     setPending(true);
     setStatus(t("contact.form.status.sending"));
+    setSubmissionState("sending");
 
     try {
       const response = await fetch("/api/leads", {
@@ -177,18 +188,21 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
         setErrors({});
         form.reset();
         setStatus(t("contact.form.status.success"));
+        setSubmissionState("success");
         track("form_submit_success", analyticsPayload());
         return;
       }
 
       if (!isTransient(response.status)) retryRef.current = null;
       setStatus(t("contact.form.status.error"));
+      setSubmissionState("error");
       track("form_submit_error", {
         ...analyticsPayload(),
         errorCode: response.ok ? "invalid_response" : `http_${response.status}`,
       });
     } catch {
       setStatus(t("contact.form.status.error"));
+      setSubmissionState("error");
       track("form_submit_error", { ...analyticsPayload(), errorCode: "network" });
     } finally {
       inFlightRef.current = false;
@@ -203,6 +217,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
       method="post"
       encType="multipart/form-data"
       noValidate={hydrated}
+      aria-busy={pending}
       onFocusCapture={trackOpen}
       onSubmit={handleSubmit}
       className={cn("space-y-5", className)}
@@ -322,12 +337,27 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
           <p>{t("contact.form.responseTime")}</p>
           <p>{t("contact.form.workingHours")}</p>
         </div>
-        <Button type="submit" size="lg" disabled={pending} className="min-h-13 rounded-full border-0 bg-[var(--public-blue)] px-7 text-[var(--public-action-foreground)] hover:bg-[var(--public-violet)]">
+        <Button type="submit" size="lg" disabled={pending} data-loading={pending ? "true" : undefined} className="min-h-13 rounded-full border-0 bg-[var(--public-blue)] px-7 text-[var(--public-action-foreground)] hover:bg-[var(--public-violet)]">
+          {pending ? <span aria-hidden="true" className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none" /> : null}
           {pending ? t("contact.form.submitting") : t("contact.form.submit")}
         </Button>
       </div>
 
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
+      <p
+        ref={statusRef}
+        role={submissionState === "error" ? "alert" : "status"}
+        aria-live={submissionState === "error" ? "assertive" : "polite"}
+        tabIndex={submissionState === "success" || submissionState === "error" ? -1 : undefined}
+        data-lead-state={submissionState}
+        className={cn(
+          "min-h-5 rounded-2xl border px-4 py-3 text-sm font-medium outline-none",
+          submissionState === "idle" && "border-transparent px-0 py-0 text-muted-foreground",
+          submissionState === "invalid" && "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100",
+          submissionState === "sending" && "border-blue-200 bg-blue-50 text-blue-950 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100",
+          submissionState === "success" && "border-emerald-300 bg-emerald-50 text-emerald-950 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100",
+          submissionState === "error" && "border-red-300 bg-red-50 text-red-950 focus-visible:ring-2 focus-visible:ring-red-500 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100",
+        )}
+      >
         {status}
       </p>
       <p id="lead-submitted-message" role="status" tabIndex={-1} className="hidden text-sm text-[var(--public-green)] target:block">

@@ -64,3 +64,18 @@ test("article cards expose only approved blog category slugs", () => {
   assert.equal(valid.category, "crm-sales");
   assert.equal(stale.category, null);
 });
+
+test("article cards never serialize the full article body or unrelated presentation data", () => {
+  const value = {
+    ...entry("compact", "Компактная карточка", "2026-09-19T08:00:00.000Z"),
+    bodyMd: "FULL ARTICLE BODY MUST NOT REACH THE BLOG INDEX",
+    payload: { readTime: "7 мин", tags: ["CRM"], category: "crm-sales" },
+  };
+
+  const card = articleCard(value);
+
+  assert.deepEqual(Object.keys(card).sort(), [
+    "category", "coverUrl", "date", "excerpt", "id", "imageUrls", "readTime", "slug", "tags", "title",
+  ]);
+  assert.doesNotMatch(JSON.stringify(card), /FULL ARTICLE BODY|bodyMd|updatedAt|media/);
+});

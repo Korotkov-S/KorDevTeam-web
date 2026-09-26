@@ -96,7 +96,7 @@ test("successful persisted lead emits form_submit_success once", async () => {
   fillRequiredFields();
 
   fireEvent.click(screen.getByRole("button", { name: "Отправить заявку" }));
-  await screen.findByText("Заявка отправлена");
+  await screen.findByText(/Заявка принята/);
 
   assert.deepEqual(events.filter((event) => event === "form_submit_success"), ["form_submit_success"]);
 });
@@ -174,7 +174,7 @@ test("submits from the native keyboard form path as multipart without a Content-
   const phone = screen.getByLabelText("Телефон");
   fireEvent.keyDown(phone, { key: "Enter", code: "Enter" });
   fireEvent.submit(phone.closest("form")!);
-  await screen.findByText("Заявка отправлена");
+  await screen.findByText(/Заявка принята/);
 
   assert.ok(capturedBody instanceof FormData);
   assert.deepEqual([...capturedBody.keys()].sort(), [
@@ -213,6 +213,32 @@ test("allows only one in-flight request and re-enables submit after a network er
   resolveRequest(new Response(null, { status: 503 }));
   await screen.findByText("Не удалось отправить заявку. Попробуйте ещё раз.");
   assert.equal((button as HTMLButtonElement).disabled, false);
+});
+
+test("shows an accessible progress state and focuses the response-time confirmation", async () => {
+  let resolveRequest!: (response: Response) => void;
+  globalThis.fetch = async () => new Promise<Response>((resolve) => {
+    resolveRequest = resolve;
+  });
+  render(<LeadForm />);
+  fillRequiredFields();
+  const button = screen.getByRole("button", { name: "Отправить заявку" });
+  const form = button.closest("form")!;
+
+  fireEvent.click(button);
+
+  assert.equal(form.getAttribute("aria-busy"), "true");
+  assert.equal(screen.getByRole("button", { name: "Отправляем…" }).getAttribute("data-loading"), "true");
+  const sending = screen.getByText("Отправляем заявку…");
+  assert.equal(sending.getAttribute("data-lead-state"), "sending");
+
+  resolveRequest(jsonResponse(201, { leadId: VALID_LEAD_ID }));
+  const success = await screen.findByText(/Заявка принята.*рабочего дня.*09:00–18:00/u);
+
+  assert.equal(form.getAttribute("aria-busy"), "false");
+  assert.equal(success.getAttribute("data-lead-state"), "success");
+  assert.equal(success.getAttribute("role"), "status");
+  assert.equal(document.activeElement, success);
 });
 
 test("reuses an idempotency key only for an unchanged retry and resets it after editing", async () => {
@@ -295,7 +321,7 @@ test("uses a new idempotency key after file changes and after a successful submi
   });
   shouldSucceed = true;
   fireEvent.click(button);
-  await screen.findByText("Заявка отправлена");
+  await screen.findByText(/Заявка принята/);
   assert.notEqual(keys[0], keys[1]);
 
   fillRequiredFields();
@@ -317,7 +343,7 @@ test("treats only 200 or 201 with a UUID leadId as success", async () => {
     fillRequiredFields();
     fireEvent.click(screen.getByRole("button", { name: "Отправить заявку" }));
     assert.ok(await screen.findByText("Не удалось отправить заявку. Попробуйте ещё раз."));
-    assert.equal(screen.queryByText("Заявка отправлена"), null);
+    assert.equal(screen.queryByText(/Заявка принята/), null);
     view.unmount();
   }
 });

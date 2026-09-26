@@ -87,6 +87,37 @@ test("omits empty description and attachment, never sets multipart Content-Type 
   assert.deepEqual(receipt, { requestId, taskId: 42, taskCode: "WEB-42", taskStatus: "new", dueDate: "2026-09-14 23:59:00", replayed: false, rateLimit: null, rateRemaining: null });
 });
 
+test("creates the CRM entity without the attachment when the vendor scanner is unavailable", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lead-crm-fallback-"));
+  const path = join(dir, "private-file");
+  await writeFile(path, "private attachment bytes", { mode: 0o600 });
+  const forms: FormData[] = [];
+  const input: DeliveryEnvelope = {
+    ...envelope,
+    attachment: { path, originalName: "brief.pdf", mediaType: "application/pdf", sha256: "HASH" },
+  };
+  try {
+    const receipt = await sendToCrm(input, config, async (_url, init) => {
+      forms.push(init?.body as FormData);
+      if (forms.length === 1) {
+        return Response.json({
+          error: { code: "file_scan_unavailable", message: "PRIVATE_ERROR" },
+          request_id: null,
+        }, { status: 503 });
+      }
+      return success();
+    });
+
+    assert.equal(receipt.taskId, 42);
+    assert.equal(forms.length, 2);
+    assert.deepEqual([...forms[0].keys()].sort(), ["description", "file", "name", "phone"]);
+    assert.deepEqual([...forms[1].keys()].sort(), ["description", "name", "phone"]);
+    assert.equal(await readFile(path, "utf8"), "private attachment bytes");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("real HTTP 302 is manual action and never sends the lead to the redirect target", async () => {
   const requestedPaths: string[] = [];
   const server = createServer((req, res) => {
