@@ -135,8 +135,23 @@ test("production deployment is dispatch-only, protected, digest-exact and passes
   assert.match(remote.with.envs, /CONTENT_MANIFEST_SHA256/);
   assert.match(remote.with.envs, /PRIVACY_POLICY_SHA256/);
   assert.match(remote.with.envs, /PERSIST_TEST_LEAD/);
+  assert.match(remote.with.envs, /RELEASE_SHA/);
+  assert.match(remote.with.envs, /REPOSITORY_URL/);
   const script = remote.with.script;
   assert.match(script, /^bash -se /, "remote orchestration must run under Bash");
+  const config = script.indexOf("source /etc/kordevteam/operations.env");
+  const clone = script.indexOf('git clone --filter=blob:none --no-checkout');
+  const exactCheckout = script.indexOf('checkout --detach "$RELEASE_SHA"');
+  const install = script.indexOf('yarn install --immutable --mode=skip-build');
+  const currentLink = script.indexOf('current_tmp="/opt/kordevteam/');
+  const checkout = script.indexOf('cd /opt/kordevteam/current');
+  assert.ok(config >= 0 && config < clone && clone < exactCheckout && exactCheckout < install && install < currentLink && currentLink < checkout,
+    "remote deployment must install the exact audited release before entering its current checkout");
+  assert.match(script, /RELEASES_DIR.*RELEASE_SHA/);
+  assert.match(script, /git rev-parse HEAD.*RELEASE_SHA/);
+  assert.match(script, /git -C .* remote get-url origin.*REPOSITORY_URL/);
+  assert.match(script, /git status --porcelain --untracked-files=no/);
+  assert.match(script, /mv -T -- .*\/opt\/kordevteam\/current/);
   const deploy = script.indexOf("scripts/deploy-slot.sh");
   const releaseGate = script.indexOf("scripts/release-gate.sh");
   const switchSlot = script.indexOf("scripts/switch-slot.sh");

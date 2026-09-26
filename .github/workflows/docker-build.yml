@@ -374,6 +374,8 @@ jobs:
       CONTENT_MANIFEST_SHA256: ${{ inputs.content_manifest_sha256 }}
       PRIVACY_POLICY_SHA256: ${{ inputs.privacy_policy_sha256 }}
       PERSIST_TEST_LEAD: ${{ inputs.persist_test_lead }}
+      RELEASE_SHA: ${{ github.sha }}
+      REPOSITORY_URL: https://github.com/${{ github.repository }}.git
 
     steps:
       - name: Validate immutable production release
@@ -409,14 +411,54 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: IMAGE_REF,CONTENT_IMAGE_REF,CONTENT_MANIFEST_SHA256,PRIVACY_POLICY_SHA256,PERSIST_TEST_LEAD
+          envs: IMAGE_REF,CONTENT_IMAGE_REF,CONTENT_MANIFEST_SHA256,PRIVACY_POLICY_SHA256,PERSIST_TEST_LEAD,RELEASE_SHA,REPOSITORY_URL
           script: |
             bash -se <<'KORDEV_RELEASE'
             set -euo pipefail
-            cd /opt/kordevteam/current
+            [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+            [[ "$REPOSITORY_URL" =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.git$ ]]
+            test -r /etc/kordevteam/operations.env
             set -a
             source /etc/kordevteam/operations.env
             set +a
+            : "${RELEASES_DIR:?RELEASES_DIR is required}"
+            [[ "$RELEASES_DIR" == /* && "$RELEASES_DIR" != / ]]
+            test -d /opt/kordevteam
+            if [[ ! -e "$RELEASES_DIR" ]]; then
+              install -d -m 0750 -- "$RELEASES_DIR"
+            fi
+            [[ -d "$RELEASES_DIR" && ! -L "$RELEASES_DIR" ]]
+            [[ "$(realpath -e -- "$RELEASES_DIR")" == "$RELEASES_DIR" ]]
+            release_dir="$RELEASES_DIR/$RELEASE_SHA"
+            if [[ ! -e "$release_dir" && ! -L "$release_dir" ]]; then
+              incoming="$RELEASES_DIR/.incoming-$RELEASE_SHA-$$"
+              [[ ! -e "$incoming" && ! -L "$incoming" ]]
+              cleanup_incoming() { rm -rf -- "$incoming"; }
+              trap cleanup_incoming EXIT
+              git clone --filter=blob:none --no-checkout "$REPOSITORY_URL" "$incoming"
+              git -C "$incoming" fetch --depth=1 origin "$RELEASE_SHA"
+              git -C "$incoming" checkout --detach "$RELEASE_SHA"
+              printf 'release\n' > "$incoming/.kordev-release"
+              mv -- "$incoming" "$release_dir"
+              trap - EXIT
+            fi
+            [[ -d "$release_dir/.git" && ! -L "$release_dir" ]]
+            [[ "$(git -C "$release_dir" remote get-url origin)" == "$REPOSITORY_URL" ]]
+            [[ "$(git -C "$release_dir" rev-parse HEAD)" == "$RELEASE_SHA" ]]
+            [[ -z "$(git -C "$release_dir" status --porcelain --untracked-files=no)" ]]
+            test "$(corepack yarn --version)" = 3.8.7
+            PUPPETEER_SKIP_DOWNLOAD=true corepack yarn install --immutable --mode=skip-build
+            current_tmp="/opt/kordevteam/.current-$RELEASE_SHA-$$"
+            [[ ! -e "$current_tmp" && ! -L "$current_tmp" ]]
+            if [[ -e /opt/kordevteam/current && ! -L /opt/kordevteam/current ]]; then
+              echo '/opt/kordevteam/current must be a managed symlink' >&2
+              exit 1
+            fi
+            ln -s -- "$release_dir" "$current_tmp"
+            mv -T -- "$current_tmp" /opt/kordevteam/current
+            cd /opt/kordevteam/current
+            [[ "$(git rev-parse HEAD)" == "$RELEASE_SHA" ]]
+            [[ -z "$(git status --porcelain --untracked-files=no)" ]]
             current="$(sed -n 's/^# current-slot: //p' "$TRAEFIK_DYNAMIC_FILE")"
             case "$current" in
               blue) inactive=green ;;
