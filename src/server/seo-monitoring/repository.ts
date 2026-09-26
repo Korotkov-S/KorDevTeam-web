@@ -152,7 +152,12 @@ export function createSeoRepository(db: SeoDatabase) {
 
     async listTrackedQueries() {
       return db.select({ id: seoQueries.id, queryText: seoQueries.queryText }).from(seoQueries)
-        .where(eq(seoQueries.tracked, true)).orderBy(asc(seoQueries.createdAt), asc(seoQueries.id));
+        .where(eq(seoQueries.tracked, true)).orderBy(
+          desc(seoQueries.priority),
+          sql`case ${seoQueries.kind} when 'commercial' then 0 when 'informational' then 1 else 2 end`,
+          asc(seoQueries.createdAt),
+          asc(seoQueries.id),
+        );
     },
 
     async listRankRegions() {

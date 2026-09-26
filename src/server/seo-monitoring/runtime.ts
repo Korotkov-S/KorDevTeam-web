@@ -40,6 +40,7 @@ export async function runSeoCollection(options: { source?: SeoCollectionTarget }
     const rank = await createSeoRankCollector({
       repository,
       provider: createYandexSearchProvider(config.yandexSearch),
+      dailyCheckLimit: config.yandexSearch.dailyCheckLimit,
     }).run();
     return { sources: [...metricReport.sources, rank], failed: metricReport.failed || rank.status === "failed" };
   } catch (error) {

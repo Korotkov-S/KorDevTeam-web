@@ -23,6 +23,7 @@ test("SEO job is isolated, read-only, and receives only its own provider credent
   assert.match(block, /SEO_YANDEX_SEARCH_ENABLED:/u);
   assert.match(block, /YANDEX_SEARCH_API_KEY:/u);
   assert.match(block, /YANDEX_SEARCH_FOLDER_ID:/u);
+  assert.match(block, /SEO_YANDEX_SEARCH_DAILY_LIMIT: \$\{SEO_YANDEX_SEARCH_DAILY_LIMIT:-1000\}/u);
   assert.match(block, /SEO_TARGET_HOST:/u);
   assert.match(block, /LEAD_TEMP_ROOT:/u);
   assert.match(block, /\$\{LEAD_TEMP_ROOT:\?Provide LEAD_TEMP_ROOT\}:.*mode=0700.*uid=1000.*gid=1000/u);

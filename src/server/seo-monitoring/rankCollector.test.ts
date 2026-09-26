@@ -5,29 +5,25 @@ import type { NormalizedRankCheck } from "./contracts";
 import { createSeoRankCollector } from "./rankCollector";
 import { SeoProviderError } from "./providers/provider-error";
 
-function fixture(options: { empty?: boolean; failAt?: number } = {}) {
+function fixture(options: { empty?: boolean; failAt?: number; queryCount?: number; regionCount?: number } = {}) {
   const events: string[] = [];
   const stored: NormalizedRankCheck[] = [];
+  const finished: Array<{ status: string; result: { completedCount: number; storedCount: number; errorCode?: string; metadata?: Record<string, unknown> } }> = [];
   let calls = 0;
   const repository = {
     async withRankLock<T>(work: () => Promise<T>) { events.push("lock"); return work(); },
     async listTrackedQueries() {
-      return options.empty ? [] : [
-        { id: "q1", queryText: "внедрение crm" },
-        { id: "q2", queryText: "техническая поддержка сайтов" },
-      ];
+      return options.empty ? [] : Array.from({ length: options.queryCount ?? 2 }, (_, index) => ({ id: `q${index + 1}`, queryText: `запрос ${index + 1}` }));
     },
     async listRankRegions() {
-      return [
-        { id: "r1", externalId: "225", displayName: "Россия" },
-        { id: "r2", externalId: "213", displayName: "Москва" },
-      ];
+      return Array.from({ length: options.regionCount ?? 2 }, (_, index) => ({ id: `r${index + 1}`, externalId: String(200 + index), displayName: `Регион ${index + 1}` }));
     },
     async startRankRun(checkDate: string, plannedCount: number) {
       events.push(`start:${checkDate}:${plannedCount}`);
       return { id: "run-1" };
     },
-    async finishRankRun(_id: string, status: string, result: { completedCount: number; storedCount: number; errorCode?: string }) {
+    async finishRankRun(_id: string, status: string, result: { completedCount: number; storedCount: number; errorCode?: string; metadata?: Record<string, unknown> }) {
+      finished.push({ status, result });
       events.push(`finish:${status}:${result.completedCount}:${result.storedCount}:${result.errorCode ?? "ok"}`);
     },
     async upsertRankChecks(rows: readonly NormalizedRankCheck[]) {
@@ -45,13 +41,13 @@ function fixture(options: { empty?: boolean; failAt?: number } = {}) {
         : { status: "found" as const, position: calls, resultUrl: "https://kordev.team/", resultLimit: 100 };
     },
   };
-  return { events, stored, repository, provider };
+  return { events, stored, finished, repository, provider };
 }
 
 test("rank collector checks the full query-region-device matrix and stores found plus not-found snapshots", async () => {
   const f = fixture();
   const collector = createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 });
+    dailyCheckLimit: 1000, clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 });
 
   const report = await collector.run();
 
@@ -66,7 +62,7 @@ test("rank collector checks the full query-region-device matrix and stores found
 test("empty tracked core is a successful zero-work run", async () => {
   const f = fixture({ empty: true });
   const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    clock: () => new Date("2026-09-26T06:00:00.000Z") }).run();
+    dailyCheckLimit: 1000, clock: () => new Date("2026-09-26T06:00:00.000Z") }).run();
 
   assert.equal(report.status, "success");
   assert.equal(report.plannedCount, 0);
@@ -77,11 +73,40 @@ test("empty tracked core is a successful zero-work run", async () => {
 test("a failed slice preserves successful checks and marks the run partial", async () => {
   const f = fixture({ failAt: 2 });
   const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 }).run();
+    dailyCheckLimit: 1000, clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 }).run();
 
   assert.equal(report.status, "partial");
   assert.equal(report.completedCount, 7);
   assert.equal(report.storedCount, 7);
   assert.equal(report.errorCode, "seo_yandex_search_retryable");
   assert.ok(f.events.includes("finish:partial:7:7:seo_yandex_search_retryable"));
+});
+
+test("daily limit selects only whole query matrices and records safe quota metadata", async () => {
+  const f = fixture({ queryCount: 5, regionCount: 8 });
+  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
+    dailyCheckLimit: 32, clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 }).run();
+
+  assert.equal(report.status, "success");
+  assert.equal(report.plannedCount, 32);
+  assert.equal(f.events.filter((event) => event.startsWith("search:")).length, 32);
+  assert.deepEqual(new Set(f.stored.map((row) => row.queryId)), new Set(["q1", "q2"]));
+  assert.deepEqual(f.finished[0].result.metadata, {
+    failedCount: 0,
+    availableQueryCount: 5,
+    selectedQueryCount: 2,
+    omittedQueryCount: 3,
+    dailyCheckLimit: 32,
+  });
+});
+
+test("limit below one complete matrix fails before any provider request", async () => {
+  const f = fixture({ queryCount: 2, regionCount: 9 });
+  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
+    dailyCheckLimit: 16, clock: () => new Date("2026-09-26T06:00:00.000Z") }).run();
+
+  assert.equal(report.status, "failed");
+  assert.equal(report.errorCode, "seo_yandex_search_daily_limit_too_low");
+  assert.equal(f.events.some((event) => event.startsWith("search:")), false);
+  assert.equal(f.finished[0].status, "failed");
 });

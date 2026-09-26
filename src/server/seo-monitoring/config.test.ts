@@ -49,7 +49,32 @@ test("enabled Yandex Search requires API key, folder and a bare target hostname"
     apiKey: "secret-key",
     folderId: "b1g1234567890abcdefg",
     targetHost: "kordev.team",
+    dailyCheckLimit: 1000,
   });
+
+  assert.equal(readSeoConfig({
+    ...base,
+    YANDEX_SEARCH_API_KEY: "secret-key",
+    YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
+    SEO_TARGET_HOST: "kordev.team",
+    SEO_YANDEX_SEARCH_DAILY_LIMIT: "32",
+  }).yandexSearch.enabled && readSeoConfig({
+    ...base,
+    YANDEX_SEARCH_API_KEY: "secret-key",
+    YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
+    SEO_TARGET_HOST: "kordev.team",
+    SEO_YANDEX_SEARCH_DAILY_LIMIT: "32",
+  }).yandexSearch.dailyCheckLimit, 32);
+
+  for (const dailyLimit of ["15", "100001", "1.5", "many"]) {
+    assert.throws(() => readSeoConfig({
+      ...base,
+      YANDEX_SEARCH_API_KEY: "secret-key",
+      YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
+      SEO_TARGET_HOST: "kordev.team",
+      SEO_YANDEX_SEARCH_DAILY_LIMIT: dailyLimit,
+    }), { message: "seo_yandex_search_daily_limit_invalid" });
+  }
 });
 
 test("enabled Yandex requires both its token and verified host identifier", () => {
@@ -162,7 +187,7 @@ test("safe configuration summary contains source identifiers but no credentials"
   assert.deepEqual(summary, {
     yandex: { enabled: true, hostId: "https:kordev.team:443" },
     google: { enabled: true, siteUrl: "sc-domain:kordev.team" },
-    yandexSearch: { enabled: true, targetHost: "kordev.team" },
+    yandexSearch: { enabled: true, targetHost: "kordev.team", dailyCheckLimit: 1000 },
   });
   const serialized = JSON.stringify(summary);
   assert.doesNotMatch(serialized, /secret-token|search-secret-key|PRIVATE KEY|gserviceaccount|b1g123/);

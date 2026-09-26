@@ -15,5 +15,5 @@ test("operations environment documents disabled-by-default SEO switches and ever
   for (const name of ["SEO_YANDEX_ENABLED=false", "YANDEX_WEBMASTER_OAUTH_TOKEN=", "YANDEX_WEBMASTER_HOST_ID=",
     "SEO_GOOGLE_ENABLED=false", "GOOGLE_SEARCH_CONSOLE_SITE_URL=", "GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL=",
     "GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64=", "SEO_YANDEX_SEARCH_ENABLED=false", "YANDEX_SEARCH_API_KEY=",
-    "YANDEX_SEARCH_FOLDER_ID=", "SEO_TARGET_HOST=kordev.team"]) assert.match(text, new RegExp(`^${name}`, "mu"));
+    "YANDEX_SEARCH_FOLDER_ID=", "SEO_YANDEX_SEARCH_DAILY_LIMIT=1000", "SEO_TARGET_HOST=kordev.team"]) assert.match(text, new RegExp(`^${name}`, "mu"));
 });

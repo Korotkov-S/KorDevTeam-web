@@ -26,6 +26,14 @@ function required(value: string | undefined, code: string): string {
   return normalized;
 }
 
+function boundedInteger(value: string | undefined, fallback: number, minimum: number, maximum: number, code: string): number {
+  const raw = value?.trim() || String(fallback);
+  if (!/^\d+$/u.test(raw)) return fail(code);
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) return fail(code);
+  return parsed;
+}
+
 function readYandexConfig(env: SeoEnvironment): YandexSeoConfig {
   if (!sourceEnabled(env.SEO_YANDEX_ENABLED, "seo_yandex_enabled_invalid")) return { enabled: false };
   const oauthToken = required(env.YANDEX_WEBMASTER_OAUTH_TOKEN, "seo_yandex_token_required");
@@ -92,7 +100,9 @@ function readYandexSearchConfig(env: SeoEnvironment): YandexSearchConfig {
   const targetHost = required(env.SEO_TARGET_HOST, "seo_target_host_required").toLocaleLowerCase("en-US");
   if (targetHost.length > 253 || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/u.test(targetHost)
     || !targetHost.includes(".") || targetHost.includes("..")) return fail("seo_target_host_invalid");
-  return { enabled: true, apiKey, folderId, targetHost };
+  const dailyCheckLimit = boundedInteger(env.SEO_YANDEX_SEARCH_DAILY_LIMIT, 1000, 16, 100_000,
+    "seo_yandex_search_daily_limit_invalid");
+  return { enabled: true, apiKey, folderId, targetHost, dailyCheckLimit };
 }
 
 export function readSeoConfig(env: SeoEnvironment = process.env): SeoConfig {
@@ -112,7 +122,7 @@ export function safeSeoConfigSummary(config: SeoConfig): SafeSeoConfigSummary {
       ? { enabled: true, siteUrl: config.google.siteUrl }
       : { enabled: false },
     yandexSearch: config.yandexSearch.enabled
-      ? { enabled: true, targetHost: config.yandexSearch.targetHost }
+      ? { enabled: true, targetHost: config.yandexSearch.targetHost, dailyCheckLimit: config.yandexSearch.dailyCheckLimit }
       : { enabled: false },
   };
 }

@@ -54,6 +54,7 @@ async function retry<T>(operation: () => Promise<T>, sleep: (ms: number) => Prom
 export function createSeoRankCollector(dependencies: {
   repository: Repository;
   provider: Provider;
+  dailyCheckLimit: number;
   clock?: () => Date;
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
@@ -72,12 +73,34 @@ export function createSeoRankCollector(dependencies: {
           dependencies.repository.listTrackedQueries(),
           dependencies.repository.listRankRegions(),
         ]);
-        const plannedCount = queries.length * regions.length * DEVICES.length;
+        const checksPerQuery = regions.length * DEVICES.length;
+        const selectedQueryCount = checksPerQuery === 0 ? 0 : Math.min(queries.length, Math.floor(dependencies.dailyCheckLimit / checksPerQuery));
+        const selectedQueries = queries.slice(0, selectedQueryCount);
+        const quotaMetadata = {
+          availableQueryCount: queries.length,
+          selectedQueryCount,
+          omittedQueryCount: queries.length - selectedQueryCount,
+          dailyCheckLimit: dependencies.dailyCheckLimit,
+        };
+        const plannedCount = selectedQueries.length * checksPerQuery;
         const run = await dependencies.repository.startRankRun(checkDate, plannedCount);
+        if (queries.length > 0 && checksPerQuery > dependencies.dailyCheckLimit) {
+          const errorCode = "seo_yandex_search_daily_limit_too_low";
+          await dependencies.repository.finishRankRun(run.id, "failed", {
+            completedCount: 0,
+            storedCount: 0,
+            errorCode,
+            metadata: { failedCount: 0, ...quotaMetadata },
+          });
+          logger.write({ event: "seo_rank_collection_finished", source: "yandex_search", status: "failed",
+            plannedCount, completedCount: 0, storedCount: 0, errorCode });
+          return { source: "yandex_search" as const, status: "failed" as const, plannedCount,
+            completedCount: 0, storedCount: 0, checkDate, errorCode };
+        }
         let completedCount = 0;
         let storedCount = 0;
         const errors: string[] = [];
-        for (const query of queries) {
+        for (const query of selectedQueries) {
           for (const region of regions) {
             const regionId = Number(region.externalId);
             if (!Number.isSafeInteger(regionId) || regionId < 1) {
@@ -108,7 +131,7 @@ export function createSeoRankCollector(dependencies: {
           completedCount,
           storedCount,
           ...(errors[0] ? { errorCode: errors[0] } : {}),
-          metadata: { failedCount: errors.length },
+          metadata: { failedCount: errors.length, ...quotaMetadata },
         });
         logger.write({ event: "seo_rank_collection_finished", source: "yandex_search", status,
           plannedCount, completedCount, storedCount, errorCode: errors[0] });

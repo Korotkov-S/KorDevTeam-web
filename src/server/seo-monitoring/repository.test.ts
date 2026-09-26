@@ -90,6 +90,24 @@ databaseTest("rank checks upsert one daily query-region-device snapshot without 
   assert.equal(await repository.upsertRankChecks([]), 0);
 });
 
+databaseTest("tracked queries are ordered by priority, intent, creation time, and id", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await db.insert(seoQueries).values([
+    { queryText: "информационный", normalizedQuery: "информационный", status: "active", tracked: true, priority: 100, kind: "informational", createdAt: new Date("2026-09-25T00:00:00Z") },
+    { queryText: "коммерческий", normalizedQuery: "коммерческий", status: "active", tracked: true, priority: 100, kind: "commercial", createdAt: new Date("2026-09-26T00:00:00Z") },
+    { queryText: "низкий приоритет", normalizedQuery: "низкий приоритет", status: "active", tracked: true, priority: 50, kind: "commercial", createdAt: new Date("2026-09-24T00:00:00Z") },
+    { queryText: "кандидат", normalizedQuery: "кандидат", status: "candidate", tracked: false, priority: 1000, kind: "commercial" },
+  ]);
+
+  assert.deepEqual((await repository.listTrackedQueries()).map((query) => query.queryText), [
+    "коммерческий",
+    "информационный",
+    "низкий приоритет",
+  ]);
+});
+
 databaseTest("query listing is paginated and applies every dashboard dimension", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);

@@ -29,6 +29,7 @@ export type YandexSearchConfig = DisabledSeoSourceConfig | {
   apiKey: string;
   folderId: string;
   targetHost: string;
+  dailyCheckLimit: number;
 };
 
 export type SeoConfig = {
@@ -40,7 +41,7 @@ export type SeoConfig = {
 export type SafeSeoConfigSummary = {
   yandex: { enabled: false } | { enabled: true; hostId: string };
   google: { enabled: false } | { enabled: true; siteUrl: string };
-  yandexSearch: { enabled: false } | { enabled: true; targetHost: string };
+  yandexSearch: { enabled: false } | { enabled: true; targetHost: string; dailyCheckLimit: number };
 };
 
 export type SeoSourceStatus = {
