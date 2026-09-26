@@ -1,4 +1,9 @@
-FROM node:22.22.0-alpine AS dependencies
+# syntax=docker/dockerfile:1
+
+# Build JavaScript on the native builder architecture. Runtime images below keep
+# the requested target architecture; .yarnrc.yml makes their native optional
+# packages available for both supported Linux CPU architectures.
+FROM --platform=$BUILDPLATFORM node:22.22.0-alpine AS dependencies
 WORKDIR /app
 RUN corepack enable
 ENV PUPPETEER_SKIP_DOWNLOAD=true
@@ -12,17 +17,30 @@ COPY . .
 RUN test "${#RELEASE_SHA}" = 40 && printf '%s' "$RELEASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
 RUN yarn build:content-release
 
-FROM dependencies AS media-migration
+FROM dependencies AS media-migration-build
 WORKDIR /app
 ARG RELEASE_SHA
 ENV RELEASE_SHA=$RELEASE_SHA
-LABEL org.opencontainers.image.revision=$RELEASE_SHA
 COPY --chown=node:node tsconfig.json tsconfig.server.json package.json ./
 COPY --chown=node:node src/server ./src/server
 COPY --chown=node:node scripts/create-admin.ts scripts/migrate-media-to-s3.ts scripts/verify-media-migration.ts scripts/sweep-public-media.ts ./scripts/
 COPY --chown=node:node drizzle ./drizzle
 COPY --chown=node:node public ./public
 RUN test "${#RELEASE_SHA}" = 40 && printf '%s' "$RELEASE_SHA" | grep -Eq '^[a-f0-9]{40}$'
+
+FROM node:22.22.0-alpine AS media-migration
+WORKDIR /app
+ARG RELEASE_SHA
+ENV RELEASE_SHA=$RELEASE_SHA
+LABEL org.opencontainers.image.revision=$RELEASE_SHA
+COPY --from=media-migration-build --chown=node:node /app/node_modules /app/node_modules
+COPY --from=media-migration-build --chown=node:node /app/tsconfig.json /app/tsconfig.json
+COPY --from=media-migration-build --chown=node:node /app/tsconfig.server.json /app/tsconfig.server.json
+COPY --from=media-migration-build --chown=node:node /app/package.json /app/package.json
+COPY --from=media-migration-build --chown=node:node /app/src/server /app/src/server
+COPY --from=media-migration-build --chown=node:node /app/scripts /app/scripts
+COPY --from=media-migration-build --chown=node:node /app/drizzle /app/drizzle
+COPY --from=media-migration-build --chown=node:node /app/public /app/public
 USER node
 CMD ["node", "--import", "tsx", "scripts/migrate-media-to-s3.ts", "--dry-run", "--report", "/tmp/media-migration-report.json"]
 

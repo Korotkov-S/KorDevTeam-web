@@ -33,6 +33,16 @@ test('production image packages SSR, migrations and production dependencies unde
   assert.match(dockerfile, /ENTRYPOINT \["\/app\/scripts\/runtime-entrypoint\.sh"\]/);
 });
 
+test('multi-platform builds run Node tooling natively and package both Linux runtime architectures', () => {
+  const dockerfile = readFileSync('Dockerfile', 'utf8');
+  const yarnConfig = readFileSync('.yarnrc.yml', 'utf8');
+  assert.match(dockerfile, /^FROM --platform=\$BUILDPLATFORM node:22\.22\.0-alpine AS dependencies$/m);
+  assert.match(dockerfile, /^FROM node:22\.22\.0-alpine AS media-migration$/m);
+  assert.match(yarnConfig, /supportedArchitectures:\s*[\s\S]*os:\s*\[current, linux\]/);
+  assert.match(yarnConfig, /supportedArchitectures:\s*[\s\S]*cpu:\s*\[current, x64, arm64\]/);
+  assert.match(yarnConfig, /supportedArchitectures:\s*[\s\S]*libc:\s*\[current, musl\]/);
+});
+
 test('content release image is a minimal compiled Node 22 runtime with immutable provenance', () => {
   const dockerfile = readFileSync('Dockerfile', 'utf8');
   assert.match(dockerfile, /FROM dependencies AS content-release-build/);
