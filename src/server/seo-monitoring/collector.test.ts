@@ -101,7 +101,7 @@ test("Yandex refreshes authoritative regions and collects only resolved desired 
   assert.ok(f.events.includes("regions:1"));
 });
 
-test("Yandex reimports a three-day-lag rolling window", async () => {
+test("Yandex keeps its lag-safe rolling window inside the official two-week horizon", async () => {
   const f = fixture();
   const windows: Array<{ from: string; to: string }> = [];
   f.yandex.collect = async (window, region) => {
@@ -114,8 +114,8 @@ test("Yandex reimports a three-day-lag rolling window", async () => {
   const report = await collector.run();
 
   assert.deepEqual(windows, [
-    { from: "2026-09-10", to: "2026-09-23" },
-    { from: "2026-09-10", to: "2026-09-23" },
+    { from: "2026-09-13", to: "2026-09-23" },
+    { from: "2026-09-13", to: "2026-09-23" },
   ]);
   assert.equal(report.sources[0].latestObservationDate, "2026-09-23");
 });

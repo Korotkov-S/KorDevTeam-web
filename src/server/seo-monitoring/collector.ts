@@ -48,6 +48,8 @@ type Logger = { write(record: Record<string, unknown>): void };
 
 const DAY_MS = 86_400_000;
 const YANDEX_DEVICES: SeoDevice[] = ["desktop", "mobile"];
+const YANDEX_DATA_HORIZON_DAYS = 14;
+const YANDEX_DATA_LAG_DAYS = 3;
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -108,7 +110,11 @@ export function createSeoCollector(dependencies: {
     const source = "yandex_webmaster" as const;
     const provider = dependencies.yandex;
     if (!provider) return { source, status: "failed", receivedCount: 0, storedCount: 0, latestObservationDate: null, errorCode: "seo_yandex_provider_missing" };
-    const window = windowEnding(clock(), 3);
+    const window = windowEnding(
+      clock(),
+      YANDEX_DATA_LAG_DAYS,
+      YANDEX_DATA_HORIZON_DAYS - YANDEX_DATA_LAG_DAYS,
+    );
     return dependencies.repository.withSourceLock(source, async () => {
       const run = await dependencies.repository.startRun(source, window.from, window.to);
       let receivedCount = 0;
