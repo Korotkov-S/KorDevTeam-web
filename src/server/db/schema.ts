@@ -45,6 +45,8 @@ export const seoSource = pgEnum("seo_source", ["yandex_webmaster", "google_searc
 export const seoDevice = pgEnum("seo_device", ["desktop", "mobile", "tablet", "all"]);
 export const seoFrequencyBand = pgEnum("seo_frequency_band", ["high", "medium", "low", "unclassified"]);
 export const seoQueryOrigin = pgEnum("seo_query_origin", ["manual", "api", "import"]);
+export const seoQueryStatus = pgEnum("seo_query_status", ["candidate", "active", "archived"]);
+export const seoQueryKind = pgEnum("seo_query_kind", ["commercial", "informational", "other"]);
 export const seoRunStatus = pgEnum("seo_run_status", ["running", "success", "partial", "failed"]);
 export const seoRankStatus = pgEnum("seo_rank_status", ["found", "not_found"]);
 export const seoRegionScope = pgEnum("seo_region_scope", ["country", "city"]);
@@ -512,16 +514,22 @@ export const seoQueries = pgTable(
     origin: seoQueryOrigin("origin").notNull().default("api"),
     wordstatFrequency: integer("wordstat_frequency"),
     frequencyBand: seoFrequencyBand("frequency_band").notNull().default("unclassified"),
-    tracked: boolean("tracked").notNull().default(true),
+    status: seoQueryStatus("status").notNull().default("candidate"),
+    kind: seoQueryKind("kind").notNull().default("other"),
+    priority: integer("priority").notNull().default(0),
+    tracked: boolean("tracked").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("seo_queries_normalized_query_uq").on(table.normalizedQuery),
     index("seo_queries_tracked_band_idx").on(table.tracked, table.frequencyBand),
+    index("seo_queries_status_priority_idx").on(table.status, table.priority),
     check("seo_queries_query_text_nonempty", sql`length(btrim(${table.queryText})) > 0`),
     check("seo_queries_normalized_query_nonempty", sql`length(btrim(${table.normalizedQuery})) > 0`),
     check("seo_queries_frequency_non_negative", sql`${table.wordstatFrequency} IS NULL OR ${table.wordstatFrequency} >= 0`),
+    check("seo_queries_priority_non_negative", sql`${table.priority} >= 0`),
+    check("seo_queries_status_tracked_coherent", sql`${table.tracked} = (${table.status} = 'active')`),
     check("seo_queries_target_path_valid", sql`${table.targetPath} IS NULL OR ${table.targetPath} LIKE '/%'`),
   ],
 );

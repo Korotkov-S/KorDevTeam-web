@@ -43,6 +43,12 @@ test("SEO schema exposes separate Yandex control-rank checks and runs", () => {
   assert.equal("plannedCount" in seoRankRuns, true);
 });
 
+test("SEO query schema exposes an explicit semantic-core lifecycle", () => {
+  assert.equal("status" in seoQueries, true);
+  assert.equal("kind" in seoQueries, true);
+  assert.equal("priority" in seoQueries, true);
+});
+
 const leadFixture = {
   id: "00000000-0000-4000-8000-000000000001",
   submissionKey: "00000000-0000-4000-8000-000000000002",
@@ -260,6 +266,69 @@ databaseTest("SEO observations are unique and reject impossible search metrics",
   }));
 });
 
+databaseTest("SEO query lifecycle defaults to a candidate and rejects incoherent states", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const [candidate] = await db.insert(seoQueries).values({
+    queryText: "внедрение crm",
+    normalizedQuery: "внедрение crm",
+  }).returning();
+
+  assert.deepEqual({
+    status: candidate.status,
+    kind: candidate.kind,
+    priority: candidate.priority,
+    tracked: candidate.tracked,
+  }, {
+    status: "candidate",
+    kind: "other",
+    priority: 0,
+    tracked: false,
+  });
+
+  await assertConstraintViolation(() => db.insert(seoQueries).values({
+    queryText: "активный без контроля",
+    normalizedQuery: "активный без контроля",
+    status: "active",
+    tracked: false,
+  }));
+  await assertConstraintViolation(() => db.insert(seoQueries).values({
+    queryText: "кандидат в контроле",
+    normalizedQuery: "кандидат в контроле",
+    status: "candidate",
+    tracked: true,
+  }));
+  await assertConstraintViolation(() => db.insert(seoQueries).values({
+    queryText: "отрицательный приоритет",
+    normalizedQuery: "отрицательный приоритет",
+    priority: -1,
+  }));
+});
+
+databaseTest("0008 promotes non-API tracked queries but turns legacy API noise into candidates", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS status`);
+  await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS kind`);
+  await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS priority`);
+  await db.execute(sql`ALTER TABLE seo_queries ALTER COLUMN tracked SET DEFAULT true`);
+  await db.execute(sql`DROP TYPE IF EXISTS seo_query_status`);
+  await db.execute(sql`DROP TYPE IF EXISTS seo_query_kind`);
+  await db.execute(sql`INSERT INTO seo_queries (query_text, normalized_query, origin, tracked)
+    VALUES ('случайный api запрос', 'случайный api запрос', 'api', true),
+      ('ручной запрос', 'ручной запрос', 'manual', true)`);
+  await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at = 1790453494948`);
+
+  await migrate(db, { migrationsFolder: "drizzle" });
+
+  const result = await db.execute(sql`SELECT normalized_query, status, kind, priority, tracked
+    FROM seo_queries ORDER BY normalized_query`);
+  assert.deepEqual(result.rows, [
+    { normalized_query: "ручной запрос", status: "active", kind: "other", priority: 0, tracked: true },
+    { normalized_query: "случайный api запрос", status: "candidate", kind: "other", priority: 0, tracked: false },
+  ]);
+});
+
 databaseTest("Google SEO observations require an explicit Russia region", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const { db, metric } = await seoMetricFixture(TEST_DATABASE_URL);
@@ -470,7 +539,7 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
   await db.execute(sql`DROP TABLE seo_rank_checks, seo_rank_runs`);
   await db.execute(sql`DROP TYPE seo_rank_status`);
   await db.execute(sql`DROP TABLE seo_daily_metrics, seo_recommendations, seo_changes, seo_collection_runs, seo_regions, seo_queries, seo_sources`);
-  await db.execute(sql`DROP TYPE seo_change_type, seo_device, seo_frequency_band, seo_query_origin, seo_recommendation_confidence, seo_recommendation_status, seo_region_scope, seo_run_status, seo_source`);
+  await db.execute(sql`DROP TYPE seo_change_type, seo_device, seo_frequency_band, seo_query_kind, seo_query_origin, seo_query_status, seo_recommendation_confidence, seo_recommendation_status, seo_region_scope, seo_run_status, seo_source`);
   await db.execute(sql`DROP TABLE mcp_tokens, content_media_refs, admin_sessions, admin_auth_limits`);
   await db.execute(sql`DROP TYPE admin_auth_limit_kind`);
   await db.execute(sql`DROP INDEX media_assets_checksum_visibility_processing_uq`);
