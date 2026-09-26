@@ -219,6 +219,26 @@ test('prune removes only old marked releases while retaining three and every rec
   for (let i=0;i<6;i++) assert.equal(existsSync(`${f.dir}/releases/${String(i).repeat(40)}`), i>=3);
   assert.ok(existsSync(`${f.dir}/releases/unrelated`));
 });
+test('prune can run from the active release without deleting that checkout', t => {
+  const f = fixture(t);
+  const active = `${f.dir}/releases/${'a'.repeat(40)}`;
+  mkdirSync(active);
+  writeFileSync(`${active}/.kordev-release`, 'release\n');
+  const old = new Date(Date.now() - 60 * 86400000);
+  utimesSync(active, old, old);
+  for (let i = 0; i < 4; i++) {
+    const dir = `${f.dir}/releases/${String(i).repeat(40)}`;
+    mkdirSync(dir);
+    writeFileSync(`${dir}/.kordev-release`, 'release\n');
+  }
+  const result = spawnSync('bash', [path.join(root, 'scripts/prune-releases.sh'), `${f.dir}/releases`], {
+    cwd: active,
+    env: f.env,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(existsSync(active), 'the checkout running the prune command must be retained');
+});
 test('backup and restore require explicit encryption, private destination and non-production target', t => {
   const f = fixture(t);
   for (const name of ['backup-postgres', 'restore-postgres']) {

@@ -62,11 +62,24 @@ export function safeDirectory(target) {
   safePath(target);
   const root = realpathSync(target);
   const repo = realpathSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
-  if ([homedir(), realpathSync(process.cwd()), repo].some(protectedRoot => protectedRoot === root || protectedRoot.startsWith(root + path.sep)) || existsSync(path.join(root, '.git')) || !lstatSync(root).isDirectory()) throw Error('Unsafe target directory');
+  const protectedRoots = [realpathSync(process.cwd()), repo];
+  const containsOnlyMarkedRelease = protectedRoot => protectedRoot.startsWith(root + path.sep)
+    && path.dirname(protectedRoot) === root
+    && /^[a-f0-9]{40}$/.test(path.basename(protectedRoot))
+    && existsSync(path.join(protectedRoot, '.kordev-release'))
+    && !lstatSync(path.join(protectedRoot, '.kordev-release')).isSymbolicLink()
+    && readFileSync(path.join(protectedRoot, '.kordev-release'), 'utf8') === 'release\n';
+  if (homedir() === root || homedir().startsWith(root + path.sep)
+    || protectedRoots.some(protectedRoot => protectedRoot === root || (protectedRoot.startsWith(root + path.sep) && !containsOnlyMarkedRelease(protectedRoot)))
+    || existsSync(path.join(root, '.git')) || !lstatSync(root).isDirectory()) throw Error('Unsafe target directory');
   return root;
 }
 function prune(target) {
   const root = safeDirectory(target);
+  const protectedDirectories = new Set([
+    realpathSync(process.cwd()),
+    realpathSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')),
+  ].filter(directory => path.dirname(directory) === root));
   const keep = Number(process.env.KEEP_RELEASES ?? 3), days = Number(process.env.RETENTION_DAYS ?? 30);
   if (!Number.isSafeInteger(keep) || keep < 3 || !Number.isSafeInteger(days) || days < 30) throw Error('Release retention must keep at least 3 releases and 30 days');
   const releases = readdirSync(root, { withFileTypes: true }).filter(entry => /^[a-f0-9]{40}$/.test(entry.name) && entry.isDirectory()).map(entry => {
@@ -75,6 +88,7 @@ function prune(target) {
     return { directory, modified: lstatSync(directory).mtimeMs };
   }).filter(Boolean).sort((a,b) => b.modified - a.modified);
   for (const release of releases.slice(keep)) {
+    if (protectedDirectories.has(realpathSync(release.directory))) continue;
     if (release.modified >= Date.now() - days * 86400000) continue;
     safePath(release.directory);
     if (path.dirname(realpathSync(release.directory)) !== root) throw Error('Release child escaped directory');
