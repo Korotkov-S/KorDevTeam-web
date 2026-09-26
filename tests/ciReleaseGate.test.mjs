@@ -149,6 +149,8 @@ test("production deployment is dispatch-only, protected, digest-exact and passes
   assert.ok(config >= 0 && config < clone && clone < exactCheckout && exactCheckout < releaseCd && releaseCd < install && install < currentLink && currentLink < checkout,
     "remote deployment must install the exact audited release before entering its current checkout");
   assert.match(script, /RELEASES_DIR.*RELEASE_SHA/);
+  assert.match(script, /install -d -m 0750 -- \/opt\/kordevteam/);
+  assert.match(script, /production deploy failed at remote line/);
   assert.match(script, /git rev-parse HEAD.*RELEASE_SHA/);
   assert.match(script, /git -C .* remote get-url origin.*REPOSITORY_URL/);
   assert.match(script, /git status --porcelain --untracked-files=no/);

@@ -414,7 +414,8 @@ jobs:
           envs: IMAGE_REF,CONTENT_IMAGE_REF,CONTENT_MANIFEST_SHA256,PRIVACY_POLICY_SHA256,PERSIST_TEST_LEAD,RELEASE_SHA,REPOSITORY_URL
           script: |
             bash -se <<'KORDEV_RELEASE'
-            set -euo pipefail
+            set -Eeuo pipefail
+            trap 'status=$?; printf "production deploy failed at remote line %s (status %s)\n" "$LINENO" "$status" >&2' ERR
             [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
             [[ "$REPOSITORY_URL" =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.git$ ]]
             test -r /etc/kordevteam/operations.env
@@ -423,7 +424,10 @@ jobs:
             set +a
             : "${RELEASES_DIR:?RELEASES_DIR is required}"
             [[ "$RELEASES_DIR" == /* && "$RELEASES_DIR" != / ]]
-            test -d /opt/kordevteam
+            if [[ ! -e /opt/kordevteam ]]; then
+              install -d -m 0750 -- /opt/kordevteam
+            fi
+            [[ -d /opt/kordevteam && ! -L /opt/kordevteam ]]
             if [[ ! -e "$RELEASES_DIR" ]]; then
               install -d -m 0750 -- "$RELEASES_DIR"
             fi
