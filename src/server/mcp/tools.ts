@@ -75,6 +75,25 @@ const seoChangeListInput = z.strictObject({ dateFrom: isoDate, dateTo: isoDate, 
 const seoRecommendationListInput = z.strictObject({ dateFrom: isoDate, dateTo: isoDate,
   status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]).optional(),
   pagePath: z.string().max(500).regex(/^\//).optional(), ...pageFields }).superRefine(validateSeoRange);
+const seoFrequencyBand = z.enum(["high", "medium", "low", "unclassified"]);
+const seoQueryKind = z.enum(["commercial", "informational", "other"]);
+const seoQueryStatus = z.enum(["candidate", "active", "archived"]);
+const seoSemanticCoreListInput = z.strictObject({ status: seoQueryStatus.optional(), kind: seoQueryKind.optional(), ...pageFields });
+const seoCandidateInput = z.strictObject({
+  queryText: z.string().trim().min(1).max(500),
+  targetPath: z.string().max(500).regex(/^\//).nullable().optional(),
+  wordstatFrequency: z.number().int().nonnegative().nullable().optional(),
+  frequencyBand: seoFrequencyBand.optional(),
+  kind: seoQueryKind.optional(),
+  priority: z.number().int().min(0).max(1000).optional(),
+});
+const seoQueryUpdateInput = z.strictObject({
+  id: z.uuid(), expectedUpdatedAt: z.iso.datetime(),
+  targetPath: z.string().max(500).regex(/^\//).nullable(),
+  wordstatFrequency: z.number().int().nonnegative().nullable(),
+  frequencyBand: seoFrequencyBand, kind: seoQueryKind,
+  priority: z.number().int().min(0).max(1000), status: seoQueryStatus,
+});
 const genericRecord = z.record(z.string(), z.unknown());
 const genericPage = z.strictObject({ items: z.array(genericRecord), nextCursor: z.string().nullable().optional() });
 const listContentInput = z.strictObject({
@@ -151,6 +170,15 @@ const errorMessages: Record<string, string> = {
   seo_cursor_invalid: "Некорректный курсор списка SEO-данных.",
   seo_recommendation_status_conflict: "Рекомендация уже изменилась. Сначала прочитайте актуальное состояние.",
   seo_recommendation_transition_invalid: "Недопустимый переход состояния рекомендации.",
+  seo_query_conflict: "Ключевой запрос уже изменён. Сначала прочитайте актуальное состояние.",
+  seo_query_exists: "Такой ключевой запрос уже существует.",
+  seo_query_not_found: "Ключевой запрос не найден.",
+  seo_query_text_invalid: "Укажите корректный ключевой запрос.",
+  seo_query_status_invalid: "Некорректное состояние ключевого запроса.",
+  seo_query_kind_invalid: "Некорректный тип ключевого запроса.",
+  seo_wordstat_frequency_invalid: "Некорректная частотность Wordstat.",
+  seo_query_priority_invalid: "Некорректный приоритет ключевого запроса.",
+  seo_query_updated_at_invalid: "Некорректная версия ключевого запроса.",
 };
 
 function compactEntry(entry: Pick<ContentEntry, "id" | "slug" | "status" | "version"> & Partial<Pick<ContentEntry, "kind" | "title" | "updatedAt" | "publishedAt">>) {
@@ -355,6 +383,13 @@ export function createKordevMcpServer(
       outputSchema: withError(genericPage),
       annotations: annotations(true),
     }, input => run("list_seo_queries", () => services.seo.listQueries(input)));
+    server.registerTool("list_seo_semantic_core", {
+      title: "Семантическое ядро SEO",
+      description: "Возвращает активные, архивные или кандидатные ключевые запросы, включая фразы без показов.",
+      inputSchema: seoSemanticCoreListInput,
+      outputSchema: withError(genericPage),
+      annotations: annotations(true),
+    }, input => run("list_seo_semantic_core", () => services.seo.listSemanticCore(input)));
     server.registerTool("list_seo_changes", {
       title: "Журнал SEO-изменений",
       description: "Возвращает ограниченную страницу зарегистрированных изменений сайта.",
@@ -372,6 +407,24 @@ export function createKordevMcpServer(
   }
 
   if (has("seo:read", "seo:write")) {
+    server.registerTool("create_seo_candidate", {
+      title: "Добавить SEO-кандидата",
+      description: "Добавляет новый ключевой запрос только как кандидата; он не включается в ежедневный контроль автоматически.",
+      inputSchema: seoCandidateInput,
+      outputSchema: withError(genericRecord),
+      annotations: annotations(false),
+    }, input => run("create_seo_candidate", () => services.seo.createCandidate(input)));
+    server.registerTool("update_seo_query", {
+      title: "Обновить ключевой запрос SEO",
+      description: "Обновляет классификацию и явно меняет состояние ключевого запроса с проверкой актуальной версии.",
+      inputSchema: seoQueryUpdateInput,
+      outputSchema: withError(genericRecord),
+      annotations: annotations(false),
+    }, input => run("update_seo_query", () => services.seo.updateSemanticQuery({
+      ...input,
+      targetPath: input.targetPath ?? null,
+      wordstatFrequency: input.wordstatFrequency ?? null,
+    })));
     server.registerTool("create_seo_recommendation", {
       title: "Создать SEO-рекомендацию",
       description: "Сохраняет аналитическую рекомендацию с серверной дедупликацией; не изменяет публичный контент.",

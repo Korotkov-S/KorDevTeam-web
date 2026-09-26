@@ -48,6 +48,9 @@ function services(overrides: { content?: Partial<McpServices["content"]>; media?
   const seo = {
     async getOverview() { return { impressions: 10, clicks: 1, ctr: 0.1, averagePosition: 5 }; },
     async listQueries() { return { items: [], nextCursor: null }; },
+    async listSemanticCore() { return { items: [{ id: ENTRY_ID, queryText: "внедрение crm", status: "active", updatedAt: "2026-09-26T07:00:00.000Z" }], nextCursor: null }; },
+    async createCandidate() { return { id: ENTRY_ID, status: "candidate", updatedAt: "2026-09-26T07:00:00.000Z" }; },
+    async updateSemanticQuery() { return { id: ENTRY_ID, status: "active", updatedAt: "2026-09-26T07:01:00.000Z" }; },
     async listChanges() { return { items: [], nextCursor: null }; },
     async listRecommendations() { return { items: [], nextCursor: null }; },
     async createRecommendation() { return { id: ENTRY_ID, status: "new" }; },
@@ -87,9 +90,9 @@ test("scope combinations register only their exact tool surface", async t => {
     [["content:publish"], ["publish_content", "unpublish_content"]],
     [["media:write"], ["upload_image"]],
     [["media:read", "media:write"], ["list_media", "upload_image"]],
-    [["seo:read"], ["get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations"]],
+    [["seo:read"], ["get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core"]],
     [["seo:write"], []],
-    [["seo:read", "seo:write"], ["create_seo_recommendation", "get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "record_seo_change", "update_seo_recommendation_status"]],
+    [["seo:read", "seo:write"], ["create_seo_candidate", "create_seo_recommendation", "get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core", "record_seo_change", "update_seo_query", "update_seo_recommendation_status"]],
     [["content:read", "content:write", "content:publish", "media:read", "media:write"], [
       "create_content_draft", "get_content", "list_content", "list_media", "publish_content",
       "unpublish_content", "update_content_draft", "upload_image",
@@ -123,6 +126,35 @@ test("SEO list schemas enforce hard limits, ISO date bounds, and cursors", async
     const result = await connection.client.callTool({ name: "list_seo_queries", arguments: args });
     assert.equal(result.isError, true);
   }
+});
+
+test("semantic core tools validate strict schemas, require both SEO scopes, and audit token-bound writes", async t => {
+  const records: McpAuditRecord[] = [];
+  let updates = 0;
+  const readOnly = await connected(["seo:read"]);
+  t.after(async () => { await readOnly.client.close(); await readOnly.server.close(); });
+  assert.equal((await readOnly.client.listTools()).tools.some(tool => tool.name === "create_seo_candidate" || tool.name === "update_seo_query"), false);
+  const page = await readOnly.client.callTool({ name: "list_seo_semantic_core", arguments: { status: "active", limit: 10 } });
+  assert.equal(page.isError, undefined);
+  const invalidList = await readOnly.client.callTool({ name: "list_seo_semantic_core", arguments: { status: "active", unexpected: true } });
+  assert.equal(invalidList.isError, true);
+
+  const write = await connected(["seo:read", "seo:write"], services({ seo: {
+    async updateSemanticQuery() { updates++; throw new Error("seo_query_conflict"); },
+  } }), record => records.push(record));
+  t.after(async () => { await write.client.close(); await write.server.close(); });
+  const invalidCreate = await write.client.callTool({ name: "create_seo_candidate", arguments: { queryText: "ключ", status: "active" } });
+  assert.equal(invalidCreate.isError, true);
+  const conflict = await write.client.callTool({ name: "update_seo_query", arguments: {
+    id: ENTRY_ID, expectedUpdatedAt: "2026-09-26T07:00:00.000Z", targetPath: "/services/crm-development/",
+    wordstatFrequency: 25, frequencyBand: "low", kind: "commercial", priority: 100, status: "active",
+  } });
+  assert.equal(updates, 1);
+  assert.equal(conflict.isError, true);
+  assert.equal((conflict.structuredContent as { code: string }).code, "seo_query_conflict");
+  assert.equal(records[0]?.tokenId, "token-id");
+  assert.equal(records[0]?.tool, "update_seo_query");
+  assert.equal(records[0]?.errorCode, "seo_query_conflict");
 });
 
 test("tool schemas reject unknown fields and successful calls return structured content", async t => {

@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
 
-import type { SeoDevice, SeoSourceId } from "./contracts";
+import type { SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "./contracts";
 import type { SeoService } from "./service";
 
 type Frequency = "high" | "medium" | "low" | "unclassified";
 type RecommendationStatus = "new" | "accepted" | "rejected" | "implemented" | "dismissed";
 type Filters = { dateFrom: string; dateTo: string; source?: SeoSourceId; regionId?: string; device?: SeoDevice; frequencyBand?: Frequency; pagePath?: string };
 type Page = { limit?: number; cursor?: string | null };
-type Backing = Pick<SeoService, "getOverview" | "listQueries" | "listChanges" | "listRecommendations" | "createRecommendation" | "recordChange" | "updateRecommendationStatus">;
+type Backing = Pick<SeoService, "getOverview" | "listQueries" | "listSemanticCore" | "createCandidate" | "updateSemanticQuery"
+  | "listChanges" | "listRecommendations" | "createRecommendation" | "recordChange" | "updateRecommendationStatus">;
 
 function stable(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
@@ -51,6 +52,15 @@ export function createMcpSeoService(service: Backing, tokenId: string) {
     async listQueries(input: Filters & Page) {
       const { limit, cursor, ...filters } = input;
       return json(await service.listQueries({ filters, limit, cursor }));
+    },
+    async listSemanticCore(input: { status?: SeoQueryStatus; kind?: SeoQueryKind } & Page) {
+      return json(await service.listSemanticCore(input));
+    },
+    async createCandidate(command: Parameters<Backing["createCandidate"]>[0]) {
+      return json(await service.createCandidate(command));
+    },
+    async updateSemanticQuery(command: Parameters<Backing["updateSemanticQuery"]>[0]) {
+      return json(await service.updateSemanticQuery(command));
     },
     async listChanges(input: { dateFrom: string; dateTo: string; pagePath?: string } & Page) {
       return json(await service.listChanges({ dateFrom: input.dateFrom, dateTo: input.dateTo,

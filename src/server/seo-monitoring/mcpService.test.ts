@@ -11,6 +11,9 @@ function backing() {
   return { calls, service: {
     async getOverview(input: unknown) { calls.push(["overview", input]); return { impressions: 10, clicks: 1, ctr: 0.1, averagePosition: 5 }; },
     async listQueries(input: unknown) { calls.push(["queries", input]); return { items: [], nextCursor: null }; },
+    async listSemanticCore(input: unknown) { calls.push(["core", input]); return { items: [{ id: queryId, updatedAt: new Date("2026-09-26T07:00:00.000Z") }], nextCursor: "10" }; },
+    async createCandidate(command: unknown) { calls.push(["candidate", command]); return { id: queryId, status: "candidate", updatedAt: new Date("2026-09-26T07:00:00.000Z") }; },
+    async updateSemanticQuery(command: unknown) { calls.push(["query-status", command]); return { id: queryId, status: "active", updatedAt: new Date("2026-09-26T07:01:00.000Z") }; },
     async listChanges(input: unknown) { calls.push(["changes", input]); return { items: [], nextCursor: null }; },
     async listRecommendations(input: unknown) { calls.push(["recommendations", input]); return { items: [], nextCursor: null }; },
     async createRecommendation(command: unknown, actor: unknown) { calls.push(["create", { command, actor }]); return command; },
@@ -47,4 +50,21 @@ test("recommendation fingerprint is stable, server-generated, and actor-bound", 
   assert.match(first.command.fingerprint, /^[0-9a-f]{64}$/u);
   assert.equal(first.command.fingerprint, second.command.fingerprint);
   assert.deepEqual(first.actor, { mcpTokenId: tokenId });
+});
+
+test("semantic core MCP adapter paginates, serializes dates, and forwards lifecycle mutations", async () => {
+  const b = backing();
+  const service = createMcpSeoService(b.service as never, tokenId);
+  const page = await service.listSemanticCore({ status: "candidate", kind: "other", limit: 10, cursor: "0" });
+  assert.deepEqual(b.calls[0], ["core", { status: "candidate", kind: "other", limit: 10, cursor: "0" }]);
+  assert.equal(page.items[0].updatedAt, "2026-09-26T07:00:00.000Z");
+  assert.equal(page.nextCursor, "10");
+
+  await service.createCandidate({ queryText: "новый ключ", targetPath: "/services/crm-development/",
+    wordstatFrequency: 25, frequencyBand: "low", kind: "commercial", priority: 100 });
+  await service.updateSemanticQuery({ id: queryId, expectedUpdatedAt: "2026-09-26T07:00:00.000Z",
+    targetPath: "/services/crm-development/", wordstatFrequency: 25, frequencyBand: "low",
+    kind: "commercial", priority: 100, status: "active" });
+  assert.equal(b.calls[1][0], "candidate");
+  assert.equal(b.calls[2][0], "query-status");
 });
