@@ -142,10 +142,11 @@ test("production deployment is dispatch-only, protected, digest-exact and passes
   const config = script.indexOf("source /etc/kordevteam/operations.env");
   const clone = script.indexOf('git clone --filter=blob:none --no-checkout');
   const exactCheckout = script.indexOf('checkout --detach "$RELEASE_SHA"');
+  const releaseCd = script.indexOf('cd "$release_dir"');
   const install = script.indexOf('yarn install --immutable --mode=skip-build');
   const currentLink = script.indexOf('current_tmp="/opt/kordevteam/');
   const checkout = script.indexOf('cd /opt/kordevteam/current');
-  assert.ok(config >= 0 && config < clone && clone < exactCheckout && exactCheckout < install && install < currentLink && currentLink < checkout,
+  assert.ok(config >= 0 && config < clone && clone < exactCheckout && exactCheckout < releaseCd && releaseCd < install && install < currentLink && currentLink < checkout,
     "remote deployment must install the exact audited release before entering its current checkout");
   assert.match(script, /RELEASES_DIR.*RELEASE_SHA/);
   assert.match(script, /git rev-parse HEAD.*RELEASE_SHA/);

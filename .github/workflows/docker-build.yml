@@ -446,6 +446,7 @@ jobs:
             [[ "$(git -C "$release_dir" remote get-url origin)" == "$REPOSITORY_URL" ]]
             [[ "$(git -C "$release_dir" rev-parse HEAD)" == "$RELEASE_SHA" ]]
             [[ -z "$(git -C "$release_dir" status --porcelain --untracked-files=no)" ]]
+            cd "$release_dir"
             test "$(corepack yarn --version)" = 3.8.7
             PUPPETEER_SKIP_DOWNLOAD=true corepack yarn install --immutable --mode=skip-build
             current_tmp="/opt/kordevteam/.current-$RELEASE_SHA-$$"
