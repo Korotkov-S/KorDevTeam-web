@@ -23,6 +23,7 @@ test('every literal Docker COPY input exists in a clean tracked checkout', () =>
 
 test('production image packages SSR, migrations and production dependencies under non-root Node 22.22', () => {
   const dockerfile = readFileSync('Dockerfile', 'utf8');
+  const packageManifest = JSON.parse(readFileSync('package.json', 'utf8'));
   assert.match(dockerfile, /FROM node:22\.22\.0-alpine/);
   for (const target of ['build/client', 'build/server', '/app/drizzle']) assert.ok(dockerfile.includes(target));
   assert.match(dockerfile, /USER node/);
@@ -31,6 +32,7 @@ test('production image packages SSR, migrations and production dependencies unde
   assert.match(dockerfile, /health\/ready/);
   assert.match(dockerfile, /ENV .*CONTENT_CACHE_TTL_SECONDS=0(?:\s|$)/m);
   assert.match(dockerfile, /ENTRYPOINT \["\/app\/scripts\/runtime-entrypoint\.sh"\]/);
+  assert.ok(packageManifest.dependencies.cheerio, 'Yandex Search XML parser must ship cheerio in the production image');
 });
 
 test('multi-platform builds run Node tooling natively and package both Linux runtime architectures', () => {

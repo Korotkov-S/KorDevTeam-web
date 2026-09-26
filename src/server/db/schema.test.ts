@@ -467,6 +467,8 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
   const [lead] = await db.insert(leads).values(leadFixture).returning();
   await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });
   await db.execute(sql`DROP TABLE content_release_items, content_release_runs`);
+  await db.execute(sql`DROP TABLE seo_rank_checks, seo_rank_runs`);
+  await db.execute(sql`DROP TYPE seo_rank_status`);
   await db.execute(sql`DROP TABLE seo_daily_metrics, seo_recommendations, seo_changes, seo_collection_runs, seo_regions, seo_queries, seo_sources`);
   await db.execute(sql`DROP TYPE seo_change_type, seo_device, seo_frequency_band, seo_query_origin, seo_recommendation_confidence, seo_recommendation_status, seo_region_scope, seo_run_status, seo_source`);
   await db.execute(sql`DROP TABLE mcp_tokens, content_media_refs, admin_sessions, admin_auth_limits`);
