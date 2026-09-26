@@ -470,11 +470,11 @@ jobs:
               green) inactive=blue ;;
               *) echo "Invalid current-slot state" >&2; exit 1 ;;
             esac
-            bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF" "$CONTENT_IMAGE_REF" "$CONTENT_MANIFEST_SHA256"
+            bash scripts/deploy-slot.sh "$inactive" "$IMAGE_REF" "$CONTENT_IMAGE_REF" "$CONTENT_MANIFEST_SHA256" </dev/null
             [[ "$PERSIST_TEST_LEAD" == true ]]
             RELEASE_FORM_SMOKE_OPT_IN=persist-clearly-marked-test-lead \
               PRIVACY_POLICY_SHA256="$PRIVACY_POLICY_SHA256" \
-              bash scripts/release-gate.sh "$inactive"
-            bash scripts/switch-slot.sh "$inactive"
-            bash scripts/prune-releases.sh "${RELEASES_DIR:?RELEASES_DIR is required}"
+              bash scripts/release-gate.sh "$inactive" </dev/null
+            bash scripts/switch-slot.sh "$inactive" </dev/null
+            bash scripts/prune-releases.sh "${RELEASES_DIR:?RELEASES_DIR is required}" </dev/null
             KORDEV_RELEASE

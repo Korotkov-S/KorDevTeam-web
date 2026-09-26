@@ -161,6 +161,9 @@ test("production deployment is dispatch-only, protected, digest-exact and passes
   const prune = script.indexOf("scripts/prune-releases.sh");
   assert.ok(deploy >= 0 && deploy < releaseGate && releaseGate < switchSlot && switchSlot < prune, "deploy, release gate, switch and prune must be explicit and ordered");
   assert.match(script, /deploy-slot\.sh "\$inactive" "\$IMAGE_REF" "\$CONTENT_IMAGE_REF" "\$CONTENT_MANIFEST_SHA256"/);
+  for (const command of ["deploy-slot", "release-gate", "switch-slot", "prune-releases"]) {
+    assert.match(script, new RegExp(`scripts/${command}\\.sh[^\\n]*</dev/null`), `${command} must not inherit the remote orchestration stdin`);
+  }
   assert.match(script, /persist-clearly-marked-test-lead/);
   assert.match(script, /PERSIST_TEST_LEAD.*true/);
   assert.match(script, /current-slot/);
