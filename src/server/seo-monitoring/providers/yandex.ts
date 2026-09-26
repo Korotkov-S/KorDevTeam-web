@@ -114,8 +114,9 @@ function parseAnalyticsPage(
     for (const [observationDate, daily] of byDate) {
       if (!Number.isSafeInteger(daily.IMPRESSIONS) || !Number.isSafeInteger(daily.CLICKS)
         || daily.IMPRESSIONS === undefined || daily.CLICKS === undefined || daily.CLICKS > daily.IMPRESSIONS
-        || daily.POSITION === undefined || daily.POSITION <= 0
         || daily.CTR === undefined || daily.CTR > 100) return invalidResponse();
+      if (daily.IMPRESSIONS === 0 && daily.CLICKS === 0 && daily.POSITION === undefined) continue;
+      if (daily.POSITION === undefined || daily.POSITION <= 0) return invalidResponse();
       rows.push({
         source: "yandex_webmaster",
         observationDate,

@@ -133,6 +133,39 @@ test("collect sends requested region/device/date filters and maps every actual d
   });
 });
 
+test("collect skips zero-impression days where Yandex omits position", async () => {
+  const provider = createYandexWebmasterProvider(config, async (input) => {
+    const url = String(input);
+    if (url.endsWith("/v4/user")) return json({ user_id: 42 });
+    if (url.includes("/pro/regions")) return json({ regions: [{ id: 225, name: "Россия" }] });
+    return json({
+      count: 1,
+      text_indicator_to_statistics: [{
+        text_indicator: { type: "QUERY", value: "Внедрение CRM" },
+        popular_complementary_indicator: { type: "URL", value: "/services/crm/" },
+        statistics: [
+          { date: "2026-09-22", field: "IMPRESSIONS", value: 0 },
+          { date: "2026-09-22", field: "CLICKS", value: 0 },
+          { date: "2026-09-22", field: "CTR", value: 0 },
+          { date: "2026-09-23", field: "IMPRESSIONS", value: 10 },
+          { date: "2026-09-23", field: "CLICKS", value: 1 },
+          { date: "2026-09-23", field: "CTR", value: 10 },
+          { date: "2026-09-23", field: "POSITION", value: 4.5 },
+        ],
+      }],
+    });
+  });
+  await provider.listAvailableRegions();
+
+  const rows = await provider.collect(
+    { from: "2026-09-22", to: "2026-09-23" },
+    { id: 225, name: "Россия" },
+    "desktop",
+  );
+
+  assert.deepEqual(rows.map((row) => row.observationDate), ["2026-09-23"]);
+});
+
 test("analytics pagination continues until a page is shorter than the requested limit", async () => {
   let analyticsCalls = 0;
   const fullPage = Array.from({ length: 500 }, (_, index) => ({
