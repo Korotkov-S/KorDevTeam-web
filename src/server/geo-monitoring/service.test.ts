@@ -29,8 +29,7 @@ function startInput(overrides: Record<string, unknown> = {}) {
     mode: "live_ui" as const,
     region: "RU",
     language: "ru",
-    plannedCount: 3,
-    promptSetFingerprint: "a".repeat(64),
+    promptIds: [promptId],
     metadata: {},
     ...overrides,
   };
@@ -76,8 +75,9 @@ test("startRun accepts only bounded plans, known modes, and bounded plain metada
 
   await service.startRun(startInput({ metadata: { agent: "daily" } }), tokenId);
   assert.equal(calls, 1);
-  await assert.rejects(service.startRun(startInput({ plannedCount: 0 }), tokenId), /geo_run_planned_count_invalid/u);
-  await assert.rejects(service.startRun(startInput({ plannedCount: 1001 }), tokenId), /geo_run_planned_count_invalid/u);
+  await assert.rejects(service.startRun(startInput({ promptIds: [] }), tokenId), /geo_run_prompt_set_invalid/u);
+  await assert.rejects(service.startRun(startInput({ promptIds: Array.from({ length: 334 }, () => promptId) }), tokenId), /geo_run_prompt_set_invalid/u);
+  await assert.rejects(service.startRun(startInput({ promptIds: [promptId, promptId] }), tokenId), /geo_run_prompt_set_invalid/u);
   await assert.rejects(service.startRun(startInput({ mode: "browser_scrape" }), tokenId), /geo_run_mode_invalid/u);
   await assert.rejects(service.startRun(startInput({ metadata: [] }), tokenId), /geo_run_metadata_invalid/u);
   await assert.rejects(service.startRun(startInput({ metadata: { value: "я".repeat(9_000) } }), tokenId), /geo_run_metadata_invalid/u);

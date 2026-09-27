@@ -184,14 +184,18 @@ function citation(input: GeoCitationInput): StoredGeoCitation {
 function validateStartRun(input: GeoStartRunInput): GeoStartRunInput {
   if (!platforms.has(input.platform)) throw new Error("geo_run_platform_invalid");
   if (!modes.has(input.mode)) throw new Error("geo_run_mode_invalid");
+  if (!Array.isArray(input.promptIds) || input.promptIds.length < 1 || input.promptIds.length > 333) {
+    throw new Error("geo_run_prompt_set_invalid");
+  }
+  const promptIds = [...new Set(input.promptIds.map((id) => uuid(id, "geo_run_prompt_set_invalid")))].sort();
+  if (promptIds.length !== input.promptIds.length) throw new Error("geo_run_prompt_set_invalid");
   return {
     platform: input.platform,
     surface: boundedText(input.surface, 120, "geo_run_surface_invalid"),
     mode: input.mode,
     region: boundedText(input.region, 120, "geo_run_region_invalid"),
     language: boundedText(input.language, 16, "geo_run_language_invalid"),
-    plannedCount: boundedInteger(input.plannedCount, 1, 1_000, "geo_run_planned_count_invalid"),
-    promptSetFingerprint: normalizeResponseHash(input.promptSetFingerprint),
+    promptIds,
     metadata: metadata(input.metadata ?? {}, 16_384, "geo_run_metadata_invalid"),
   };
 }
@@ -261,7 +265,7 @@ function validateObservation(input: GeoObservationInput) {
   };
 }
 
-export function createGeoMonitoringService(repository: GeoRepository) {
+export function createGeoMonitoringService(repository: GeoRepository, clock = () => new Date()) {
   return {
     async getOverview(input: GeoReadFilters) {
       return repository.getOverview(readFilters(input));
@@ -336,6 +340,20 @@ export function createGeoMonitoringService(repository: GeoRepository) {
         ...(validated.platform ? { platform: validated.platform } : {}), ...page(input) });
     },
 
+    async listCrawlerChecks(input: { from: string; to: string; status?: "pass" | "fail" | "unavailable";
+      bot?: string; target?: string; limit?: number; cursor?: string | null }) {
+      const validated = readFilters({ from: input.from, to: input.to });
+      if (input.status && !crawlerStatuses.has(input.status)) throw new Error("geo_crawler_status_invalid");
+      return repository.listCrawlerChecks({
+        from: validated.from,
+        to: validated.to,
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.bot ? { bot: boundedText(input.bot, 120, "geo_crawler_bot_invalid") } : {}),
+        ...(input.target ? { target: normalizeGeoTargetPath(input.target) } : {}),
+        ...page(input),
+      });
+    },
+
     async listExperiments(input: { status?: "proposed" | "approved" | "active" | "completed" | "cancelled";
       pagePath?: string; limit?: number; cursor?: string | null }) {
       if (input.status && !experimentStatuses.has(input.status)) throw new Error("geo_experiment_status_invalid");
@@ -389,7 +407,7 @@ export function createGeoMonitoringService(repository: GeoRepository) {
     async evaluateExperiment(input: { id: string; milestone: 7 | 14 | 28; evaluatedAt: string }, value: GeoActor) {
       if (![7, 14, 28].includes(input.milestone)) throw new Error("geo_experiment_milestone_invalid");
       const evaluatedAt = new Date(input.evaluatedAt);
-      if (Number.isNaN(+evaluatedAt)) throw new Error("geo_experiment_evaluated_at_invalid");
+      if (Number.isNaN(+evaluatedAt) || evaluatedAt > clock()) throw new Error("geo_experiment_evaluated_at_invalid");
       return repository.evaluateExperiment({ id: uuid(input.id, "geo_experiment_invalid"),
         milestone: input.milestone, evaluatedAt }, actor(value));
     },

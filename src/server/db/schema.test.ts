@@ -59,6 +59,85 @@ test("SEO schema keeps Yandex Metrica traffic separate from search observations"
   assert.equal("averagePosition" in seoTrafficMetrics, false);
 });
 
+databaseTest("0012 reconstructs legacy GEO prompt sets and distrusts incomplete runs", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  await db.execute(sql`ALTER TABLE geo_runs
+    DROP CONSTRAINT geo_runs_prompt_ids_bounded,
+    DROP CONSTRAINT geo_runs_plan_matches_prompts,
+    DROP COLUMN prompt_ids`);
+  await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1790499950906`);
+  await db.execute(sql`
+    INSERT INTO admin_users (id, login, password_digest, password_salt)
+    VALUES ('10000000-0000-4000-8000-000000000001', 'geo-migration', 'digest', 'salt');
+    INSERT INTO mcp_tokens (id, admin_user_id, name, token_hash, token_prefix, scopes)
+    VALUES ('10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001',
+      'GEO migration', '1111111111111111111111111111111111111111111111111111111111111111', 'geo_test', ARRAY['seo:read','seo:write']);
+    INSERT INTO geo_topics (id, name, slug, status)
+    VALUES ('10000000-0000-4000-8000-000000000003', 'CRM', 'migration-crm', 'active');
+    INSERT INTO geo_prompts
+      (id, prompt_text, normalized_text, topic_id, category, status, language, region, source)
+    VALUES ('10000000-0000-4000-8000-000000000004', 'CRM для B2B', 'crm для b2b',
+      '10000000-0000-4000-8000-000000000003', 'commercial', 'active', 'ru', 'RU', 'catalog');
+    INSERT INTO geo_runs
+      (id, platform, surface, mode, region, language, status, completed_at, planned_count, completed_count,
+       stored_count, initiated_by_mcp_token_id, prompt_set_fingerprint)
+    VALUES
+      ('10000000-0000-4000-8000-000000000005', 'chatgpt_search', 'search', 'live_ui', 'RU', 'ru', 'success', now(), 3, 3, 3,
+        '10000000-0000-4000-8000-000000000002', '2222222222222222222222222222222222222222222222222222222222222222'),
+      ('10000000-0000-4000-8000-000000000006', 'chatgpt_search', 'search', 'live_ui', 'RU', 'ru', 'success', now(), 3, 1, 1,
+        '10000000-0000-4000-8000-000000000002', '3333333333333333333333333333333333333333333333333333333333333333'),
+      ('10000000-0000-4000-8000-000000000007', 'chatgpt_search', 'search', 'live_ui', 'RU', 'ru', 'running', NULL, 3, 0, 0,
+        '10000000-0000-4000-8000-000000000002', '4444444444444444444444444444444444444444444444444444444444444444'),
+      ('10000000-0000-4000-8000-000000000008', 'chatgpt_search', 'search', 'live_ui', 'RU', 'ru', 'failed', now(), 1002, 334, 334,
+        '10000000-0000-4000-8000-000000000002', '9999999999999999999999999999999999999999999999999999999999999999');
+    INSERT INTO geo_observations
+      (run_id, prompt_id, repetition, mentioned, linked, cited, response_hash)
+    VALUES
+      ('10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000004', 1, false, false, false, '5555555555555555555555555555555555555555555555555555555555555555'),
+      ('10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000004', 2, false, false, false, '6666666666666666666666666666666666666666666666666666666666666666'),
+      ('10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000004', 3, false, false, false, '7777777777777777777777777777777777777777777777777777777777777777'),
+      ('10000000-0000-4000-8000-000000000006', '10000000-0000-4000-8000-000000000004', 1, false, false, false, '8888888888888888888888888888888888888888888888888888888888888888');
+    INSERT INTO geo_prompts
+      (id, prompt_text, normalized_text, topic_id, category, status, language, region, source)
+    SELECT (substr(md5(n::text),1,8)||'-'||substr(md5(n::text),9,4)||'-4'||substr(md5(n::text),14,3)||'-8'||substr(md5(n::text),18,3)||'-'||substr(md5(n::text),21,12))::uuid,
+      'Legacy prompt '||n, 'legacy prompt '||n, '10000000-0000-4000-8000-000000000003',
+      'commercial', 'active', 'ru', 'RU', 'legacy'
+      FROM generate_series(1, 334) AS n;
+    INSERT INTO geo_observations
+      (run_id, prompt_id, repetition, mentioned, linked, cited, response_hash)
+    SELECT '10000000-0000-4000-8000-000000000008',
+      (substr(md5(n::text),1,8)||'-'||substr(md5(n::text),9,4)||'-4'||substr(md5(n::text),14,3)||'-8'||substr(md5(n::text),18,3)||'-'||substr(md5(n::text),21,12))::uuid,
+      1, false, false, false, md5(n::text)||md5(n::text)
+      FROM generate_series(1, 334) AS n;
+  `);
+
+  await migrate(db, { migrationsFolder: "drizzle" });
+
+  const result = await db.execute(sql`SELECT id, status, cardinality(prompt_ids)::int AS prompt_count,
+    planned_count, completed_count, stored_count,
+    CASE WHEN cardinality(prompt_ids) = 1 THEN prompt_set_fingerprint ELSE NULL END AS singleton_fingerprint,
+    error_code, completed_at IS NOT NULL AS completed
+    FROM geo_runs ORDER BY id`);
+  assert.deepEqual(result.rows, [
+    { id: "10000000-0000-4000-8000-000000000005", status: "success", prompt_count: 1,
+      planned_count: 3, completed_count: 3, stored_count: 3,
+      singleton_fingerprint: "6789912c6209aafb67765af50dcb868c46e4955c03895ca0079883bcf3fe386b",
+      error_code: null, completed: true },
+    { id: "10000000-0000-4000-8000-000000000006", status: "failed", prompt_count: 1,
+      planned_count: 3, completed_count: 1, stored_count: 1,
+      singleton_fingerprint: "6789912c6209aafb67765af50dcb868c46e4955c03895ca0079883bcf3fe386b",
+      error_code: "geo_legacy_run_incomplete", completed: true },
+    { id: "10000000-0000-4000-8000-000000000007", status: "failed", prompt_count: 0,
+      planned_count: 0, completed_count: 0, stored_count: 0,
+      singleton_fingerprint: null,
+      error_code: "geo_legacy_run_incomplete", completed: true },
+    { id: "10000000-0000-4000-8000-000000000008", status: "failed", prompt_count: 334,
+      planned_count: 1002, completed_count: 334, stored_count: 334, singleton_fingerprint: null,
+      error_code: null, completed: true },
+  ]);
+});
+
 const leadFixture = {
   id: "00000000-0000-4000-8000-000000000001",
   submissionKey: "00000000-0000-4000-8000-000000000002",

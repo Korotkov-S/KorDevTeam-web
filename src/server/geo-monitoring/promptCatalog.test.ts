@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 
 import { GEO_PLATFORMS, GEO_PROMPT_CATEGORIES } from "./contracts";
 import { normalizeCitationUrl, normalizeGeoPrompt } from "./normalization";
-import { loadGeoPromptCatalog, parseGeoPromptCatalog } from "./promptCatalog";
+import { loadGeoPromptCatalog, parseGeoPromptCatalog, resolveGeoPromptCatalogPath } from "./promptCatalog";
 
 test("GEO contracts expose only the approved platforms and prompt categories", () => {
   assert.deepEqual(GEO_PLATFORMS, ["yandex_alice", "chatgpt_search", "google_ai", "bing_copilot"]);
@@ -27,6 +28,7 @@ test("citation normalization accepts only bounded HTTP URLs and removes tracking
 });
 
 test("versioned Russian catalog contains exactly the approved 48-prompt distribution", () => {
+  assert.equal(resolveGeoPromptCatalogPath("/app"), path.resolve("/app/content/seo/geo-prompts.ru.json"));
   const catalog = loadGeoPromptCatalog();
   assert.equal(catalog.length, 48);
   const counts = Object.fromEntries(GEO_PROMPT_CATEGORIES.map((category) => [

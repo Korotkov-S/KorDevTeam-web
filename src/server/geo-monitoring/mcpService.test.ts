@@ -21,6 +21,7 @@ function backing() {
       async listCitations(input: unknown) { calls.push(["citations", input]); return { items: [], nextCursor: null }; },
       async listFanoutQueries(input: unknown) { calls.push(["fanout", input]); return { items: [], nextCursor: null }; },
       async listReferrals(input: unknown) { calls.push(["referrals", input]); return { items: [], nextCursor: null }; },
+      async listCrawlerChecks(input: unknown) { calls.push(["crawler", input]); return { items: [], nextCursor: null }; },
       async createPromptCandidate(input: unknown) { calls.push(["candidate", input]); return { status: "candidate" }; },
       async startRun(input: unknown, principal: string) { calls.push(["start", { input, principal }]); return { id: "run" }; },
       async recordObservation(runId: string, principal: string, input: unknown) { calls.push(["record", { runId, principal, input }]); return { id: "observation" }; },

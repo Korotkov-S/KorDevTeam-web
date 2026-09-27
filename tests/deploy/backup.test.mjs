@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.mcp_tokens': '0', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
 const postMigrationTableCounts = {
   ...preMigrationTableCounts,
-  'drizzle.__drizzle_migrations': '12',
+  'drizzle.__drizzle_migrations': '13',
   'public.leads': '0',
   'public.lead_attachments': '0',
   'public.lead_delivery_jobs': '0',
@@ -57,6 +57,7 @@ const migrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0009_yandex_metrika.sql')).digest('hex'), created_at: '1790482078740' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0010_yandex_metrika_source.sql')).digest('hex'), created_at: '1790484327389' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0011_geo_ai_visibility.sql')).digest('hex'), created_at: '1790493945985' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0012_geo_run_prompt_sets.sql')).digest('hex'), created_at: '1790499950906' },
 ];
 const tableCounts = postMigrationTableCounts;
 function inventoryQuery(sql, tables = tableCounts) {

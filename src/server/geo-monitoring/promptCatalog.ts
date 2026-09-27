@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 import { GEO_PROMPT_CATEGORIES, GEO_PROMPT_STATUSES, type GeoPromptCatalogEntry } from "./contracts";
@@ -52,9 +51,11 @@ export function parseGeoPromptCatalog(value: unknown): GeoPromptCatalogEntry[] {
   return result;
 }
 
-const defaultPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../content/seo/geo-prompts.ru.json");
+export function resolveGeoPromptCatalogPath(runtimeRoot = process.cwd()) {
+  return path.resolve(runtimeRoot, "content/seo/geo-prompts.ru.json");
+}
 
-export function loadGeoPromptCatalog(catalogPath = defaultPath): GeoPromptCatalogEntry[] {
+export function loadGeoPromptCatalog(catalogPath = resolveGeoPromptCatalogPath()): GeoPromptCatalogEntry[] {
   try {
     return parseGeoPromptCatalog(JSON.parse(readFileSync(catalogPath, "utf8")));
   } catch (error) {

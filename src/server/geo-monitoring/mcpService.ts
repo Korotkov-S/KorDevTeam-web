@@ -9,6 +9,7 @@ type Backing = Pick<GeoMonitoringService,
   | "listCitations"
   | "listFanoutQueries"
   | "listReferrals"
+  | "listCrawlerChecks"
   | "listExperiments"
   | "createPromptCandidate"
   | "startRun"
@@ -55,6 +56,9 @@ export function createMcpGeoService(service: Backing, tokenId: string) {
     },
     async listReferrals(input: Parameters<Backing["listReferrals"]>[0]) {
       return json(await service.listReferrals(input));
+    },
+    async listCrawlerChecks(input: Parameters<Backing["listCrawlerChecks"]>[0]) {
+      return json(await service.listCrawlerChecks(input));
     },
     async listExperiments(input: Parameters<Backing["listExperiments"]>[0]) {
       return json(await service.listExperiments(input));

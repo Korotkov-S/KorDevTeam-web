@@ -54,6 +54,7 @@ function fakeRepository(overrides: Partial<GeoRepository> = {}): GeoRepository {
     listCitations: async () => ({ items: [], nextCursor: null }),
     listFanoutQueries: async () => ({ items: [], nextCursor: null }),
     listReferrals: async () => ({ items: [], nextCursor: null }),
+    listCrawlerChecks: async () => ({ items: [], nextCursor: null }),
     listExperiments: async () => ({ items: [], nextCursor: null }),
     createExperimentCandidate: async (input) => input as never,
     approveExperiment: async (input) => input as never,
@@ -101,9 +102,11 @@ test("evaluation requires a full milestone after implementation and never accept
   let evaluated: any;
   const service = createGeoMonitoringService(fakeRepository({
     evaluateExperiment: async (input, actor) => { evaluated = { input, actor }; return input as never; },
-  }));
+  }), () => new Date("2026-10-01T00:00:00.000Z"));
   await service.evaluateExperiment({ id: experimentId, milestone: 7, evaluatedAt: "2026-09-28T00:00:00.000Z" }, { mcpTokenId: tokenId });
   assert.deepEqual(evaluated.actor, { mcpTokenId: tokenId });
   await assert.rejects(service.evaluateExperiment({ id: experimentId, milestone: 10 as never,
     evaluatedAt: "2026-09-28T00:00:00.000Z" }, { mcpTokenId: tokenId }), /geo_experiment_milestone_invalid/u);
+  await assert.rejects(service.evaluateExperiment({ id: experimentId, milestone: 7,
+    evaluatedAt: "2026-10-02T00:00:00.000Z" }, { mcpTokenId: tokenId }), /geo_experiment_evaluated_at_invalid/u);
 });

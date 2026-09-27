@@ -16,7 +16,10 @@ type Page<T> = { items: T[]; nextCursor: string | null };
 type Rate = { numerator: number; denominator: number; value: number | null };
 type Overview = { period: { from: string; to: string }; mentionRate: Rate; citationRate: Rate; citationShare: Rate;
   ownedSourceCoverage: Rate; shareOfVoice: Rate; sample: { runs: number; prompts: number; observations: number; requiredRepetitions: number };
-  actionMatrix: Record<"strong" | "strengthenSource" | "restoreBrand" | "attention", { prompts: number; promptIds: string[] }> };
+  actionMatrix: Record<"strong" | "strengthenSource" | "restoreBrand" | "attention", { prompts: number; promptIds: string[] }>;
+  freshness: { platforms: Array<{ platform: string; run: null | { status: string; startedAt: string | Date; completedAt: string | Date | null; errorCode: string | null } }>;
+    crawler: { lastCheckedAt: string | Date | null; checks: number; passed: number; failed: number };
+    referrals: { lastImportedAt: string | Date | null } } };
 type Observation = { id: string; promptId: string; observedAt: string | Date; platform: string; mode: string; region: string; language: string;
   mentioned: boolean; linked: boolean; cited: boolean; sourceOrder: number | null; responseExcerpt: string; snapshotTruncated: boolean;
   modelName: string | null; sourceCount: number };
@@ -29,6 +32,8 @@ type Citation = { id?: string; observationId?: string; url: string; hostname: st
 type Fanout = { observationId: string; position: number; queryText: string; source: string; platform?: string; mode?: string };
 type Referral = { observationDate: string; platform: string; users: number; newUsers: number; visits: number; pageviews: number;
   landingPath: string; importedAt: string | Date };
+type CrawlerCheck = { id: string; checkDate: string; target: string; bot: string; status: "pass" | "fail" | "unavailable";
+  reasonCode: string | null; httpStatus: number | null; checkedAt: string | Date };
 type Experiment = { id: string; pagePath: string; actionType: string; hypothesis: string; platform: string; mode: string; language: string;
   region: string; primaryMetric: string; direction: string; minimumDelta: string | number; evaluationWindows: number[]; expectedSignal: string;
   status: string; baseline: Record<string, unknown>; evaluationResults: Record<string, unknown>; verdict: string; seoChangeId: string | null;
@@ -38,7 +43,7 @@ type Evidence = { observation: Observation & { responseSnapshot: string }; menti
 
 export type GeoAdminLoaderData = { view: GeoView; filters: Filters; overview?: Overview; observations?: Page<Observation>;
   prompts?: Page<Prompt>; entities?: Page<Entity>; citations?: Page<Citation>; fanout?: Page<Fanout>; evidence?: Evidence;
-  referrals?: Page<Referral>; experiments?: Page<Experiment>; nextCursor?: string | null };
+  referrals?: Page<Referral>; crawlerChecks?: Page<CrawlerCheck>; experiments?: Page<Experiment>; nextCursor?: string | null };
 
 const statusLabels: Record<string, string> = { candidate: "Кандидат", active: "Активен", archived: "Архив",
   proposed: "Предложен", approved: "Утверждён", completed: "Завершён", cancelled: "Отменён" };
@@ -67,6 +72,10 @@ function OverviewView({ overview }: { overview?: Overview }) {
     <GeoPanel title="Достаточность выборки" help="В расчёт входят только успешные запуски, где каждый контрольный вопрос проверен ровно три раза.">
       <p>{integer.format(overview.sample.observations)} наблюдений · {integer.format(overview.sample.prompts)} вопросов · {integer.format(overview.sample.runs)} запусков · требуется {overview.sample.requiredRepetitions} повторения.</p>
     </GeoPanel>
+    <GeoPanel title="Свежесть источников" help="Отсутствие запуска показывается как «нет данных», а не как нулевая AI-видимость.">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{overview.freshness.platforms.map(({ platform, run }) => <article key={platform} className="rounded-lg border border-border p-3"><h3 className="font-semibold">{platformLabels[platform] ?? platform}</h3><p className="mt-1 text-sm">{run ? `${statusLabels[run.status] ?? run.status} · ${formatDate(run.completedAt ?? run.startedAt)}` : "Нет данных"}</p></article>)}</div>
+      <p className="mt-3 text-sm">Crawler health: {overview.freshness.crawler.checks ? `${overview.freshness.crawler.passed} успешно, ${overview.freshness.crawler.failed} с ошибкой; обновлено ${formatDate(overview.freshness.crawler.lastCheckedAt)}` : "нет данных"}. AI-referral: {overview.freshness.referrals.lastImportedAt ? `обновлено ${formatDate(overview.freshness.referrals.lastImportedAt)}` : "нет данных"}.</p>
+    </GeoPanel>
     <GeoPanel title="Матрица действий" help="Подсказывает следующий тип работы, но не меняет страницы автоматически.">
       <div className="grid gap-3 md:grid-cols-2">{matrix.map(([title, bucket, explanation]) => <article key={title} className="rounded-lg border border-border p-4"><h3 className="font-semibold">{title}</h3><p className="mt-1 text-2xl font-semibold">{integer.format(bucket.prompts)}</p><p className="mt-1 text-sm text-muted-foreground">{explanation}</p></article>)}</div>
     </GeoPanel>
@@ -94,11 +103,12 @@ function EntitiesView({ entities, csrfToken }: { entities?: Page<Entity>; csrfTo
   </div>;
 }
 
-function SourcesView({ citations, fanout }: { citations?: Page<Citation>; fanout?: Page<Fanout> }) {
+function SourcesView({ citations, fanout, crawlerChecks }: { citations?: Page<Citation>; fanout?: Page<Fanout>; crawlerChecks?: Page<CrawlerCheck> }) {
   const links = citations?.items ?? []; const queries = fanout?.items ?? [];
   return <div className="space-y-6"><PageHeader title="Источники и страницы" description="Показывает, какие сайты и страницы AI использует как доказательства, а также какие дополнительные запросы раскрывает интерфейс." />
     <GeoPanel title="Цитируемые источники" help="Собственный источник — ссылка на kordev.team; его место фиксируется в порядке источников ответа.">{links.length ? <GeoTable minWidth="1100px"><thead><tr><th className="p-3">Дата фиксации</th><th className="p-3">Платформа / режим</th><th className="p-3">Источник</th><th className="p-3">URL</th><th className="p-3">Порядок</th><th className="p-3">Категория</th><th className="p-3">Наша страница</th></tr></thead><tbody>{links.map((row, index) => <tr key={row.id ?? `${row.url}-${index}`} className="border-t border-border"><td className="p-3">{row.createdAt ? formatDate(row.createdAt) : "—"}</td><td className="p-3">{platformLabels[row.platform ?? ""] ?? row.platform ?? "—"} · {modeLabels[row.mode ?? ""] ?? row.mode ?? "—"}</td><td className="p-3">{row.hostname}</td><td className="max-w-[420px] break-all p-3"><a href={row.url} rel="noreferrer" target="_blank" className="underline">{row.title || row.url}</a></td><td className="p-3">{row.sourceOrder}</td><td className="p-3">{row.category}</td><td className="p-3">{row.isOwned ? row.localPath ?? "Да" : "Нет"}</td></tr>)}</tbody></GeoTable> : <Empty>Цитат за выбранный период нет. Это означает отсутствие зафиксированных ссылок, а не отсутствие сайта в AI-ответах.</Empty>}</GeoPanel>
     <GeoPanel title="Дополнительные запросы" help="Fan-out — подзапросы или связанные вопросы, которые AI-интерфейс явно показал при подготовке ответа.">{queries.length ? <GeoTable minWidth="800px"><thead><tr><th className="p-3">Позиция</th><th className="p-3">Запрос</th><th className="p-3">Источник фиксации</th><th className="p-3">Платформа / режим</th></tr></thead><tbody>{queries.map((row) => <tr key={`${row.observationId}-${row.position}`} className="border-t border-border"><td className="p-3">{row.position}</td><td className="p-3">{row.queryText}</td><td className="p-3">{row.source}</td><td className="p-3">{platformLabels[row.platform ?? ""] ?? row.platform ?? "—"} · {modeLabels[row.mode ?? ""] ?? row.mode ?? "—"}</td></tr>)}</tbody></GeoTable> : <Empty>Интерфейс не показал дополнительных запросов либо они ещё не были зафиксированы.</Empty>}</GeoPanel>
+    <GeoPanel title="Доступность для роботов" help="Ежедневная проверка robots.txt, sitemap и индексируемости целевых страниц; отсутствие строк означает, что проверка ещё не выполнялась.">{crawlerChecks?.items.length ? <GeoTable minWidth="900px"><thead><tr><th className="p-3">Дата</th><th className="p-3">Цель</th><th className="p-3">Робот / проверка</th><th className="p-3">Статус</th><th className="p-3">HTTP</th><th className="p-3">Причина</th></tr></thead><tbody>{crawlerChecks.items.map((row) => <tr key={row.id} className="border-t border-border"><td className="p-3">{formatDate(row.checkDate)}</td><td className="p-3">{row.target}</td><td className="p-3">{row.bot}</td><td className="p-3">{row.status === "pass" ? "Доступно" : row.status === "fail" ? "Ошибка" : "Нет данных"}</td><td className="p-3">{row.httpStatus ?? "—"}</td><td className="p-3">{row.reasonCode ?? "—"}</td></tr>)}</tbody></GeoTable> : <Empty>Проверок доступности за выбранный период нет.</Empty>}</GeoPanel>
   </div>;
 }
 
@@ -143,7 +153,7 @@ export function GeoAiVisibilityPage({ data, csrfToken }: { data: GeoAdminLoaderD
     {data.view === "platforms" ? <PlatformsView observations={data.observations} /> : null}
     {data.view === "prompts" ? <PromptsView prompts={data.prompts} csrfToken={csrfToken} /> : null}
     {data.view === "entities" ? <EntitiesView entities={data.entities} csrfToken={csrfToken} /> : null}
-    {data.view === "sources" ? <SourcesView citations={data.citations} fanout={data.fanout} /> : null}
+    {data.view === "sources" ? <SourcesView citations={data.citations} fanout={data.fanout} crawlerChecks={data.crawlerChecks} /> : null}
     {data.view === "evidence" ? <EvidenceView evidence={data.evidence} /> : null}
     {data.view === "traffic" ? <TrafficView referrals={data.referrals} /> : null}
     {data.view === "promotion" ? <PromotionView experiments={data.experiments} csrfToken={csrfToken} /> : null}

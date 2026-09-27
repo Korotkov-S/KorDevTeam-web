@@ -38,6 +38,16 @@ const overview = {
     restoreBrand: { prompts: 0, promptIds: [] },
     attention: { prompts: 1, promptIds: [promptId] },
   },
+  freshness: {
+    platforms: [
+      { platform: "yandex_alice", run: null },
+      { platform: "chatgpt_search", run: { status: "success", startedAt: "2026-09-27T06:00:00Z", completedAt: "2026-09-27T06:30:00Z", errorCode: null } },
+      { platform: "google_ai", run: null },
+      { platform: "bing_copilot", run: null },
+    ],
+    crawler: { lastCheckedAt: "2026-09-27T06:00:00Z", checks: 8, passed: 8, failed: 0 },
+    referrals: { lastImportedAt: null },
+  },
 };
 
 const observation = { id: observationId, promptId, observedAt: "2026-09-27T06:30:00Z", platform: "chatgpt_search",
@@ -76,7 +86,7 @@ test("GEO report has eight focused views with Russian explanations and no print 
     ["platforms", { ...base, view: "platforms", observations: { items: [observation], nextCursor: null } }, "Платформы и режимы"],
     ["prompts", { ...base, view: "prompts", prompts: { items: [prompt], nextCursor: null } }, "Темы и контрольные вопросы"],
     ["entities", { ...base, view: "entities", entities: { items: [entity, competitor], nextCursor: null } }, "Бренд и конкуренты"],
-    ["sources", { ...base, view: "sources", citations: { items: evidence.citations, nextCursor: null }, fanout: { items: evidence.fanoutQueries, nextCursor: null } }, "Источники и страницы"],
+    ["sources", { ...base, view: "sources", citations: { items: evidence.citations, nextCursor: null }, fanout: { items: evidence.fanoutQueries, nextCursor: null }, crawlerChecks: { items: [{ id: changeId, checkDate: "2026-09-27", target: "/services/ai-automation/", bot: "indexability", status: "pass", reasonCode: null, httpStatus: 200, checkedAt: "2026-09-27T06:00:00Z" }], nextCursor: null } }, "Источники и страницы"],
     ["evidence", { ...base, view: "evidence", evidence }, "Доказательства"],
     ["traffic", { ...base, view: "traffic", referrals: { items: [{ observationDate: "2026-09-27", platform: "chatgpt_search", users: 2,
       newUsers: 1, visits: 3, pageviews: 5, landingPath: "/services/ai-automation/", importedAt: "2026-09-27T06:00:00Z" }], nextCursor: null } }, "AI-трафик"],
@@ -94,6 +104,7 @@ test("GEO report has eight focused views with Russian explanations and no print 
   assert.match(overviewMarkup, /01\.09\.2026/u);
   assert.match(overviewMarkup, /27\.09\.2026/u);
   assert.doesNotMatch(overviewMarkup, /Полный проверяемый снимок ответа/u);
+  assert.match(overviewMarkup, /Свежесть источников|Нет данных|Crawler health/u);
 });
 
 test("only evidence detail renders the bounded response snapshot", () => {
@@ -120,6 +131,7 @@ function serviceFixture() {
     getOverview: method("getOverview", overview), listObservations: method("listObservations", { items: [observation], nextCursor: null }),
     listPrompts: method("listPrompts", { items: [prompt], nextCursor: null }), listEntities: method("listEntities", { items: [entity], nextCursor: null }),
     listCitations: method("listCitations", { items: [], nextCursor: null }), listFanoutQueries: method("listFanoutQueries", { items: [], nextCursor: null }),
+    listCrawlerChecks: method("listCrawlerChecks", { items: [], nextCursor: null }),
     getObservationEvidence: method("getObservationEvidence", evidence), listReferrals: method("listReferrals", { items: [], nextCursor: null }),
     listExperiments: method("listExperiments", { items: [], nextCursor: null }),
   } };
@@ -127,7 +139,7 @@ function serviceFixture() {
 
 const expectedCalls: Record<GeoView, string[]> = {
   overview: ["getOverview"], platforms: ["listObservations"], prompts: ["listPrompts"], entities: ["listEntities"],
-  sources: ["listCitations", "listFanoutQueries"], evidence: ["getObservationEvidence"], traffic: ["listReferrals"], promotion: ["listExperiments"],
+  sources: ["listCitations", "listFanoutQueries", "listCrawlerChecks"], evidence: ["getObservationEvidence"], traffic: ["listReferrals"], promotion: ["listExperiments"],
 };
 
 for (const view of Object.keys(expectedCalls) as GeoView[]) {

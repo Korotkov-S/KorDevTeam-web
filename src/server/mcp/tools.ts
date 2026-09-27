@@ -117,6 +117,14 @@ const geoObservationListInput = z.strictObject({ ...geoDateFilterFields, promptI
 const geoCitationListInput = z.strictObject({ ...geoDateFilterFields, promptId: z.uuid().optional(), owned: z.boolean().optional(), hostname: z.string().trim().min(1).max(253).optional(), ...pageFields }).superRefine(validateGeoRange);
 const geoFanoutListInput = z.strictObject({ ...geoDateFilterFields, promptId: z.uuid().optional(), ...pageFields }).superRefine(validateGeoRange);
 const geoReferralListInput = z.strictObject({ from: isoDate, to: isoDate, platform: geoPlatform.optional(), ...pageFields }).superRefine(validateGeoRange);
+const geoCrawlerListInput = z.strictObject({
+  from: isoDate,
+  to: isoDate,
+  status: z.enum(["pass", "fail", "unavailable"]).optional(),
+  bot: z.string().trim().min(1).max(120).optional(),
+  target: z.string().max(500).regex(/^\//).optional(),
+  ...pageFields,
+}).superRefine(validateGeoRange);
 const geoPromptCandidateInput = z.strictObject({
   promptText: z.string().trim().min(1).max(2_000),
   topicId: z.uuid(),
@@ -135,8 +143,7 @@ const geoStartRunInput = z.strictObject({
   mode: geoMode,
   region: z.string().trim().min(2).max(120),
   language: z.string().trim().min(2).max(16),
-  plannedCount: z.number().int().min(1).max(1_000),
-  promptSetFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  promptIds: z.array(z.uuid()).min(1).max(333),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 const geoMentionInput = z.strictObject({
@@ -563,6 +570,12 @@ export function createKordevMcpServer(
       inputSchema: geoReferralListInput,
       outputSchema: withError(genericPage), annotations: annotations(true),
     }, input => run("list_geo_referrals", () => services.geo.listReferrals(input)));
+    server.registerTool("list_geo_crawler_checks", {
+      title: "Доступность сайта для AI и поисковых роботов",
+      description: "Возвращает ежедневные проверки robots.txt, sitemap и индексируемости целевых GEO-страниц.",
+      inputSchema: geoCrawlerListInput,
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_crawler_checks", () => services.geo.listCrawlerChecks(input)));
     server.registerTool("list_geo_experiments", {
       title: "GEO-эксперименты",
       description: "Возвращает гипотезы продвижения, baseline и оценки 7/14/28 дней без изменения контента.",

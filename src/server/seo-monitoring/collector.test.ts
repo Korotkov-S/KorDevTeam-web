@@ -31,12 +31,16 @@ function geoReferral(date = "2026-09-24"): NormalizedGeoReferral {
 
 function fixture(overrides: Record<string, unknown> = {}) {
   const events: string[] = [];
+  const finished: Array<{ id: string; status: string; result: { errorCode?: string; metadata?: Record<string, unknown> } }> = [];
   let run = 0;
   const repository = {
     async setSourceEnabled(source: SeoSourceId, enabled: boolean) { events.push(`enabled:${source}:${enabled}`); },
     async withSourceLock<T>(source: SeoSourceId, work: () => Promise<T>) { events.push(`lock:${source}`); return work(); },
     async startRun(source: SeoSourceId, from: string, to: string) { events.push(`start:${source}:${from}:${to}`); return { id: `run-${++run}` }; },
-    async finishRun(id: string, status: string, result: { errorCode?: string }) { events.push(`finish:${id}:${status}:${result.errorCode ?? "ok"}`); },
+    async finishRun(id: string, status: string, result: { errorCode?: string; metadata?: Record<string, unknown> }) {
+      events.push(`finish:${id}:${status}:${result.errorCode ?? "ok"}`);
+      finished.push({ id, status, result });
+    },
     async upsertObservations(rows: readonly NormalizedSeoObservation[]) { events.push(`store:${rows[0]?.source}:${rows.length}`); return rows.length; },
     async upsertTrafficObservations(rows: readonly NormalizedTrafficObservation[]) { events.push(`store:${rows[0]?.source}:${rows.length}`); return rows.length; },
     async upsertGeoReferrals(rows: readonly NormalizedGeoReferral[]) { events.push(`store:geo-referrals:${rows.length}`); return rows.length; },
@@ -71,7 +75,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
       return [geoReferral(window.to)];
     },
   };
-  return { events, repository, yandex, google, yandexMetrika, ...overrides };
+  return { events, finished, repository, yandex, google, yandexMetrika, ...overrides };
 }
 
 test("enabled sources run under independent locks and a Google failure cannot roll back Yandex", async () => {
@@ -133,6 +137,11 @@ test("Yandex Metrica refreshes fourteen complete days ending yesterday", async (
     source: "yandex_metrika", status: "success", receivedCount: 2, storedCount: 2,
     latestObservationDate: "2026-09-26",
   });
+  assert.deepEqual(f.finished[0]?.result.metadata, {
+    completedSlices: 2,
+    failedSlices: 0,
+    slices: { traffic: "success", aiReferrals: "success" },
+  });
 });
 
 test("Metrica keeps a successful slice and marks the source partial when AI referrals fail", async () => {
@@ -148,6 +157,11 @@ test("Metrica keeps a successful slice and marks the source partial when AI refe
   assert.equal(report.sources[0].storedCount, 1);
   assert.equal(report.sources[0].errorCode, "seo_yandex_metrika_ai_response_incomplete");
   assert.ok(f.events.includes("store:yandex_metrika:1"));
+  assert.deepEqual(f.finished[0]?.result.metadata, {
+    completedSlices: 1,
+    failedSlices: 1,
+    slices: { traffic: "success", aiReferrals: "failed" },
+  });
 });
 
 test("Yandex refreshes authoritative regions and collects only resolved desired city/device slices", async () => {

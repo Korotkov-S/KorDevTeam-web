@@ -67,6 +67,7 @@ function services(overrides: { content?: Partial<McpServices["content"]>; media?
     async listCitations() { return { items: [], nextCursor: null }; },
     async listFanoutQueries() { return { items: [], nextCursor: null }; },
     async listReferrals() { return { items: [], nextCursor: null }; },
+    async listCrawlerChecks() { return { items: [], nextCursor: null }; },
     async listExperiments() { return { items: [], nextCursor: null }; },
     async createPromptCandidate() { return { id: ENTRY_ID, status: "candidate" }; },
     async startRun() { return { id: ENTRY_ID, status: "running" }; },
@@ -108,9 +109,9 @@ test("scope combinations register only their exact tool surface", async t => {
     [["content:publish"], ["publish_content", "unpublish_content"]],
     [["media:write"], ["upload_image"]],
     [["media:read", "media:write"], ["list_media", "upload_image"]],
-    [["seo:read"], ["get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_entities", "list_geo_experiments", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core"]],
+    [["seo:read"], ["get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_crawler_checks", "list_geo_entities", "list_geo_experiments", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core"]],
     [["seo:write"], []],
-    [["seo:read", "seo:write"], ["create_geo_experiment_candidate", "create_geo_prompt_candidate", "create_seo_candidate", "create_seo_recommendation", "finish_geo_run", "get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_entities", "list_geo_experiments", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core", "record_geo_experiment_evaluation", "record_geo_observation", "record_seo_change", "start_geo_run", "update_seo_query", "update_seo_recommendation_status"]],
+    [["seo:read", "seo:write"], ["create_geo_experiment_candidate", "create_geo_prompt_candidate", "create_seo_candidate", "create_seo_recommendation", "finish_geo_run", "get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_crawler_checks", "list_geo_entities", "list_geo_experiments", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core", "record_geo_experiment_evaluation", "record_geo_observation", "record_seo_change", "start_geo_run", "update_seo_query", "update_seo_recommendation_status"]],
     [["content:read", "content:write", "content:publish", "media:read", "media:write"], [
       "create_content_draft", "get_content", "list_content", "list_media", "publish_content",
       "unpublish_content", "update_content_draft", "upload_image",
@@ -179,7 +180,7 @@ test("GEO tools are scope-bound, read-only annotated, bounded, and return safe G
   const readOnly = await connected(["seo:read"]);
   t.after(async () => { await readOnly.client.close(); await readOnly.server.close(); });
   const readTools = (await readOnly.client.listTools()).tools.filter(tool => tool.name.includes("geo_"));
-  assert.equal(readTools.length, 9);
+  assert.equal(readTools.length, 10);
   assert.ok(readTools.every(tool => tool.annotations?.readOnlyHint === true));
   assert.equal(readTools.some(tool => tool.name === "start_geo_run"), false);
 
@@ -189,7 +190,7 @@ test("GEO tools are scope-bound, read-only annotated, bounded, and return safe G
   } }));
   t.after(async () => { await write.client.close(); await write.server.close(); });
   const writeTools = (await write.client.listTools()).tools.filter(tool => tool.name.includes("geo_"));
-  assert.equal(writeTools.length, 15);
+  assert.equal(writeTools.length, 16);
   const oversized = await write.client.callTool({ name: "record_geo_observation", arguments: {
     runId: ENTRY_ID,
     promptId: ENTRY_ID,

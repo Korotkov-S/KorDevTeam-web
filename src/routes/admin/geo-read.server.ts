@@ -10,7 +10,7 @@ export const GEO_VIEWS = ["overview", "platforms", "prompts", "entities", "sourc
 export type GeoView = typeof GEO_VIEWS[number];
 type Authenticator = Pick<AdminAuthService, "authenticate">;
 type Service = Pick<GeoMonitoringService, "getOverview" | "listObservations" | "listPrompts" | "listEntities" |
-  "listCitations" | "listFanoutQueries" | "getObservationEvidence" | "listReferrals" | "listExperiments">;
+  "listCitations" | "listFanoutQueries" | "getObservationEvidence" | "listReferrals" | "listCrawlerChecks" | "listExperiments">;
 
 const DAY_MS = 86_400_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -80,11 +80,12 @@ export function createGeoSectionLoader(auth: Authenticator, service: Service, cl
       }) };
       else if (parsed.view === "entities") payload = { entities: await service.listEntities({ limit: 100, cursor: parsed.cursor }) };
       else if (parsed.view === "sources") {
-        const [citations, fanout] = await Promise.all([
+        const [citations, fanout, crawlerChecks] = await Promise.all([
           service.listCitations({ ...filters, limit: 100, cursor: parsed.cursor }),
           service.listFanoutQueries({ ...filters, limit: 100, cursor: null }),
+          service.listCrawlerChecks({ from: filters.from, to: filters.to, limit: 100, cursor: null }),
         ]);
-        payload = { citations, fanout };
+        payload = { citations, fanout, crawlerChecks };
       } else if (parsed.view === "evidence") {
         if (!parsed.observationId || !UUID.test(parsed.observationId)) throw new Error("geo_observation_invalid");
         payload = { evidence: await service.getObservationEvidence(parsed.observationId) };
@@ -100,4 +101,3 @@ export function createGeoSectionLoader(auth: Authenticator, service: Service, cl
     }
   };
 }
-

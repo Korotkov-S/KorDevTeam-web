@@ -200,24 +200,27 @@ export function createSeoCollector(dependencies: {
       let latestObservationDate: string | null = null;
       let completedSlices = 0;
       const errors: string[] = [];
-      for (const slice of [
-        async () => {
+      const slices = { traffic: "pending", aiReferrals: "pending" } as Record<"traffic" | "aiReferrals", "pending" | "success" | "failed">;
+      for (const [sliceName, slice] of [
+        ["traffic", async () => {
           const rows = await retry(() => provider.collect(window), sleep, random);
           receivedCount += rows.length;
           storedCount += await dependencies.repository.upsertTrafficObservations(rows);
           latestObservationDate = [latestObservationDate, latestDate(rows)].filter(Boolean).sort().at(-1) ?? null;
-        },
-        async () => {
+        }],
+        ["aiReferrals", async () => {
           const rows = await retry(() => provider.collectAiReferrals(window), sleep, random);
           receivedCount += rows.length;
           storedCount += await dependencies.repository.upsertGeoReferrals(rows);
           latestObservationDate = [latestObservationDate, latestDate(rows)].filter(Boolean).sort().at(-1) ?? null;
-        },
-      ]) {
+        }],
+      ] as const) {
         try {
           await slice();
+          slices[sliceName] = "success";
           completedSlices++;
         } catch (error) {
+          slices[sliceName] = "failed";
           errors.push(safeError(error).code);
         }
       }
@@ -226,7 +229,7 @@ export function createSeoCollector(dependencies: {
         receivedCount,
         storedCount,
         ...(errors[0] ? { errorCode: errors[0] } : {}),
-        metadata: { completedSlices, failedSlices: errors.length },
+        metadata: { completedSlices, failedSlices: errors.length, slices },
       });
       logger.write({ event: "seo_collection_finished", source, status, receivedCount, storedCount,
         ...(errors[0] ? { errorCode: errors[0] } : {}) });

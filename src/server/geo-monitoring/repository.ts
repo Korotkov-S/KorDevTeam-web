@@ -1,4 +1,6 @@
-import { and, asc, desc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+
+import { and, arrayOverlaps, asc, desc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
 import {
@@ -16,10 +18,11 @@ import {
   geoTopics,
   seoQueries,
   seoChanges,
+  seoCollectionRuns,
   seoRecommendations,
 } from "../db/schema";
 import { normalizeSeoQuery } from "../seo-monitoring/normalization";
-import type {
+import { GEO_PLATFORMS, type
   GeoCitationCategory,
   GeoEntityStatus,
   GeoObservationInput,
@@ -41,8 +44,7 @@ export type GeoStartRunInput = {
   mode: GeoRunMode;
   region: string;
   language: string;
-  plannedCount: number;
-  promptSetFingerprint: string;
+  promptIds: string[];
   metadata: Record<string, unknown>;
 };
 
@@ -163,6 +165,113 @@ function metricFromOverview(overview: ReturnType<typeof summarizeGeoObservations
     : { value: null, sample: 0, complete: false };
 }
 
+function inclusiveDays(from: string, to: string) {
+  return Math.floor((Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000) + 1;
+}
+
+async function readExperimentMetric(db: GeoDatabase, input: GeoReadFilters & {
+  metric: typeof geoExperiments.$inferSelect.primaryMetric;
+  pagePath: string;
+}) {
+  if (input.metric === "ai_referrals") {
+    const [total] = await db.select({
+      value: sql<number>`coalesce(sum(${geoReferralDailyMetrics.visits}), 0)::int`,
+      rows: sql<number>`count(*)::int`,
+    }).from(geoReferralDailyMetrics).where(and(
+      gte(geoReferralDailyMetrics.observationDate, input.from),
+      lte(geoReferralDailyMetrics.observationDate, input.to),
+      eq(geoReferralDailyMetrics.platform, input.platform!),
+      eq(geoReferralDailyMetrics.landingPath, input.pagePath),
+    ));
+    const coverage = await db.execute(sql`
+      SELECT count(*)::int AS uncovered_days
+        FROM generate_series(${input.from}::date, ${input.to}::date, interval '1 day') AS coverage_day(day)
+       WHERE NOT EXISTS (
+        SELECT 1
+          FROM ${seoCollectionRuns} AS metrika_run
+         WHERE metrika_run.source = 'yandex_metrika'
+           AND metrika_run.status IN ('success', 'partial')
+           AND metrika_run.metadata -> 'slices' ->> 'aiReferrals' = 'success'
+           AND metrika_run.requested_from <= coverage_day.day::date
+           AND metrika_run.requested_to >= coverage_day.day::date
+      )`);
+    const coverageRows = coverage.rows as Array<{ uncovered_days: number }>;
+    return { value: total?.value ?? 0, sample: total?.rows ?? 0, complete: (coverageRows[0]?.uncovered_days ?? 1) === 0 };
+  }
+  if (input.metric === "crawler_health") {
+    const [total] = await db.select({
+      passed: sql<number>`count(*) FILTER (WHERE ${geoCrawlerChecks.status} = 'pass')::int`,
+      checks: sql<number>`count(*)::int`,
+      days: sql<number>`count(DISTINCT ${geoCrawlerChecks.checkDate})::int`,
+    }).from(geoCrawlerChecks).where(and(
+      gte(geoCrawlerChecks.checkDate, input.from),
+      lte(geoCrawlerChecks.checkDate, input.to),
+      eq(geoCrawlerChecks.target, input.pagePath),
+      eq(geoCrawlerChecks.bot, "indexability"),
+    ));
+    const checks = total?.checks ?? 0;
+    return {
+      value: checks ? (total?.passed ?? 0) / checks : null,
+      sample: checks,
+      complete: (total?.days ?? 0) === inclusiveDays(input.from, input.to),
+    };
+  }
+  return metricFromOverview(await readOverview(db, input), input.metric);
+}
+
+function evidenceRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function evidencePeriod(value: unknown) {
+  const evidence = evidenceRecord(value);
+  const period = evidenceRecord(evidence?.period);
+  const from = period?.from;
+  const to = period?.to;
+  if (typeof from !== "string" || typeof to !== "string"
+    || !/^\d{4}-\d{2}-\d{2}$/u.test(from) || !/^\d{4}-\d{2}-\d{2}$/u.test(to)
+    || inclusiveDays(from, to) < 1 || inclusiveDays(from, to) > 366) {
+    throw new Error("geo_experiment_recommendation_invalid");
+  }
+  return { evidence: evidence!, from, to };
+}
+
+async function recommendationHasEvidence(db: GeoDatabase, recommendationEvidence: unknown, input: GeoExperimentCandidateInput) {
+  const { evidence, from, to } = evidencePeriod(recommendationEvidence);
+  const expectedSource = input.primaryMetric === "ai_referrals" ? "geo_referrals"
+    : input.primaryMetric === "crawler_health" ? "geo_crawler" : "geo_observations";
+  const dimensions = evidenceRecord(evidence.dimensions);
+  const evidencePromptIds = Array.isArray(evidence.promptIds) ? evidence.promptIds.filter((id): id is string => typeof id === "string").sort() : [];
+  if (evidence.source !== expectedSource || evidence.metric !== input.primaryMetric || !dimensions
+    || dimensions.platform !== input.platform || dimensions.mode !== input.mode
+    || dimensions.language !== input.language || dimensions.region !== input.region
+    || dimensions.promptSetFingerprint !== input.promptSetFingerprint
+    || JSON.stringify(evidencePromptIds) !== JSON.stringify([...input.promptIds].sort())) return false;
+
+  const metric = await readExperimentMetric(db, {
+    from, to, platform: input.platform, mode: input.mode, language: input.language, region: input.region,
+    promptSetFingerprint: input.promptSetFingerprint, promptIds: input.promptIds,
+    metric: input.primaryMetric, pagePath: input.pagePath,
+  });
+  if (!metric.complete) return false;
+  if (input.primaryMetric === "ai_referrals") return (metric.value ?? 0) >= 10;
+  if (input.primaryMetric === "crawler_health") return metric.sample >= 28;
+
+  const [weekly] = await db.select({
+    weeks: sql<number>`count(DISTINCT date_trunc('week', ${geoRuns.startedAt}))::int`,
+  }).from(geoRuns).where(and(
+    eq(geoRuns.status, "success"),
+    eq(geoRuns.platform, input.platform),
+    eq(geoRuns.mode, input.mode),
+    eq(geoRuns.language, input.language),
+    eq(geoRuns.region, input.region),
+    eq(geoRuns.promptSetFingerprint, input.promptSetFingerprint),
+    gte(geoRuns.startedAt, new Date(`${from}T00:00:00.000Z`)),
+    lte(geoRuns.startedAt, new Date(`${to}T23:59:59.999Z`)),
+  ));
+  return (weekly?.weeks ?? 0) >= 3;
+}
+
 async function readOverview(db: GeoDatabase, filters: GeoReadFilters) {
   const rows = await db.select({
     runId: geoRuns.id,
@@ -189,7 +298,7 @@ async function readOverview(db: GeoDatabase, filters: GeoReadFilters) {
   return summarizeGeoObservations(rows);
 }
 
-function runConditions(filters: GeoReadFilters) {
+function runDimensionConditions(filters: GeoReadFilters) {
   const conditions = [
     gte(geoRuns.startedAt, new Date(`${filters.from}T00:00:00.000Z`)),
     lte(geoRuns.startedAt, new Date(`${filters.to}T23:59:59.999Z`)),
@@ -198,8 +307,13 @@ function runConditions(filters: GeoReadFilters) {
   if (filters.mode) conditions.push(eq(geoRuns.mode, filters.mode));
   if (filters.language) conditions.push(eq(geoRuns.language, filters.language));
   if (filters.region) conditions.push(eq(geoRuns.region, filters.region));
-  if (filters.topicId) conditions.push(eq(geoPrompts.topicId, filters.topicId));
   if (filters.promptSetFingerprint) conditions.push(eq(geoRuns.promptSetFingerprint, filters.promptSetFingerprint));
+  return conditions;
+}
+
+function runConditions(filters: GeoReadFilters) {
+  const conditions = runDimensionConditions(filters);
+  if (filters.topicId) conditions.push(eq(geoPrompts.topicId, filters.topicId));
   if (filters.promptIds?.length) conditions.push(inArray(geoObservations.promptId, filters.promptIds));
   return and(...conditions);
 }
@@ -328,19 +442,37 @@ export function createGeoRepository(db: GeoDatabase) {
     },
 
     async startRun(input: GeoStartRunInput, tokenId: string) {
-      const [row] = await db.insert(geoRuns).values({
-        ...input,
-        initiatedByMcpTokenId: tokenId,
-        status: "running",
-      }).returning();
-      if (!row) throw new Error("geo_run_not_started");
-      return row;
+      return db.transaction(async (tx) => {
+        const promptIds = [...input.promptIds].sort();
+        const prompts = await tx.select({
+          id: geoPrompts.id,
+          status: geoPrompts.status,
+          language: geoPrompts.language,
+          region: geoPrompts.region,
+        }).from(geoPrompts).where(inArray(geoPrompts.id, promptIds));
+        if (prompts.length !== promptIds.length || prompts.some((prompt) => prompt.status !== "active"
+          || prompt.language !== input.language || prompt.region !== input.region)) {
+          throw new Error("geo_run_prompt_set_invalid");
+        }
+        const promptSetFingerprint = createHash("sha256").update(promptIds.join("\u0000"), "utf8").digest("hex");
+        const [row] = await tx.insert(geoRuns).values({
+          ...input,
+          promptIds,
+          plannedCount: promptIds.length * 3,
+          promptSetFingerprint,
+          initiatedByMcpTokenId: tokenId,
+          status: "running",
+        }).returning();
+        if (!row) throw new Error("geo_run_not_started");
+        return row;
+      });
     },
 
     async recordObservation(runId: string, tokenId: string, input: StoredGeoObservationInput) {
       return db.transaction(async (tx) => {
         const [run] = await tx.select().from(geoRuns).where(eq(geoRuns.id, runId)).for("update").limit(1);
-        assertOwnedRun(run, tokenId);
+        const ownedRun = assertOwnedRun(run, tokenId);
+        if (!ownedRun.promptIds.includes(input.promptId)) throw new Error("geo_run_prompt_set_invalid");
         const [existing] = await tx.select().from(geoObservations).where(and(
           eq(geoObservations.runId, runId),
           eq(geoObservations.promptId, input.promptId),
@@ -349,6 +481,14 @@ export function createGeoRepository(db: GeoDatabase) {
         if (existing) return existing;
 
         const { mentions, citations, fanoutQueries, ...observation } = input;
+        const mentionedEntities = mentions.length ? await tx.select({
+          id: geoEntities.id,
+          type: geoEntities.type,
+          status: geoEntities.status,
+        }).from(geoEntities).where(inArray(geoEntities.id, mentions.map((mention) => mention.entityId))) : [];
+        if (mentionedEntities.length !== mentions.length) throw new Error("geo_observation_mentions_invalid");
+        const ownedMentioned = mentionedEntities.some((entity) => entity.type === "owned" && entity.status === "active");
+        if (observation.mentioned !== ownedMentioned) throw new Error("geo_observation_mention_flag_incoherent");
         const [row] = await tx.insert(geoObservations).values({ ...observation, runId }).returning();
         if (!row) throw new Error("geo_observation_not_stored");
         if (mentions.length) {
@@ -380,8 +520,22 @@ export function createGeoRepository(db: GeoDatabase) {
         const counted = await tx.select({ count: sql<number>`count(*)::int` }).from(geoObservations)
           .where(eq(geoObservations.runId, runId));
         const stored = counted[0]?.count ?? 0;
-        if (input.storedCount !== stored || input.completedCount < stored || input.completedCount > ownedRun.plannedCount) {
+        if (input.storedCount !== stored || input.completedCount < stored || input.completedCount > ownedRun.plannedCount
+          || (input.status === "success" && (stored !== ownedRun.plannedCount
+            || input.completedCount !== ownedRun.plannedCount || input.storedCount !== ownedRun.plannedCount))) {
           throw new Error("geo_run_counts_mismatch");
+        }
+        if (input.status === "success") {
+          const completePrompts = await tx.select({
+            promptId: geoObservations.promptId,
+            count: sql<number>`count(*)::int`,
+            repetitions: sql<number>`count(DISTINCT ${geoObservations.repetition})::int`,
+          }).from(geoObservations).where(eq(geoObservations.runId, runId))
+            .groupBy(geoObservations.promptId);
+          if (completePrompts.length !== ownedRun.promptIds.length
+            || completePrompts.some((prompt) => prompt.count !== 3 || prompt.repetitions !== 3)) {
+            throw new Error("geo_run_incomplete");
+          }
         }
         const [row] = await tx.update(geoRuns).set({
           ...input,
@@ -452,6 +606,48 @@ export function createGeoRepository(db: GeoDatabase) {
     },
 
     async getOverview(filters: GeoReadFilters) {
+      const latestRunFields = { platform: geoRuns.platform, status: geoRuns.status, startedAt: geoRuns.startedAt,
+        completedAt: geoRuns.completedAt, errorCode: geoRuns.errorCode };
+      const promptScopeRequested = Boolean(filters.topicId || filters.promptIds?.length);
+      const promptScopeConditions = [];
+      if (filters.topicId) promptScopeConditions.push(eq(geoPrompts.topicId, filters.topicId));
+      if (filters.promptIds?.length) promptScopeConditions.push(inArray(geoPrompts.id, filters.promptIds));
+      const scopedPrompts = promptScopeRequested ? await db.select({
+        id: geoPrompts.id,
+        targetPath: geoPrompts.targetPath,
+      }).from(geoPrompts).where(and(...promptScopeConditions)) : [];
+      const scopedPromptIds = scopedPrompts.map((prompt) => prompt.id);
+      const scopedPaths = [...new Set(scopedPrompts.map((prompt) => prompt.targetPath).filter((path): path is string => Boolean(path)))];
+      const latestConditions = runDimensionConditions(filters);
+      if (promptScopeRequested && scopedPromptIds.length) latestConditions.push(arrayOverlaps(geoRuns.promptIds, scopedPromptIds));
+      const latestRuns = promptScopeRequested && !scopedPromptIds.length ? [] : await db.select(latestRunFields)
+        .from(geoRuns).where(and(...latestConditions)).orderBy(desc(geoRuns.startedAt));
+      const crawlerConditions = [
+        gte(geoCrawlerChecks.checkDate, filters.from), lte(geoCrawlerChecks.checkDate, filters.to),
+      ];
+      const referralConditions = [
+        gte(geoReferralDailyMetrics.observationDate, filters.from),
+        lte(geoReferralDailyMetrics.observationDate, filters.to),
+      ];
+      if (promptScopeRequested && scopedPaths.length) {
+        crawlerConditions.push(inArray(geoCrawlerChecks.target, scopedPaths));
+        referralConditions.push(inArray(geoReferralDailyMetrics.landingPath, scopedPaths));
+      }
+      if (filters.platform) referralConditions.push(eq(geoReferralDailyMetrics.platform, filters.platform));
+      const [metrics, crawler, referrals] = await Promise.all([
+        readOverview(db, filters),
+        db.select({
+          lastCheckedAt: sql<Date | null>`max(${geoCrawlerChecks.checkedAt})`,
+          checks: sql<number>`count(*)::int`,
+          passed: sql<number>`count(*) FILTER (WHERE ${geoCrawlerChecks.status} = 'pass')::int`,
+          failed: sql<number>`count(*) FILTER (WHERE ${geoCrawlerChecks.status} = 'fail')::int`,
+        }).from(geoCrawlerChecks).where(promptScopeRequested && !scopedPaths.length ? sql`false` : and(...crawlerConditions)),
+        db.select({ lastImportedAt: sql<Date | null>`max(${geoReferralDailyMetrics.importedAt})` })
+          .from(geoReferralDailyMetrics)
+          .where(promptScopeRequested && !scopedPaths.length ? sql`false` : and(...referralConditions)),
+      ]);
+      const latestByPlatform = new Map<GeoPlatform, typeof latestRuns[number]>();
+      for (const run of latestRuns) if (!latestByPlatform.has(run.platform)) latestByPlatform.set(run.platform, run);
       return {
         dimensions: {
           platform: filters.platform ?? null,
@@ -461,7 +657,13 @@ export function createGeoRepository(db: GeoDatabase) {
           topicId: filters.topicId ?? null,
         },
         period: { from: filters.from, to: filters.to },
-        ...await readOverview(db, filters),
+        ...metrics,
+        freshness: {
+          platforms: (filters.platform ? [filters.platform] : GEO_PLATFORMS)
+            .map((platform) => ({ platform, run: latestByPlatform.get(platform) ?? null })),
+          crawler: crawler[0] ?? { lastCheckedAt: null, checks: 0, passed: 0, failed: 0 },
+          referrals: referrals[0] ?? { lastImportedAt: null },
+        },
       };
     },
 
@@ -616,6 +818,21 @@ export function createGeoRepository(db: GeoDatabase) {
       return paged(items, input);
     },
 
+    async listCrawlerChecks(input: { from: string; to: string; status?: "pass" | "fail" | "unavailable";
+      bot?: string; target?: string } & GeoPage) {
+      const conditions = [
+        gte(geoCrawlerChecks.checkDate, input.from),
+        lte(geoCrawlerChecks.checkDate, input.to),
+      ];
+      if (input.status) conditions.push(eq(geoCrawlerChecks.status, input.status));
+      if (input.bot) conditions.push(eq(geoCrawlerChecks.bot, input.bot));
+      if (input.target) conditions.push(eq(geoCrawlerChecks.target, input.target));
+      const items = await db.select().from(geoCrawlerChecks).where(and(...conditions))
+        .orderBy(desc(geoCrawlerChecks.checkDate), asc(geoCrawlerChecks.target), asc(geoCrawlerChecks.bot))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
     async listExperiments(input: { status?: typeof geoExperiments.$inferSelect.status; pagePath?: string } & GeoPage) {
       const conditions = [];
       if (input.status) conditions.push(eq(geoExperiments.status, input.status));
@@ -630,8 +847,10 @@ export function createGeoRepository(db: GeoDatabase) {
         const [recommendation] = await tx.select().from(seoRecommendations)
           .where(eq(seoRecommendations.id, input.recommendationId)).limit(1);
         if (!recommendation || !recommendation.issueType.startsWith("geo_")
-          || recommendation.pagePath !== input.pagePath || Object.keys(recommendation.evidence).length === 0
-          || ["rejected", "dismissed"].includes(recommendation.status)) {
+          || recommendation.pagePath !== input.pagePath
+          || ["rejected", "dismissed"].includes(recommendation.status)
+          || (actor.mcpTokenId && recommendation.createdByMcpTokenId !== actor.mcpTokenId)
+          || !await recommendationHasEvidence(tx as unknown as GeoDatabase, recommendation.evidence, input)) {
           throw new Error("geo_experiment_recommendation_invalid");
         }
         const prompts = await tx.select({ id: geoPrompts.id, promptText: geoPrompts.promptText })
@@ -675,12 +894,13 @@ export function createGeoRepository(db: GeoDatabase) {
           .where(eq(geoExperimentPrompts.experimentId, experiment.id));
         const baselineTo = shiftDate(change.appliedAt, -1);
         const baselineFrom = shiftDate(change.appliedAt, -28);
-        const overview = await readOverview(tx as unknown as GeoDatabase, {
+        const metric = await readExperimentMetric(tx as unknown as GeoDatabase, {
           from: utcDate(baselineFrom), to: utcDate(baselineTo), platform: experiment.platform,
           mode: experiment.mode, language: experiment.language, region: experiment.region,
           promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
+          metric: experiment.primaryMetric,
+          pagePath: experiment.pagePath,
         });
-        const metric = metricFromOverview(overview, experiment.primaryMetric);
         const baseline = {
           ...metric,
           unit: experiment.primaryMetric === "ai_referrals" ? "visits" : "ratio",
@@ -704,8 +924,14 @@ export function createGeoRepository(db: GeoDatabase) {
       return db.transaction(async (tx) => {
         const [experiment] = await tx.select().from(geoExperiments)
           .where(eq(geoExperiments.id, input.id)).for("update").limit(1);
-        if (!experiment || !experiment.implementedAt || !["active", "completed"].includes(experiment.status)) {
+        if (!experiment || !experiment.implementedAt || experiment.status !== "active") {
           throw new Error("geo_experiment_state_invalid");
+        }
+        const previousResults = evidenceRecord(experiment.evaluationResults) ?? {};
+        const key = String(input.milestone);
+        if (key in previousResults || (input.milestone === 14 && !("7" in previousResults))
+          || (input.milestone === 28 && (!("7" in previousResults) || !("14" in previousResults)))) {
+          throw new Error("geo_experiment_milestone_order_invalid");
         }
         const from = shiftDate(experiment.implementedAt, 1);
         const to = shiftDate(experiment.implementedAt, input.milestone);
@@ -713,12 +939,13 @@ export function createGeoRepository(db: GeoDatabase) {
         if (input.evaluatedAt < availableAt) throw new Error("geo_experiment_period_incomplete");
         const prompts = await tx.select({ id: geoExperimentPrompts.promptId }).from(geoExperimentPrompts)
           .where(eq(geoExperimentPrompts.experimentId, experiment.id));
-        const overview = await readOverview(tx as unknown as GeoDatabase, {
+        const resultMetric = await readExperimentMetric(tx as unknown as GeoDatabase, {
           from: utcDate(from), to: utcDate(to), platform: experiment.platform, mode: experiment.mode,
           language: experiment.language, region: experiment.region,
           promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
+          metric: experiment.primaryMetric,
+          pagePath: experiment.pagePath,
         });
-        const resultMetric = metricFromOverview(overview, experiment.primaryMetric);
         const baseline = experiment.baseline as { value?: number | null; sample?: number; complete?: boolean };
         const changes = await tx.select({ id: seoChanges.id }).from(seoChanges).where(and(
           eq(seoChanges.pagePath, experiment.pagePath),
@@ -737,7 +964,7 @@ export function createGeoRepository(db: GeoDatabase) {
           complete: baseline.complete === true && resultMetric.complete,
           confoundingChanges: changes.map((change) => change.id),
         });
-        const evaluationResults = { ...experiment.evaluationResults, [String(input.milestone)]: {
+        const evaluationResults = { ...previousResults, [key]: {
           ...evaluation,
           evaluatedAt: input.evaluatedAt.toISOString(),
           period: { from: utcDate(from), to: utcDate(to) },
