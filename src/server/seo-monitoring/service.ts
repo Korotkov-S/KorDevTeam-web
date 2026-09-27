@@ -163,6 +163,11 @@ export function createSeoService(repository: SeoRepository) {
       return repository.listRankChecks(filters(input.filters), page(input));
     },
 
+    getRankControl(input: { dateTo: string }) {
+      dateValue(input.dateTo);
+      return repository.getRankControl(input.dateTo);
+    },
+
     listChanges(input: { pagePath?: string; dateFrom?: string; dateTo?: string; limit?: number; cursor?: string | null }) {
       if ((input.dateFrom ? 1 : 0) !== (input.dateTo ? 1 : 0)) throw new Error("seo_date_range_invalid");
       if (input.dateFrom && input.dateTo) filters({ dateFrom: input.dateFrom, dateTo: input.dateTo });

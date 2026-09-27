@@ -31,6 +31,124 @@ export type SeoMetricFilters = {
   pagePath?: string;
 };
 
+type RankControlQuery = {
+  id: string;
+  queryText: string;
+  targetPath: string | null;
+  wordstatFrequency: number | null;
+  frequencyBand: FrequencyBand;
+};
+
+type RankControlRegion = {
+  id: string;
+  code: string;
+  displayName: string;
+  sortOrder: number;
+};
+
+type RankControlCheck = {
+  queryId: string;
+  regionId: string;
+  device: Extract<SeoDevice, "desktop" | "mobile">;
+  checkDate: string;
+  status: "found" | "not_found";
+  position: number | null;
+  resultUrl: string | null;
+  resultLimit: number;
+};
+
+export type RankMovement = "improved" | "declined" | "same";
+
+export type RankControlCell = RankControlCheck & {
+  deltaDay: number | null;
+  deltaWeek: number | null;
+  movementDay: RankMovement | null;
+  movementWeek: RankMovement | null;
+};
+
+const RANK_CONTROL_DEVICES = ["desktop", "mobile"] as const;
+const DAY_MS = 86_400_000;
+
+function shiftDate(value: string, days: number): string {
+  return new Date(+new Date(`${value}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+function rankMovement(current: RankControlCheck, previous: RankControlCheck | undefined): RankMovement | null {
+  if (!previous) return null;
+  const currentScore = current.status === "found" ? current.position! : current.resultLimit + 1;
+  const previousScore = previous.status === "found" ? previous.position! : previous.resultLimit + 1;
+  return currentScore < previousScore ? "improved" : currentScore > previousScore ? "declined" : "same";
+}
+
+function numericDelta(current: RankControlCheck, previous: RankControlCheck | undefined): number | null {
+  return current.status === "found" && previous?.status === "found"
+    ? current.position! - previous.position!
+    : null;
+}
+
+export function buildRankControl(
+  dateTo: string,
+  queries: RankControlQuery[],
+  regions: RankControlRegion[],
+  checks: RankControlCheck[],
+) {
+  const referenceRegion = regions.find((region) => region.code === "ru") ?? regions[0] ?? null;
+  const bySlice = new Map<string, RankControlCheck[]>();
+  for (const check of checks) {
+    const key = `${check.queryId}:${check.regionId}:${check.device}`;
+    const entries = bySlice.get(key) ?? [];
+    entries.push(check);
+    bySlice.set(key, entries);
+  }
+  for (const entries of bySlice.values()) entries.sort((a, b) => b.checkDate.localeCompare(a.checkDate));
+
+  const rows = queries.map((query) => {
+    const cells: Record<string, Record<string, RankControlCell | null>> = {};
+    for (const region of regions) {
+      cells[region.code] = {};
+      for (const device of RANK_CONTROL_DEVICES) {
+        const entries = bySlice.get(`${query.id}:${region.id}:${device}`) ?? [];
+        const current = entries.find((entry) => entry.checkDate <= dateTo && entry.checkDate >= shiftDate(dateTo, -7));
+        if (!current) {
+          cells[region.code][device] = null;
+          continue;
+        }
+        const previousDay = entries.find((entry) => entry.checkDate === shiftDate(current.checkDate, -1));
+        const previousWeek = entries.find((entry) => entry.checkDate === shiftDate(current.checkDate, -7));
+        cells[region.code][device] = {
+          ...current,
+          deltaDay: numericDelta(current, previousDay),
+          deltaWeek: numericDelta(current, previousWeek),
+          movementDay: rankMovement(current, previousDay),
+          movementWeek: rankMovement(current, previousWeek),
+        };
+      }
+    }
+    return { ...query, queryId: query.id, checks: cells };
+  });
+
+  const referenceCells = rows.map((row) => referenceRegion ? row.checks[referenceRegion.code]?.desktop ?? null : null);
+  const foundPositions = referenceCells.flatMap((cell) => cell?.status === "found" ? [cell.position!] : []);
+  return {
+    summary: {
+      tracked: rows.length,
+      top3: foundPositions.filter((position) => position <= 3).length,
+      top10: foundPositions.filter((position) => position <= 10).length,
+      top30: foundPositions.filter((position) => position <= 30).length,
+      outsideTop100: referenceCells.filter((cell) => cell?.status === "not_found").length,
+      noData: referenceCells.filter((cell) => cell === null).length,
+      improvedDay: referenceCells.filter((cell) => cell?.movementDay === "improved").length,
+      declinedDay: referenceCells.filter((cell) => cell?.movementDay === "declined").length,
+      improvedWeek: referenceCells.filter((cell) => cell?.movementWeek === "improved").length,
+      declinedWeek: referenceCells.filter((cell) => cell?.movementWeek === "declined").length,
+      referenceRegionName: referenceRegion?.displayName ?? "Россия",
+      referenceDevice: "desktop" as const,
+    },
+    regions,
+    rows,
+  };
+}
+
 const activeRecommendationStatuses: RecommendationStatus[] = ["new", "accepted"];
 const recommendationTransitions: Record<RecommendationStatus, RecommendationStatus[]> = {
   new: ["accepted", "rejected", "dismissed"],
@@ -350,6 +468,46 @@ export function createSeoRepository(db: SeoDatabase) {
         items: items.slice(offset, offset + page.limit),
         nextCursor: items.length > offset + page.limit ? String(offset + page.limit) : null,
       };
+    },
+
+    async getRankControl(dateTo: string) {
+      const queries = await db.select({
+        id: seoQueries.id,
+        queryText: seoQueries.queryText,
+        targetPath: seoQueries.targetPath,
+        wordstatFrequency: seoQueries.wordstatFrequency,
+        frequencyBand: seoQueries.frequencyBand,
+      }).from(seoQueries).where(eq(seoQueries.status, "active")).orderBy(
+        desc(seoQueries.priority),
+        asc(seoQueries.queryText),
+        asc(seoQueries.id),
+      );
+      const regions = await db.select({
+        id: seoRegions.id,
+        code: seoRegions.code,
+        displayName: seoRegions.displayName,
+        sortOrder: seoRegions.sortOrder,
+      }).from(seoRegions).where(and(
+        eq(seoRegions.source, "yandex_webmaster"),
+        eq(seoRegions.active, true),
+      )).orderBy(asc(seoRegions.sortOrder));
+      if (queries.length === 0 || regions.length === 0) return buildRankControl(dateTo, queries, regions, []);
+      const checks = await db.select({
+        queryId: seoRankChecks.queryId,
+        regionId: seoRankChecks.regionId,
+        device: seoRankChecks.device,
+        checkDate: seoRankChecks.checkDate,
+        status: seoRankChecks.status,
+        position: seoRankChecks.position,
+        resultUrl: seoRankChecks.resultUrl,
+        resultLimit: seoRankChecks.resultLimit,
+      }).from(seoRankChecks).where(and(
+        inArray(seoRankChecks.queryId, queries.map((query) => query.id)),
+        inArray(seoRankChecks.regionId, regions.map((region) => region.id)),
+        gte(seoRankChecks.checkDate, shiftDate(dateTo, -14)),
+        lte(seoRankChecks.checkDate, dateTo),
+      ));
+      return buildRankControl(dateTo, queries, regions, checks as RankControlCheck[]);
     },
 
     async listSemanticCore(filters: { status?: SeoQueryStatus; kind?: SeoQueryKind }, page: { limit: number; cursor: string | null }) {

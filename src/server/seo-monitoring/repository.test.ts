@@ -13,10 +13,71 @@ import {
   seoRegions,
 } from "../db/schema";
 import { resetTestDatabase } from "../db/testDatabase";
+import * as repositoryModule from "./repository";
 import { createSeoRepository } from "./repository";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
+
+test("rank control keeps every tracked query and compares exact day and week snapshots", () => {
+  const buildRankControl = (repositoryModule as unknown as {
+    buildRankControl?: (dateTo: string, queries: unknown[], regions: unknown[], checks: unknown[]) => {
+      summary: Record<string, number | string>;
+      rows: Array<{ queryId: string; checks: Record<string, Record<string, {
+        position: number | null;
+        movementDay: string | null;
+        movementWeek: string | null;
+      } | null>> }>;
+    };
+  }).buildRankControl;
+  assert.equal(typeof buildRankControl, "function");
+
+  const queries = [
+    { id: "query-1", queryText: "внедрение crm", targetPath: "/services/crm/", wordstatFrequency: 1037, frequencyBand: "high" },
+    { id: "query-2", queryText: "crm под ключ", targetPath: "/services/crm/", wordstatFrequency: 35, frequencyBand: "low" },
+    { id: "query-3", queryText: "crm цена", targetPath: "/services/crm/", wordstatFrequency: 271, frequencyBand: "medium" },
+  ];
+  const regions = [
+    { id: "region-ru", code: "ru", displayName: "Россия", sortOrder: 0 },
+    { id: "region-msk", code: "moscow", displayName: "Москва", sortOrder: 10 },
+  ];
+  const found = (queryId: string, regionId: string, device: "desktop" | "mobile", checkDate: string, position: number) => ({
+    queryId, regionId, device, checkDate, status: "found", position, resultUrl: "https://kordev.team/services/crm/", resultLimit: 100,
+  });
+  const missing = (queryId: string, regionId: string, device: "desktop" | "mobile", checkDate: string) => ({
+    queryId, regionId, device, checkDate, status: "not_found", position: null, resultUrl: null, resultLimit: 100,
+  });
+  const checks = [
+    found("query-1", "region-ru", "desktop", "2026-09-27", 5),
+    found("query-1", "region-ru", "desktop", "2026-09-26", 10),
+    missing("query-1", "region-ru", "desktop", "2026-09-20"),
+    missing("query-1", "region-msk", "mobile", "2026-09-27"),
+    found("query-1", "region-msk", "mobile", "2026-09-26", 80),
+    missing("query-3", "region-ru", "desktop", "2026-09-27"),
+    found("query-3", "region-ru", "desktop", "2026-09-26", 70),
+    found("query-3", "region-ru", "desktop", "2026-09-20", 90),
+  ];
+
+  const result = buildRankControl!("2026-09-27", queries, regions, checks);
+  assert.deepEqual(result.summary, {
+    tracked: 3, top3: 0, top10: 1, top30: 1, outsideTop100: 1, noData: 1,
+    improvedDay: 1, declinedDay: 1, improvedWeek: 1, declinedWeek: 1,
+    referenceRegionName: "Россия", referenceDevice: "desktop",
+  });
+  assert.equal(result.rows.length, 3);
+  assert.equal(result.rows[1].queryId, "query-2");
+  assert.equal(result.rows[1].checks.ru.desktop, null);
+  assert.deepEqual(result.rows[0].checks.ru.desktop && {
+    position: result.rows[0].checks.ru.desktop.position,
+    movementDay: result.rows[0].checks.ru.desktop.movementDay,
+    movementWeek: result.rows[0].checks.ru.desktop.movementWeek,
+  }, { position: 5, movementDay: "improved", movementWeek: "improved" });
+  assert.deepEqual(result.rows[0].checks.moscow.mobile && {
+    position: result.rows[0].checks.moscow.mobile.position,
+    movementDay: result.rows[0].checks.moscow.mobile.movementDay,
+    movementWeek: result.rows[0].checks.moscow.mobile.movementWeek,
+  }, { position: null, movementDay: "declined", movementWeek: null });
+});
 
 const observation = {
   source: "google_search_console" as const,
