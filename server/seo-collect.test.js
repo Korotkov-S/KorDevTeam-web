@@ -9,6 +9,7 @@ test("CLI accepts only --check and exact source selection", () => {
   assert.deepEqual(parseSeoCollectArgs(["--source=google"]), { check: false, source: "google_search_console" });
   assert.deepEqual(parseSeoCollectArgs(["--source=metrika"]), { check: false, source: "yandex_metrika" });
   assert.deepEqual(parseSeoCollectArgs(["--source=yandex-rank"]), { check: false, source: "yandex_search" });
+  assert.deepEqual(parseSeoCollectArgs(["--source=geo-crawler"]), { check: false, source: "geo_crawler" });
   assert.throws(() => parseSeoCollectArgs(["--source=bing"]), /seo_collect_arguments_invalid/u);
   assert.throws(() => parseSeoCollectArgs(["--check", "--check"]), /seo_collect_arguments_invalid/u);
 });

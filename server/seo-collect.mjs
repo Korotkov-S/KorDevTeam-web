@@ -11,6 +11,7 @@ export function parseSeoCollectArgs(args) {
     else if (argument === "--source=google" && source === undefined) source = "google_search_console";
     else if (argument === "--source=metrika" && source === undefined) source = "yandex_metrika";
     else if (argument === "--source=yandex-rank" && source === undefined) source = "yandex_search";
+    else if (argument === "--source=geo-crawler" && source === undefined) source = "geo_crawler";
     else throw new Error("seo_collect_arguments_invalid");
   }
   return { check, ...(source ? { source } : {}) };

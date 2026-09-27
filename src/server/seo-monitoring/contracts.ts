@@ -4,7 +4,7 @@ export const SEO_QUERY_STATUSES = ["candidate", "active", "archived"] as const;
 export const SEO_QUERY_KINDS = ["commercial", "informational", "other"] as const;
 
 export type SeoSourceId = typeof SEO_SOURCES[number];
-export type SeoCollectionTarget = SeoSourceId | "yandex_search";
+export type SeoCollectionTarget = SeoSourceId | "yandex_search" | "geo_crawler";
 export type SeoDevice = typeof SEO_DEVICES[number];
 export type SeoQueryStatus = typeof SEO_QUERY_STATUSES[number];
 export type SeoQueryKind = typeof SEO_QUERY_KINDS[number];

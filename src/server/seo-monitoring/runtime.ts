@@ -12,6 +12,12 @@ import { createYandexSearchProvider } from "./providers/yandexSearch";
 import { createSeoRankCollector } from "./rankCollector";
 import { loadSemanticCore } from "./semanticCore";
 import { createGeoRepository } from "../geo-monitoring/repository";
+import { createGeoCollector } from "../geo-monitoring/collector";
+import { checkGeoCrawlerHealth } from "../geo-monitoring/crawlerHealth";
+
+function publicOrigin() {
+  return new URL(process.env.PUBLIC_SITE_ORIGIN ?? process.env.ADMIN_TRUSTED_ORIGIN ?? "https://kordev.team");
+}
 
 export function getSeoMonitoringService() {
   return createSeoService(createSeoRepository(getDb()));
@@ -32,27 +38,38 @@ export async function runSeoCollection(options: { source?: SeoCollectionTarget }
     ...(config.google.enabled ? { google: createGoogleSearchConsoleProvider(config.google) } : {}),
     ...(config.yandexMetrika.enabled ? { yandexMetrika: createYandexMetrikaProvider(config.yandexMetrika) } : {}),
   });
-  const metricReport = options.source === "yandex_search"
+  const metricReport = options.source === "yandex_search" || options.source === "geo_crawler"
     ? { sources: [], failed: false }
     : await collector.run(options.source as SeoSourceId | undefined);
-  if (options.source && options.source !== "yandex_search") return metricReport;
-  if (!config.yandexSearch.enabled) {
-    const rank = { source: "yandex_search" as const, status: "disabled" as const, plannedCount: 0, completedCount: 0, storedCount: 0, checkDate: null };
-    return { sources: [...metricReport.sources, rank], failed: metricReport.failed };
+  if (options.source && options.source !== "yandex_search" && options.source !== "geo_crawler") return metricReport;
+  const sources: Array<Record<string, unknown>> = [...metricReport.sources];
+  let failed = metricReport.failed;
+  if (!options.source || options.source === "yandex_search") {
+    if (!config.yandexSearch.enabled) {
+      sources.push({ source: "yandex_search", status: "disabled", plannedCount: 0, completedCount: 0, storedCount: 0, checkDate: null });
+    } else {
+      try {
+        const rank = await createSeoRankCollector({
+          repository,
+          provider: createYandexSearchProvider(config.yandexSearch),
+          dailyCheckLimit: config.yandexSearch.dailyCheckLimit,
+        }).run();
+        sources.push(rank);
+        failed ||= rank.status === "failed";
+      } catch (error) {
+        const errorCode = error instanceof SeoProviderError || (error instanceof Error && error.message === "seo_rank_locked")
+          ? error.message : "seo_yandex_search_collection_failed";
+        sources.push({ source: "yandex_search", status: "failed", plannedCount: 0, completedCount: 0, storedCount: 0, checkDate: null, errorCode });
+        failed = true;
+      }
+    }
   }
-  try {
-    const rank = await createSeoRankCollector({
-      repository,
-      provider: createYandexSearchProvider(config.yandexSearch),
-      dailyCheckLimit: config.yandexSearch.dailyCheckLimit,
-    }).run();
-    return { sources: [...metricReport.sources, rank], failed: metricReport.failed || rank.status === "failed" };
-  } catch (error) {
-    const errorCode = error instanceof SeoProviderError || (error instanceof Error && error.message === "seo_rank_locked")
-      ? error.message : "seo_yandex_search_collection_failed";
-    const rank = { source: "yandex_search" as const, status: "failed" as const, plannedCount: 0, completedCount: 0, storedCount: 0, checkDate: null, errorCode };
-    return { sources: [...metricReport.sources, rank], failed: true };
+  if (!options.source || options.source === "geo_crawler") {
+    const geo = await createGeoCollector({ origin: publicOrigin(), repository: geoRepository }).run();
+    sources.push(geo);
+    failed ||= geo.status === "failed";
   }
+  return { sources, failed };
 }
 
 export async function checkSeoCollectionReady(options: { source?: SeoCollectionTarget } = {}) {
@@ -84,6 +101,14 @@ export async function checkSeoCollectionReady(options: { source?: SeoCollectionT
         sources.push({ source: "yandex_search", status: "failed",
           errorCode: error instanceof SeoProviderError ? error.message : "seo_check_failed" });
       }
+    }
+  }
+  if (!options.source || options.source === "geo_crawler") {
+    try {
+      await checkGeoCrawlerHealth(publicOrigin());
+      sources.push({ source: "geo_crawler", status: "ready" });
+    } catch {
+      sources.push({ source: "geo_crawler", status: "failed", errorCode: "geo_crawler_check_failed" });
     }
   }
   return { config: summary, sources, failed: sources.some((source) => source.status === "failed") };
