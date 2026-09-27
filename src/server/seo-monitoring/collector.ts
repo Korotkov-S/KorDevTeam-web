@@ -1,6 +1,7 @@
 import type { NormalizedSeoObservation, NormalizedTrafficObservation, SeoConfig, SeoDevice, SeoSourceId } from "./contracts";
 import type { YandexRegion } from "./providers/yandex";
 import { SeoProviderError } from "./providers/provider-error";
+import type { NormalizedGeoReferral } from "../geo-monitoring/referrals";
 
 type Window = { from: string; to: string };
 type SourceStatus = "disabled" | "success" | "partial" | "failed";
@@ -26,6 +27,7 @@ type CollectorRepository = {
   }): Promise<unknown>;
   upsertObservations(rows: readonly NormalizedSeoObservation[]): Promise<number>;
   upsertTrafficObservations(rows: readonly NormalizedTrafficObservation[]): Promise<number>;
+  upsertGeoReferrals(rows: readonly NormalizedGeoReferral[]): Promise<number>;
   syncYandexRegions(regions: readonly YandexRegion[]): Promise<Array<{
     code: string;
     displayName: string;
@@ -48,6 +50,7 @@ type GoogleProvider = {
 type YandexMetrikaProvider = {
   check(): Promise<unknown>;
   collect(window: Window): Promise<NormalizedTrafficObservation[]>;
+  collectAiReferrals(window: Window): Promise<NormalizedGeoReferral[]>;
 };
 
 type Logger = { write(record: Record<string, unknown>): void };
@@ -192,18 +195,43 @@ export function createSeoCollector(dependencies: {
     const window = windowEnding(clock(), 1, 14);
     return dependencies.repository.withSourceLock(source, async () => {
       const run = await dependencies.repository.startRun(source, window.from, window.to);
-      try {
-        const rows = await retry(() => provider.collect(window), sleep, random);
-        const storedCount = await dependencies.repository.upsertTrafficObservations(rows);
-        await dependencies.repository.finishRun(run.id, "success", { receivedCount: rows.length, storedCount });
-        logger.write({ event: "seo_collection_finished", source, status: "success", receivedCount: rows.length, storedCount });
-        return { source, status: "success", receivedCount: rows.length, storedCount, latestObservationDate: latestDate(rows) };
-      } catch (error) {
-        const { code } = safeError(error);
-        await dependencies.repository.finishRun(run.id, "failed", { receivedCount: 0, storedCount: 0, errorCode: code });
-        logger.write({ event: "seo_collection_finished", source, status: "failed", receivedCount: 0, storedCount: 0, errorCode: code });
-        return { source, status: "failed", receivedCount: 0, storedCount: 0, latestObservationDate: null, errorCode: code };
+      let receivedCount = 0;
+      let storedCount = 0;
+      let latestObservationDate: string | null = null;
+      let completedSlices = 0;
+      const errors: string[] = [];
+      for (const slice of [
+        async () => {
+          const rows = await retry(() => provider.collect(window), sleep, random);
+          receivedCount += rows.length;
+          storedCount += await dependencies.repository.upsertTrafficObservations(rows);
+          latestObservationDate = [latestObservationDate, latestDate(rows)].filter(Boolean).sort().at(-1) ?? null;
+        },
+        async () => {
+          const rows = await retry(() => provider.collectAiReferrals(window), sleep, random);
+          receivedCount += rows.length;
+          storedCount += await dependencies.repository.upsertGeoReferrals(rows);
+          latestObservationDate = [latestObservationDate, latestDate(rows)].filter(Boolean).sort().at(-1) ?? null;
+        },
+      ]) {
+        try {
+          await slice();
+          completedSlices++;
+        } catch (error) {
+          errors.push(safeError(error).code);
+        }
       }
+      const status = errors.length === 0 ? "success" : completedSlices > 0 ? "partial" : "failed";
+      await dependencies.repository.finishRun(run.id, status, {
+        receivedCount,
+        storedCount,
+        ...(errors[0] ? { errorCode: errors[0] } : {}),
+        metadata: { completedSlices, failedSlices: errors.length },
+      });
+      logger.write({ event: "seo_collection_finished", source, status, receivedCount, storedCount,
+        ...(errors[0] ? { errorCode: errors[0] } : {}) });
+      return { source, status, receivedCount, storedCount, latestObservationDate,
+        ...(errors[0] ? { errorCode: errors[0] } : {}) };
     });
   }
 

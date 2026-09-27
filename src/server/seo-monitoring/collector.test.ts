@@ -4,6 +4,7 @@ import test from "node:test";
 import type { NormalizedSeoObservation, NormalizedTrafficObservation, SeoConfig, SeoDevice, SeoSourceId } from "./contracts";
 import { createSeoCollector } from "./collector";
 import { SeoProviderError } from "./providers/provider-error";
+import type { NormalizedGeoReferral } from "../geo-monitoring/referrals";
 
 const enabledConfig = {
   yandex: { enabled: true, oauthToken: "yandex-secret", hostId: "https:example.test:443" },
@@ -23,6 +24,11 @@ function trafficObservation(date = "2026-09-24"): NormalizedTrafficObservation {
     pageviews: 20, bounceRate: 0.2, pageDepth: 2, avgVisitDurationSeconds: 90 };
 }
 
+function geoReferral(date = "2026-09-24"): NormalizedGeoReferral {
+  return { observationDate: date, platform: "chatgpt_search", users: 4, newUsers: 2, visits: 5,
+    pageviews: 8, landingPath: "/services/crm/" };
+}
+
 function fixture(overrides: Record<string, unknown> = {}) {
   const events: string[] = [];
   let run = 0;
@@ -33,6 +39,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     async finishRun(id: string, status: string, result: { errorCode?: string }) { events.push(`finish:${id}:${status}:${result.errorCode ?? "ok"}`); },
     async upsertObservations(rows: readonly NormalizedSeoObservation[]) { events.push(`store:${rows[0]?.source}:${rows.length}`); return rows.length; },
     async upsertTrafficObservations(rows: readonly NormalizedTrafficObservation[]) { events.push(`store:${rows[0]?.source}:${rows.length}`); return rows.length; },
+    async upsertGeoReferrals(rows: readonly NormalizedGeoReferral[]) { events.push(`store:geo-referrals:${rows.length}`); return rows.length; },
     async syncYandexRegions(regions: Array<{ id: number; name: string }>) {
       events.push(`regions:${regions.length}`);
       return [{ code: "moscow", displayName: "Москва", externalId: "213", active: true }];
@@ -58,6 +65,10 @@ function fixture(overrides: Record<string, unknown> = {}) {
     async collect(window: { from: string; to: string }) {
       events.push(`metrika:${window.from}:${window.to}`);
       return [trafficObservation(window.to)];
+    },
+    async collectAiReferrals(window: { from: string; to: string }) {
+      events.push(`metrika-ai:${window.from}:${window.to}`);
+      return [geoReferral(window.to)];
     },
   };
   return { events, repository, yandex, google, yandexMetrika, ...overrides };
@@ -117,10 +128,26 @@ test("Yandex Metrica refreshes fourteen complete days ending yesterday", async (
 
   assert.ok(f.events.includes("metrika:2026-09-13:2026-09-26"));
   assert.ok(f.events.includes("store:yandex_metrika:1"));
+  assert.ok(f.events.includes("store:geo-referrals:1"));
   assert.deepEqual(report.sources[0], {
-    source: "yandex_metrika", status: "success", receivedCount: 1, storedCount: 1,
+    source: "yandex_metrika", status: "success", receivedCount: 2, storedCount: 2,
     latestObservationDate: "2026-09-26",
   });
+});
+
+test("Metrica keeps a successful slice and marks the source partial when AI referrals fail", async () => {
+  const f = fixture();
+  f.yandexMetrika.collectAiReferrals = async () => {
+    throw new SeoProviderError("seo_yandex_metrika_ai_response_incomplete", false);
+  };
+  const collector = createSeoCollector({ config: { ...enabledConfig, yandex: { enabled: false }, google: { enabled: false } },
+    repository: f.repository, yandexMetrika: f.yandexMetrika, clock: () => new Date("2026-09-27T06:00:00Z"),
+    sleep: async () => {}, random: () => 0 });
+  const report = await collector.run("yandex_metrika");
+  assert.equal(report.sources[0].status, "partial");
+  assert.equal(report.sources[0].storedCount, 1);
+  assert.equal(report.sources[0].errorCode, "seo_yandex_metrika_ai_response_incomplete");
+  assert.ok(f.events.includes("store:yandex_metrika:1"));
 });
 
 test("Yandex refreshes authoritative regions and collects only resolved desired city/device slices", async () => {

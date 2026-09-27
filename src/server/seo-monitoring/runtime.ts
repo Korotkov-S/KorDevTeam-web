@@ -11,6 +11,7 @@ import { SeoProviderError } from "./providers/provider-error";
 import { createYandexSearchProvider } from "./providers/yandexSearch";
 import { createSeoRankCollector } from "./rankCollector";
 import { loadSemanticCore } from "./semanticCore";
+import { createGeoRepository } from "../geo-monitoring/repository";
 
 export function getSeoMonitoringService() {
   return createSeoService(createSeoRepository(getDb()));
@@ -23,9 +24,10 @@ export function syncSeoSemanticCore() {
 export async function runSeoCollection(options: { source?: SeoCollectionTarget } = {}) {
   const config = readSeoConfig(process.env);
   const repository = createSeoRepository(getDb());
+  const geoRepository = createGeoRepository(getDb());
   const collector = createSeoCollector({
     config,
-    repository,
+    repository: { ...repository, upsertGeoReferrals: geoRepository.upsertGeoReferrals },
     ...(config.yandex.enabled ? { yandex: createYandexWebmasterProvider(config.yandex) } : {}),
     ...(config.google.enabled ? { google: createGoogleSearchConsoleProvider(config.google) } : {}),
     ...(config.yandexMetrika.enabled ? { yandexMetrika: createYandexMetrikaProvider(config.yandexMetrika) } : {}),

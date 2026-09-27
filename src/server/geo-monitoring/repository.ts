@@ -26,6 +26,7 @@ import type {
   GeoRunMode,
 } from "./contracts";
 import { summarizeGeoObservations } from "./analytics";
+import type { NormalizedGeoReferral } from "./referrals";
 
 export type GeoDatabase = ReturnType<typeof createDb>;
 
@@ -349,6 +350,29 @@ export function createGeoRepository(db: GeoDatabase) {
           });
         }
         return input.length;
+      });
+    },
+
+    async upsertGeoReferrals(rows: readonly NormalizedGeoReferral[]) {
+      if (!rows.length) return 0;
+      return db.transaction(async (tx) => {
+        for (const row of rows) {
+          await tx.insert(geoReferralDailyMetrics).values(row).onConflictDoUpdate({
+            target: [
+              geoReferralDailyMetrics.observationDate,
+              geoReferralDailyMetrics.platform,
+              geoReferralDailyMetrics.landingPath,
+            ],
+            set: {
+              users: row.users,
+              newUsers: row.newUsers,
+              visits: row.visits,
+              pageviews: row.pageviews,
+              importedAt: new Date(),
+            },
+          });
+        }
+        return rows.length;
       });
     },
 

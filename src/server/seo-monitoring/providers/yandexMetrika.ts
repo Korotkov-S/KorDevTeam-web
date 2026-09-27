@@ -1,6 +1,7 @@
 import type { NormalizedTrafficObservation, SeoTrafficSlice, YandexMetrikaConfig } from "../contracts";
 import { normalizeSitePath } from "../normalization";
 import { boundedRetryAfter, SeoProviderError } from "./provider-error";
+import { classifyAiReferral, type NormalizedGeoReferral } from "../../geo-monitoring/referrals";
 
 const API_ORIGIN = "https://api-metrika.yandex.net";
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -15,6 +16,8 @@ const MAIN_METRICS = [
   "ym:s:avgVisitDurationSeconds",
 ] as const;
 const MAJOR_CITIES = ["Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", "Казань", "Нижний Новгород", "Краснодар"];
+const AI_DIMENSIONS = ["ym:s:date", "ym:s:refererDomain", "ym:s:refererPath", "ym:s:startURLPath", "ym:s:lastUTMSource"] as const;
+const AI_FILTER = "ym:s:isRobot=='No' AND (ym:s:refererDomain=.('chatgpt.com','chat.openai.com','gemini.google.com','copilot.microsoft.com') OR ym:s:lastUTMSource=.('chatgpt','chatgpt.com','gemini','google_ai','google-ai','copilot','bing_copilot','bing-copilot'))";
 
 type Window = { from: string; to: string };
 type ReportSlice = { slice: SeoTrafficSlice; dimension?: string; filter?: string };
@@ -106,6 +109,45 @@ function rowKey(row: Pick<ParsedReportRow, "observationDate" | "dimensionKey">):
   return `${row.observationDate}\u0000${row.dimensionKey}`;
 }
 
+type AiReportRow = {
+  observationDate: string;
+  platform: NormalizedGeoReferral["platform"];
+  landingPath: string;
+  metrics: number[];
+};
+
+function optionalDimension(value: unknown): string {
+  if (!plainObject(value) || typeof value.name !== "string" || value.name.length > 2_000) return invalidResponse();
+  return value.name.trim();
+}
+
+function parseAiReport(payload: unknown, metricCount: number): AiReportRow[] {
+  if (!plainObject(payload) || payload.sampled !== false || payload.sample_share !== 1
+    || payload.total_rows_rounded !== false || !Number.isSafeInteger(payload.total_rows)
+    || (payload.total_rows as number) < 0 || !Array.isArray(payload.data)
+    || payload.data.length > REPORT_LIMIT || payload.total_rows !== payload.data.length) {
+    return invalidResponse("seo_yandex_metrika_ai_response_incomplete");
+  }
+  return payload.data.flatMap((row) => {
+    if (!plainObject(row) || !Array.isArray(row.dimensions) || row.dimensions.length !== AI_DIMENSIONS.length
+      || !Array.isArray(row.metrics) || row.metrics.length !== metricCount
+      || row.metrics.some((metric) => typeof metric !== "number" || !Number.isFinite(metric))) return invalidResponse();
+    const observationDate = optionalDimension(row.dimensions[0]);
+    if (!validDate(observationDate)) return invalidResponse();
+    const refererDomain = optionalDimension(row.dimensions[1]);
+    const refererPath = optionalDimension(row.dimensions[2]);
+    let landingPath: string;
+    try {
+      landingPath = normalizeSitePath(optionalDimension(row.dimensions[3]) || "/");
+    } catch {
+      return invalidResponse();
+    }
+    const utmSource = optionalDimension(row.dimensions[4]);
+    const platform = classifyAiReferral({ refererDomain, refererPath, utmSource });
+    return platform ? [{ observationDate, platform, landingPath, metrics: row.metrics as number[] }] : [];
+  });
+}
+
 export function createYandexMetrikaProvider(
   config: Extract<YandexMetrikaConfig, { enabled: true }>,
   fetchImpl: typeof fetch = fetch,
@@ -144,6 +186,23 @@ export function createYandexMetrikaProvider(
       dimensions: ["ym:s:date", slice.dimension].filter(Boolean).join(","),
       metrics: newUsers ? "ym:s:users" : MAIN_METRICS.join(","),
       filters,
+      attribution: "last",
+      accuracy: "full",
+      lang: "ru",
+      limit: String(REPORT_LIMIT),
+      offset: "1",
+    });
+    return `/stat/v1/data?${params.toString()}`;
+  }
+
+  function aiReportUrl(window: Window, newUsers: boolean): string {
+    const params = new URLSearchParams({
+      ids: String(config.counterId),
+      date1: window.from,
+      date2: window.to,
+      dimensions: AI_DIMENSIONS.join(","),
+      metrics: newUsers ? "ym:s:users" : "ym:s:visits,ym:s:users,ym:s:pageviews",
+      filters: [AI_FILTER, newUsers ? "ym:s:isNewUser=='Yes'" : undefined].filter(Boolean).join(" AND "),
       attribution: "last",
       accuracy: "full",
       lang: "ru",
@@ -198,6 +257,39 @@ export function createYandexMetrikaProvider(
         }
       }
       return observations;
+    },
+
+    async collectAiReferrals(window: Window): Promise<NormalizedGeoReferral[]> {
+      validateWindow(window);
+      const mainRows = parseAiReport(await request(aiReportUrl(window, false)), 3);
+      const newRows = parseAiReport(await request(aiReportUrl(window, true)), 1);
+      const key = (row: AiReportRow) => `${row.observationDate}\u0000${row.platform}\u0000${row.landingPath}`;
+      const main = new Map<string, AiReportRow>();
+      for (const row of mainRows) {
+        const existing = main.get(key(row));
+        if (!existing) main.set(key(row), row);
+        else existing.metrics = existing.metrics.map((value, index) => Math.max(value, row.metrics[index] ?? 0));
+      }
+      const newUsers = new Map<string, number>();
+      for (const row of newRows) newUsers.set(key(row), Math.max(newUsers.get(key(row)) ?? 0, row.metrics[0] ?? 0));
+      if (main.size !== newUsers.size || [...main.keys()].some((item) => !newUsers.has(item))) {
+        return invalidResponse("seo_yandex_metrika_ai_new_users_mismatch");
+      }
+      return [...main.entries()].map(([itemKey, row]) => {
+        const [visits, users, pageviews] = row.metrics;
+        const newUserCount = newUsers.get(itemKey)!;
+        if (![visits, users, pageviews, newUserCount].every(Number.isSafeInteger)
+          || visits < users || users < newUserCount || newUserCount < 0 || pageviews < visits) return invalidResponse();
+        return {
+          observationDate: row.observationDate,
+          platform: row.platform,
+          users,
+          newUsers: newUserCount,
+          visits,
+          pageviews,
+          landingPath: row.landingPath,
+        };
+      });
     },
   };
 }

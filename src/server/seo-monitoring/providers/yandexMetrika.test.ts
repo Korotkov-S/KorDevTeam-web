@@ -121,3 +121,38 @@ test("Metrica provider rejects malformed windows and impossible metric values", 
   await assert.rejects(() => provider.collect({ from: "bad", to: "2026-09-26" }), { message: "seo_yandex_metrika_window_invalid" });
   await assert.rejects(() => provider.collect({ from: "2026-09-13", to: "2026-09-26" }), { message: "seo_yandex_metrika_response_invalid" });
 });
+
+test("Metrica provider collects complete verified AI referrals and deduplicates dual signals", async () => {
+  const requests: URL[] = [];
+  const provider = createYandexMetrikaProvider(config, async (input) => {
+    const url = new URL(String(input));
+    requests.push(url);
+    const newUsers = url.searchParams.get("filters")?.includes("isNewUser") ?? false;
+    const metrics = newUsers ? [3] : [5, 4, 8];
+    return Response.json({
+      sampled: false, sample_share: 1, total_rows_rounded: false, total_rows: 2,
+      data: [
+        { dimensions: [{ name: "2026-09-26" }, { name: "chatgpt.com" }, { name: "/" }, { name: "/services/crm/" }, { name: "chatgpt.com" }], metrics },
+        { dimensions: [{ name: "2026-09-26" }, { name: "" }, { name: "" }, { name: "/services/crm/" }, { name: "chatgpt.com" }], metrics },
+      ],
+    });
+  });
+  assert.deepEqual(await provider.collectAiReferrals({ from: "2026-09-13", to: "2026-09-26" }), [{
+    observationDate: "2026-09-26", platform: "chatgpt_search", users: 4, newUsers: 3,
+    visits: 5, pageviews: 8, landingPath: "/services/crm/",
+  }]);
+  assert.equal(requests.length, 2);
+  for (const url of requests) {
+    assert.equal(url.searchParams.get("accuracy"), "full");
+    assert.equal(url.searchParams.get("dimensions"), "ym:s:date,ym:s:refererDomain,ym:s:refererPath,ym:s:startURLPath,ym:s:lastUTMSource");
+  }
+});
+
+test("Metrica AI report fails closed when sampled or incomplete", async () => {
+  const provider = createYandexMetrikaProvider(config, async () => Response.json({
+    sampled: true, sample_share: 0.5, total_rows_rounded: false, total_rows: 0, data: [],
+  }));
+  await assert.rejects(() => provider.collectAiReferrals({ from: "2026-09-13", to: "2026-09-26" }), {
+    message: "seo_yandex_metrika_ai_response_incomplete",
+  });
+});
