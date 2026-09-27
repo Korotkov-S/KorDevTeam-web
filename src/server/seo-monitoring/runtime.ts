@@ -15,8 +15,16 @@ import { createGeoRepository } from "../geo-monitoring/repository";
 import { createGeoCollector } from "../geo-monitoring/collector";
 import { checkGeoCrawlerHealth } from "../geo-monitoring/crawlerHealth";
 
-function publicOrigin() {
-  return new URL(process.env.PUBLIC_SITE_ORIGIN ?? process.env.ADMIN_TRUSTED_ORIGIN ?? "https://kordev.team");
+export function readGeoSiteOrigin(env: NodeJS.ProcessEnv = process.env) {
+  let origin: URL;
+  try {
+    origin = new URL(env.GEO_SITE_ORIGIN ?? "https://kordev.team");
+  } catch {
+    throw new Error("geo_site_origin_invalid");
+  }
+  if (origin.protocol !== "https:" || origin.pathname !== "/" || origin.search || origin.hash
+    || origin.username || origin.password) throw new Error("geo_site_origin_invalid");
+  return origin;
 }
 
 export function getSeoMonitoringService() {
@@ -65,7 +73,7 @@ export async function runSeoCollection(options: { source?: SeoCollectionTarget }
     }
   }
   if (!options.source || options.source === "geo_crawler") {
-    const geo = await createGeoCollector({ origin: publicOrigin(), repository: geoRepository }).run();
+    const geo = await createGeoCollector({ origin: readGeoSiteOrigin(), repository: geoRepository }).run();
     sources.push(geo);
     failed ||= geo.status === "failed";
   }
@@ -105,7 +113,7 @@ export async function checkSeoCollectionReady(options: { source?: SeoCollectionT
   }
   if (!options.source || options.source === "geo_crawler") {
     try {
-      await checkGeoCrawlerHealth(publicOrigin());
+      await checkGeoCrawlerHealth(readGeoSiteOrigin());
       sources.push({ source: "geo_crawler", status: "ready" });
     } catch {
       sources.push({ source: "geo_crawler", status: "failed", errorCode: "geo_crawler_check_failed" });

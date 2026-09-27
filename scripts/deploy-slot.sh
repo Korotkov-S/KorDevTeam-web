@@ -38,6 +38,7 @@ manifest_total="$(printf '%s' "$manifest_report" | node "$SCRIPT_DIR/release-bou
 BACKUP_REASON=pre-release bash "$SCRIPT_DIR/backup-postgres.sh"
 docker compose -f "$COMPOSE_FILE" run --rm --no-deps "kordevteam-$target" node scripts/migrate-production.mjs
 docker compose -f "$COMPOSE_FILE" run --rm --no-deps "kordevteam-$target" node server/seo-core-sync.mjs
+docker compose -f "$COMPOSE_FILE" run --rm --no-deps "kordevteam-$target" node server/geo-core-sync.mjs
 
 plan_report="$(content_release plan)" || fail 'Content release plan command failed'
 plan_checksum="$(printf '%s' "$plan_report" | node "$SCRIPT_DIR/release-boundary.mjs" content-report "$DEPLOY_STATE_DIR" "$target" plan "$image" "$content_image" "$web_revision" "$manifest_checksum" -)" || fail 'Content release plan is blocked or invalid'

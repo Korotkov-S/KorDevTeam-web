@@ -32,6 +32,8 @@ test('production image packages SSR, migrations and production dependencies unde
   assert.match(dockerfile, /health\/ready/);
   assert.match(dockerfile, /ENV .*CONTENT_CACHE_TTL_SECONDS=0(?:\s|$)/m);
   assert.match(dockerfile, /ENTRYPOINT \["\/app\/scripts\/runtime-entrypoint\.sh"\]/);
+  assert.match(dockerfile, /geo-prompts\.ru\.json/u);
+  assert.match(dockerfile, /geo-core-sync\.mjs/u);
   assert.ok(packageManifest.dependencies.cheerio, 'Yandex Search XML parser must ship cheerio in the production image');
 });
 

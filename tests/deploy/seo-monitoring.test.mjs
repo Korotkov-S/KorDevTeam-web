@@ -11,6 +11,9 @@ test("production image and package expose the SEO collector", () => {
   assert.equal(pkg.scripts["seo:core:sync"], "node server/seo-core-sync.mjs");
   assert.match(dockerfile, /test -f \/app\/server\/seo-core-sync\.mjs/u);
   assert.match(dockerfile, /content\/seo\/semantic-core\.ru\.json/u);
+  assert.equal(pkg.scripts["geo:core:sync"], "node server/geo-core-sync.mjs");
+  assert.match(dockerfile, /test -f \/app\/server\/geo-core-sync\.mjs/u);
+  assert.match(dockerfile, /content\/seo\/geo-prompts\.ru\.json/u);
 });
 test("SEO job is isolated, read-only, and receives only its own provider credentials", () => {
   const compose = readFileSync("deploy/docker-compose.team.yml", "utf8");
@@ -28,11 +31,33 @@ test("SEO job is isolated, read-only, and receives only its own provider credent
   assert.match(block, /YANDEX_SEARCH_FOLDER_ID:/u);
   assert.match(block, /SEO_YANDEX_SEARCH_DAILY_LIMIT: \$\{SEO_YANDEX_SEARCH_DAILY_LIMIT:-1000\}/u);
   assert.match(block, /SEO_TARGET_HOST:/u);
+  assert.match(block, /GEO_SITE_ORIGIN: \$\{GEO_SITE_ORIGIN:-https:\/\/kordev\.team\}/u);
   assert.match(block, /LEAD_TEMP_ROOT:/u);
   assert.match(block, /\$\{LEAD_TEMP_ROOT:\?Provide LEAD_TEMP_ROOT\}:.*mode=0700.*uid=1000.*gid=1000/u);
   assert.doesNotMatch(block, /SMTP_PASSWORD|LEAD_S3_SECRET_ACCESS_KEY|ADMIN_SESSION_HMAC_KEY/u);
   assert.match(block, /backend:/u);
   assert.match(block, /egress:/u);
+});
+
+test("GEO crawler origin and provider-free agent contract stay isolated from web and lead worker", () => {
+  const compose = readFileSync("deploy/docker-compose.team.yml", "utf8");
+  const webBlock = compose.match(/x-web: &web[\s\S]*?(?=\nservices:)/u)?.[0] ?? "";
+  const leadBlock = compose.match(/  lead-worker:\n[\s\S]*?(?=\n  [a-z][a-z0-9-]+:)/u)?.[0] ?? "";
+  const seoBlock = compose.match(/  seo-job:\n[\s\S]*?(?=\n  [a-z][a-z0-9-]+:|\nnetworks:)/u)?.[0] ?? "";
+  assert.doesNotMatch(webBlock, /GEO_SITE_ORIGIN|OPENAI_API_KEY|GOOGLE_AI_API_KEY|ALICE_COOKIE|CHATGPT_COOKIE|GEMINI_COOKIE/iu);
+  assert.doesNotMatch(leadBlock, /GEO_SITE_ORIGIN|OPENAI_API_KEY|GOOGLE_AI_API_KEY|ALICE_COOKIE|CHATGPT_COOKIE|GEMINI_COOKIE/iu);
+  assert.doesNotMatch(seoBlock, /OPENAI_API_KEY|GOOGLE_AI_API_KEY|ALICE_COOKIE|CHATGPT_COOKIE|GEMINI_COOKIE/iu);
+  const example = readFileSync("deploy/env/operations.env.example", "utf8");
+  assert.match(example, /^GEO_SITE_ORIGIN=https:\/\/kordev\.team$/mu);
+});
+
+test("GEO site origin is validated as a bare HTTPS origin", () => {
+  const runtime = readFileSync("src/server/seo-monitoring/runtime.ts", "utf8");
+  assert.match(runtime, /env\.GEO_SITE_ORIGIN/u);
+  assert.match(runtime, /protocol !== "https:"/u);
+  assert.match(runtime, /pathname !== "\/"/u);
+  assert.match(runtime, /username|password/u);
+  assert.match(runtime, /search|hash/u);
 });
 
 test("Yandex Search API key is not exposed to web or lead-worker services", () => {

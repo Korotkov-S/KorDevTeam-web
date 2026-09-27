@@ -108,6 +108,38 @@ async function assertDatabaseCode(operation: () => Promise<unknown>, expectedCod
   });
 }
 
+async function dropGeoSchema(db: ReturnType<typeof createDb>) {
+  await db.execute(sql`DROP TABLE IF EXISTS
+    geo_experiment_prompts,
+    geo_experiments,
+    geo_citations,
+    geo_fanout_queries,
+    geo_observation_mentions,
+    geo_observations,
+    geo_runs,
+    geo_prompts,
+    geo_topics,
+    geo_entities,
+    geo_referral_daily_metrics,
+    geo_crawler_checks`);
+  await db.execute(sql`DROP TYPE IF EXISTS
+    geo_citation_category,
+    geo_crawler_status,
+    geo_entity_status,
+    geo_entity_type,
+    geo_experiment_action_type,
+    geo_experiment_direction,
+    geo_experiment_metric,
+    geo_experiment_status,
+    geo_experiment_verdict,
+    geo_platform,
+    geo_prompt_category,
+    geo_prompt_status,
+    geo_run_mode,
+    geo_run_status,
+    geo_sentiment`);
+}
+
 async function seoMetricFixture(databaseUrl: string) {
   const db = createDb(databaseUrl);
   const [region] = await db
@@ -357,6 +389,7 @@ databaseTest("SEO query lifecycle defaults to a candidate and rejects incoherent
 databaseTest("0008 promotes non-API tracked queries but turns legacy API noise into candidates", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropGeoSchema(db);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS status`);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS kind`);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS priority`);
@@ -585,6 +618,7 @@ databaseTest("lead delivery and rate-limit counters reject negative values", asy
 databaseTest("0002 additively upgrades existing delivery jobs with a zero provider counter", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropGeoSchema(db);
   const [lead] = await db.insert(leads).values(leadFixture).returning();
   await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });
   await db.execute(sql`DROP TABLE content_release_items, content_release_runs`);

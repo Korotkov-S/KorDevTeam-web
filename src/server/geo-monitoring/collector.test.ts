@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createGeoCollector } from "./collector";
+import { readGeoSiteOrigin } from "../seo-monitoring/runtime";
+
+test("GEO crawler accepts only a bare HTTPS site origin", () => {
+  assert.equal(readGeoSiteOrigin({ GEO_SITE_ORIGIN: "https://kordev.team" }).origin, "https://kordev.team");
+  for (const value of ["http://kordev.team", "https://user:pass@kordev.team", "https://kordev.team/path",
+    "https://kordev.team/?query=1", "https://kordev.team/#fragment", "not-a-url"]) {
+    assert.throws(() => readGeoSiteOrigin({ GEO_SITE_ORIGIN: value }), /geo_site_origin_invalid/u);
+  }
+});
 
 test("GEO collector persists crawler checks and returns compact counts", async () => {
   const stored: unknown[] = [];

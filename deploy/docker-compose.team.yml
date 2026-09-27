@@ -184,6 +184,7 @@ services:
       YANDEX_SEARCH_FOLDER_ID: ${YANDEX_SEARCH_FOLDER_ID:-}
       SEO_YANDEX_SEARCH_DAILY_LIMIT: ${SEO_YANDEX_SEARCH_DAILY_LIMIT:-1000}
       SEO_TARGET_HOST: ${SEO_TARGET_HOST:-kordev.team}
+      GEO_SITE_ORIGIN: ${GEO_SITE_ORIGIN:-https://kordev.team}
       LEAD_TEMP_ROOT: ${LEAD_TEMP_ROOT:?Provide LEAD_TEMP_ROOT}
     depends_on:
       postgres:
