@@ -149,6 +149,45 @@ test("dashboard explains Yandex rank control and renders the regional keyword ma
   assert.match(html, /26\.09\.2026/u);
 });
 
+test("dashboard labels every semantic editor field and explains ambiguous SEO terms", () => {
+  const html = renderDashboard(data);
+  for (const label of ["Целевая страница", "Wordstat/месяц", "ВЧ/СЧ/НЧ", "Тип запроса", "Приоритет", "Статус", "Действие"]) {
+    assert.match(html, new RegExp(`<th[^>]*>[^<]*(?:<[^>]+>)*${label}`, "u"));
+  }
+  for (const explanation of [
+    "Число показов запроса в Яндекс Wordstat за месяц",
+    "ВЧ — высокочастотный, СЧ — среднечастотный, НЧ — низкочастотный",
+    "Чем выше число, тем раньше запрос проверяется",
+    "Активные запросы проверяются ежедневно",
+  ]) assert.match(html, new RegExp(explanation, "u"));
+  assert.doesNotMatch(html, /<th[^>]*>Параметры<\/th>/u);
+  assert.doesNotMatch(html, /<th[^>]*>Настройка<\/th>/u);
+});
+
+test("dashboard replaces ambiguous breakdown bars with explicitly labelled metric tables", () => {
+  const unclassified = {
+    ...data,
+    dashboard: {
+      ...data.dashboard,
+      regions: [{ key: "ru", label: "Россия", impressions: 116, clicks: 4 }],
+      devices: [
+        { key: "desktop", label: "Компьютеры", impressions: 74, clicks: 3 },
+        { key: "mobile", label: "Смартфоны", impressions: 42, clicks: 1 },
+      ],
+      frequencies: [{ key: "unclassified", label: "Не классифицировано", impressions: 116, clicks: 4 }],
+    },
+  };
+  const html = renderDashboard(unclassified);
+  for (const label of ["Показы и клики по устройствам", "Фактические показы по регионам Яндекса", "Устройство", "Регион", "Показы", "Клики"]) {
+    assert.match(html, new RegExp(label, "u"));
+  }
+  assert.match(html, /По городам данных о фактических показах пока нет/u);
+  assert.match(html, /116 показов пока не распределены по ВЧ, СЧ и НЧ/u);
+  assert.doesNotMatch(html, /Диапазоны позиций/u);
+  assert.doesNotMatch(html, /<h2[^>]*>Устройства<\/h2>/u);
+  assert.doesNotMatch(html, /<h2[^>]*>Частотность<\/h2>/u);
+});
+
 test("SEO loader rejects invalid and oversized custom ranges safely", async () => {
   const loader = createSeoAdminLoader(auth, service(), () => new Date("2026-09-25T10:00:00Z"));
   for (const url of [
@@ -209,7 +248,7 @@ test("SEO admin creates candidates and updates lifecycle fields with optimistic 
 test("dashboard renders semantic core, candidates, factual queries, and all decision sections", () => {
   const withGap = { ...data, queries: { ...data.queries, nextCursor: "50" }, dashboard: { ...data.dashboard, daily: [...data.dashboard.daily, { date: "2026-09-24", impressions: 0, clicks: 0, ctr: null, averagePosition: null }] } };
   const html = renderDashboard(withGap);
-  for (const label of ["SEO-мониторинг", "Показы и клики", "CTR", "Средняя позиция", "Диапазоны позиций", "Регионы Яндекса", "Устройства", "Частотность", "Движение запросов", "Семантическое ядро", "Кандидаты", "Фактические запросы", "Контрольные позиции Яндекса", "Изменения", "Рекомендации"]) assert.match(html, new RegExp(label, "u"));
+  for (const label of ["SEO-мониторинг", "Показы и клики", "CTR", "Средняя позиция", "Показы и клики по устройствам", "Фактические показы по регионам Яндекса", "Показы по частотности семантики", "Движение запросов", "Семантическое ядро", "Кандидаты", "Фактические запросы", "Контрольные позиции Яндекса", "Изменения", "Рекомендации"]) assert.match(html, new RegExp(label, "u"));
   assert.match(html, /автоматизация бизнес процессов/u);
   assert.match(html, /4[\s ]?311/u);
   assert.match(html, /Коммерческий/u);

@@ -2,7 +2,7 @@ import React from "react";
 import { Form, Link, useActionData, useLoaderData, useMatches } from "react-router";
 
 import type { SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "../../server/seo-monitoring/contracts";
-import { BreakdownChart, CtrChart, PositionChart, TrafficChart } from "./seo-charts";
+import { CtrChart, PositionChart, TrafficChart } from "./seo-charts";
 
 export { action, headers, loader } from "./seo.server";
 
@@ -148,22 +148,19 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   return <section className="rounded-xl border border-border bg-card p-5"><h2 className="text-xl font-semibold">{title}</h2><div className="mt-4">{children}</div></section>;
 }
 
-function SemanticQueryForm({ query, csrfToken }: { query: SemanticQuery; csrfToken: string }) {
-  return <Form method="post" className="grid min-w-[760px] grid-cols-[minmax(170px,1fr)_110px_110px_150px_90px_130px_auto] gap-2">
-    <input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="intent" value="update-query" />
-    <input type="hidden" name="id" value={query.id} /><input type="hidden" name="expectedUpdatedAt" value={new Date(query.updatedAt).toISOString()} />
-    <input name="targetPath" defaultValue={query.targetPath ?? ""} placeholder="/целевая-страница/" className="rounded border border-input bg-background px-2 py-1" />
-    <input name="wordstatFrequency" type="number" min="0" defaultValue={query.wordstatFrequency ?? ""} placeholder="Wordstat" className="rounded border border-input bg-background px-2 py-1" />
-    <select name="frequencyBand" defaultValue={query.frequencyBand} className="rounded border border-input bg-background px-2"><option value="high">ВЧ</option><option value="medium">СЧ</option><option value="low">НЧ</option><option value="unclassified">—</option></select>
-    <select name="kind" defaultValue={query.kind} className="rounded border border-input bg-background px-2"><option value="commercial">Коммерческий</option><option value="informational">Информационный</option><option value="other">Другой</option></select>
-    <input name="priority" type="number" min="0" max="1000" defaultValue={query.priority} aria-label="Приоритет" className="rounded border border-input bg-background px-2 py-1" />
-    <select name="status" defaultValue={query.status} className="rounded border border-input bg-background px-2"><option value="candidate">Кандидат</option><option value="active">Активен</option><option value="archived">Архив</option></select>
-    <button className="rounded bg-primary px-3 py-1 text-primary-foreground">Сохранить</button>
-  </Form>;
+function HelpHeader({ label, help }: { label: string; help: string }) {
+  return <th className="p-2 align-bottom"><span>{label}</span> <abbr title={help} aria-label={`${label}: ${help}`} className="cursor-help rounded-full border border-border px-1.5 text-xs no-underline">?</abbr></th>;
 }
 
 function SemanticQueryTable({ queries, csrfToken }: { queries: SemanticQuery[]; csrfToken: string }) {
-  return queries.length ? <div className="overflow-x-auto"><table className="min-w-[1050px] text-left text-sm"><thead><tr><th className="p-2">Ключевой запрос</th><th className="p-2">Параметры</th><th className="p-2">Настройка</th></tr></thead><tbody>{queries.map((query) => <tr key={query.id} className="border-t border-border"><td className="p-2 align-top"><p className="font-medium">{query.queryText}</p><p className="mt-1 text-xs text-muted-foreground">{statusLabels[query.status]} · {kindLabels[query.kind]} · {frequencyLabels[query.frequencyBand]} · Wordstat: {query.wordstatFrequency === null ? "—" : integer.format(query.wordstatFrequency)}</p></td><td className="p-2 align-top"><p>{query.targetPath ?? "Целевая страница не назначена"}</p><p className="mt-1 text-xs text-muted-foreground">Приоритет: {query.priority}</p></td><td className="p-2"><SemanticQueryForm query={query} csrfToken={csrfToken} /></td></tr>)}</tbody></table></div> : <p className="text-muted-foreground">Запросов пока нет.</p>;
+  return queries.length ? <div className="overflow-x-auto"><table className="min-w-[1380px] text-left text-sm"><thead><tr><th className="p-2 align-bottom">Ключевой запрос</th><HelpHeader label="Целевая страница" help="Страница сайта, которую нужно продвигать по этому запросу" /><HelpHeader label="Wordstat/месяц" help="Число показов запроса в Яндекс Wordstat за месяц" /><HelpHeader label="ВЧ/СЧ/НЧ" help="ВЧ — высокочастотный, СЧ — среднечастотный, НЧ — низкочастотный" /><HelpHeader label="Тип запроса" help="Коммерческий запрос ведёт к покупке или заявке, информационный — к статье или инструкции" /><HelpHeader label="Приоритет" help="Чем выше число, тем раньше запрос проверяется" /><HelpHeader label="Статус" help="Активные запросы проверяются ежедневно; кандидаты ждут утверждения, архивные только хранят историю" /><th className="p-2 align-bottom">Действие</th></tr></thead><tbody>{queries.map((query) => {
+    const formId = `semantic-query-${query.id}`;
+    return <tr key={query.id} className="border-t border-border"><td className="max-w-[280px] p-2 align-top"><p className="font-medium">{query.queryText}</p><p className="mt-1 text-xs text-muted-foreground">{statusLabels[query.status]} · {kindLabels[query.kind]} · {frequencyLabels[query.frequencyBand]}</p></td><td className="p-2 align-top"><input form={formId} name="targetPath" defaultValue={query.targetPath ?? ""} placeholder="/целевая-страница/" aria-label={`Целевая страница: ${query.queryText}`} className="w-[240px] rounded border border-input bg-background px-2 py-1" /></td><td className="p-2 align-top"><input form={formId} name="wordstatFrequency" type="number" min="0" defaultValue={query.wordstatFrequency ?? ""} aria-label={`Wordstat в месяц: ${query.queryText}`} className="w-[120px] rounded border border-input bg-background px-2 py-1" /></td><td className="p-2 align-top"><select form={formId} name="frequencyBand" defaultValue={query.frequencyBand} aria-label={`Частотность: ${query.queryText}`} className="w-[100px] rounded border border-input bg-background px-2 py-1"><option value="high">ВЧ</option><option value="medium">СЧ</option><option value="low">НЧ</option><option value="unclassified">—</option></select></td><td className="p-2 align-top"><select form={formId} name="kind" defaultValue={query.kind} aria-label={`Тип запроса: ${query.queryText}`} className="w-[160px] rounded border border-input bg-background px-2 py-1"><option value="commercial">Коммерческий</option><option value="informational">Информационный</option><option value="other">Другой</option></select></td><td className="p-2 align-top"><input form={formId} name="priority" type="number" min="0" max="1000" defaultValue={query.priority} aria-label={`Приоритет: ${query.queryText}`} className="w-[90px] rounded border border-input bg-background px-2 py-1" /></td><td className="p-2 align-top"><select form={formId} name="status" defaultValue={query.status} aria-label={`Статус: ${query.queryText}`} className="w-[130px] rounded border border-input bg-background px-2 py-1"><option value="candidate">Кандидат</option><option value="active">Активен</option><option value="archived">Архив</option></select></td><td className="p-2 align-top"><Form id={formId} method="post"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="intent" value="update-query" /><input type="hidden" name="id" value={query.id} /><input type="hidden" name="expectedUpdatedAt" value={new Date(query.updatedAt).toISOString()} /><button className="rounded bg-primary px-3 py-1 text-primary-foreground">Сохранить</button></Form></td></tr>;
+  })}</tbody></table></div> : <p className="text-muted-foreground">Запросов пока нет.</p>;
+}
+
+function MetricTable({ dimension, rows }: { dimension: "Устройство" | "Регион" | "Частотность"; rows: Array<{ key: string; label: string; impressions: number; clicks: number }> }) {
+  return <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr><th className="p-2">{dimension}</th><th className="p-2 text-right">Показы</th><th className="p-2 text-right">Клики</th></tr></thead><tbody>{rows.map((row) => <tr key={row.key} className="border-t border-border"><td className="p-2 font-medium">{row.label}</td><td className="p-2 text-right">{integer.format(row.impressions)}</td><td className="p-2 text-right">{integer.format(row.clicks)}</td></tr>)}</tbody></table></div>;
 }
 
 export function AdminSeoDashboard({ data, csrfToken }: { data: SeoAdminLoaderData; csrfToken: string }) {
@@ -171,6 +168,9 @@ export function AdminSeoDashboard({ data, csrfToken }: { data: SeoAdminLoaderDat
   const yandex = filters.source === "yandex_webmaster";
   const selectedSource = dashboard.sources.find((source) => source.source === filters.source);
   const changes = data.changes.items.map((change) => ({ ...change, appliedAt: String(change.appliedAt) }));
+  const cityRows = dashboard.regions.filter((row) => row.key !== "ru" && row.label !== "Россия");
+  const unclassifiedFrequency = dashboard.frequencies.find((row) => row.key === "unclassified");
+  const classifiedFrequencies = dashboard.frequencies.filter((row) => row.key !== "unclassified");
   return <section className="mx-auto max-w-[1500px] space-y-6">
     <header><h1 className="text-3xl font-semibold">SEO-мониторинг</h1><p className="mt-2 text-muted-foreground">Официальные данные Яндекс Вебмастера и Google Search Console. Позиция — средняя, а не проверка живой выдачи.</p></header>
 
@@ -197,7 +197,23 @@ export function AdminSeoDashboard({ data, csrfToken }: { data: SeoAdminLoaderDat
     {dashboard.daily.length === 0 ? <p className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">Данных по выбранным фильтрам пока нет.</p> : <>
       <Panel title="Показы и клики"><TrafficChart data={dashboard.daily} changes={changes} /></Panel>
       <div className="grid gap-6 xl:grid-cols-2"><Panel title="CTR"><CtrChart data={dashboard.daily} changes={changes} /></Panel><Panel title="Средняя позиция по показам"><PositionChart data={dashboard.daily} changes={changes} /></Panel></div>
-      <div className="grid gap-6 xl:grid-cols-2"><Panel title="Диапазоны позиций"><BreakdownChart data={dashboard.positionBuckets} dataKey="count" /></Panel>{yandex ? <Panel title="Регионы Яндекса"><BreakdownChart data={dashboard.regions} /></Panel> : null}<Panel title="Устройства"><BreakdownChart data={dashboard.devices} /></Panel><Panel title="Частотность"><BreakdownChart data={dashboard.frequencies} /></Panel></div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Panel title="Показы и клики по устройствам">
+          <p className="mb-3 text-sm text-muted-foreground">Сколько раз сайт появился в поиске и сколько переходов получил с каждого типа устройства.</p>
+          <MetricTable dimension="Устройство" rows={dashboard.devices} />
+        </Panel>
+        {yandex ? <Panel title="Фактические показы по регионам Яндекса">
+          <p className="mb-3 text-sm text-muted-foreground">Это реальные показы и клики из Яндекс Вебмастера, а не контрольная позиция сайта.</p>
+          <MetricTable dimension="Регион" rows={dashboard.regions} />
+          {cityRows.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">По городам данных о фактических показах пока нет. Россия учитывается как общий регион.</p> : null}
+        </Panel> : null}
+        <Panel title="Показы по частотности семантики">
+          <p className="mb-3 text-sm text-muted-foreground">Распределение фактических показов между утверждёнными группами ВЧ, СЧ и НЧ.</p>
+          {classifiedFrequencies.length ? <MetricTable dimension="Частотность" rows={classifiedFrequencies} /> : null}
+          {unclassifiedFrequency?.impressions ? <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{integer.format(unclassifiedFrequency.impressions)} показов пока не распределены по ВЧ, СЧ и НЧ. Назначьте частотность запросам в семантическом ядре.</p> : null}
+          {!classifiedFrequencies.length && !unclassifiedFrequency?.impressions ? <p className="text-sm text-muted-foreground">Данных по частотности пока нет.</p> : null}
+        </Panel>
+      </div>
     </>}
 
     <Panel title="Семантическое ядро"><p className="mb-4 text-sm text-muted-foreground">Утверждённые ключевые запросы сайта видны здесь ещё до первых показов. Активные запросы участвуют в ежедневном контроле позиций, архивные сохраняют историю.</p><SemanticQueryTable queries={data.semanticCore.items} csrfToken={csrfToken} /></Panel>
