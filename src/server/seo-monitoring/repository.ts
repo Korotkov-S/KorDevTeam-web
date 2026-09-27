@@ -22,6 +22,31 @@ type FrequencyBand = typeof seoQueries.$inferSelect.frequencyBand;
 type RecommendationStatus = typeof seoRecommendations.$inferSelect.status;
 type RecommendationCommand = Omit<typeof seoRecommendations.$inferInsert, "id" | "status" | "createdAt" | "updatedAt">;
 
+type TrafficRow = {
+  observationDate: string;
+  slice: "overall" | "device" | "region" | "page";
+  dimensionKey: string;
+  dimensionLabel: string;
+  pagePath: string | null;
+  users: number;
+  newUsers: number;
+  visits: number;
+  pageviews: number;
+  bounceRate: number;
+  pageDepth: number;
+  avgVisitDurationSeconds: number;
+};
+
+type TrafficAggregate = {
+  users: number;
+  newUsers: number;
+  visits: number;
+  pageviews: number;
+  bounceRate: number | null;
+  pageDepth: number | null;
+  avgVisitDurationSeconds: number | null;
+};
+
 export type SeoMetricFilters = {
   dateFrom: string;
   dateTo: string;
@@ -69,6 +94,55 @@ export type RankControlCell = RankControlCheck & {
 
 const RANK_CONTROL_DEVICES = ["desktop", "mobile"] as const;
 const DAY_MS = 86_400_000;
+
+function aggregateTrafficMetrics(rows: readonly TrafficRow[]): TrafficAggregate {
+  const result = rows.reduce((totals, row) => ({
+    users: totals.users + row.users,
+    newUsers: totals.newUsers + row.newUsers,
+    visits: totals.visits + row.visits,
+    pageviews: totals.pageviews + row.pageviews,
+    bounceWeight: totals.bounceWeight + row.bounceRate * row.visits,
+    depthWeight: totals.depthWeight + row.pageDepth * row.visits,
+    durationWeight: totals.durationWeight + row.avgVisitDurationSeconds * row.visits,
+  }), { users: 0, newUsers: 0, visits: 0, pageviews: 0, bounceWeight: 0, depthWeight: 0, durationWeight: 0 });
+  return {
+    users: result.users,
+    newUsers: result.newUsers,
+    visits: result.visits,
+    pageviews: result.pageviews,
+    bounceRate: result.visits ? result.bounceWeight / result.visits : null,
+    pageDepth: result.visits ? result.depthWeight / result.visits : null,
+    avgVisitDurationSeconds: result.visits ? result.durationWeight / result.visits : null,
+  };
+}
+
+function groupedTraffic(rows: readonly TrafficRow[], key: (row: TrafficRow) => string) {
+  const groups = new Map<string, TrafficRow[]>();
+  for (const row of rows) groups.set(key(row), [...(groups.get(key(row)) ?? []), row]);
+  return [...groups.entries()].map(([, values]) => ({
+    dimensionKey: values[0].dimensionKey,
+    dimensionLabel: values[0].dimensionLabel,
+    pagePath: values[0].pagePath,
+    ...aggregateTrafficMetrics(values),
+  })).sort((left, right) => right.visits - left.visits || left.dimensionLabel.localeCompare(right.dimensionLabel, "ru"));
+}
+
+export function aggregateTrafficRows(rows: readonly TrafficRow[]) {
+  const overall = rows.filter((row) => row.slice === "overall");
+  const byDate = new Map<string, TrafficRow[]>();
+  for (const row of overall) byDate.set(row.observationDate, [...(byDate.get(row.observationDate) ?? []), row]);
+  const daily = [...byDate.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([date, values]) => ({
+    date,
+    ...aggregateTrafficMetrics(values),
+  }));
+  return {
+    overview: aggregateTrafficMetrics(overall),
+    daily,
+    devices: groupedTraffic(rows.filter((row) => row.slice === "device"), (row) => row.dimensionKey),
+    regions: groupedTraffic(rows.filter((row) => row.slice === "region"), (row) => row.dimensionKey),
+    pages: groupedTraffic(rows.filter((row) => row.slice === "page"), (row) => row.dimensionKey),
+  };
+}
 
 function shiftDate(value: string, days: number): string {
   return new Date(+new Date(`${value}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10);
@@ -657,6 +731,86 @@ export function createSeoRepository(db: SeoDatabase) {
       }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId))
         .where(whereFilters(filters));
       return overview;
+    },
+
+    async getTrafficReport(filters: { dateFrom: string; dateTo: string }) {
+      const rows = await db.select({
+        observationDate: seoTrafficMetrics.observationDate,
+        slice: seoTrafficMetrics.slice,
+        dimensionKey: seoTrafficMetrics.dimensionKey,
+        dimensionLabel: seoTrafficMetrics.dimensionLabel,
+        pagePath: seoTrafficMetrics.pagePath,
+        users: seoTrafficMetrics.users,
+        newUsers: seoTrafficMetrics.newUsers,
+        visits: seoTrafficMetrics.visits,
+        pageviews: seoTrafficMetrics.pageviews,
+        bounceRate: sql<number>`${seoTrafficMetrics.bounceRate}::double precision`,
+        pageDepth: sql<number>`${seoTrafficMetrics.pageDepth}::double precision`,
+        avgVisitDurationSeconds: sql<number>`${seoTrafficMetrics.avgVisitDurationSeconds}::double precision`,
+      }).from(seoTrafficMetrics).where(and(
+        gte(seoTrafficMetrics.observationDate, filters.dateFrom),
+        lte(seoTrafficMetrics.observationDate, filters.dateTo),
+      )).orderBy(asc(seoTrafficMetrics.observationDate), asc(seoTrafficMetrics.slice), asc(seoTrafficMetrics.dimensionKey));
+      return aggregateTrafficRows(rows);
+    },
+
+    async listPagePerformance(filters: SeoMetricFilters, page: { limit: number; cursor: string | null }) {
+      const searchRows = await db.select({
+        pagePath: seoDailyMetrics.pagePath,
+        impressions: sql<number>`sum(${seoDailyMetrics.impressions})::double precision`,
+        clicks: sql<number>`sum(${seoDailyMetrics.clicks})::double precision`,
+        ctr: sql<number | null>`sum(${seoDailyMetrics.clicks})::double precision / nullif(sum(${seoDailyMetrics.impressions}), 0)`,
+        averagePosition: sql<number | null>`sum(${seoDailyMetrics.impressions} * ${seoDailyMetrics.averagePosition})::double precision / nullif(sum(${seoDailyMetrics.impressions}), 0)`,
+        observedQueries: sql<number>`count(distinct ${seoDailyMetrics.queryId})::integer`,
+      }).from(seoDailyMetrics).innerJoin(seoQueries, eq(seoQueries.id, seoDailyMetrics.queryId))
+        .where(whereFilters(filters)).groupBy(seoDailyMetrics.pagePath);
+      const trafficRows = await db.select({
+        observationDate: seoTrafficMetrics.observationDate,
+        slice: seoTrafficMetrics.slice,
+        dimensionKey: seoTrafficMetrics.dimensionKey,
+        dimensionLabel: seoTrafficMetrics.dimensionLabel,
+        pagePath: seoTrafficMetrics.pagePath,
+        users: seoTrafficMetrics.users,
+        newUsers: seoTrafficMetrics.newUsers,
+        visits: seoTrafficMetrics.visits,
+        pageviews: seoTrafficMetrics.pageviews,
+        bounceRate: sql<number>`${seoTrafficMetrics.bounceRate}::double precision`,
+        pageDepth: sql<number>`${seoTrafficMetrics.pageDepth}::double precision`,
+        avgVisitDurationSeconds: sql<number>`${seoTrafficMetrics.avgVisitDurationSeconds}::double precision`,
+      }).from(seoTrafficMetrics).where(and(
+        eq(seoTrafficMetrics.slice, "page"),
+        gte(seoTrafficMetrics.observationDate, filters.dateFrom),
+        lte(seoTrafficMetrics.observationDate, filters.dateTo),
+        ...(filters.pagePath ? [eq(seoTrafficMetrics.pagePath, filters.pagePath)] : []),
+      ));
+      const assignedRows = await db.select({
+        pagePath: seoQueries.targetPath,
+        assignedQueries: sql<number>`count(*)::integer`,
+      }).from(seoQueries).where(and(
+        eq(seoQueries.status, "active"),
+        isNotNull(seoQueries.targetPath),
+        ...(filters.pagePath ? [eq(seoQueries.targetPath, filters.pagePath)] : []),
+      )).groupBy(seoQueries.targetPath);
+      const paths = new Map<string, {
+        pagePath: string; impressions: number; clicks: number; ctr: number | null; averagePosition: number | null;
+        observedQueries: number; assignedQueries: number; users: number; newUsers: number; visits: number; pageviews: number;
+        bounceRate: number | null; pageDepth: number | null; avgVisitDurationSeconds: number | null;
+      }>();
+      const empty = (pagePath: string) => ({ pagePath, impressions: 0, clicks: 0, ctr: null, averagePosition: null,
+        observedQueries: 0, assignedQueries: 0, users: 0, newUsers: 0, visits: 0, pageviews: 0,
+        bounceRate: null, pageDepth: null, avgVisitDurationSeconds: null });
+      for (const row of searchRows) paths.set(row.pagePath, { ...empty(row.pagePath), ...row });
+      for (const row of aggregateTrafficRows(trafficRows).pages) {
+        if (!row.pagePath) continue;
+        paths.set(row.pagePath, { ...(paths.get(row.pagePath) ?? empty(row.pagePath)), ...row, pagePath: row.pagePath });
+      }
+      for (const row of assignedRows) {
+        if (!row.pagePath) continue;
+        paths.set(row.pagePath, { ...(paths.get(row.pagePath) ?? empty(row.pagePath)), assignedQueries: row.assignedQueries });
+      }
+      const rows = [...paths.values()].sort((left, right) => right.impressions - left.impressions || right.visits - left.visits || left.pagePath.localeCompare(right.pagePath));
+      const offset = cursorOffset(page.cursor);
+      return { items: rows.slice(offset, offset + page.limit), nextCursor: rows.length > offset + page.limit ? String(offset + page.limit) : null };
     },
 
     async getDashboard(filters: SeoMetricFilters) {

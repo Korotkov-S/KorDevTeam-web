@@ -95,6 +95,15 @@ export function createSeoService(repository: SeoRepository) {
       return repository.getDashboard(filters(input));
     },
 
+    getTrafficReport(input: { dateFrom: string; dateTo: string }) {
+      const validated = filters({ dateFrom: input.dateFrom, dateTo: input.dateTo });
+      return repository.getTrafficReport({ dateFrom: validated.dateFrom, dateTo: validated.dateTo });
+    },
+
+    listPagePerformance(input: { filters: SeoMetricFilters; limit?: number; cursor?: string | null }) {
+      return repository.listPagePerformance(filters(input.filters), page(input));
+    },
+
     listQueries(input: { filters: SeoMetricFilters; limit?: number; cursor?: string | null }) {
       return repository.listQueries(filters(input.filters), page(input));
     },

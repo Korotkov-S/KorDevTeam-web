@@ -80,6 +80,42 @@ test("rank control keeps every tracked query and compares exact day and week sna
   }, { position: null, movementDay: "declined", movementWeek: null });
 });
 
+test("traffic aggregation keeps additive totals and weights behavior by visits", () => {
+  const aggregateTrafficRows = (repositoryModule as unknown as {
+    aggregateTrafficRows?: (rows: unknown[]) => {
+      overview: Record<string, number | null>;
+      daily: Array<Record<string, number | string | null>>;
+      devices: Array<Record<string, number | string | null>>;
+      regions: Array<Record<string, number | string | null>>;
+      pages: Array<Record<string, number | string | null>>;
+    };
+  }).aggregateTrafficRows;
+  assert.equal(typeof aggregateTrafficRows, "function");
+  const row = (overrides: Record<string, unknown>) => ({
+    observationDate: "2026-09-25", slice: "overall", dimensionKey: "all",
+    dimensionLabel: "Весь органический трафик", pagePath: null, users: 8, newUsers: 5,
+    visits: 10, pageviews: 20, bounceRate: 0.2, pageDepth: 2, avgVisitDurationSeconds: 90,
+    ...overrides,
+  });
+
+  const report = aggregateTrafficRows!([
+    row({}),
+    row({ observationDate: "2026-09-26", users: 15, newUsers: 10, visits: 20, pageviews: 50, bounceRate: 0.4, pageDepth: 2.5, avgVisitDurationSeconds: 120 }),
+    row({ slice: "device", dimensionKey: "desktop", dimensionLabel: "ПК" }),
+    row({ slice: "region", dimensionKey: "213", dimensionLabel: "Москва" }),
+    row({ slice: "page", dimensionKey: "/services/crm/", dimensionLabel: "/services/crm/", pagePath: "/services/crm/" }),
+  ]);
+
+  assert.deepEqual(report.overview, {
+    users: 23, newUsers: 15, visits: 30, pageviews: 70,
+    bounceRate: 1 / 3, pageDepth: 7 / 3, avgVisitDurationSeconds: 110,
+  });
+  assert.deepEqual(report.daily.map((item) => item.date), ["2026-09-25", "2026-09-26"]);
+  assert.equal(report.devices[0].dimensionLabel, "ПК");
+  assert.equal(report.regions[0].dimensionLabel, "Москва");
+  assert.equal(report.pages[0].pagePath, "/services/crm/");
+});
+
 const observation = {
   source: "google_search_console" as const,
   observationDate: "2026-09-23",
@@ -136,6 +172,28 @@ databaseTest("Metrica traffic upsert is idempotent and updates late behavior met
   assert.deepEqual((await db.select({ users: seoTrafficMetrics.users, visits: seoTrafficMetrics.visits })
     .from(seoTrafficMetrics))[0], { users: 13, visits: 16 });
   assert.equal(await repository.upsertTrafficObservations([]), 0);
+});
+
+databaseTest("page performance combines search demand, Metrica behavior, and assigned semantic queries", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await repository.upsertObservations([observation]);
+  await repository.upsertTrafficObservations([{ ...trafficObservation, slice: "page", dimensionKey: observation.pagePath,
+    dimensionLabel: observation.pagePath, pagePath: observation.pagePath }]);
+  await db.update(seoQueries).set({ targetPath: observation.pagePath, status: "active", tracked: true })
+    .where(eq(seoQueries.normalizedQuery, observation.normalizedQuery));
+
+  const pages = await repository.listPagePerformance({
+    dateFrom: "2026-09-23", dateTo: "2026-09-26", source: "google_search_console",
+  }, { limit: 10, cursor: null });
+
+  assert.equal(pages.items.length, 1);
+  assert.deepEqual(pages.items[0], {
+    pagePath: "/services/crm-development/", impressions: 100, clicks: 10, ctr: 0.1,
+    averagePosition: 8, observedQueries: 1, assignedQueries: 1, users: 12, newUsers: 8,
+    visits: 15, pageviews: 31, bounceRate: 0.2667, pageDepth: 2.0667, avgVisitDurationSeconds: 93.5,
+  });
 });
 
 databaseTest("source collection runs finish independently", async () => {

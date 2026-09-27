@@ -13,6 +13,8 @@ function fakeRepository() {
     calls,
     repository: {
       getOverview: method("getOverview"),
+      getTrafficReport: method("getTrafficReport"),
+      listPagePerformance: method("listPagePerformance", { items: [], nextCursor: null }),
       listQueries: method("listQueries", { items: [], nextCursor: null }),
       listSemanticCore: method("listSemanticCore", { items: [], nextCursor: null }),
       createCandidate: method("createCandidate"),
@@ -42,6 +44,25 @@ test("service bounds date windows and pagination before repository access", asyn
     filters: { dateFrom: "bad", dateTo: "2026-09-25" },
   }), { message: "seo_date_invalid" });
   assert.equal(fake.calls.length, 0);
+});
+
+test("service validates focused traffic and page report filters before repository access", async () => {
+  const fake = fakeRepository();
+  const service = createSeoService(fake.repository as never);
+  await service.getTrafficReport({ dateFrom: "2026-09-01", dateTo: "2026-09-25" });
+  await service.listPagePerformance({
+    filters: { dateFrom: "2026-09-01", dateTo: "2026-09-25", source: "yandex_webmaster", pagePath: "https://kordev.team/services/crm/?x=1" },
+    limit: 20,
+    cursor: "0",
+  });
+  assert.deepEqual(fake.calls, [
+    { method: "getTrafficReport", args: [{ dateFrom: "2026-09-01", dateTo: "2026-09-25" }] },
+    { method: "listPagePerformance", args: [{ dateFrom: "2026-09-01", dateTo: "2026-09-25", source: "yandex_webmaster", pagePath: "/services/crm/" }, { limit: 20, cursor: "0" }] },
+  ]);
+  assert.throws(() => service.getTrafficReport({ dateFrom: "bad", dateTo: "2026-09-25" }), { message: "seo_date_invalid" });
+  assert.throws(() => service.listPagePerformance({
+    filters: { dateFrom: "2026-09-01", dateTo: "2026-09-25", source: "yandex_metrika" },
+  }), { message: "seo_source_invalid" });
 });
 
 test("service normalizes local paths and rejects unsafe evidence", async () => {
