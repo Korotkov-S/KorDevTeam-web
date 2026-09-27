@@ -30,10 +30,42 @@ const dashboard = {
   availableRegions: [{ id: "00000000-0000-4000-8000-000000000004", source: "yandex_webmaster", code: "moscow", displayName: "Москва", externalId: "213", active: true }],
 };
 
+const rankControl = {
+  summary: {
+    tracked: 2, top3: 0, top10: 1, top30: 1, outsideTop100: 1, noData: 0,
+    improvedDay: 1, declinedDay: 1, improvedWeek: 1, declinedWeek: 0,
+    referenceRegionName: "Россия", referenceDevice: "desktop" as const,
+  },
+  regions: [
+    { id: "region-ru", code: "ru", displayName: "Россия", sortOrder: 0 },
+    { id: "region-msk", code: "moscow", displayName: "Москва", sortOrder: 10 },
+  ],
+  rows: [
+    {
+      id: queryId, queryId, queryText: "внедрение crm", targetPath: "/services/crm/", wordstatFrequency: 1037, frequencyBand: "high" as const,
+      checks: {
+        ru: {
+          desktop: { queryId, regionId: "region-ru", device: "desktop" as const, checkDate: "2026-09-26", status: "found" as const, position: 8, resultUrl: "https://kordev.team/services/crm/", resultLimit: 100, deltaDay: -4, deltaWeek: -11, movementDay: "improved" as const, movementWeek: "improved" as const },
+          mobile: null,
+        },
+        moscow: {
+          desktop: { queryId, regionId: "region-msk", device: "desktop" as const, checkDate: "2026-09-26", status: "not_found" as const, position: null, resultUrl: null, resultLimit: 100, deltaDay: null, deltaWeek: null, movementDay: "declined" as const, movementWeek: null },
+          mobile: null,
+        },
+      },
+    },
+    {
+      id: candidateId, queryId: candidateId, queryText: "crm под ключ", targetPath: "/services/crm/", wordstatFrequency: 35, frequencyBand: "low" as const,
+      checks: { ru: { desktop: null, mobile: null }, moscow: { desktop: null, mobile: null } },
+    },
+  ],
+};
+
 const data: SeoAdminLoaderData = {
   filters: { range: "28", dateFrom: "2026-08-29", dateTo: "2026-09-25", source: "yandex_webmaster", regionId: null, device: null, frequencyBand: null, pagePath: "" },
   dashboard,
   previousOverview: { impressions: 1000, clicks: 60, ctr: 0.06, averagePosition: 9.2 },
+  rankControl,
   semanticCore: { items: [{ id: queryId, queryText: "автоматизация бизнес процессов", normalizedQuery: "автоматизация бизнес процессов",
     targetPath: "/services/business-process-automation/", origin: "import", wordstatFrequency: 4311, frequencyBand: "high",
     status: "active", kind: "commercial", priority: 100, tracked: true,
@@ -63,6 +95,7 @@ function service() {
     async listChanges() { return data.changes; },
     async listRecommendations() { return data.recommendations; },
     async listRankChecks() { return data.rankChecks; },
+    async getRankControl() { return rankControl; },
     async saveQueryClassification() { return {}; },
     async recordChange() { return {}; },
     async updateRecommendationStatus() { return {}; },
@@ -97,8 +130,23 @@ test("SEO loader redirects unauthenticated users and accepts bounded shared filt
   assert.equal(body.filters.regionId, null);
   assert.equal(body.semanticCore.items[0].queryText, "автоматизация бизнес процессов");
   assert.equal(body.candidates.items[0].status, "candidate");
+  assert.equal((body as unknown as { rankControl: typeof rankControl }).rankControl.summary.tracked, 2);
   assert.equal(response.headers.get("Cache-Control"), "no-store");
   assert.doesNotMatch(JSON.stringify(body), /oauth|private.?key|secret/iu);
+});
+
+test("dashboard explains Yandex rank control and renders the regional keyword matrix", () => {
+  const html = renderDashboard(Object.assign({}, data, { rankControl }) as SeoAdminLoaderData);
+  for (const label of [
+    "Контроль семантического ядра", "Отслеживается", "В топ-3", "В топ-10", "В топ-30",
+    "Вне топ-100", "Без данных", "Россия · компьютеры", "Изменение за день", "Изменение за 7 дней",
+    "Wordstat/месяц", "Целевая страница", "Москва", "Компьютер", "Смартфон",
+  ]) assert.match(html, new RegExp(label, "u"));
+  assert.match(html, /лучше на 4/u);
+  assert.match(html, /лучше на 11/u);
+  assert.match(html, /вне топ-100/u);
+  assert.match(html, /нет данных/u);
+  assert.match(html, /26\.09\.2026/u);
 });
 
 test("SEO loader rejects invalid and oversized custom ranges safely", async () => {

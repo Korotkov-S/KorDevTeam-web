@@ -9,6 +9,24 @@ export { action, headers, loader } from "./seo.server";
 type Frequency = "high" | "medium" | "low" | "unclassified";
 type Overview = { impressions: number; clicks: number; ctr: number | null; averagePosition: number | null };
 type Page<T> = { items: T[]; nextCursor: string | null };
+type RankMovement = "improved" | "declined" | "same";
+type RankControlCell = {
+  queryId: string; regionId: string; device: "desktop" | "mobile"; checkDate: string;
+  status: "found" | "not_found"; position: number | null; resultUrl: string | null; resultLimit: number;
+  deltaDay: number | null; deltaWeek: number | null; movementDay: RankMovement | null; movementWeek: RankMovement | null;
+};
+type RankControl = {
+  summary: {
+    tracked: number; top3: number; top10: number; top30: number; outsideTop100: number; noData: number;
+    improvedDay: number; declinedDay: number; improvedWeek: number; declinedWeek: number;
+    referenceRegionName: string; referenceDevice: "desktop";
+  };
+  regions: Array<{ id: string; code: string; displayName: string; sortOrder: number }>;
+  rows: Array<{
+    id: string; queryId: string; queryText: string; targetPath: string | null; wordstatFrequency: number | null;
+    frequencyBand: Frequency; checks: Record<string, Record<string, RankControlCell | null>>;
+  }>;
+};
 type SemanticQuery = { id: string; queryText: string; normalizedQuery: string; targetPath: string | null; origin: string;
   wordstatFrequency: number | null; frequencyBand: Frequency; status: SeoQueryStatus; kind: SeoQueryKind;
   priority: number; tracked: boolean; createdAt: string | Date; updatedAt: string | Date };
@@ -25,6 +43,7 @@ export type SeoAdminLoaderData = {
     availableRegions: Array<{ id: string; source: SeoSourceId; code: string; displayName: string; externalId: string | null; active: boolean }>;
   };
   previousOverview: Overview;
+  rankControl: RankControl;
   semanticCore: Page<SemanticQuery>;
   candidates: Page<SemanticQuery>;
   queries: Page<{ id: string; queryText: string; targetPath: string | null; frequencyBand: Frequency; impressions: number; clicks: number; ctr: number | null; averagePosition: number | null }>;
@@ -73,6 +92,58 @@ function pageHref(filters: SeoAdminLoaderData["filters"], cursor: string) {
 function Card({ title, value, comparison }: { title: string; value: string; comparison: string }) {
   return <article className="rounded-xl border border-border bg-card p-4"><p className="text-sm text-muted-foreground">{title}</p><p className="mt-1 text-2xl font-semibold">{value}</p><p className="mt-1 text-xs text-muted-foreground">к прошлому периоду: {comparison}</p></article>;
 }
+
+function RankSummaryCard({ title, value, note }: { title: string; value: number; note?: string }) {
+  return <article className="rounded-xl border border-border bg-background p-4">
+    <p className="text-sm text-muted-foreground">{title}</p>
+    <p className="mt-1 text-2xl font-semibold">{integer.format(value)}</p>
+    {note ? <p className="mt-1 text-xs text-muted-foreground">{note}</p> : null}
+  </article>;
+}
+
+function movementText(movement: RankMovement | null, change: number | null): string {
+  if (movement === null) return "нет сравнения";
+  if (movement === "same") return "без изменений";
+  if (change !== null) return `${movement === "improved" ? "лучше" : "хуже"} на ${integer.format(Math.abs(change))}`;
+  return movement === "improved" ? "лучше: появился в топ-100" : "хуже: вышел из топ-100";
+}
+
+function RankPosition({ cell }: { cell: RankControlCell | null }) {
+  if (!cell) return <span className="text-muted-foreground">нет данных</span>;
+  return <div className="min-w-[170px] space-y-1">
+    <p className="font-medium">{cell.status === "found" ? `позиция ${integer.format(cell.position!)}` : `вне топ-${cell.resultLimit}`}</p>
+    <p className={cell.movementDay === "improved" ? "text-emerald-700" : cell.movementDay === "declined" ? "text-destructive" : "text-muted-foreground"}>1 день: {movementText(cell.movementDay, cell.deltaDay)}</p>
+    <p className={cell.movementWeek === "improved" ? "text-emerald-700" : cell.movementWeek === "declined" ? "text-destructive" : "text-muted-foreground"}>7 дней: {movementText(cell.movementWeek, cell.deltaWeek)}</p>
+    <p className="text-muted-foreground">снимок: {date(cell.checkDate)}</p>
+  </div>;
+}
+
+function RankControlPanel({ control }: { control: RankControl }) {
+  const summary = control.summary;
+  return <Panel title="Контроль семантического ядра">
+    <p className="text-sm text-muted-foreground">Точные места kordev.team в органической выдаче Яндекса. Это отдельный контроль Search API, а не средняя позиция по показам.</p>
+    <p className="mt-2 text-sm font-medium">Сводный срез: {summary.referenceRegionName} · компьютеры</p>
+    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <RankSummaryCard title="Отслеживается" value={summary.tracked} note="активных ключевых слов" />
+      <RankSummaryCard title="В топ-3" value={summary.top3} />
+      <RankSummaryCard title="В топ-10" value={summary.top10} note="включая топ-3" />
+      <RankSummaryCard title="В топ-30" value={summary.top30} note="включая топ-10" />
+      <RankSummaryCard title="Вне топ-100" value={summary.outsideTop100} />
+      <RankSummaryCard title="Без данных" value={summary.noData} />
+    </div>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <article className="rounded-xl border border-border bg-background p-4"><p className="font-medium">Изменение за день</p><p className="mt-1 text-sm"><span className="text-emerald-700">Выросло: {integer.format(summary.improvedDay)}</span><span className="mx-2 text-muted-foreground">·</span><span className="text-destructive">Упало: {integer.format(summary.declinedDay)}</span></p></article>
+      <article className="rounded-xl border border-border bg-background p-4"><p className="font-medium">Изменение за 7 дней</p><p className="mt-1 text-sm"><span className="text-emerald-700">Выросло: {integer.format(summary.improvedWeek)}</span><span className="mx-2 text-muted-foreground">·</span><span className="text-destructive">Упало: {integer.format(summary.declinedWeek)}</span></p></article>
+    </div>
+    <div className="mt-5 overflow-x-auto">
+      <table className="min-w-max text-left text-sm">
+        <thead><tr className="border-b border-border"><th className="sticky left-0 z-10 min-w-[240px] bg-card p-3">Ключевой запрос</th><th className="min-w-[130px] p-3">Wordstat/месяц</th><th className="min-w-[100px] p-3">ВЧ/СЧ/НЧ</th><th className="min-w-[240px] p-3">Целевая страница</th>{control.regions.map((region) => <th key={region.id} className="min-w-[380px] p-3" colSpan={2}>{region.displayName}</th>)}</tr><tr className="border-b border-border text-xs text-muted-foreground"><th className="sticky left-0 z-10 bg-card p-3" /><th /><th /><th />{control.regions.flatMap((region) => [<th key={`${region.id}-desktop`} className="p-3">Компьютер</th>, <th key={`${region.id}-mobile`} className="p-3">Смартфон</th>])}</tr></thead>
+        <tbody>{control.rows.map((row) => <tr key={row.queryId} className="border-b border-border/70"><td className="sticky left-0 z-10 max-w-[280px] bg-card p-3 align-top font-medium">{row.queryText}</td><td className="p-3 align-top">{row.wordstatFrequency === null ? "—" : integer.format(row.wordstatFrequency)}</td><td className="p-3 align-top">{frequencyLabels[row.frequencyBand]}</td><td className="max-w-[300px] break-all p-3 align-top">{row.targetPath ?? "не назначена"}</td>{control.regions.flatMap((region) => [<td key={`${row.queryId}-${region.id}-desktop`} className="p-3 align-top"><RankPosition cell={row.checks[region.code]?.desktop ?? null} /></td>, <td key={`${row.queryId}-${region.id}-mobile`} className="p-3 align-top"><RankPosition cell={row.checks[region.code]?.mobile ?? null} /></td>])}</tr>)}</tbody>
+      </table>
+      {control.rows.length === 0 ? <p className="py-8 text-center text-muted-foreground">В семантическом ядре пока нет активных запросов.</p> : null}
+    </div>
+  </Panel>;
+}
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return <section className="rounded-xl border border-border bg-card p-5"><h2 className="text-xl font-semibold">{title}</h2><div className="mt-4">{children}</div></section>;
 }
@@ -118,6 +189,8 @@ export function AdminSeoDashboard({ data, csrfToken }: { data: SeoAdminLoaderDat
       {dashboard.sources.map((source) => <article key={source.source} className="rounded-xl border border-border bg-card p-4"><p className="font-medium">{source.displayName}</p><p className="mt-1 text-sm">{!source.enabled ? "Не настроено" : source.lastErrorCode ? `Ошибка: ${source.lastErrorCode}` : "Подключено"}</p><p className="mt-2 text-xs text-muted-foreground">Последние данные: {source.latestDataDate ? date(source.latestDataDate) : "данных пока нет"}</p></article>)}
     </div>
     {selectedSource?.enabled && selectedSource.latestDataDate ? <p className="text-sm text-muted-foreground">Последняя доступная дата: {date(selectedSource.latestDataDate)}. Данные поисковых систем поступают с задержкой и могут уточняться.</p> : null}
+
+    {yandex ? <RankControlPanel control={data.rankControl} /> : null}
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Card title="Показы" value={integer.format(dashboard.overview.impressions)} comparison={delta(dashboard.overview.impressions, data.previousOverview.impressions)} /><Card title="Клики" value={integer.format(dashboard.overview.clicks)} comparison={delta(dashboard.overview.clicks, data.previousOverview.clicks)} /><Card title="CTR" value={percent(dashboard.overview.ctr)} comparison={delta(dashboard.overview.ctr, data.previousOverview.ctr)} /><Card title="Средняя позиция по показам" value={position(dashboard.overview.averagePosition)} comparison={delta(dashboard.overview.averagePosition, data.previousOverview.averagePosition, true)} /></div>
 

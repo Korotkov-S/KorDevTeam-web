@@ -12,7 +12,7 @@ import { adminHeaders, adminRouteHeaders, requestCspNonce } from "./headers";
 
 type Authenticator = Pick<AdminAuthService, "authenticate">;
 type Service = Pick<SeoService, "getDashboard" | "getOverview" | "listQueries" | "listChanges" | "listRecommendations"
-  | "listSemanticCore" | "createCandidate" | "updateSemanticQuery" | "listRankChecks" | "saveQueryClassification"
+  | "listSemanticCore" | "createCandidate" | "updateSemanticQuery" | "listRankChecks" | "getRankControl" | "saveQueryClassification"
   | "recordChange" | "updateRecommendationStatus">;
 type Range = "7" | "28" | "90" | "custom";
 const DAY_MS = 86_400_000;
@@ -89,7 +89,7 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
       const previousTo = shift(parsed.ui.dateFrom, -1);
       const previousFrom = shift(previousTo, -(parsed.duration - 1));
       const previousFilters = { ...parsed.service, dateFrom: previousFrom, dateTo: previousTo };
-      const [dashboard, previousOverview, queries, previousQueries, activeCore, archivedCore, candidates, rankChecks, changes, recommendations] = await Promise.all([
+      const [dashboard, previousOverview, queries, previousQueries, activeCore, archivedCore, candidates, rankChecks, rankControl, changes, recommendations] = await Promise.all([
         service.getDashboard(parsed.service), service.getOverview(previousFilters),
         service.listQueries({ filters: parsed.service, limit: 50, cursor: new URL(request.url).searchParams.get("cursor") }),
         service.listQueries({ filters: previousFilters, limit: 100, cursor: null }),
@@ -99,6 +99,7 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
         parsed.ui.source === "yandex_webmaster"
           ? service.listRankChecks({ filters: parsed.service, limit: 100, cursor: null })
           : Promise.resolve({ items: [], nextCursor: null }),
+        service.getRankControl({ dateTo: parsed.ui.dateTo }),
         service.listChanges({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 20 }),
         service.listRecommendations({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 20 }),
       ]);
@@ -109,7 +110,7 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
         return [{ queryText: item.queryText, averagePosition: item.averagePosition, delta: item.averagePosition - previous.averagePosition }];
       }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 10);
       const semanticItems = [...new Map([...activeCore.items, ...archivedCore.items].map((item) => [item.id, item])).values()];
-      return Response.json({ filters: parsed.ui, dashboard, previousOverview, queries, movers,
+      return Response.json({ filters: parsed.ui, dashboard, previousOverview, queries, movers, rankControl,
         semanticCore: { items: semanticItems, nextCursor: activeCore.nextCursor ?? archivedCore.nextCursor },
         candidates, rankChecks, changes, recommendations },
         { headers: adminHeaders(requestCspNonce(request)) });
