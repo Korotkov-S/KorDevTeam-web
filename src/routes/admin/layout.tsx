@@ -1,50 +1,114 @@
-import { Form, NavLink, Outlet, useLoaderData } from "react-router";
+import React from "react";
+import {
+  BriefcaseBusiness,
+  ChartNoAxesCombined,
+  CircleHelp,
+  FileText,
+  Files,
+  Images,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  Wrench,
+} from "lucide-react";
+import { Form, NavLink, Outlet, useLoaderData, useLocation } from "react-router";
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "../../components/ui/sidebar";
 
 export { headers, loader } from "./layout.server";
 
-type AdminLayoutData = { login: string; csrfToken: string; expiresAt: string };
+type AdminLayoutData = { login: string; csrfToken: string; expiresAt: string; sidebarOpen: boolean };
 
 const navigation = [
-  ["/admin/", "Обзор"],
-  ["/admin/content/article/", "Статьи"],
-  ["/admin/content/case/", "Кейсы"],
-  ["/admin/content/service/", "Услуги"],
-  ["/admin/content/faq/", "FAQ"],
-  ["/admin/content/page/", "Страницы"],
-  ["/admin/media/", "Медиатека"],
-  ["/admin/mcp/", "MCP-доступ"],
-  ["/admin/seo/", "SEO-мониторинг"],
-  ["/admin/settings/", "Настройки"],
+  ["/admin/", "Обзор", LayoutDashboard],
+  ["/admin/content/article/", "Статьи", FileText],
+  ["/admin/content/case/", "Кейсы", BriefcaseBusiness],
+  ["/admin/content/service/", "Услуги", Wrench],
+  ["/admin/content/faq/", "FAQ", CircleHelp],
+  ["/admin/content/page/", "Страницы", Files],
+  ["/admin/media/", "Медиатека", Images],
+  ["/admin/mcp/", "MCP-доступ", KeyRound],
+  ["/admin/seo/", "SEO-мониторинг", ChartNoAxesCombined],
+  ["/admin/settings/", "Настройки", Settings],
 ] as const;
 
 export default function AdminLayout() {
   const data = useLoaderData<AdminLayoutData>();
-  const links = navigation.map(([to, label]) => (
-    <NavLink key={to} to={to} end={to === "/admin/"}
-      className={({ isActive }) => `block rounded-lg px-3 py-2 ${isActive ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
-      {label}
-    </NavLink>
-  ));
+  const location = useLocation();
   return (
-    <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[250px_1fr]">
-      <aside className="hidden border-r border-border bg-card p-4 md:block">
-        <p className="mb-1 font-semibold">KorDevTeam</p>
-        <p className="mb-6 text-sm text-muted-foreground">{data.login}</p>
-        <nav aria-label="Админка" className="space-y-1">{links}</nav>
-        <Form method="post" action="/admin/logout/" className="mt-6">
-          <input type="hidden" name="_csrf" value={data.csrfToken} />
-          <button className="text-sm underline" type="submit">Выйти</button>
-        </Form>
-      </aside>
-      <div>
-        <header className="border-b border-border bg-card p-3 md:hidden">
-          <details>
-            <summary className="cursor-pointer font-medium">Меню админки</summary>
-            <nav aria-label="Админка" className="mt-3 space-y-1">{links}</nav>
-          </details>
+    <SidebarProvider defaultOpen={data.sidebarOpen}>
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="border-b border-sidebar-border">
+          <div className="flex min-w-0 items-center gap-2 px-2 py-1">
+            <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary font-semibold text-primary-foreground">K</span>
+            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+              <p className="truncate font-semibold">KorDevTeam</p>
+              <p className="truncate text-xs text-muted-foreground">{data.login}</p>
+            </div>
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <nav aria-label="Админка">
+                <SidebarMenu>
+                  {navigation.map(([to, label, Icon]) => {
+                    const isActive = to === "/admin/" ? location.pathname === to : location.pathname.startsWith(to);
+                    return <SidebarMenuItem key={to}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+                        <NavLink to={to} end={to === "/admin/"} title={label}>
+                          <Icon aria-hidden />
+                          <span>{label}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>;
+                  })}
+                </SidebarMenu>
+              </nav>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter className="border-t border-sidebar-border">
+          <Form method="post" action="/admin/logout/">
+            <input type="hidden" name="_csrf" value={data.csrfToken} />
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Выйти">
+                  <button type="submit" title="Выйти">
+                    <LogOut aria-hidden />
+                    <span>Выйти</span>
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </Form>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+      <SidebarInset className="min-w-0 overflow-x-hidden">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur">
+          <SidebarTrigger aria-label="Свернуть или открыть меню" title="Свернуть или открыть меню" className="size-9" />
+          <p className="text-sm font-medium">Административная панель</p>
         </header>
-        <main className="p-4 sm:p-6 lg:p-8"><Outlet /></main>
-      </div>
-    </div>
+        <div data-admin-content="true" className="min-w-0 p-4 sm:p-6 lg:p-8">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

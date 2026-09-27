@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { isAdminPath } from "../../lib/adminPath";
 import { adminHeaders } from "./headers";
 import { createAdminIndexLoader } from "./index.server";
+import { createAdminLayoutLoader } from "./layout.server";
 import { meta as loginMeta } from "./login";
 import { createLoginAction, createLoginLoader } from "./login.server";
 import { createLoginCsrfCookie } from "./loginCsrf";
@@ -89,4 +90,34 @@ test("login loader issues csrf and public chrome is excluded from admin paths", 
   assert.equal(isAdminPath("/admin/"), true);
   assert.equal(isAdminPath("/admin/content/article/"), true);
   assert.equal(isAdminPath("/administration/"), false);
+});
+
+test("admin layout loader restores the remembered sidebar state", async () => {
+  const loader = createAdminLayoutLoader({ authenticate: async () => principal });
+  const sessionCookie = `__Host-kordev_admin=${"s".repeat(43)}`;
+  const collapsed = await loader({
+    request: new Request("https://kordev.team/admin/seo/positions/", {
+      headers: { cookie: `${sessionCookie}; sidebar_state=false`, "x-kordev-csp-nonce": nonce },
+    }),
+    params: {},
+    context: {},
+  });
+  const expanded = await loader({
+    request: new Request("https://kordev.team/admin/", {
+      headers: { cookie: `${sessionCookie}; sidebar_state=true`, "x-kordev-csp-nonce": nonce },
+    }),
+    params: {},
+    context: {},
+  });
+  const fallback = await loader({
+    request: new Request("https://kordev.team/admin/", {
+      headers: { cookie: sessionCookie, "x-kordev-csp-nonce": nonce },
+    }),
+    params: {},
+    context: {},
+  });
+
+  assert.equal((await collapsed.json()).sidebarOpen, false);
+  assert.equal((await expanded.json()).sidebarOpen, true);
+  assert.equal((await fallback.json()).sidebarOpen, true);
 });

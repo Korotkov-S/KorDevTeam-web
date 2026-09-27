@@ -54,6 +54,7 @@ test("SEO secondary navigation exposes six real subpages and one active section"
   for (const label of ["Сводка", "Позиции", "Трафик и запросы", "Страницы", "Семантика", "Изменения"]) assert.match(markup, new RegExp(label, "u"));
   assert.equal((markup.match(/aria-current="page"/gu) ?? []).length, 1);
   assert.match(markup, /<a(?=[^>]*href="\/admin\/seo\/traffic\/")(?=[^>]*aria-current="page")[^>]*>/u);
+  assert.match(markup, /<nav[^>]*class="[^"]*flex-wrap[^"]*"[^>]*aria-label="Разделы SEO-мониторинга"|<nav[^>]*aria-label="Разделы SEO-мониторинга"[^>]*class="[^"]*flex-wrap[^"]*"/u);
 });
 
 test("overview is a decision summary and labels Metrica behavior separately", () => {
