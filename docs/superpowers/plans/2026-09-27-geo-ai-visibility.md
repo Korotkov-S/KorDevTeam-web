@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a separate, evidence-backed GEO monitoring area that records controlled AI-answer checks, tracks mentions/citations/competitors, imports AI referral traffic, exposes safe MCP tools, and renders understandable admin reports without changing public content automatically.
+**Goal:** Add a separate, evidence-backed GEO monitoring and promotion area that records controlled AI-answer checks, identifies actionable visibility gaps, links approved changes to experiments, measures their 7/14/28-day effect, imports AI referral traffic, exposes safe MCP tools, and never changes public content automatically.
 
-**Architecture:** A dedicated `src/server/geo-monitoring` domain owns GEO contracts, storage, validation, analytics, prompt catalog, referral collection, and crawler checks. It shares PostgreSQL, the existing Yandex Metrica credential, MCP bearer scopes, SEO recommendations, admin authentication, and the production collection/deployment path, but it never mixes AI observations with search positions. Controlled AI responses are recorded by the authorized chat agent through MCP; the server does not scrape AI interfaces.
+**Architecture:** A dedicated `src/server/geo-monitoring` domain owns GEO contracts, storage, validation, analytics, prompt catalog, promotion experiments, referral collection, and crawler checks. It shares PostgreSQL, the existing Yandex Metrica credential, MCP bearer scopes, SEO recommendations/change journal, admin authentication, and the production collection/deployment path, but it never mixes AI observations with search positions. Controlled AI responses are recorded by the authorized chat agent through MCP; the server does not scrape AI interfaces.
 
 **Tech Stack:** TypeScript, React Router 7 SSR, React 18, Drizzle ORM, PostgreSQL 16, Zod, MCP SDK, Yandex Metrica Reporting API, Node test runner + `tsx`, Docker Compose/systemd.
 
@@ -29,7 +29,8 @@
 - A partial/failed run, mismatched prompt set, or fewer than three repetitions must not change comparison metrics or recommendations; Task 4 pins this.
 - Oversized snapshots, unsafe URLs, malformed metadata, and inconsistent `mentioned/linked/cited` flags must be rejected with safe codes and no partial write; Tasks 1 and 3 pin this.
 - Referral classification must not label generic `google.com`, `bing.com`, or `yandex.ru` search traffic as AI traffic; Task 5 pins this.
-- Empty platforms, missing city support, and unavailable official reports must render “нет данных” with source freshness rather than zero visibility; Task 7 pins this.
+- Empty platforms, missing city support, and unavailable official reports must render “нет данных” with source freshness rather than zero visibility; Task 8 pins this.
+- A second material change on the same page during an experiment window must mark the result confounded instead of claiming causality; Task 7 pins this.
 
 ---
 
@@ -44,13 +45,13 @@
 - Test: `src/server/geo-monitoring/repository.test.ts`
 
 **Interfaces:**
-- Produces: Drizzle tables `geoTopics`, `geoEntities`, `geoPrompts`, `geoRuns`, `geoObservations`, `geoObservationMentions`, `geoCitations`, `geoFanoutQueries`, `geoReferralDailyMetrics`, and `geoCrawlerChecks` exported through `schema`.
+- Produces: Drizzle tables `geoTopics`, `geoEntities`, `geoPrompts`, `geoRuns`, `geoObservations`, `geoObservationMentions`, `geoCitations`, `geoFanoutQueries`, `geoReferralDailyMetrics`, `geoCrawlerChecks`, `geoExperiments`, and `geoExperimentPrompts` exported through `schema`.
 - Produces: enums/types for platform, run mode/status, prompt category/status, entity type/status, sentiment, citation category, and crawler status.
 - Consumes: `seoQueries` and `mcpTokens` foreign keys.
 
 - [ ] **Step 1: Write failing migration/repository tests**
 
-Add assertions that duplicate `(normalized_text, language, region)` prompts fail, `(run_id, prompt_id, repetition)` is unique, source URLs must be HTTP(S), response snapshots are at most 16 KiB, coherent citation flags are enforced, counts are non-negative, and an observation graph deletes atomically with its run.
+Add assertions that duplicate `(normalized_text, language, region)` prompts fail, `(run_id, prompt_id, repetition)` is unique, source URLs must be HTTP(S), response snapshots are at most 16 KiB, coherent citation flags are enforced, experiment windows are exactly 7/14/28 days, counts are non-negative, and an observation graph deletes atomically with its run.
 
 - [ ] **Step 2: Run the focused tests and confirm failure**
 
@@ -62,7 +63,7 @@ Expected: FAIL because the GEO schema and migration do not exist.
 
 Use arrays for prompt tags and entity aliases; use UUID primary keys; store `initiated_by_mcp_token_id` on `geo_runs`; store a `response_excerpt`, private `response_snapshot`, `snapshot_truncated`, and SHA-256 on observations. Add indexes for period/platform/mode, prompt/run, entity/observation, citation host/path, referral date/platform, and crawler date/target.
 
-- [ ] **Step 4: Extend backup/restore fixtures for all ten GEO tables**
+- [ ] **Step 4: Extend backup/restore fixtures for all twelve GEO tables**
 
 Update post-migration inventory and migration history so a pre-0011 backup remains valid and a post-0011 restore requires exact GEO table counts. Do not add GEO tables to the pre-migration required set.
 
@@ -321,7 +322,59 @@ git add src/server/geo-monitoring src/server/seo-monitoring server package.json
 git commit -m "feat: add GEO crawler health collection"
 ```
 
-### Task 7: Separate AI visibility admin report with evidence drill-down
+### Task 7: Evidence-backed GEO promotion experiments
+
+**Files:**
+- Create: `src/server/geo-monitoring/experiments.ts`
+- Create: `src/server/geo-monitoring/experiments.test.ts`
+- Modify: `src/server/geo-monitoring/repository.ts`
+- Modify: `src/server/geo-monitoring/service.ts`
+- Modify: `src/server/geo-monitoring/analytics.ts`
+- Modify: `src/server/geo-monitoring/mcpService.ts`
+- Modify: `src/server/mcp/tools.ts`
+- Modify: `src/server/mcp/tools.test.ts`
+
+**Interfaces:**
+- Produces service methods `listExperiments(input)`, `createExperimentCandidate(input, actor)`, `approveExperiment(input, adminActor)`, `linkExperimentChange(input, adminActor)`, and `evaluateExperiment({ id, milestone, evaluatedAt }, actor)`.
+- Produces MCP tools `list_geo_experiments`, `create_geo_experiment_candidate`, and `record_geo_experiment_evaluation`; MCP cannot approve an experiment, link an unverified content change, publish content, or roll anything back.
+- Consumes: completed comparable GEO runs, existing `seo_recommendations`, existing `seo_changes`, active prompt IDs, and referral/crawler metrics.
+
+- [ ] **Step 1: Write failing lifecycle and attribution tests**
+
+Assert that a candidate requires an existing evidence-backed recommendation, target page, immutable prompt set, platform/mode/language/region, action type, hypothesis, primary metric, direction, minimum delta, and 7/14/28-day windows. Assert that only an admin can approve and link a real `seo_changes` row, only one experiment can be active for the same page/comparable prompt set, and evaluation never edits public content.
+
+- [ ] **Step 2: Write failing evaluation tests**
+
+Assert that day 7 is labeled an early signal, day 14 intermediate, and day 28 final; only full days after `implemented_at` count; baseline and result use identical prompt fingerprints and dimensions; insufficient repetitions return `inconclusive`; a second material page change marks `confounded`; and final `won/lost/inconclusive` follows the stored direction and minimum delta rather than an opaque score.
+
+- [ ] **Step 3: Run focused tests and confirm failure**
+
+Run: `yarn tsx --test --test-concurrency=1 src/server/geo-monitoring/experiments.test.ts src/server/mcp/tools.test.ts`
+
+Expected: FAIL because GEO experiments do not exist.
+
+- [ ] **Step 4: Implement the promotion lifecycle**
+
+Allowed action types are `content_answer`, `first_party_evidence`, `internal_linking`, `technical_indexing`, `structured_data`, and `authority_outreach`. Store structured success criteria with explicit unit; calculate metric deltas from completed comparable runs; never mark purchased reviews, fabricated evidence, or mass outreach as an allowed action.
+
+- [ ] **Step 5: Implement safe MCP experiment tools**
+
+Return absolute baseline/result values, delta, sample counts, completeness, milestone, confounding changes, and verdict. Candidate creation and evaluation require both SEO scopes; listing requires `seo:read`. No tool accepts arbitrary HTML, a content mutation, or an automatic rollback instruction.
+
+- [ ] **Step 6: Run focused tests**
+
+Run: `yarn tsx --test --test-concurrency=1 src/server/geo-monitoring/experiments.test.ts src/server/geo-monitoring/analytics.test.ts src/server/geo-monitoring/mcpService.test.ts src/server/mcp/tools.test.ts`
+
+Expected: PASS.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/server/geo-monitoring src/server/mcp
+git commit -m "feat: add measurable GEO promotion experiments"
+```
+
+### Task 8: Separate AI visibility admin report with evidence drill-down
 
 **Files:**
 - Create: `src/routes/admin/seo-ai-visibility.tsx`
@@ -333,13 +386,13 @@ git commit -m "feat: add GEO crawler health collection"
 - Modify: `src/routes.ts`
 
 **Interfaces:**
-- Produces route `/admin/seo/ai-visibility/` with query view `overview|platforms|prompts|entities|sources|evidence|traffic`.
+- Produces route `/admin/seo/ai-visibility/` with query view `overview|platforms|prompts|entities|sources|evidence|traffic|promotion`.
 - Consumes: Task 4 read methods and Task 3 admin mutations with `{ adminUserId }` actor where applicable.
 - Produces authenticated evidence detail that alone includes the bounded snapshot and always sets `Cache-Control: no-store`.
 
 - [ ] **Step 1: Write failing SSR and loader/action tests**
 
-Assert seven distinct views, only the selected view's dataset is loaded, Russian labels/tooltips and `дд.мм.гггг` dates, absolute numerator/denominator beside rates, source freshness, formulas, action matrix, confirmed-vs-candidate competitors, and explanatory empty states. Assert no page contains PDF/print controls and no snapshot appears in overview/list markup.
+Assert eight distinct views, only the selected view's dataset is loaded, Russian labels/tooltips and `дд.мм.гггг` dates, absolute numerator/denominator beside rates, source freshness, formulas, action matrix, confirmed-vs-candidate competitors, and explanatory empty states. Assert no page contains PDF/print controls and no snapshot appears in overview/list markup.
 
 - [ ] **Step 2: Run tests and confirm failure**
 
@@ -351,9 +404,9 @@ Expected: FAIL because the route and navigation item are absent.
 
 Reuse `requireAdminPage`, CSRF validation, private admin headers, offset cursors, safe 422 validation errors, and safe 503 availability errors. Admin actions may activate/archive/edit prompts and confirm/archive competitor entities; they never edit content entries.
 
-- [ ] **Step 4: Implement the seven focused views**
+- [ ] **Step 4: Implement the eight focused views**
 
-Use internal tabs so only one report is visible at a time. The evidence view opens a single observation by UUID, shows its bounded snapshot with truncation warning, mentions, citation URLs, and explicit fan-out. All tables have named columns, help text, internal horizontal overflow, and no page-level horizontal overflow.
+Use internal tabs so only one report is visible at a time. The evidence view opens a single observation by UUID, shows its bounded snapshot with truncation warning, mentions, citation URLs, and explicit fan-out. The promotion view shows opportunity, hypothesis, target prompts/page, approved change, baseline, 7/14/28-day results, confounders, and verdict; approval and change linkage require CSRF-protected admin actions. All tables have named columns, help text, internal horizontal overflow, and no page-level horizontal overflow.
 
 - [ ] **Step 5: Run focused tests**
 
@@ -368,7 +421,7 @@ git add src/routes.ts src/routes/admin
 git commit -m "feat: add focused GEO visibility reports"
 ```
 
-### Task 8: Deployment packaging, daily-agent contract, and complete verification
+### Task 9: Deployment packaging, daily-agent contract, and complete verification
 
 **Files:**
 - Modify: `Dockerfile`
@@ -424,4 +477,4 @@ Use the existing blue/green deployment path. Verify migration inventory, GEO cat
 
 - [ ] **Step 8: Update the existing daily SEO heartbeat**
 
-Extend automation `seo` to rotate active GEO prompts after the official SEO collection, use the new MCP GEO tools, preserve platform/mode/region, record three repetitions, remain quiet on healthy unchanged data, and create recommendations only after the minimum evidence threshold. The automation must never publish content or treat missing platform data as zero.
+Extend automation `seo` to rotate active GEO prompts after the official SEO collection, use the new MCP GEO tools, preserve platform/mode/region, record three repetitions, remain quiet on healthy unchanged data, and create recommendations only after the minimum evidence threshold. Every two weeks it may propose one measurable experiment per page; at 7/14/28 full days it records evaluations and flags confounders. The automation must never approve an experiment, publish content, fabricate external signals, or treat missing platform data as zero.
