@@ -8,6 +8,7 @@ const sections = [
   ["/admin/seo/pages/", "Страницы"],
   ["/admin/seo/semantics/", "Семантика"],
   ["/admin/seo/changes/", "Изменения"],
+  ["/admin/seo/ai-visibility/", "AI-видимость"],
 ] as const;
 
 export function SeoSectionLayout() {

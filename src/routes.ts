@@ -19,6 +19,7 @@ export default [
       route("admin/seo/pages/", "routes/admin/seo-pages.tsx"),
       route("admin/seo/semantics/", "routes/admin/seo-semantics.tsx"),
       route("admin/seo/changes/", "routes/admin/seo-changes.tsx"),
+      route("admin/seo/ai-visibility/", "routes/admin/seo-ai-visibility.tsx"),
     ]),
     route("admin/content/:kind/", "routes/admin/content-list.tsx"),
     route("admin/content/:kind/preview/", "routes/admin/content-preview.tsx"),
