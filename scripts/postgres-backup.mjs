@@ -44,15 +44,18 @@ async function migrationRows(client) {
 }
 const coreRequiredTables = ['drizzle.__drizzle_migrations', 'public.admin_users', 'public.content_entries', 'public.content_relations', 'public.content_revisions', 'public.mcp_tokens', 'public.media_assets', 'public.redirects', 'public.site_settings'];
 const seoRequiredTables = ['public.seo_changes', 'public.seo_collection_runs', 'public.seo_daily_metrics', 'public.seo_queries', 'public.seo_recommendations', 'public.seo_regions', 'public.seo_sources'];
+const metrikaRequiredTables = ['public.seo_traffic_metrics'];
 const contentReleaseRequiredTables = ['public.content_release_items', 'public.content_release_runs'];
-const requiredTables = [...coreRequiredTables, ...seoRequiredTables, ...contentReleaseRequiredTables];
+const requiredTables = [...coreRequiredTables, ...seoRequiredTables, ...metrikaRequiredTables, ...contentReleaseRequiredTables];
 const seoMigrationCreatedAt = '1790333729506';
 const contentReleaseMigrationCreatedAt = '1790350786115';
-const migrationSeedCounts = { 'public.seo_regions': '9', 'public.seo_sources': '2' };
+const metrikaMigrationCreatedAt = '1790484327389';
+const migrationSeedCounts = { 'public.seo_regions': '9', 'public.seo_sources': '3' };
 const requiredTablesForHistory = history => [
   ...coreRequiredTables,
   ...(history.some(row => row.created_at === seoMigrationCreatedAt) ? seoRequiredTables : []),
   ...(history.some(row => row.created_at === contentReleaseMigrationCreatedAt) ? contentReleaseRequiredTables : []),
+  ...(history.some(row => row.created_at === metrikaMigrationCreatedAt) ? metrikaRequiredTables : []),
 ];
 const quoteIdentifier = value => `"${value.replaceAll('"', '""')}"`;
 export async function databaseInventory(client, requiredInventoryTables = requiredTables) {
@@ -86,6 +89,11 @@ export async function verifyRestoreState(client, manifest, afterMigrations = fal
     // Expand migrations may add empty tables; existing data counts must survive.
     for (const name of Object.keys(inventory.tables)) {
       if (!Object.hasOwn(expectedTables, name)) expectedTables[name] = migrationSeedCounts[name] ?? '0';
+    }
+    const metrikaAdded = history.some(row => row.created_at === metrikaMigrationCreatedAt)
+      && !manifest.migrations.some(row => row.created_at === metrikaMigrationCreatedAt);
+    if (metrikaAdded && Object.hasOwn(manifest.inventory.tables, 'public.seo_sources')) {
+      expectedTables['public.seo_sources'] = String(Number(manifest.inventory.tables['public.seo_sources']) + 1);
     }
   }
   same(Object.entries(inventory.tables).sort(), Object.entries(expectedTables).sort());

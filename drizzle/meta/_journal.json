@@ -71,6 +71,13 @@
       "when": 1790482078740,
       "tag": "0009_yandex_metrika",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790484327389,
+      "tag": "0010_yandex_metrika_source",
+      "breakpoints": true
     }
   ]
 }

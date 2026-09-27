@@ -802,7 +802,17 @@ export function createSeoRepository(db: SeoDatabase) {
       for (const row of searchRows) paths.set(row.pagePath, { ...empty(row.pagePath), ...row });
       for (const row of aggregateTrafficRows(trafficRows).pages) {
         if (!row.pagePath) continue;
-        paths.set(row.pagePath, { ...(paths.get(row.pagePath) ?? empty(row.pagePath)), ...row, pagePath: row.pagePath });
+        paths.set(row.pagePath, {
+          ...(paths.get(row.pagePath) ?? empty(row.pagePath)),
+          pagePath: row.pagePath,
+          users: row.users,
+          newUsers: row.newUsers,
+          visits: row.visits,
+          pageviews: row.pageviews,
+          bounceRate: row.bounceRate,
+          pageDepth: row.pageDepth,
+          avgVisitDurationSeconds: row.avgVisitDurationSeconds,
+        });
       }
       for (const row of assignedRows) {
         if (!row.pagePath) continue;

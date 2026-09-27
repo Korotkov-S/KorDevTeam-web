@@ -52,7 +52,7 @@ export async function checkDatabase(mode, databaseUrl = process.env.DATABASE_URL
     await client.connect();
     if (mode === 'pristine') {
       const tables = (await client.query("SELECT tablename FROM pg_tables WHERE schemaname='public'")).rows;
-      const migrationSeeds = { seo_regions: 9, seo_sources: 2 };
+      const migrationSeeds = { seo_regions: 9, seo_sources: 3 };
       for (const { tablename } of tables) {
         const quoted = `"${tablename.replaceAll('"', '""')}"`;
         const expected = migrationSeeds[tablename] ?? 0;

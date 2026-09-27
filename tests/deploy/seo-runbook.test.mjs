@@ -7,13 +7,14 @@ test("SEO runbook covers credentials, collection, MCP, diagnosis, and safe disab
   for (const pattern of [
     /Яндекс Вебмастер/u, /Search Console/u, /base64/u, /--check/u, /--source=yandex/u, /--source=google/u,
     /seo:read/u, /seo:write/u, /429/u, /partial/u, /Google.*задерж/isu, /не удаляет.*истори/isu,
-    /systemctl enable --now kordevteam-seo-collect\.timer/u, /ротац/iu,
+    /systemctl enable --now kordevteam-seo-collect\.timer/u, /ротац/iu, /Яндекс Метрик/u, /--source=metrika/u,
   ]) assert.match(text, pattern);
 });
 test("operations environment documents disabled-by-default SEO switches and every credential", () => {
   const text = readFileSync("deploy/env/operations.env.example", "utf8");
   for (const name of ["SEO_YANDEX_ENABLED=false", "YANDEX_WEBMASTER_OAUTH_TOKEN=", "YANDEX_WEBMASTER_HOST_ID=",
     "SEO_GOOGLE_ENABLED=false", "GOOGLE_SEARCH_CONSOLE_SITE_URL=", "GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL=",
-    "GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64=", "SEO_YANDEX_SEARCH_ENABLED=false", "YANDEX_SEARCH_API_KEY=",
+    "GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64=", "SEO_YANDEX_METRIKA_ENABLED=false", "YANDEX_METRIKA_OAUTH_TOKEN=",
+    "YANDEX_METRIKA_COUNTER_ID=", "SEO_YANDEX_SEARCH_ENABLED=false", "YANDEX_SEARCH_API_KEY=",
     "YANDEX_SEARCH_FOLDER_ID=", "SEO_YANDEX_SEARCH_DAILY_LIMIT=1000", "SEO_TARGET_HOST=kordev.team"]) assert.match(text, new RegExp(`^${name}`, "mu"));
 });

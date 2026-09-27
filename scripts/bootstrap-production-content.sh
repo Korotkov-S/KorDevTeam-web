@@ -51,7 +51,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, connecti
   await client.connect();
   if (mode === "pristine") {
     const tables = (await client.query("SELECT tablename FROM pg_tables WHERE schemaname=\u0027public\u0027")).rows;
-    const seeds = { seo_regions: 9, seo_sources: 2 };
+    const seeds = { seo_regions: 9, seo_sources: 3 };
     for (const { tablename } of tables) {
       const quoted = `"${tablename.replaceAll("\"", "\"\"")}"`;
       const count = Number((await client.query(`SELECT count(*) AS count FROM public.${quoted}`)).rows[0].count);

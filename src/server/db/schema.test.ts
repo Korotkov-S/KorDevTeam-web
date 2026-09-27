@@ -366,7 +366,10 @@ databaseTest("0008 promotes non-API tracked queries but turns legacy API noise i
   await db.execute(sql`INSERT INTO seo_queries (query_text, normalized_query, origin, tracked)
     VALUES ('случайный api запрос', 'случайный api запрос', 'api', true),
       ('ручной запрос', 'ручной запрос', 'manual', true)`);
-  await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at = 1790453494948`);
+  await db.execute(sql`DROP TABLE seo_traffic_metrics`);
+  await db.execute(sql`DROP TYPE seo_traffic_slice`);
+  await db.execute(sql`DELETE FROM seo_sources WHERE id = 'yandex_metrika'`);
+  await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1790453494948`);
 
   await migrate(db, { migrationsFolder: "drizzle" });
 
@@ -587,6 +590,8 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
   await db.execute(sql`DROP TABLE content_release_items, content_release_runs`);
   await db.execute(sql`DROP TABLE seo_rank_checks, seo_rank_runs`);
   await db.execute(sql`DROP TYPE seo_rank_status`);
+  await db.execute(sql`DROP TABLE seo_traffic_metrics`);
+  await db.execute(sql`DROP TYPE seo_traffic_slice`);
   await db.execute(sql`DROP TABLE seo_daily_metrics, seo_recommendations, seo_changes, seo_collection_runs, seo_regions, seo_queries, seo_sources`);
   await db.execute(sql`DROP TYPE seo_change_type, seo_device, seo_frequency_band, seo_query_kind, seo_query_origin, seo_query_status, seo_recommendation_confidence, seo_recommendation_status, seo_region_scope, seo_run_status, seo_source`);
   await db.execute(sql`DROP TABLE mcp_tokens, content_media_refs, admin_sessions, admin_auth_limits`);

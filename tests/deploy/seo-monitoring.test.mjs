@@ -20,6 +20,9 @@ test("SEO job is isolated, read-only, and receives only its own provider credent
   assert.match(block, /DATABASE_URL:/u);
   assert.match(block, /YANDEX_WEBMASTER_OAUTH_TOKEN:/u);
   assert.match(block, /GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY_B64:/u);
+  assert.match(block, /SEO_YANDEX_METRIKA_ENABLED: \$\{SEO_YANDEX_METRIKA_ENABLED:-false\}/u);
+  assert.match(block, /YANDEX_METRIKA_OAUTH_TOKEN: \$\{YANDEX_METRIKA_OAUTH_TOKEN:-\}/u);
+  assert.match(block, /YANDEX_METRIKA_COUNTER_ID: \$\{YANDEX_METRIKA_COUNTER_ID:-\}/u);
   assert.match(block, /SEO_YANDEX_SEARCH_ENABLED:/u);
   assert.match(block, /YANDEX_SEARCH_API_KEY:/u);
   assert.match(block, /YANDEX_SEARCH_FOLDER_ID:/u);
@@ -38,6 +41,8 @@ test("Yandex Search API key is not exposed to web or lead-worker services", () =
   const leadBlock = compose.match(/  lead-worker:\n[\s\S]*?(?=\n  [a-z][a-z0-9-]+:)/u)?.[0] ?? "";
   assert.doesNotMatch(webBlock, /YANDEX_SEARCH_API_KEY/u);
   assert.doesNotMatch(leadBlock, /YANDEX_SEARCH_API_KEY/u);
+  assert.doesNotMatch(webBlock, /YANDEX_METRIKA_OAUTH_TOKEN/u);
+  assert.doesNotMatch(leadBlock, /YANDEX_METRIKA_OAUTH_TOKEN/u);
 });
 
 test("systemd schedules collection before the 09:00 Moscow analysis", (t) => {
