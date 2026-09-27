@@ -391,3 +391,58 @@ databaseTest("GEO read model calculates only complete three-repetition runs and 
   assert.equal(Object.hasOwn(listed.items[0], "responseSnapshot"), false);
   assert.equal(JSON.stringify(listed).includes("PRIVATE-"), false);
 });
+
+databaseTest("GEO promotion requires evidence and permits only one active experiment per page and prompt set", async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fixture.pool.end());
+  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+  const recommendation = await fixture.pool.query<{ id: string }>(
+    `INSERT INTO seo_recommendations
+      (title, rationale, page_path, issue_type, evidence, confidence, fingerprint)
+     VALUES ('GEO gap', 'Нет цитирования', '/services/crm/', 'geo_visibility_gap', '{"citationRate":0}'::jsonb, 'high', $1)
+     RETURNING id`,
+    ["a".repeat(64)],
+  );
+  const change = await fixture.pool.query<{ id: string }>(
+    `INSERT INTO seo_changes (page_path, summary, type, applied_at, actor_admin_user_id)
+     VALUES ('/services/crm/', 'Добавлен прямой ответ', 'content', '2026-08-01T10:00:00Z', $1)
+     RETURNING id`,
+    [fixture.adminId],
+  );
+  const command = {
+    recommendationId: recommendation.rows[0].id,
+    pagePath: "/services/crm/",
+    actionType: "content_answer" as const,
+    hypothesis: "Прямой ответ повысит цитирование",
+    platform: "chatgpt_search" as const,
+    mode: "live_ui" as const,
+    language: "ru",
+    region: "RU",
+    promptIds: [fixture.promptId],
+    promptSetFingerprint: "b".repeat(64),
+    primaryMetric: "citation_rate" as const,
+    direction: "increase" as const,
+    minimumDelta: 0.05,
+    evaluationWindows: [7, 14, 28],
+    expectedSignal: "Рост на 5 п.п.",
+  };
+  const first = await repository.createExperimentCandidate(command, { mcpTokenId: fixture.tokenId });
+  const second = await repository.createExperimentCandidate(command, { mcpTokenId: fixture.tokenId });
+  await repository.approveExperiment({ id: first.id }, { adminUserId: fixture.adminId });
+  await repository.approveExperiment({ id: second.id }, { adminUserId: fixture.adminId });
+  await repository.linkExperimentChange({ id: first.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId });
+  await assert.rejects(
+    repository.linkExperimentChange({ id: second.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId }),
+    (error: unknown) => {
+      if (typeof error !== "object" || error === null) return false;
+      if ("code" in error && error.code === "23505") return true;
+      return "cause" in error && typeof error.cause === "object" && error.cause !== null
+        && "code" in error.cause && error.cause.code === "23505";
+    },
+  );
+  const evaluation = await repository.evaluateExperiment({
+    id: first.id, milestone: 28, evaluatedAt: new Date("2026-08-31T00:00:00Z"),
+  }, { mcpTokenId: fixture.tokenId });
+  assert.equal(evaluation.evaluation.verdict, "inconclusive");
+  assert.equal(evaluation.experiment.status, "completed");
+});

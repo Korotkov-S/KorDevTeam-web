@@ -9,10 +9,13 @@ type Backing = Pick<GeoMonitoringService,
   | "listCitations"
   | "listFanoutQueries"
   | "listReferrals"
+  | "listExperiments"
   | "createPromptCandidate"
   | "startRun"
   | "recordObservation"
   | "finishRun"
+  | "createExperimentCandidate"
+  | "evaluateExperiment"
 >;
 
 function json<T>(value: T): T {
@@ -53,6 +56,9 @@ export function createMcpGeoService(service: Backing, tokenId: string) {
     async listReferrals(input: Parameters<Backing["listReferrals"]>[0]) {
       return json(await service.listReferrals(input));
     },
+    async listExperiments(input: Parameters<Backing["listExperiments"]>[0]) {
+      return json(await service.listExperiments(input));
+    },
     async createPromptCandidate(input: Parameters<Backing["createPromptCandidate"]>[0]) {
       return json(await service.createPromptCandidate(input));
     },
@@ -64,6 +70,12 @@ export function createMcpGeoService(service: Backing, tokenId: string) {
     },
     async finishRun(runId: string, input: Parameters<Backing["finishRun"]>[2]) {
       return json(await service.finishRun(runId, tokenId, input));
+    },
+    async createExperimentCandidate(input: Parameters<Backing["createExperimentCandidate"]>[0]) {
+      return json(await service.createExperimentCandidate(input, { mcpTokenId: tokenId }));
+    },
+    async evaluateExperiment(input: Parameters<Backing["evaluateExperiment"]>[0]) {
+      return json(await service.evaluateExperiment(input, { mcpTokenId: tokenId }));
     },
   };
 }

@@ -1,10 +1,12 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
 import {
   geoCitations,
   geoCrawlerChecks,
   geoEntities,
+  geoExperimentPrompts,
+  geoExperiments,
   geoFanoutQueries,
   geoObservationMentions,
   geoObservations,
@@ -13,6 +15,8 @@ import {
   geoRuns,
   geoTopics,
   seoQueries,
+  seoChanges,
+  seoRecommendations,
 } from "../db/schema";
 import { normalizeSeoQuery } from "../seo-monitoring/normalization";
 import type {
@@ -27,6 +31,7 @@ import type {
 } from "./contracts";
 import { summarizeGeoObservations } from "./analytics";
 import type { NormalizedGeoReferral } from "./referrals";
+import { evaluateExperimentMetric, type ExperimentMilestone } from "./experiments";
 
 export type GeoDatabase = ReturnType<typeof createDb>;
 
@@ -112,9 +117,77 @@ export type GeoReadFilters = {
   language?: string;
   region?: string;
   topicId?: string;
+  promptSetFingerprint?: string;
+  promptIds?: string[];
 };
 
 export type GeoPage = { limit: number; cursor: string | null };
+
+export type GeoActor = { adminUserId?: string; mcpTokenId?: string };
+export type GeoExperimentCandidateInput = {
+  recommendationId: string;
+  pagePath: string;
+  actionType: typeof geoExperiments.$inferInsert.actionType;
+  hypothesis: string;
+  platform: GeoPlatform;
+  mode: GeoRunMode;
+  language: string;
+  region: string;
+  promptIds: string[];
+  promptSetFingerprint: string;
+  primaryMetric: typeof geoExperiments.$inferInsert.primaryMetric;
+  direction: "increase" | "decrease";
+  minimumDelta: number;
+  evaluationWindows: number[];
+  expectedSignal: string;
+};
+
+function utcDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function shiftDate(date: Date, days: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days));
+}
+
+function metricFromOverview(overview: ReturnType<typeof summarizeGeoObservations>, metric: string) {
+  const named = {
+    mention_rate: overview.mentionRate,
+    citation_rate: overview.citationRate,
+    citation_share: overview.citationShare,
+    owned_source_coverage: overview.ownedSourceCoverage,
+    share_of_voice: overview.shareOfVoice,
+  } as const;
+  const selected = named[metric as keyof typeof named];
+  return selected ? { value: selected.value, sample: selected.denominator, complete: selected.denominator > 0 }
+    : { value: null, sample: 0, complete: false };
+}
+
+async function readOverview(db: GeoDatabase, filters: GeoReadFilters) {
+  const rows = await db.select({
+    runId: geoRuns.id,
+    runStatus: geoRuns.status,
+    platform: geoRuns.platform,
+    mode: geoRuns.mode,
+    language: geoRuns.language,
+    region: geoRuns.region,
+    promptSetFingerprint: geoRuns.promptSetFingerprint,
+    promptId: geoObservations.promptId,
+    topicId: geoPrompts.topicId,
+    repetition: geoObservations.repetition,
+    mentioned: geoObservations.mentioned,
+    cited: geoObservations.cited,
+    ownedCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id} AND c.is_owned = true)`,
+    totalCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id})`,
+    expectedOwnedCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id} AND c.is_owned = true AND c.local_path = ${geoPrompts.targetPath})`,
+    ownedEntityMentionCount: sql<number>`(SELECT count(*)::int FROM geo_observation_mentions m JOIN geo_entities e ON e.id = m.entity_id WHERE m.observation_id = ${geoObservations.id} AND e.type = 'owned' AND e.status = 'active')`,
+    confirmedCompetitorMentionCount: sql<number>`(SELECT count(*)::int FROM geo_observation_mentions m JOIN geo_entities e ON e.id = m.entity_id WHERE m.observation_id = ${geoObservations.id} AND e.type = 'competitor' AND e.status = 'active')`,
+  }).from(geoObservations)
+    .innerJoin(geoRuns, eq(geoRuns.id, geoObservations.runId))
+    .innerJoin(geoPrompts, eq(geoPrompts.id, geoObservations.promptId))
+    .where(runConditions(filters));
+  return summarizeGeoObservations(rows);
+}
 
 function runConditions(filters: GeoReadFilters) {
   const conditions = [
@@ -126,6 +199,8 @@ function runConditions(filters: GeoReadFilters) {
   if (filters.language) conditions.push(eq(geoRuns.language, filters.language));
   if (filters.region) conditions.push(eq(geoRuns.region, filters.region));
   if (filters.topicId) conditions.push(eq(geoPrompts.topicId, filters.topicId));
+  if (filters.promptSetFingerprint) conditions.push(eq(geoRuns.promptSetFingerprint, filters.promptSetFingerprint));
+  if (filters.promptIds?.length) conditions.push(inArray(geoObservations.promptId, filters.promptIds));
   return and(...conditions);
 }
 
@@ -377,28 +452,6 @@ export function createGeoRepository(db: GeoDatabase) {
     },
 
     async getOverview(filters: GeoReadFilters) {
-      const rows = await db.select({
-        runId: geoRuns.id,
-        runStatus: geoRuns.status,
-        platform: geoRuns.platform,
-        mode: geoRuns.mode,
-        language: geoRuns.language,
-        region: geoRuns.region,
-        promptSetFingerprint: geoRuns.promptSetFingerprint,
-        promptId: geoObservations.promptId,
-        topicId: geoPrompts.topicId,
-        repetition: geoObservations.repetition,
-        mentioned: geoObservations.mentioned,
-        cited: geoObservations.cited,
-        ownedCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id} AND c.is_owned = true)`,
-        totalCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id})`,
-        expectedOwnedCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id} AND c.is_owned = true AND c.local_path = ${geoPrompts.targetPath})`,
-        ownedEntityMentionCount: sql<number>`(SELECT count(*)::int FROM geo_observation_mentions m JOIN geo_entities e ON e.id = m.entity_id WHERE m.observation_id = ${geoObservations.id} AND e.type = 'owned' AND e.status = 'active')`,
-        confirmedCompetitorMentionCount: sql<number>`(SELECT count(*)::int FROM geo_observation_mentions m JOIN geo_entities e ON e.id = m.entity_id WHERE m.observation_id = ${geoObservations.id} AND e.type = 'competitor' AND e.status = 'active')`,
-      }).from(geoObservations)
-        .innerJoin(geoRuns, eq(geoRuns.id, geoObservations.runId))
-        .innerJoin(geoPrompts, eq(geoPrompts.id, geoObservations.promptId))
-        .where(runConditions(filters));
       return {
         dimensions: {
           platform: filters.platform ?? null,
@@ -408,7 +461,7 @@ export function createGeoRepository(db: GeoDatabase) {
           topicId: filters.topicId ?? null,
         },
         period: { from: filters.from, to: filters.to },
-        ...summarizeGeoObservations(rows),
+        ...await readOverview(db, filters),
       };
     },
 
@@ -561,6 +614,145 @@ export function createGeoRepository(db: GeoDatabase) {
         .orderBy(desc(geoReferralDailyMetrics.observationDate), desc(geoReferralDailyMetrics.visits))
         .limit(input.limit).offset(Number(input.cursor ?? "0"));
       return paged(items, input);
+    },
+
+    async listExperiments(input: { status?: typeof geoExperiments.$inferSelect.status; pagePath?: string } & GeoPage) {
+      const conditions = [];
+      if (input.status) conditions.push(eq(geoExperiments.status, input.status));
+      if (input.pagePath) conditions.push(eq(geoExperiments.pagePath, input.pagePath));
+      const items = await db.select().from(geoExperiments).where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(geoExperiments.createdAt)).limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
+    async createExperimentCandidate(input: GeoExperimentCandidateInput, actor: GeoActor) {
+      return db.transaction(async (tx) => {
+        const [recommendation] = await tx.select().from(seoRecommendations)
+          .where(eq(seoRecommendations.id, input.recommendationId)).limit(1);
+        if (!recommendation || !recommendation.issueType.startsWith("geo_")
+          || recommendation.pagePath !== input.pagePath || Object.keys(recommendation.evidence).length === 0
+          || ["rejected", "dismissed"].includes(recommendation.status)) {
+          throw new Error("geo_experiment_recommendation_invalid");
+        }
+        const prompts = await tx.select({ id: geoPrompts.id, promptText: geoPrompts.promptText })
+          .from(geoPrompts).where(and(inArray(geoPrompts.id, input.promptIds), eq(geoPrompts.status, "active")));
+        if (prompts.length !== input.promptIds.length) throw new Error("geo_experiment_prompt_set_invalid");
+        const { promptIds, minimumDelta, ...values } = input;
+        const [experiment] = await tx.insert(geoExperiments).values({
+          ...values,
+          minimumDelta: minimumDelta.toFixed(6),
+          status: "proposed",
+          createdByMcpTokenId: actor.mcpTokenId ?? null,
+        }).returning();
+        if (!experiment) throw new Error("geo_experiment_not_created");
+        await tx.insert(geoExperimentPrompts).values(prompts.map((prompt) => ({
+          experimentId: experiment.id,
+          promptId: prompt.id,
+          promptTextSnapshot: prompt.promptText,
+        })));
+        return experiment;
+      });
+    },
+
+    async approveExperiment(input: { id: string }, actor: GeoActor) {
+      const [row] = await db.update(geoExperiments).set({
+        status: "approved",
+        approvedByAdminUserId: actor.adminUserId ?? null,
+        updatedAt: new Date(),
+      }).where(and(eq(geoExperiments.id, input.id), eq(geoExperiments.status, "proposed"))).returning();
+      if (!row) throw new Error("geo_experiment_state_invalid");
+      return row;
+    },
+
+    async linkExperimentChange(input: { id: string; seoChangeId: string }, _actor: GeoActor) {
+      return db.transaction(async (tx) => {
+        const [experiment] = await tx.select().from(geoExperiments)
+          .where(eq(geoExperiments.id, input.id)).for("update").limit(1);
+        if (!experiment || experiment.status !== "approved") throw new Error("geo_experiment_state_invalid");
+        const [change] = await tx.select().from(seoChanges).where(eq(seoChanges.id, input.seoChangeId)).limit(1);
+        if (!change || change.pagePath !== experiment.pagePath) throw new Error("geo_experiment_change_invalid");
+        const prompts = await tx.select({ id: geoExperimentPrompts.promptId }).from(geoExperimentPrompts)
+          .where(eq(geoExperimentPrompts.experimentId, experiment.id));
+        const baselineTo = shiftDate(change.appliedAt, -1);
+        const baselineFrom = shiftDate(change.appliedAt, -28);
+        const overview = await readOverview(tx as unknown as GeoDatabase, {
+          from: utcDate(baselineFrom), to: utcDate(baselineTo), platform: experiment.platform,
+          mode: experiment.mode, language: experiment.language, region: experiment.region,
+          promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
+        });
+        const metric = metricFromOverview(overview, experiment.primaryMetric);
+        const baseline = {
+          ...metric,
+          unit: experiment.primaryMetric === "ai_referrals" ? "visits" : "ratio",
+          period: { from: utcDate(baselineFrom), to: utcDate(baselineTo) },
+          dimensions: { platform: experiment.platform, mode: experiment.mode, language: experiment.language,
+            region: experiment.region, promptSetFingerprint: experiment.promptSetFingerprint },
+        };
+        const [row] = await tx.update(geoExperiments).set({
+          status: "active",
+          seoChangeId: change.id,
+          implementedAt: change.appliedAt,
+          baseline,
+          updatedAt: new Date(),
+        }).where(eq(geoExperiments.id, experiment.id)).returning();
+        if (!row) throw new Error("geo_experiment_not_found");
+        return row;
+      });
+    },
+
+    async evaluateExperiment(input: { id: string; milestone: ExperimentMilestone; evaluatedAt: Date }, _actor: GeoActor) {
+      return db.transaction(async (tx) => {
+        const [experiment] = await tx.select().from(geoExperiments)
+          .where(eq(geoExperiments.id, input.id)).for("update").limit(1);
+        if (!experiment || !experiment.implementedAt || !["active", "completed"].includes(experiment.status)) {
+          throw new Error("geo_experiment_state_invalid");
+        }
+        const from = shiftDate(experiment.implementedAt, 1);
+        const to = shiftDate(experiment.implementedAt, input.milestone);
+        const availableAt = shiftDate(experiment.implementedAt, input.milestone + 1);
+        if (input.evaluatedAt < availableAt) throw new Error("geo_experiment_period_incomplete");
+        const prompts = await tx.select({ id: geoExperimentPrompts.promptId }).from(geoExperimentPrompts)
+          .where(eq(geoExperimentPrompts.experimentId, experiment.id));
+        const overview = await readOverview(tx as unknown as GeoDatabase, {
+          from: utcDate(from), to: utcDate(to), platform: experiment.platform, mode: experiment.mode,
+          language: experiment.language, region: experiment.region,
+          promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
+        });
+        const resultMetric = metricFromOverview(overview, experiment.primaryMetric);
+        const baseline = experiment.baseline as { value?: number | null; sample?: number; complete?: boolean };
+        const changes = await tx.select({ id: seoChanges.id }).from(seoChanges).where(and(
+          eq(seoChanges.pagePath, experiment.pagePath),
+          gte(seoChanges.appliedAt, experiment.implementedAt),
+          lte(seoChanges.appliedAt, to),
+          experiment.seoChangeId ? ne(seoChanges.id, experiment.seoChangeId) : undefined,
+        ));
+        const evaluation = evaluateExperimentMetric({
+          milestone: input.milestone,
+          baseline: typeof baseline.value === "number" ? baseline.value : null,
+          result: resultMetric.value,
+          direction: experiment.direction,
+          minimumDelta: Number(experiment.minimumDelta),
+          baselineSample: baseline.sample ?? 0,
+          resultSample: resultMetric.sample,
+          complete: baseline.complete === true && resultMetric.complete,
+          confoundingChanges: changes.map((change) => change.id),
+        });
+        const evaluationResults = { ...experiment.evaluationResults, [String(input.milestone)]: {
+          ...evaluation,
+          evaluatedAt: input.evaluatedAt.toISOString(),
+          period: { from: utcDate(from), to: utcDate(to) },
+          dimensions: { platform: experiment.platform, mode: experiment.mode, language: experiment.language,
+            region: experiment.region, promptSetFingerprint: experiment.promptSetFingerprint },
+        } };
+        const [row] = await tx.update(geoExperiments).set({
+          evaluationResults,
+          verdict: evaluation.verdict,
+          ...(input.milestone === 28 ? { status: "completed" as const } : {}),
+          updatedAt: new Date(),
+        }).where(eq(geoExperiments.id, experiment.id)).returning();
+        if (!row) throw new Error("geo_experiment_not_found");
+        return { experiment: row, evaluation };
+      });
     },
   };
 }

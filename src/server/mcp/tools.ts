@@ -184,6 +184,22 @@ const geoFinishRunInput = z.strictObject({
   errorCode: z.string().regex(/^[a-z][a-z0-9_]{0,119}$/).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
+const geoExperimentStatus = z.enum(["proposed", "approved", "active", "completed", "cancelled"]);
+const geoExperimentCandidateInput = z.strictObject({
+  recommendationId: z.uuid(),
+  pagePath: z.string().max(500).regex(/^\//),
+  actionType: z.enum(["content_answer", "first_party_evidence", "internal_linking", "technical_indexing", "structured_data", "authority_outreach"]),
+  hypothesis: z.string().trim().min(1).max(5_000),
+  platform: geoPlatform,
+  mode: geoMode,
+  language: z.string().trim().min(2).max(16),
+  region: z.string().trim().min(2).max(120),
+  promptIds: z.array(z.uuid()).min(1).max(100),
+  primaryMetric: z.enum(["mention_rate", "citation_rate", "citation_share", "owned_source_coverage", "share_of_voice", "ai_referrals", "crawler_health"]),
+  direction: z.enum(["increase", "decrease"]),
+  minimumDelta: z.number().positive().max(1_000_000),
+  expectedSignal: z.string().trim().min(1).max(2_000),
+});
 const genericRecord = z.record(z.string(), z.unknown());
 const genericPage = z.strictObject({ items: z.array(genericRecord), nextCursor: z.string().nullable().optional() });
 const listContentInput = z.strictObject({
@@ -547,6 +563,12 @@ export function createKordevMcpServer(
       inputSchema: geoReferralListInput,
       outputSchema: withError(genericPage), annotations: annotations(true),
     }, input => run("list_geo_referrals", () => services.geo.listReferrals(input)));
+    server.registerTool("list_geo_experiments", {
+      title: "GEO-эксперименты",
+      description: "Возвращает гипотезы продвижения, baseline и оценки 7/14/28 дней без изменения контента.",
+      inputSchema: z.strictObject({ status: geoExperimentStatus.optional(), pagePath: z.string().max(500).regex(/^\//).optional(), ...pageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_experiments", () => services.geo.listExperiments(input)));
   }
 
   if (has("seo:read", "seo:write")) {
@@ -633,6 +655,20 @@ export function createKordevMcpServer(
       const { runId, ...result } = input;
       return services.geo.finishRun(runId, { ...result, errorCode: result.errorCode ?? null, metadata: result.metadata ?? {} });
     }));
+    server.registerTool("create_geo_experiment_candidate", {
+      title: "Предложить GEO-эксперимент",
+      description: "Создаёт только гипотезу из существующей доказательной рекомендации; не одобряет и не меняет сайт.",
+      inputSchema: geoExperimentCandidateInput,
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("create_geo_experiment_candidate", () => services.geo.createExperimentCandidate(input)));
+    server.registerTool("record_geo_experiment_evaluation", {
+      title: "Оценить GEO-эксперимент",
+      description: "Рассчитывает доказательную оценку за 7, 14 или 28 полных дней; не меняет и не откатывает контент.",
+      inputSchema: z.strictObject({ id: z.uuid(), milestone: z.union([z.literal(7), z.literal(14), z.literal(28)]), evaluatedAt: z.iso.datetime() }),
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("record_geo_experiment_evaluation", () => services.geo.evaluateExperiment(
+      input as Parameters<McpGeoService["evaluateExperiment"]>[0],
+    )));
   }
 
   return server;

@@ -1,4 +1,5 @@
 import { domainToASCII } from "node:url";
+import { createHash } from "node:crypto";
 
 import {
   GEO_CITATION_CATEGORIES,
@@ -15,6 +16,8 @@ import type {
   GeoCrawlerCheckInput,
   GeoEntityWriteInput,
   GeoFinishRunInput,
+  GeoActor,
+  GeoExperimentCandidateInput,
   GeoPromptCandidateInput,
   GeoPromptUpdateInput,
   GeoReadFilters,
@@ -35,6 +38,9 @@ const citationCategories = new Set<string>(GEO_CITATION_CATEGORIES);
 const terminalStatuses = new Set<string>(["success", "partial", "failed"]);
 const sentiments = new Set<string>(["positive", "neutral", "negative", "unknown"]);
 const crawlerStatuses = new Set<string>(["pass", "fail", "unavailable"]);
+const experimentActions = new Set<string>(["content_answer", "first_party_evidence", "internal_linking", "technical_indexing", "structured_data", "authority_outreach"]);
+const experimentMetrics = new Set<string>(["mention_rate", "citation_rate", "citation_share", "owned_source_coverage", "share_of_voice", "ai_referrals", "crawler_health"]);
+const experimentStatuses = new Set<string>(["proposed", "approved", "active", "completed", "cancelled"]);
 
 function uuid(value: string, code: string): string {
   if (!uuidPattern.test(value)) throw new Error(code);
@@ -136,6 +142,20 @@ function page(input: { limit?: number; cursor?: string | null }) {
   const cursor = input.cursor ?? null;
   if (cursor !== null && !/^(?:0|[1-9]\d*)$/u.test(cursor)) throw new Error("geo_cursor_invalid");
   return { limit, cursor };
+}
+
+function actor(value: GeoActor): GeoActor {
+  const count = Number(Boolean(value.adminUserId)) + Number(Boolean(value.mcpTokenId));
+  if (count !== 1) throw new Error("geo_actor_invalid");
+  return value.adminUserId
+    ? { adminUserId: uuid(value.adminUserId, "geo_actor_invalid") }
+    : { mcpTokenId: uuid(value.mcpTokenId!, "geo_actor_invalid") };
+}
+
+function adminActor(value: GeoActor): GeoActor {
+  const validated = actor(value);
+  if (!validated.adminUserId) throw new Error("geo_admin_required");
+  return validated;
 }
 
 function isOwnedHostname(hostname: string): boolean {
@@ -314,6 +334,64 @@ export function createGeoMonitoringService(repository: GeoRepository) {
       const validated = readFilters({ from: input.from, to: input.to, ...(input.platform ? { platform: input.platform } : {}) });
       return repository.listReferrals({ from: validated.from, to: validated.to,
         ...(validated.platform ? { platform: validated.platform } : {}), ...page(input) });
+    },
+
+    async listExperiments(input: { status?: "proposed" | "approved" | "active" | "completed" | "cancelled";
+      pagePath?: string; limit?: number; cursor?: string | null }) {
+      if (input.status && !experimentStatuses.has(input.status)) throw new Error("geo_experiment_status_invalid");
+      return repository.listExperiments({
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.pagePath ? { pagePath: normalizeGeoTargetPath(input.pagePath) } : {}),
+        ...page(input),
+      });
+    },
+
+    async createExperimentCandidate(input: Omit<GeoExperimentCandidateInput, "promptSetFingerprint" | "evaluationWindows">, value: GeoActor) {
+      if (!experimentActions.has(input.actionType)) throw new Error("geo_experiment_action_invalid");
+      if (!experimentMetrics.has(input.primaryMetric)) throw new Error("geo_experiment_metric_invalid");
+      if (input.direction !== "increase" && input.direction !== "decrease") throw new Error("geo_experiment_direction_invalid");
+      if (!Number.isFinite(input.minimumDelta) || input.minimumDelta <= 0 || input.minimumDelta > 1_000_000) {
+        throw new Error("geo_experiment_delta_invalid");
+      }
+      if (!Array.isArray(input.promptIds) || input.promptIds.length < 1 || input.promptIds.length > 100) {
+        throw new Error("geo_experiment_prompt_set_invalid");
+      }
+      const promptIds = [...new Set(input.promptIds.map((id) => uuid(id, "geo_experiment_prompt_set_invalid")))].sort();
+      if (promptIds.length !== input.promptIds.length) throw new Error("geo_experiment_prompt_set_invalid");
+      if (!platforms.has(input.platform)) throw new Error("geo_run_platform_invalid");
+      if (!modes.has(input.mode)) throw new Error("geo_run_mode_invalid");
+      const promptSetFingerprint = createHash("sha256").update(promptIds.join("\u0000"), "utf8").digest("hex");
+      return repository.createExperimentCandidate({
+        ...input,
+        recommendationId: uuid(input.recommendationId, "geo_recommendation_invalid"),
+        pagePath: normalizeGeoTargetPath(input.pagePath),
+        hypothesis: boundedText(input.hypothesis, 5_000, "geo_experiment_hypothesis_invalid"),
+        language: boundedText(input.language, 16, "geo_run_language_invalid"),
+        region: boundedText(input.region, 120, "geo_run_region_invalid"),
+        promptIds,
+        promptSetFingerprint,
+        evaluationWindows: [7, 14, 28],
+        expectedSignal: boundedText(input.expectedSignal, 2_000, "geo_experiment_signal_invalid"),
+      }, actor(value));
+    },
+
+    async approveExperiment(input: { id: string }, value: GeoActor) {
+      return repository.approveExperiment({ id: uuid(input.id, "geo_experiment_invalid") }, adminActor(value));
+    },
+
+    async linkExperimentChange(input: { id: string; seoChangeId: string }, value: GeoActor) {
+      return repository.linkExperimentChange({
+        id: uuid(input.id, "geo_experiment_invalid"),
+        seoChangeId: uuid(input.seoChangeId, "geo_change_invalid"),
+      }, adminActor(value));
+    },
+
+    async evaluateExperiment(input: { id: string; milestone: 7 | 14 | 28; evaluatedAt: string }, value: GeoActor) {
+      if (![7, 14, 28].includes(input.milestone)) throw new Error("geo_experiment_milestone_invalid");
+      const evaluatedAt = new Date(input.evaluatedAt);
+      if (Number.isNaN(+evaluatedAt)) throw new Error("geo_experiment_evaluated_at_invalid");
+      return repository.evaluateExperiment({ id: uuid(input.id, "geo_experiment_invalid"),
+        milestone: input.milestone, evaluatedAt }, actor(value));
     },
 
     async syncPromptCatalog(entries: Parameters<GeoRepository["syncPromptCatalog"]>[0]) {
