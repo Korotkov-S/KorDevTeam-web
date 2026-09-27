@@ -6,11 +6,13 @@ import type { McpPrincipal, McpScope } from "./contracts";
 import type { McpContentSelector, McpContentService, McpContentSnapshot } from "./contentService";
 import type { McpMediaService } from "./mediaService";
 import type { McpSeoService } from "../seo-monitoring/mcpService";
+import type { McpGeoService } from "../geo-monitoring/mcpService";
 
 export type McpServices = {
   content: McpContentService;
   media: McpMediaService;
   seo: McpSeoService;
+  geo: McpGeoService;
 };
 
 export type McpAuditRecord = {
@@ -93,6 +95,94 @@ const seoQueryUpdateInput = z.strictObject({
   wordstatFrequency: z.number().int().nonnegative().nullable(),
   frequencyBand: seoFrequencyBand, kind: seoQueryKind,
   priority: z.number().int().min(0).max(1000), status: seoQueryStatus,
+});
+const geoPlatform = z.enum(["yandex_alice", "chatgpt_search", "google_ai", "bing_copilot"]);
+const geoMode = z.enum(["official_report", "live_ui", "api_probe"]);
+const geoPromptCategory = z.enum(["commercial", "informational", "comparison", "local", "brand"]);
+const geoStatus = z.enum(["candidate", "active", "archived"]);
+const geoDateFilterFields = {
+  from: isoDate,
+  to: isoDate,
+  platform: geoPlatform.optional(),
+  mode: geoMode.optional(),
+  language: z.string().trim().min(2).max(16).optional(),
+  region: z.string().trim().min(2).max(120).optional(),
+  topicId: z.uuid().optional(),
+};
+function validateGeoRange(value: { from: string; to: string }, context: z.RefinementCtx) {
+  validateSeoRange({ dateFrom: value.from, dateTo: value.to }, context);
+}
+const geoOverviewInput = z.strictObject(geoDateFilterFields).superRefine(validateGeoRange);
+const geoObservationListInput = z.strictObject({ ...geoDateFilterFields, promptId: z.uuid().optional(), ...pageFields }).superRefine(validateGeoRange);
+const geoCitationListInput = z.strictObject({ ...geoDateFilterFields, promptId: z.uuid().optional(), owned: z.boolean().optional(), hostname: z.string().trim().min(1).max(253).optional(), ...pageFields }).superRefine(validateGeoRange);
+const geoFanoutListInput = z.strictObject({ ...geoDateFilterFields, promptId: z.uuid().optional(), ...pageFields }).superRefine(validateGeoRange);
+const geoReferralListInput = z.strictObject({ from: isoDate, to: isoDate, platform: geoPlatform.optional(), ...pageFields }).superRefine(validateGeoRange);
+const geoPromptCandidateInput = z.strictObject({
+  promptText: z.string().trim().min(1).max(2_000),
+  topicId: z.uuid(),
+  tags: z.array(z.string().trim().min(1).max(80)).max(20),
+  category: geoPromptCategory,
+  priority: z.number().int().min(0).max(1_000),
+  language: z.string().trim().min(2).max(16),
+  region: z.string().trim().min(2).max(120),
+  targetPath: z.string().max(500).regex(/^\//).nullable(),
+  seoQueryId: z.uuid().nullable().optional(),
+  expectedEntityDomain: z.string().trim().min(1).max(253).nullable().optional(),
+});
+const geoStartRunInput = z.strictObject({
+  platform: geoPlatform,
+  surface: z.string().trim().min(1).max(120),
+  mode: geoMode,
+  region: z.string().trim().min(2).max(120),
+  language: z.string().trim().min(2).max(16),
+  plannedCount: z.number().int().min(1).max(1_000),
+  promptSetFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+const geoMentionInput = z.strictObject({
+  entityId: z.uuid(),
+  firstMentionOrder: z.number().int().min(1).max(1_000),
+  recommended: z.boolean(),
+  sentiment: z.enum(["positive", "neutral", "negative", "unknown"]),
+});
+const geoCitationInput = z.strictObject({
+  url: z.string().trim().min(1).max(2_000),
+  title: z.string().trim().min(1).max(1_000).nullable().optional(),
+  sourceOrder: z.number().int().min(1).max(1_000),
+  category: z.enum(["owned", "competitor", "media", "blog", "forum", "directory", "other"]),
+});
+const geoFanoutInput = z.strictObject({
+  queryText: z.string().trim().min(1).max(2_000),
+  position: z.number().int().min(1).max(1_000),
+  source: z.string().trim().min(1).max(120),
+});
+const geoObservationInput = z.strictObject({
+  runId: z.uuid(),
+  promptId: z.uuid(),
+  repetition: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  observedAt: z.iso.datetime().optional(),
+  mentioned: z.boolean(),
+  linked: z.boolean(),
+  cited: z.boolean(),
+  sourceOrder: z.number().int().min(1).max(1_000).nullable().optional(),
+  responseExcerpt: z.string().max(2_048),
+  responseSnapshot: z.string().max(16_384),
+  snapshotTruncated: z.boolean(),
+  responseHash: z.string().regex(/^[0-9a-f]{64}$/),
+  modelName: z.string().trim().min(1).max(160).nullable().optional(),
+  sourceCount: z.number().int().min(0).max(10_000),
+  sessionPersonalized: z.boolean(),
+  mentions: z.array(geoMentionInput).max(100),
+  citations: z.array(geoCitationInput).max(100),
+  fanoutQueries: z.array(geoFanoutInput).max(100),
+});
+const geoFinishRunInput = z.strictObject({
+  runId: z.uuid(),
+  status: z.enum(["success", "partial", "failed"]),
+  completedCount: z.number().int().min(0).max(1_000),
+  storedCount: z.number().int().min(0).max(1_000),
+  errorCode: z.string().regex(/^[a-z][a-z0-9_]{0,119}$/).nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 const genericRecord = z.record(z.string(), z.unknown());
 const genericPage = z.strictObject({ items: z.array(genericRecord), nextCursor: z.string().nullable().optional() });
@@ -214,8 +304,10 @@ function success(value: unknown) {
 
 function failure(error: unknown) {
   const raw = error instanceof Error ? error.message : "internal_error";
-  const code = Object.hasOwn(errorMessages, raw) ? raw : "internal_error";
-  const result = { code, message: errorMessages[code] ?? "Внутренняя ошибка MCP. Повторите запрос позже." };
+  const code = Object.hasOwn(errorMessages, raw) || /^geo_[a-z0-9_]+$/u.test(raw) ? raw : "internal_error";
+  const result = { code, message: errorMessages[code] ?? (code.startsWith("geo_")
+    ? "GEO-операция отклонена. Проверьте параметры и состояние запуска."
+    : "Внутренняя ошибка MCP. Повторите запрос позже.") };
   return {
     content: [{ type: "text" as const, text: JSON.stringify(result) }],
     structuredContent: result,
@@ -404,6 +496,57 @@ export function createKordevMcpServer(
       outputSchema: withError(genericPage),
       annotations: annotations(true),
     }, input => run("list_seo_recommendations", () => services.seo.listRecommendations(input)));
+
+    server.registerTool("get_geo_overview", {
+      title: "Сводка GEO / AI-видимости",
+      description: "Возвращает доказательные доли упоминаний и цитирований с числителями и знаменателями.",
+      inputSchema: geoOverviewInput,
+      outputSchema: withError(genericRecord),
+      annotations: annotations(true),
+    }, input => run("get_geo_overview", () => services.geo.getOverview(input)));
+    server.registerTool("list_geo_topics", {
+      title: "Темы GEO",
+      description: "Возвращает ограниченный список тем контрольных AI-вопросов.",
+      inputSchema: z.strictObject({ status: geoStatus.optional(), ...pageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_topics", () => services.geo.listTopics(input)));
+    server.registerTool("list_geo_entities", {
+      title: "Сущности GEO",
+      description: "Возвращает собственный бренд, подтверждённых конкурентов и кандидатов отдельно.",
+      inputSchema: z.strictObject({ status: geoStatus.optional(), type: z.enum(["owned", "competitor"]).optional(), ...pageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_entities", () => services.geo.listEntities(input)));
+    server.registerTool("list_geo_prompts", {
+      title: "Контрольные GEO-вопросы",
+      description: "Возвращает каталог контрольных AI-вопросов без приватных снимков ответов.",
+      inputSchema: z.strictObject({ status: geoStatus.optional(), category: geoPromptCategory.optional(), topicId: z.uuid().optional(),
+        language: z.string().trim().min(2).max(16).optional(), region: z.string().trim().min(2).max(120).optional(), ...pageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_prompts", () => services.geo.listPrompts(input)));
+    server.registerTool("list_geo_observations", {
+      title: "Наблюдения GEO",
+      description: "Возвращает компактные результаты AI-проверок без приватных полных ответов.",
+      inputSchema: geoObservationListInput,
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_observations", () => services.geo.listObservations(input)));
+    server.registerTool("list_geo_citations", {
+      title: "Источники GEO",
+      description: "Возвращает нормализованные URL-источники AI-ответов и их принадлежность.",
+      inputSchema: geoCitationListInput,
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_citations", () => services.geo.listCitations(input)));
+    server.registerTool("list_geo_fanout_queries", {
+      title: "Fan-out запросы GEO",
+      description: "Возвращает только явно раскрытые платформой подзапросы.",
+      inputSchema: geoFanoutListInput,
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_fanout_queries", () => services.geo.listFanoutQueries(input)));
+    server.registerTool("list_geo_referrals", {
+      title: "Переходы из AI",
+      description: "Возвращает ежедневные переходы из подтверждённых AI-источников.",
+      inputSchema: geoReferralListInput,
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_geo_referrals", () => services.geo.listReferrals(input)));
   }
 
   if (has("seo:read", "seo:write")) {
@@ -454,6 +597,42 @@ export function createKordevMcpServer(
         status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]) }),
       outputSchema: withError(genericRecord), annotations: annotations(false),
     }, input => run("update_seo_recommendation_status", () => services.seo.updateRecommendationStatus(input)));
+
+    server.registerTool("create_geo_prompt_candidate", {
+      title: "Добавить GEO-вопрос-кандидат",
+      description: "Создаёт контрольный AI-вопрос только как кандидата и не активирует его автоматически.",
+      inputSchema: geoPromptCandidateInput,
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("create_geo_prompt_candidate", () => services.geo.createPromptCandidate({
+      ...input,
+      targetPath: input.targetPath ?? null,
+      seoQueryId: input.seoQueryId ?? null,
+      expectedEntityDomain: input.expectedEntityDomain ?? null,
+    })));
+    server.registerTool("start_geo_run", {
+      title: "Начать GEO-проверку",
+      description: "Создаёт ограниченный запуск, принадлежащий текущему MCP-токену.",
+      inputSchema: geoStartRunInput,
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("start_geo_run", () => services.geo.startRun({ ...input, metadata: input.metadata ?? {} })));
+    server.registerTool("record_geo_observation", {
+      title: "Записать GEO-наблюдение",
+      description: "Атомарно сохраняет один ответ, сущности, цитаты и явно раскрытые fan-out запросы.",
+      inputSchema: geoObservationInput,
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("record_geo_observation", () => {
+      const { runId, ...observation } = input;
+      return services.geo.recordObservation(runId, observation as Parameters<McpGeoService["recordObservation"]>[1]);
+    }));
+    server.registerTool("finish_geo_run", {
+      title: "Завершить GEO-проверку",
+      description: "Завершает только запуск текущего MCP-токена после проверки фактических счётчиков.",
+      inputSchema: geoFinishRunInput,
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("finish_geo_run", () => {
+      const { runId, ...result } = input;
+      return services.geo.finishRun(runId, { ...result, errorCode: result.errorCode ?? null, metadata: result.metadata ?? {} });
+    }));
   }
 
   return server;

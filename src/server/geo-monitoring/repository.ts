@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
 import {
@@ -9,6 +9,7 @@ import {
   geoObservationMentions,
   geoObservations,
   geoPrompts,
+  geoReferralDailyMetrics,
   geoRuns,
   geoTopics,
   seoQueries,
@@ -24,6 +25,7 @@ import type {
   GeoPromptStatus,
   GeoRunMode,
 } from "./contracts";
+import { summarizeGeoObservations } from "./analytics";
 
 export type GeoDatabase = ReturnType<typeof createDb>;
 
@@ -100,6 +102,35 @@ export type GeoCrawlerCheckInput = {
   checkedAt?: Date;
   metadata: Record<string, unknown>;
 };
+
+export type GeoReadFilters = {
+  from: string;
+  to: string;
+  platform?: GeoPlatform;
+  mode?: GeoRunMode;
+  language?: string;
+  region?: string;
+  topicId?: string;
+};
+
+export type GeoPage = { limit: number; cursor: string | null };
+
+function runConditions(filters: GeoReadFilters) {
+  const conditions = [
+    gte(geoRuns.startedAt, new Date(`${filters.from}T00:00:00.000Z`)),
+    lte(geoRuns.startedAt, new Date(`${filters.to}T23:59:59.999Z`)),
+  ];
+  if (filters.platform) conditions.push(eq(geoRuns.platform, filters.platform));
+  if (filters.mode) conditions.push(eq(geoRuns.mode, filters.mode));
+  if (filters.language) conditions.push(eq(geoRuns.language, filters.language));
+  if (filters.region) conditions.push(eq(geoRuns.region, filters.region));
+  if (filters.topicId) conditions.push(eq(geoPrompts.topicId, filters.topicId));
+  return and(...conditions);
+}
+
+function paged<T>(items: T[], page: GeoPage) {
+  return { items, nextCursor: items.length === page.limit ? String(Number(page.cursor ?? "0") + page.limit) : null };
+}
 
 function assertOwnedRun(run: typeof geoRuns.$inferSelect | undefined, tokenId: string) {
   if (!run) throw new Error("geo_run_not_found");
@@ -319,6 +350,193 @@ export function createGeoRepository(db: GeoDatabase) {
         }
         return input.length;
       });
+    },
+
+    async getOverview(filters: GeoReadFilters) {
+      const rows = await db.select({
+        runId: geoRuns.id,
+        runStatus: geoRuns.status,
+        platform: geoRuns.platform,
+        mode: geoRuns.mode,
+        language: geoRuns.language,
+        region: geoRuns.region,
+        promptSetFingerprint: geoRuns.promptSetFingerprint,
+        promptId: geoObservations.promptId,
+        topicId: geoPrompts.topicId,
+        repetition: geoObservations.repetition,
+        mentioned: geoObservations.mentioned,
+        cited: geoObservations.cited,
+        ownedCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id} AND c.is_owned = true)`,
+        totalCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id})`,
+        expectedOwnedCitationCount: sql<number>`(SELECT count(*)::int FROM geo_citations c WHERE c.observation_id = ${geoObservations.id} AND c.is_owned = true AND c.local_path = ${geoPrompts.targetPath})`,
+        ownedEntityMentionCount: sql<number>`(SELECT count(*)::int FROM geo_observation_mentions m JOIN geo_entities e ON e.id = m.entity_id WHERE m.observation_id = ${geoObservations.id} AND e.type = 'owned' AND e.status = 'active')`,
+        confirmedCompetitorMentionCount: sql<number>`(SELECT count(*)::int FROM geo_observation_mentions m JOIN geo_entities e ON e.id = m.entity_id WHERE m.observation_id = ${geoObservations.id} AND e.type = 'competitor' AND e.status = 'active')`,
+      }).from(geoObservations)
+        .innerJoin(geoRuns, eq(geoRuns.id, geoObservations.runId))
+        .innerJoin(geoPrompts, eq(geoPrompts.id, geoObservations.promptId))
+        .where(runConditions(filters));
+      return {
+        dimensions: {
+          platform: filters.platform ?? null,
+          mode: filters.mode ?? null,
+          language: filters.language ?? null,
+          region: filters.region ?? null,
+          topicId: filters.topicId ?? null,
+        },
+        period: { from: filters.from, to: filters.to },
+        ...summarizeGeoObservations(rows),
+      };
+    },
+
+    async listTopics(input: { status?: GeoPromptStatus } & GeoPage) {
+      const items = await db.select().from(geoTopics)
+        .where(input.status ? eq(geoTopics.status, input.status) : undefined)
+        .orderBy(desc(geoTopics.priority), asc(geoTopics.name))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
+    async listEntities(input: { status?: GeoEntityStatus; type?: "owned" | "competitor" } & GeoPage) {
+      const conditions = [];
+      if (input.status) conditions.push(eq(geoEntities.status, input.status));
+      if (input.type) conditions.push(eq(geoEntities.type, input.type));
+      const items = await db.select().from(geoEntities).where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(asc(geoEntities.type), asc(geoEntities.canonicalName))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
+    async listPrompts(input: {
+      status?: GeoPromptStatus; category?: GeoPromptCategory; topicId?: string; language?: string; region?: string;
+    } & GeoPage) {
+      const conditions = [];
+      if (input.status) conditions.push(eq(geoPrompts.status, input.status));
+      if (input.category) conditions.push(eq(geoPrompts.category, input.category));
+      if (input.topicId) conditions.push(eq(geoPrompts.topicId, input.topicId));
+      if (input.language) conditions.push(eq(geoPrompts.language, input.language));
+      if (input.region) conditions.push(eq(geoPrompts.region, input.region));
+      const items = await db.select().from(geoPrompts).where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(geoPrompts.priority), asc(geoPrompts.promptText))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
+    async listObservations(input: GeoReadFilters & { promptId?: string } & GeoPage) {
+      const conditions = [runConditions(input)];
+      if (input.promptId) conditions.push(eq(geoObservations.promptId, input.promptId));
+      const items = await db.select({
+        id: geoObservations.id,
+        runId: geoObservations.runId,
+        promptId: geoObservations.promptId,
+        repetition: geoObservations.repetition,
+        observedAt: geoObservations.observedAt,
+        mentioned: geoObservations.mentioned,
+        linked: geoObservations.linked,
+        cited: geoObservations.cited,
+        sourceOrder: geoObservations.sourceOrder,
+        responseExcerpt: geoObservations.responseExcerpt,
+        snapshotTruncated: geoObservations.snapshotTruncated,
+        responseHash: geoObservations.responseHash,
+        modelName: geoObservations.modelName,
+        sourceCount: geoObservations.sourceCount,
+        sessionPersonalized: geoObservations.sessionPersonalized,
+        platform: geoRuns.platform,
+        mode: geoRuns.mode,
+        language: geoRuns.language,
+        region: geoRuns.region,
+        runStatus: geoRuns.status,
+        promptSetFingerprint: geoRuns.promptSetFingerprint,
+        topicId: geoPrompts.topicId,
+      }).from(geoObservations)
+        .innerJoin(geoRuns, eq(geoRuns.id, geoObservations.runId))
+        .innerJoin(geoPrompts, eq(geoPrompts.id, geoObservations.promptId))
+        .where(and(...conditions)).orderBy(desc(geoObservations.observedAt), desc(geoObservations.id))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
+    async getObservationEvidence(id: string) {
+      const [observation] = await db.select().from(geoObservations).where(eq(geoObservations.id, id)).limit(1);
+      if (!observation) throw new Error("geo_observation_not_found");
+      const [mentions, citations, fanoutQueries] = await Promise.all([
+        db.select({
+          entityId: geoObservationMentions.entityId,
+          canonicalName: geoEntities.canonicalName,
+          type: geoEntities.type,
+          status: geoEntities.status,
+          firstMentionOrder: geoObservationMentions.firstMentionOrder,
+          recommended: geoObservationMentions.recommended,
+          sentiment: geoObservationMentions.sentiment,
+        }).from(geoObservationMentions).innerJoin(geoEntities, eq(geoEntities.id, geoObservationMentions.entityId))
+          .where(eq(geoObservationMentions.observationId, id)).orderBy(asc(geoObservationMentions.firstMentionOrder)),
+        db.select().from(geoCitations).where(eq(geoCitations.observationId, id)).orderBy(asc(geoCitations.sourceOrder)),
+        db.select().from(geoFanoutQueries).where(eq(geoFanoutQueries.observationId, id)).orderBy(asc(geoFanoutQueries.position)),
+      ]);
+      return { observation, mentions, citations, fanoutQueries };
+    },
+
+    async listCitations(input: GeoReadFilters & { owned?: boolean; hostname?: string; promptId?: string } & GeoPage) {
+      const conditions = [runConditions(input)];
+      if (input.owned !== undefined) conditions.push(eq(geoCitations.isOwned, input.owned));
+      if (input.hostname) conditions.push(eq(geoCitations.hostname, input.hostname));
+      if (input.promptId) conditions.push(eq(geoObservations.promptId, input.promptId));
+      const items = await db.select({
+        id: geoCitations.id,
+        observationId: geoCitations.observationId,
+        promptId: geoObservations.promptId,
+        url: geoCitations.url,
+        hostname: geoCitations.hostname,
+        title: geoCitations.title,
+        sourceOrder: geoCitations.sourceOrder,
+        isOwned: geoCitations.isOwned,
+        category: geoCitations.category,
+        localPath: geoCitations.localPath,
+        createdAt: geoCitations.createdAt,
+        platform: geoRuns.platform,
+        mode: geoRuns.mode,
+        language: geoRuns.language,
+        region: geoRuns.region,
+      }).from(geoCitations)
+        .innerJoin(geoObservations, eq(geoObservations.id, geoCitations.observationId))
+        .innerJoin(geoRuns, eq(geoRuns.id, geoObservations.runId))
+        .innerJoin(geoPrompts, eq(geoPrompts.id, geoObservations.promptId))
+        .where(and(...conditions)).orderBy(desc(geoCitations.createdAt), asc(geoCitations.sourceOrder))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
+    async listFanoutQueries(input: GeoReadFilters & { promptId?: string } & GeoPage) {
+      const conditions = [runConditions(input)];
+      if (input.promptId) conditions.push(eq(geoObservations.promptId, input.promptId));
+      const items = await db.select({
+        observationId: geoFanoutQueries.observationId,
+        promptId: geoObservations.promptId,
+        position: geoFanoutQueries.position,
+        queryText: geoFanoutQueries.queryText,
+        source: geoFanoutQueries.source,
+        platform: geoRuns.platform,
+        mode: geoRuns.mode,
+        language: geoRuns.language,
+        region: geoRuns.region,
+      }).from(geoFanoutQueries)
+        .innerJoin(geoObservations, eq(geoObservations.id, geoFanoutQueries.observationId))
+        .innerJoin(geoRuns, eq(geoRuns.id, geoObservations.runId))
+        .innerJoin(geoPrompts, eq(geoPrompts.id, geoObservations.promptId))
+        .where(and(...conditions)).orderBy(desc(geoObservations.observedAt), asc(geoFanoutQueries.position))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
+    },
+
+    async listReferrals(input: { from: string; to: string; platform?: GeoPlatform } & GeoPage) {
+      const conditions = [
+        gte(geoReferralDailyMetrics.observationDate, input.from),
+        lte(geoReferralDailyMetrics.observationDate, input.to),
+      ];
+      if (input.platform) conditions.push(eq(geoReferralDailyMetrics.platform, input.platform));
+      const items = await db.select().from(geoReferralDailyMetrics).where(and(...conditions))
+        .orderBy(desc(geoReferralDailyMetrics.observationDate), desc(geoReferralDailyMetrics.visits))
+        .limit(input.limit).offset(Number(input.cursor ?? "0"));
+      return paged(items, input);
     },
   };
 }

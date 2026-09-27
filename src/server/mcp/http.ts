@@ -92,6 +92,7 @@ export function createMcpRouter(dependencies: McpHttpDependencies = {}) {
         content: runtime!.content,
         media: runtime!.media,
         seo: runtime!.seoForToken(principal.tokenId),
+        geo: runtime!.geoForToken(principal.tokenId),
       };
       return createKordevMcpServer(principal, scopedServices, dependencies.logger);
     },

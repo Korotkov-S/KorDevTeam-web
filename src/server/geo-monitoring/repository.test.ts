@@ -355,3 +355,39 @@ databaseTest("a repeated competitor source creates only an unconfirmed candidate
     if (index === 1) assert.deepEqual(candidates.rows[0], { canonical_name: "competitor.example", status: "candidate" });
   }
 });
+
+databaseTest("GEO read model calculates only complete three-repetition runs and never lists private snapshots", async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fixture.pool.end());
+  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+  for (const repetition of [1, 2, 3]) {
+    await fixture.pool.query(
+      `INSERT INTO geo_observations
+        (run_id, prompt_id, repetition, mentioned, linked, cited, source_order, response_excerpt,
+         response_snapshot, response_hash, source_count, session_personalized)
+       VALUES ($1, $2, $3, true, true, true, 1, 'Кратко', $4, $5, 1, false)`,
+      [fixture.runId, fixture.promptId, repetition, `PRIVATE-${repetition}`, String(repetition).repeat(64)],
+    );
+    const observation = await fixture.pool.query<{ id: string }>(
+      "SELECT id FROM geo_observations WHERE run_id = $1 AND prompt_id = $2 AND repetition = $3",
+      [fixture.runId, fixture.promptId, repetition],
+    );
+    await fixture.pool.query(
+      `INSERT INTO geo_citations (observation_id, url, hostname, source_order, is_owned, category, local_path)
+       VALUES ($1, $2, 'kordev.team', 1, true, 'owned', '/services/crm/')`,
+      [observation.rows[0].id, `https://kordev.team/services/crm/?r=${repetition}`],
+    );
+  }
+  await fixture.pool.query(
+    "UPDATE geo_runs SET status = 'success', completed_at = now(), completed_count = 3, stored_count = 3 WHERE id = $1",
+    [fixture.runId],
+  );
+  const date = new Date().toISOString().slice(0, 10);
+  const overview = await repository.getOverview({ from: date, to: date, platform: "chatgpt_search", mode: "live_ui" });
+  assert.deepEqual(overview.sample, { runs: 1, prompts: 1, observations: 3, requiredRepetitions: 3 });
+  assert.deepEqual(overview.citationRate, { numerator: 3, denominator: 3, value: 1 });
+  const listed = await repository.listObservations({ from: date, to: date, limit: 10, cursor: null });
+  assert.equal(listed.items.length, 3);
+  assert.equal(Object.hasOwn(listed.items[0], "responseSnapshot"), false);
+  assert.equal(JSON.stringify(listed).includes("PRIVATE-"), false);
+});

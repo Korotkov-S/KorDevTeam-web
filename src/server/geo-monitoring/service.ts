@@ -17,6 +17,7 @@ import type {
   GeoFinishRunInput,
   GeoPromptCandidateInput,
   GeoPromptUpdateInput,
+  GeoReadFilters,
   GeoRepository,
   GeoStartRunInput,
   StoredGeoCitation,
@@ -102,6 +103,39 @@ function normalizedDomain(value: unknown): string {
     throw new Error("geo_entity_domain_invalid");
   }
   return ascii;
+}
+
+function isoDate(value: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) throw new Error("geo_date_invalid");
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(+parsed) || parsed.toISOString().slice(0, 10) !== value) throw new Error("geo_date_invalid");
+  return +parsed;
+}
+
+function readFilters(input: GeoReadFilters): GeoReadFilters {
+  const from = isoDate(input.from);
+  const to = isoDate(input.to);
+  const days = ((to - from) / 86_400_000) + 1;
+  if (days < 1 || days > 366) throw new Error("geo_date_range_invalid");
+  if (input.platform && !platforms.has(input.platform)) throw new Error("geo_run_platform_invalid");
+  if (input.mode && !modes.has(input.mode)) throw new Error("geo_run_mode_invalid");
+  return {
+    from: input.from,
+    to: input.to,
+    ...(input.platform ? { platform: input.platform } : {}),
+    ...(input.mode ? { mode: input.mode } : {}),
+    ...(input.language ? { language: boundedText(input.language, 16, "geo_run_language_invalid") } : {}),
+    ...(input.region ? { region: boundedText(input.region, 120, "geo_run_region_invalid") } : {}),
+    ...(input.topicId ? { topicId: uuid(input.topicId, "geo_topic_invalid") } : {}),
+  };
+}
+
+function page(input: { limit?: number; cursor?: string | null }) {
+  const limit = input.limit ?? 50;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error("geo_limit_invalid");
+  const cursor = input.cursor ?? null;
+  if (cursor !== null && !/^(?:0|[1-9]\d*)$/u.test(cursor)) throw new Error("geo_cursor_invalid");
+  return { limit, cursor };
 }
 
 function isOwnedHostname(hostname: string): boolean {
@@ -209,11 +243,84 @@ function validateObservation(input: GeoObservationInput) {
 
 export function createGeoMonitoringService(repository: GeoRepository) {
   return {
+    async getOverview(input: GeoReadFilters) {
+      return repository.getOverview(readFilters(input));
+    },
+
+    async listTopics(input: { status?: typeof GEO_PROMPT_STATUSES[number]; limit?: number; cursor?: string | null }) {
+      if (input.status && !promptStatuses.has(input.status)) throw new Error("geo_prompt_status_invalid");
+      return repository.listTopics({ ...(input.status ? { status: input.status } : {}), ...page(input) });
+    },
+
+    async listEntities(input: { status?: typeof GEO_ENTITY_STATUSES[number]; type?: "owned" | "competitor"; limit?: number; cursor?: string | null }) {
+      if (input.status && !entityStatuses.has(input.status)) throw new Error("geo_entity_status_invalid");
+      if (input.type && input.type !== "owned" && input.type !== "competitor") throw new Error("geo_entity_type_invalid");
+      return repository.listEntities({
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.type ? { type: input.type } : {}),
+        ...page(input),
+      });
+    },
+
+    async listPrompts(input: {
+      status?: typeof GEO_PROMPT_STATUSES[number]; category?: typeof GEO_PROMPT_CATEGORIES[number]; topicId?: string;
+      language?: string; region?: string; limit?: number; cursor?: string | null;
+    }) {
+      if (input.status && !promptStatuses.has(input.status)) throw new Error("geo_prompt_status_invalid");
+      if (input.category && !categories.has(input.category)) throw new Error("geo_prompt_category_invalid");
+      return repository.listPrompts({
+        ...(input.status ? { status: input.status } : {}),
+        ...(input.category ? { category: input.category } : {}),
+        ...(input.topicId ? { topicId: uuid(input.topicId, "geo_topic_invalid") } : {}),
+        ...(input.language ? { language: boundedText(input.language, 16, "geo_run_language_invalid") } : {}),
+        ...(input.region ? { region: boundedText(input.region, 120, "geo_run_region_invalid") } : {}),
+        ...page(input),
+      });
+    },
+
+    async listObservations(input: GeoReadFilters & { promptId?: string; limit?: number; cursor?: string | null }) {
+      return repository.listObservations({
+        ...readFilters(input),
+        ...(input.promptId ? { promptId: uuid(input.promptId, "geo_prompt_invalid") } : {}),
+        ...page(input),
+      });
+    },
+
+    async getObservationEvidence(id: string) {
+      return repository.getObservationEvidence(uuid(id, "geo_observation_invalid"));
+    },
+
+    async listCitations(input: GeoReadFilters & {
+      owned?: boolean; hostname?: string; promptId?: string; limit?: number; cursor?: string | null;
+    }) {
+      return repository.listCitations({
+        ...readFilters(input),
+        ...(input.owned === undefined ? {} : { owned: strictBoolean(input.owned, "geo_citation_owned_invalid") }),
+        ...(input.hostname ? { hostname: normalizedDomain(input.hostname) } : {}),
+        ...(input.promptId ? { promptId: uuid(input.promptId, "geo_prompt_invalid") } : {}),
+        ...page(input),
+      });
+    },
+
+    async listFanoutQueries(input: GeoReadFilters & { promptId?: string; limit?: number; cursor?: string | null }) {
+      return repository.listFanoutQueries({
+        ...readFilters(input),
+        ...(input.promptId ? { promptId: uuid(input.promptId, "geo_prompt_invalid") } : {}),
+        ...page(input),
+      });
+    },
+
+    async listReferrals(input: { from: string; to: string; platform?: typeof GEO_PLATFORMS[number]; limit?: number; cursor?: string | null }) {
+      const validated = readFilters({ from: input.from, to: input.to, ...(input.platform ? { platform: input.platform } : {}) });
+      return repository.listReferrals({ from: validated.from, to: validated.to,
+        ...(validated.platform ? { platform: validated.platform } : {}), ...page(input) });
+    },
+
     async syncPromptCatalog(entries: Parameters<GeoRepository["syncPromptCatalog"]>[0]) {
       return repository.syncPromptCatalog(entries);
     },
 
-    async createPromptCandidate(input: GeoPromptCandidateInput) {
+    async createPromptCandidate(input: Omit<GeoPromptCandidateInput, "normalizedText" | "source">) {
       if (!categories.has(input.category)) throw new Error("geo_prompt_category_invalid");
       return repository.createPromptCandidate({
         ...input,

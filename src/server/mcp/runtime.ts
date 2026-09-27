@@ -8,6 +8,8 @@ import { createMcpTokenRepository, type McpTokenRepository } from "./tokenReposi
 import { createMcpTokenService, type McpTokenService } from "./tokenService";
 import { getSeoMonitoringService } from "../seo-monitoring/runtime";
 import { createMcpSeoService } from "../seo-monitoring/mcpService";
+import { getGeoMonitoringService } from "../geo-monitoring/runtime";
+import { createMcpGeoService } from "../geo-monitoring/mcpService";
 
 let repository: McpTokenRepository | undefined;
 let service: McpTokenService | undefined;
@@ -19,6 +21,7 @@ function buildMcpServices() {
     content: createMcpContentService(getAdminContentService()),
     media: createMcpMediaService(getMediaService()),
     seoForToken: (tokenId: string) => createMcpSeoService(getSeoMonitoringService(), tokenId),
+    geoForToken: (tokenId: string) => createMcpGeoService(getGeoMonitoringService(), tokenId),
   };
 }
 

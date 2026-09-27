@@ -30,7 +30,7 @@ function snapshot(bodyMd = "Текст") {
   };
 }
 
-function services(overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]>; seo?: Partial<McpServices["seo"]> } = {}): McpServices {
+function services(overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]>; seo?: Partial<McpServices["seo"]>; geo?: Partial<McpServices["geo"]> } = {}): McpServices {
   const content = {
     async list() { return { items: [{ id: ENTRY_ID, kind: "article", slug: "mcp-article", status: "draft", title: "MCP статья", version: 1, updatedAt: new Date("2026-09-25T10:00:00.000Z"), publishedAt: null }] }; },
     async get() { return { entry: { id: ENTRY_ID, ...snapshot(), status: "draft", version: 1 }, relations: [], mediaRefs: [] }; },
@@ -58,7 +58,22 @@ function services(overrides: { content?: Partial<McpServices["content"]>; media?
     async updateRecommendationStatus() { return { id: ENTRY_ID, status: "accepted" }; },
     ...overrides.seo,
   };
-  return { content, media, seo } as McpServices;
+  const geo = {
+    async getOverview() { return { mentionRate: { numerator: 0, denominator: 0, value: null } }; },
+    async listTopics() { return { items: [], nextCursor: null }; },
+    async listEntities() { return { items: [], nextCursor: null }; },
+    async listPrompts() { return { items: [], nextCursor: null }; },
+    async listObservations() { return { items: [], nextCursor: null }; },
+    async listCitations() { return { items: [], nextCursor: null }; },
+    async listFanoutQueries() { return { items: [], nextCursor: null }; },
+    async listReferrals() { return { items: [], nextCursor: null }; },
+    async createPromptCandidate() { return { id: ENTRY_ID, status: "candidate" }; },
+    async startRun() { return { id: ENTRY_ID, status: "running" }; },
+    async recordObservation() { return { id: ENTRY_ID }; },
+    async finishRun() { return { id: ENTRY_ID, status: "success" }; },
+    ...overrides.geo,
+  };
+  return { content, media, seo, geo } as McpServices;
 }
 
 async function connected(scopes: McpScope[], provided = services(), logger?: (record: McpAuditRecord) => void) {
@@ -90,9 +105,9 @@ test("scope combinations register only their exact tool surface", async t => {
     [["content:publish"], ["publish_content", "unpublish_content"]],
     [["media:write"], ["upload_image"]],
     [["media:read", "media:write"], ["list_media", "upload_image"]],
-    [["seo:read"], ["get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core"]],
+    [["seo:read"], ["get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_entities", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core"]],
     [["seo:write"], []],
-    [["seo:read", "seo:write"], ["create_seo_candidate", "create_seo_recommendation", "get_seo_overview", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core", "record_seo_change", "update_seo_query", "update_seo_recommendation_status"]],
+    [["seo:read", "seo:write"], ["create_geo_prompt_candidate", "create_seo_candidate", "create_seo_recommendation", "finish_geo_run", "get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_entities", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core", "record_geo_observation", "record_seo_change", "start_geo_run", "update_seo_query", "update_seo_recommendation_status"]],
     [["content:read", "content:write", "content:publish", "media:read", "media:write"], [
       "create_content_draft", "get_content", "list_content", "list_media", "publish_content",
       "unpublish_content", "update_content_draft", "upload_image",
@@ -155,6 +170,65 @@ test("semantic core tools validate strict schemas, require both SEO scopes, and 
   assert.equal(records[0]?.tokenId, "token-id");
   assert.equal(records[0]?.tool, "update_seo_query");
   assert.equal(records[0]?.errorCode, "seo_query_conflict");
+});
+
+test("GEO tools are scope-bound, read-only annotated, bounded, and return safe GEO codes", async t => {
+  const readOnly = await connected(["seo:read"]);
+  t.after(async () => { await readOnly.client.close(); await readOnly.server.close(); });
+  const readTools = (await readOnly.client.listTools()).tools.filter(tool => tool.name.includes("geo_"));
+  assert.equal(readTools.length, 8);
+  assert.ok(readTools.every(tool => tool.annotations?.readOnlyHint === true));
+  assert.equal(readTools.some(tool => tool.name === "start_geo_run"), false);
+
+  let records = 0;
+  const write = await connected(["seo:read", "seo:write"], services({ geo: {
+    async recordObservation() { records++; throw new Error("geo_run_forbidden"); },
+  } }));
+  t.after(async () => { await write.client.close(); await write.server.close(); });
+  const writeTools = (await write.client.listTools()).tools.filter(tool => tool.name.includes("geo_"));
+  assert.equal(writeTools.length, 12);
+  const oversized = await write.client.callTool({ name: "record_geo_observation", arguments: {
+    runId: ENTRY_ID,
+    promptId: ENTRY_ID,
+    repetition: 1,
+    mentioned: false,
+    linked: false,
+    cited: false,
+    responseExcerpt: "",
+    responseSnapshot: "Ответ",
+    snapshotTruncated: false,
+    responseHash: "a".repeat(64),
+    sourceCount: 0,
+    sessionPersonalized: false,
+    mentions: [],
+    citations: Array.from({ length: 101 }, (_, index) => ({
+      url: `https://example.com/${index}`, sourceOrder: index + 1, category: "other",
+    })),
+    fanoutQueries: [],
+  } });
+  assert.equal(oversized.isError, true);
+  assert.equal(records, 0);
+
+  const forbidden = await write.client.callTool({ name: "record_geo_observation", arguments: {
+    runId: ENTRY_ID,
+    promptId: ENTRY_ID,
+    repetition: 1,
+    mentioned: false,
+    linked: false,
+    cited: false,
+    responseExcerpt: "",
+    responseSnapshot: "Ответ",
+    snapshotTruncated: false,
+    responseHash: "a".repeat(64),
+    sourceCount: 0,
+    sessionPersonalized: false,
+    mentions: [],
+    citations: [],
+    fanoutQueries: [],
+  } });
+  assert.equal(records, 1);
+  assert.equal(forbidden.isError, true);
+  assert.equal((forbidden.structuredContent as { code: string }).code, "geo_run_forbidden");
 });
 
 test("tool schemas reject unknown fields and successful calls return structured content", async t => {
