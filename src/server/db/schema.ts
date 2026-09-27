@@ -41,8 +41,9 @@ export const leadDeliveryStatus = pgEnum("lead_delivery_status", [
 ]);
 export const leadRateLimitKind = pgEnum("lead_rate_limit_kind", ["ip", "phone", "crm_token"]);
 export const adminAuthLimitKind = pgEnum("admin_auth_limit_kind", ["ip", "login", "global"]);
-export const seoSource = pgEnum("seo_source", ["yandex_webmaster", "google_search_console"]);
+export const seoSource = pgEnum("seo_source", ["yandex_webmaster", "google_search_console", "yandex_metrika"]);
 export const seoDevice = pgEnum("seo_device", ["desktop", "mobile", "tablet", "all"]);
+export const seoTrafficSlice = pgEnum("seo_traffic_slice", ["overall", "device", "region", "page"]);
 export const seoFrequencyBand = pgEnum("seo_frequency_band", ["high", "medium", "low", "unclassified"]);
 export const seoQueryOrigin = pgEnum("seo_query_origin", ["manual", "api", "import"]);
 export const seoQueryStatus = pgEnum("seo_query_status", ["candidate", "active", "archived"]);
@@ -599,6 +600,51 @@ export const seoRankRuns = pgTable(
   ],
 );
 
+export const seoTrafficMetrics = pgTable(
+  "seo_traffic_metrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    observationDate: date("observation_date", { mode: "string" }).notNull(),
+    source: seoSource("source")
+      .notNull()
+      .references(() => seoSources.id, { onDelete: "restrict" }),
+    slice: seoTrafficSlice("slice").notNull(),
+    dimensionKey: varchar("dimension_key", { length: 500 }).notNull(),
+    dimensionLabel: varchar("dimension_label", { length: 500 }).notNull(),
+    pagePath: varchar("page_path", { length: 500 }),
+    users: integer("users").notNull(),
+    newUsers: integer("new_users").notNull(),
+    visits: integer("visits").notNull(),
+    pageviews: integer("pageviews").notNull(),
+    bounceRate: numeric("bounce_rate", { precision: 9, scale: 8 }).notNull(),
+    pageDepth: numeric("page_depth", { precision: 12, scale: 4 }).notNull(),
+    avgVisitDurationSeconds: numeric("avg_visit_duration_seconds", { precision: 12, scale: 3 }).notNull(),
+    importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("seo_traffic_metrics_observation_uq").on(
+      table.observationDate,
+      table.source,
+      table.slice,
+      table.dimensionKey,
+    ),
+    index("seo_traffic_metrics_slice_date_idx").on(table.slice, table.observationDate),
+    index("seo_traffic_metrics_page_date_idx").on(table.pagePath, table.observationDate),
+    check("seo_traffic_metrics_source_metrika", sql`${table.source} = 'yandex_metrika'`),
+    check("seo_traffic_metrics_dimension_key_nonempty", sql`length(btrim(${table.dimensionKey})) > 0`),
+    check("seo_traffic_metrics_dimension_label_nonempty", sql`length(btrim(${table.dimensionLabel})) > 0`),
+    check("seo_traffic_metrics_counts_non_negative", sql`${table.users} >= 0 AND ${table.newUsers} >= 0 AND ${table.visits} >= 0 AND ${table.pageviews} >= 0`),
+    check("seo_traffic_metrics_new_users_valid", sql`${table.newUsers} <= ${table.users}`),
+    check("seo_traffic_metrics_visits_valid", sql`${table.visits} >= ${table.users}`),
+    check("seo_traffic_metrics_pageviews_valid", sql`${table.pageviews} >= ${table.visits}`),
+    check("seo_traffic_metrics_bounce_rate_valid", sql`${table.bounceRate} >= 0 AND ${table.bounceRate} <= 1`),
+    check("seo_traffic_metrics_depth_valid", sql`${table.pageDepth} >= 0`),
+    check("seo_traffic_metrics_duration_valid", sql`${table.avgVisitDurationSeconds} >= 0`),
+    check("seo_traffic_metrics_page_coherent", sql`(${table.slice} = 'page' AND ${table.pagePath} IS NOT NULL AND ${table.pagePath} = ${table.dimensionKey}) OR (${table.slice} <> 'page' AND ${table.pagePath} IS NULL)`),
+    check("seo_traffic_metrics_page_path_valid", sql`${table.pagePath} IS NULL OR ${table.pagePath} LIKE '/%'`),
+  ],
+);
+
 export const seoRankChecks = pgTable(
   "seo_rank_checks",
   {
@@ -731,6 +777,7 @@ export const schema = {
   seoDailyMetrics,
   seoRankChecks,
   seoRankRuns,
+  seoTrafficMetrics,
   seoCollectionRuns,
   seoChanges,
   seoRecommendations,

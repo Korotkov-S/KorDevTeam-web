@@ -13,12 +13,42 @@ test("disabled SEO sources do not require credentials", () => {
   const config = readSeoConfig({
     SEO_YANDEX_ENABLED: "false",
     SEO_GOOGLE_ENABLED: "false",
+    SEO_YANDEX_METRIKA_ENABLED: "false",
   });
 
   assert.deepEqual(config, {
     yandex: { enabled: false },
     google: { enabled: false },
+    yandexMetrika: { enabled: false },
     yandexSearch: { enabled: false },
+  });
+});
+
+test("enabled Yandex Metrica requires a token and positive numeric counter identifier", () => {
+  const base = {
+    SEO_YANDEX_ENABLED: "false",
+    SEO_GOOGLE_ENABLED: "false",
+    SEO_YANDEX_METRIKA_ENABLED: "true",
+  };
+  assert.throws(() => readSeoConfig(base), { message: "seo_yandex_metrika_token_required" });
+  assert.throws(() => readSeoConfig({ ...base, YANDEX_METRIKA_OAUTH_TOKEN: "metrika-secret" }), {
+    message: "seo_yandex_metrika_counter_id_required",
+  });
+  for (const counterId of ["0", "-1", "1.5", "counter", "9007199254740992"]) {
+    assert.throws(() => readSeoConfig({
+      ...base,
+      YANDEX_METRIKA_OAUTH_TOKEN: "metrika-secret",
+      YANDEX_METRIKA_COUNTER_ID: counterId,
+    }), { message: "seo_yandex_metrika_counter_id_invalid" });
+  }
+  assert.deepEqual(readSeoConfig({
+    ...base,
+    YANDEX_METRIKA_OAUTH_TOKEN: "metrika-secret",
+    YANDEX_METRIKA_COUNTER_ID: "123456789",
+  }).yandexMetrika, {
+    enabled: true,
+    oauthToken: "metrika-secret",
+    counterId: 123456789,
   });
 });
 
@@ -125,6 +155,9 @@ test("enabled Google requires a property, service-account email, and valid base6
     YANDEX_SEARCH_API_KEY: "search-secret-key",
     YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
     SEO_TARGET_HOST: "kordev.team",
+    SEO_YANDEX_METRIKA_ENABLED: "true",
+    YANDEX_METRIKA_OAUTH_TOKEN: "metrika-secret-token",
+    YANDEX_METRIKA_COUNTER_ID: "123456789",
   });
   assert.equal(config.google.enabled, true);
   if (config.google.enabled) assert.equal(config.google.privateKey, privateKey);
@@ -181,14 +214,18 @@ test("safe configuration summary contains source identifiers but no credentials"
     YANDEX_SEARCH_API_KEY: "search-secret-key",
     YANDEX_SEARCH_FOLDER_ID: "b1g1234567890abcdefg",
     SEO_TARGET_HOST: "kordev.team",
+    SEO_YANDEX_METRIKA_ENABLED: "true",
+    YANDEX_METRIKA_OAUTH_TOKEN: "metrika-secret-token",
+    YANDEX_METRIKA_COUNTER_ID: "123456789",
   });
 
   const summary = safeSeoConfigSummary(config);
   assert.deepEqual(summary, {
     yandex: { enabled: true, hostId: "https:kordev.team:443" },
     google: { enabled: true, siteUrl: "sc-domain:kordev.team" },
+    yandexMetrika: { enabled: true, counterId: 123456789 },
     yandexSearch: { enabled: true, targetHost: "kordev.team", dailyCheckLimit: 1000 },
   });
   const serialized = JSON.stringify(summary);
-  assert.doesNotMatch(serialized, /secret-token|search-secret-key|PRIVATE KEY|gserviceaccount|b1g123/);
+  assert.doesNotMatch(serialized, /secret-token|metrika-secret|search-secret-key|PRIVATE KEY|gserviceaccount|b1g123/);
 });

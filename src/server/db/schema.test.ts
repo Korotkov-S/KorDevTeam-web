@@ -28,6 +28,8 @@ import {
   seoRankRuns,
   seoRegions,
   seoSources,
+  seoSource,
+  seoTrafficMetrics,
   siteSettings,
 } from "./schema";
 import { resetTestDatabase } from "./testDatabase";
@@ -47,6 +49,14 @@ test("SEO query schema exposes an explicit semantic-core lifecycle", () => {
   assert.equal("status" in seoQueries, true);
   assert.equal("kind" in seoQueries, true);
   assert.equal("priority" in seoQueries, true);
+});
+
+test("SEO schema keeps Yandex Metrica traffic separate from search observations", () => {
+  assert.deepEqual(seoSource.enumValues, ["yandex_webmaster", "google_search_console", "yandex_metrika"]);
+  assert.ok(seoTrafficMetrics);
+  assert.equal("visits" in seoTrafficMetrics, true);
+  assert.equal("bounceRate" in seoTrafficMetrics, true);
+  assert.equal("averagePosition" in seoTrafficMetrics, false);
 });
 
 const leadFixture = {
@@ -266,6 +276,45 @@ databaseTest("SEO observations are unique and reject impossible search metrics",
   }));
 });
 
+databaseTest("Yandex Metrica traffic rows are daily-idempotent and reject impossible behavior metrics", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const metric = {
+    observationDate: "2026-09-26",
+    source: "yandex_metrika" as const,
+    slice: "overall" as const,
+    dimensionKey: "all",
+    dimensionLabel: "Весь органический трафик",
+    users: 12,
+    newUsers: 8,
+    visits: 15,
+    pageviews: 31,
+    bounceRate: "0.26670000",
+    pageDepth: "2.0667",
+    avgVisitDurationSeconds: "93.500",
+  };
+
+  await db.insert(seoTrafficMetrics).values(metric);
+  await assertConstraintViolation(() => db.insert(seoTrafficMetrics).values(metric));
+  await assertConstraintViolation(() => db.insert(seoTrafficMetrics).values({
+    ...metric,
+    observationDate: "2026-09-25",
+    newUsers: 13,
+  }));
+  await assertConstraintViolation(() => db.insert(seoTrafficMetrics).values({
+    ...metric,
+    observationDate: "2026-09-24",
+    bounceRate: "1.00000001",
+  }));
+  await assertConstraintViolation(() => db.insert(seoTrafficMetrics).values({
+    ...metric,
+    observationDate: "2026-09-23",
+    slice: "page",
+    dimensionKey: "broken",
+    pagePath: null,
+  }));
+});
+
 databaseTest("SEO query lifecycle defaults to a candidate and rejects incoherent states", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
@@ -405,7 +454,7 @@ databaseTest("content deletion preserves SEO change history and clears only its 
   assert.equal(preserved.contentEntryId, null);
   assert.equal(preserved.pagePath, "/blog/seo-history/");
   assert.equal(preserved.summary, "Обновили title и description");
-  assert.equal((await db.select().from(seoSources)).length, 2);
+  assert.equal((await db.select().from(seoSources)).length, 3);
 });
 
 databaseTest("admin counters and optimistic versions reject invalid values", async () => {

@@ -1,4 +1,4 @@
-export const SEO_SOURCES = ["yandex_webmaster", "google_search_console"] as const;
+export const SEO_SOURCES = ["yandex_webmaster", "google_search_console", "yandex_metrika"] as const;
 export const SEO_DEVICES = ["desktop", "mobile", "tablet", "all"] as const;
 export const SEO_QUERY_STATUSES = ["candidate", "active", "archived"] as const;
 export const SEO_QUERY_KINDS = ["commercial", "informational", "other"] as const;
@@ -24,6 +24,12 @@ export type GoogleSeoConfig = DisabledSeoSourceConfig | {
   privateKey: string;
 };
 
+export type YandexMetrikaConfig = DisabledSeoSourceConfig | {
+  enabled: true;
+  oauthToken: string;
+  counterId: number;
+};
+
 export type YandexSearchConfig = DisabledSeoSourceConfig | {
   enabled: true;
   apiKey: string;
@@ -35,12 +41,14 @@ export type YandexSearchConfig = DisabledSeoSourceConfig | {
 export type SeoConfig = {
   yandex: YandexSeoConfig;
   google: GoogleSeoConfig;
+  yandexMetrika: YandexMetrikaConfig;
   yandexSearch: YandexSearchConfig;
 };
 
 export type SafeSeoConfigSummary = {
   yandex: { enabled: false } | { enabled: true; hostId: string };
   google: { enabled: false } | { enabled: true; siteUrl: string };
+  yandexMetrika: { enabled: false } | { enabled: true; counterId: number };
   yandexSearch: { enabled: false } | { enabled: true; targetHost: string; dailyCheckLimit: number };
 };
 
@@ -76,4 +84,22 @@ export type NormalizedRankCheck = {
   position: number | null;
   resultUrl: string | null;
   resultLimit: number;
+};
+
+export type SeoTrafficSlice = "overall" | "device" | "region" | "page";
+
+export type NormalizedTrafficObservation = {
+  source: "yandex_metrika";
+  observationDate: string;
+  slice: SeoTrafficSlice;
+  dimensionKey: string;
+  dimensionLabel: string;
+  pagePath: string | null;
+  users: number;
+  newUsers: number;
+  visits: number;
+  pageviews: number;
+  bounceRate: number;
+  pageDepth: number;
+  avgVisitDurationSeconds: number;
 };

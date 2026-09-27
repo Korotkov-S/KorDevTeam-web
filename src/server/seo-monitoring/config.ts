@@ -4,6 +4,7 @@ import type {
   GoogleSeoConfig,
   SafeSeoConfigSummary,
   SeoConfig,
+  YandexMetrikaConfig,
   YandexSearchConfig,
   YandexSeoConfig,
 } from "./contracts";
@@ -90,6 +91,18 @@ function readGoogleConfig(env: SeoEnvironment): GoogleSeoConfig {
   return { enabled: true, siteUrl, clientEmail, privateKey: decodeGooglePrivateKey(encodedKey) };
 }
 
+function readYandexMetrikaConfig(env: SeoEnvironment): YandexMetrikaConfig {
+  if (!sourceEnabled(env.SEO_YANDEX_METRIKA_ENABLED, "seo_yandex_metrika_enabled_invalid")) {
+    return { enabled: false };
+  }
+  const oauthToken = required(env.YANDEX_METRIKA_OAUTH_TOKEN, "seo_yandex_metrika_token_required");
+  const rawCounterId = required(env.YANDEX_METRIKA_COUNTER_ID, "seo_yandex_metrika_counter_id_required");
+  if (!/^\d+$/u.test(rawCounterId)) return fail("seo_yandex_metrika_counter_id_invalid");
+  const counterId = Number(rawCounterId);
+  if (!Number.isSafeInteger(counterId) || counterId < 1) return fail("seo_yandex_metrika_counter_id_invalid");
+  return { enabled: true, oauthToken, counterId };
+}
+
 function readYandexSearchConfig(env: SeoEnvironment): YandexSearchConfig {
   if (!sourceEnabled(env.SEO_YANDEX_SEARCH_ENABLED, "seo_yandex_search_enabled_invalid")) {
     return { enabled: false };
@@ -109,6 +122,7 @@ export function readSeoConfig(env: SeoEnvironment = process.env): SeoConfig {
   return {
     yandex: readYandexConfig(env),
     google: readGoogleConfig(env),
+    yandexMetrika: readYandexMetrikaConfig(env),
     yandexSearch: readYandexSearchConfig(env),
   };
 }
@@ -120,6 +134,9 @@ export function safeSeoConfigSummary(config: SeoConfig): SafeSeoConfigSummary {
       : { enabled: false },
     google: config.google.enabled
       ? { enabled: true, siteUrl: config.google.siteUrl }
+      : { enabled: false },
+    yandexMetrika: config.yandexMetrika.enabled
+      ? { enabled: true, counterId: config.yandexMetrika.counterId }
       : { enabled: false },
     yandexSearch: config.yandexSearch.enabled
       ? { enabled: true, targetHost: config.yandexSearch.targetHost, dailyCheckLimit: config.yandexSearch.dailyCheckLimit }

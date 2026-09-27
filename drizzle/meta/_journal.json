@@ -64,6 +64,13 @@
       "when": 1790453494948,
       "tag": "0008_seo_semantic_core",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790482078740,
+      "tag": "0009_yandex_metrika",
+      "breakpoints": true
     }
   ]
 }
