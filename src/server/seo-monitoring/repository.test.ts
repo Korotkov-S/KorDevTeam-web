@@ -11,6 +11,7 @@ import {
   seoRankChecks,
   seoRecommendations,
   seoRegions,
+  seoTrafficMetrics,
 } from "../db/schema";
 import { resetTestDatabase } from "../db/testDatabase";
 import * as repositoryModule from "./repository";
@@ -93,6 +94,22 @@ const observation = {
   averagePosition: 8,
 };
 
+const trafficObservation = {
+  source: "yandex_metrika" as const,
+  observationDate: "2026-09-26",
+  slice: "overall" as const,
+  dimensionKey: "all",
+  dimensionLabel: "Весь органический трафик",
+  pagePath: null,
+  users: 12,
+  newUsers: 8,
+  visits: 15,
+  pageviews: 31,
+  bounceRate: 0.2667,
+  pageDepth: 2.0667,
+  avgVisitDurationSeconds: 93.5,
+};
+
 databaseTest("observation upsert is idempotent, updates late metrics, and never deletes omissions", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
@@ -106,6 +123,19 @@ databaseTest("observation upsert is idempotent, updates late metrics, and never 
 
   assert.equal(await repository.upsertObservations([]), 0);
   assert.equal((await db.select().from(seoDailyMetrics)).length, 1);
+});
+
+databaseTest("Metrica traffic upsert is idempotent and updates late behavior metrics", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+
+  assert.equal(await repository.upsertTrafficObservations([trafficObservation]), 1);
+  assert.equal(await repository.upsertTrafficObservations([{ ...trafficObservation, users: 13, newUsers: 9, visits: 16 }]), 1);
+  assert.equal((await db.select().from(seoTrafficMetrics)).length, 1);
+  assert.deepEqual((await db.select({ users: seoTrafficMetrics.users, visits: seoTrafficMetrics.visits })
+    .from(seoTrafficMetrics))[0], { users: 13, visits: 16 });
+  assert.equal(await repository.upsertTrafficObservations([]), 0);
 });
 
 databaseTest("source collection runs finish independently", async () => {

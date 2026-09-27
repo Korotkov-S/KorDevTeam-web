@@ -7,6 +7,7 @@ test("CLI accepts only --check and exact source selection", () => {
   assert.deepEqual(parseSeoCollectArgs([]), { check: false });
   assert.deepEqual(parseSeoCollectArgs(["--check", "--source=yandex"]), { check: true, source: "yandex_webmaster" });
   assert.deepEqual(parseSeoCollectArgs(["--source=google"]), { check: false, source: "google_search_console" });
+  assert.deepEqual(parseSeoCollectArgs(["--source=metrika"]), { check: false, source: "yandex_metrika" });
   assert.deepEqual(parseSeoCollectArgs(["--source=yandex-rank"]), { check: false, source: "yandex_search" });
   assert.throws(() => parseSeoCollectArgs(["--source=bing"]), /seo_collect_arguments_invalid/u);
   assert.throws(() => parseSeoCollectArgs(["--check", "--check"]), /seo_collect_arguments_invalid/u);

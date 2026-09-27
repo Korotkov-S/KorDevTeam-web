@@ -6,6 +6,7 @@ import { createSeoRepository } from "./repository";
 import { createSeoService } from "./service";
 import { createGoogleSearchConsoleProvider } from "./providers/google";
 import { createYandexWebmasterProvider } from "./providers/yandex";
+import { createYandexMetrikaProvider } from "./providers/yandexMetrika";
 import { SeoProviderError } from "./providers/provider-error";
 import { createYandexSearchProvider } from "./providers/yandexSearch";
 import { createSeoRankCollector } from "./rankCollector";
@@ -27,6 +28,7 @@ export async function runSeoCollection(options: { source?: SeoCollectionTarget }
     repository,
     ...(config.yandex.enabled ? { yandex: createYandexWebmasterProvider(config.yandex) } : {}),
     ...(config.google.enabled ? { google: createGoogleSearchConsoleProvider(config.google) } : {}),
+    ...(config.yandexMetrika.enabled ? { yandexMetrika: createYandexMetrikaProvider(config.yandexMetrika) } : {}),
   });
   const metricReport = options.source === "yandex_search"
     ? { sources: [], failed: false }
@@ -58,6 +60,7 @@ export async function checkSeoCollectionReady(options: { source?: SeoCollectionT
   for (const [source, provider] of [
     ["yandex_webmaster", config.yandex.enabled ? createYandexWebmasterProvider(config.yandex) : null],
     ["google_search_console", config.google.enabled ? createGoogleSearchConsoleProvider(config.google) : null],
+    ["yandex_metrika", config.yandexMetrika.enabled ? createYandexMetrikaProvider(config.yandexMetrika) : null],
   ] as const) {
     if (options.source && source !== options.source) continue;
     if (!provider) { sources.push({ source, status: "disabled" }); continue; }

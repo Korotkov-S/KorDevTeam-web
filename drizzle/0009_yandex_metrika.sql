@@ -1,5 +1,7 @@
 CREATE TYPE "public"."seo_traffic_slice" AS ENUM('overall', 'device', 'region', 'page');--> statement-breakpoint
 ALTER TYPE "public"."seo_source" ADD VALUE 'yandex_metrika';--> statement-breakpoint
+INSERT INTO "seo_sources" ("id", "display_name") VALUES
+	('yandex_metrika', 'Яндекс Метрика');--> statement-breakpoint
 CREATE TABLE "seo_traffic_metrics" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"observation_date" date NOT NULL,

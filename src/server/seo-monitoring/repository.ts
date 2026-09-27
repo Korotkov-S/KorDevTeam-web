@@ -11,8 +11,9 @@ import {
   seoRecommendations,
   seoRegions,
   seoSources,
+  seoTrafficMetrics,
 } from "../db/schema";
-import type { NormalizedRankCheck, NormalizedSeoObservation, SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "./contracts";
+import type { NormalizedRankCheck, NormalizedSeoObservation, NormalizedTrafficObservation, SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "./contracts";
 import type { SemanticCoreEntry } from "./semanticCore";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
@@ -415,6 +416,51 @@ export function createSeoRepository(db: SeoDatabase) {
           stored++;
         }
         return stored;
+      });
+    },
+
+    async upsertTrafficObservations(observations: readonly NormalizedTrafficObservation[]): Promise<number> {
+      if (observations.length === 0) return 0;
+      return db.transaction(async (tx) => {
+        for (const observation of observations) {
+          const now = new Date();
+          await tx.insert(seoTrafficMetrics).values({
+            observationDate: observation.observationDate,
+            source: observation.source,
+            slice: observation.slice,
+            dimensionKey: observation.dimensionKey,
+            dimensionLabel: observation.dimensionLabel,
+            pagePath: observation.pagePath,
+            users: observation.users,
+            newUsers: observation.newUsers,
+            visits: observation.visits,
+            pageviews: observation.pageviews,
+            bounceRate: observation.bounceRate.toFixed(8),
+            pageDepth: observation.pageDepth.toFixed(4),
+            avgVisitDurationSeconds: observation.avgVisitDurationSeconds.toFixed(3),
+            importedAt: now,
+          }).onConflictDoUpdate({
+            target: [
+              seoTrafficMetrics.observationDate,
+              seoTrafficMetrics.source,
+              seoTrafficMetrics.slice,
+              seoTrafficMetrics.dimensionKey,
+            ],
+            set: {
+              dimensionLabel: observation.dimensionLabel,
+              pagePath: observation.pagePath,
+              users: observation.users,
+              newUsers: observation.newUsers,
+              visits: observation.visits,
+              pageviews: observation.pageviews,
+              bounceRate: observation.bounceRate.toFixed(8),
+              pageDepth: observation.pageDepth.toFixed(4),
+              avgVisitDurationSeconds: observation.avgVisitDurationSeconds.toFixed(3),
+              importedAt: now,
+            },
+          });
+        }
+        return observations.length;
       });
     },
 

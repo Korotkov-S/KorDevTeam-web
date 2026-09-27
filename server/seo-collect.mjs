@@ -9,6 +9,7 @@ export function parseSeoCollectArgs(args) {
     if (argument === "--check" && !check) check = true;
     else if (argument === "--source=yandex" && source === undefined) source = "yandex_webmaster";
     else if (argument === "--source=google" && source === undefined) source = "google_search_console";
+    else if (argument === "--source=metrika" && source === undefined) source = "yandex_metrika";
     else if (argument === "--source=yandex-rank" && source === undefined) source = "yandex_search";
     else throw new Error("seo_collect_arguments_invalid");
   }

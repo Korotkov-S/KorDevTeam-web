@@ -1,19 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { NormalizedSeoObservation, SeoConfig, SeoDevice, SeoSourceId } from "./contracts";
+import type { NormalizedSeoObservation, NormalizedTrafficObservation, SeoConfig, SeoDevice, SeoSourceId } from "./contracts";
 import { createSeoCollector } from "./collector";
 import { SeoProviderError } from "./providers/provider-error";
 
 const enabledConfig = {
   yandex: { enabled: true, oauthToken: "yandex-secret", hostId: "https:example.test:443" },
   google: { enabled: true, siteUrl: "sc-domain:example.test", clientEmail: "seo@example.test", privateKey: "private-secret" },
+  yandexMetrika: { enabled: true, oauthToken: "metrika-secret", counterId: 123456789 },
   yandexSearch: { enabled: false },
 } satisfies SeoConfig;
 
 function observation(source: SeoSourceId, date = "2026-09-24", regionExternalId = "RUS"): NormalizedSeoObservation {
   return { source, observationDate: date, queryText: "CRM", normalizedQuery: "crm", pagePath: "/crm/", regionExternalId,
     device: "desktop", impressions: 10, clicks: 2, ctr: 0.2, averagePosition: 4 };
+}
+
+function trafficObservation(date = "2026-09-24"): NormalizedTrafficObservation {
+  return { source: "yandex_metrika", observationDate: date, slice: "overall", dimensionKey: "all",
+    dimensionLabel: "Весь органический трафик", pagePath: null, users: 8, newUsers: 5, visits: 10,
+    pageviews: 20, bounceRate: 0.2, pageDepth: 2, avgVisitDurationSeconds: 90 };
 }
 
 function fixture(overrides: Record<string, unknown> = {}) {
@@ -25,6 +32,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     async startRun(source: SeoSourceId, from: string, to: string) { events.push(`start:${source}:${from}:${to}`); return { id: `run-${++run}` }; },
     async finishRun(id: string, status: string, result: { errorCode?: string }) { events.push(`finish:${id}:${status}:${result.errorCode ?? "ok"}`); },
     async upsertObservations(rows: readonly NormalizedSeoObservation[]) { events.push(`store:${rows[0]?.source}:${rows.length}`); return rows.length; },
+    async upsertTrafficObservations(rows: readonly NormalizedTrafficObservation[]) { events.push(`store:${rows[0]?.source}:${rows.length}`); return rows.length; },
     async syncYandexRegions(regions: Array<{ id: number; name: string }>) {
       events.push(`regions:${regions.length}`);
       return [{ code: "moscow", displayName: "Москва", externalId: "213", active: true }];
@@ -45,17 +53,24 @@ function fixture(overrides: Record<string, unknown> = {}) {
       return [observation("google_search_console", window.to)];
     },
   };
-  return { events, repository, yandex, google, ...overrides };
+  const yandexMetrika = {
+    async check() { return { counterId: 123456789 }; },
+    async collect(window: { from: string; to: string }) {
+      events.push(`metrika:${window.from}:${window.to}`);
+      return [trafficObservation(window.to)];
+    },
+  };
+  return { events, repository, yandex, google, yandexMetrika, ...overrides };
 }
 
 test("enabled sources run under independent locks and a Google failure cannot roll back Yandex", async () => {
   const f = fixture();
   f.google.collect = async () => { throw new SeoProviderError("seo_google_auth_failed", false); };
-  const collector = createSeoCollector({ config: enabledConfig, repository: f.repository, yandex: f.yandex, google: f.google,
+  const collector = createSeoCollector({ config: enabledConfig, repository: f.repository, yandex: f.yandex, google: f.google, yandexMetrika: f.yandexMetrika,
     clock: () => new Date("2026-09-25T06:00:00Z"), sleep: async () => {}, random: () => 0 });
   const report = await collector.run();
   assert.deepEqual(report.sources.map((item) => [item.source, item.status]), [
-    ["yandex_webmaster", "success"], ["google_search_console", "failed"],
+    ["yandex_webmaster", "success"], ["google_search_console", "failed"], ["yandex_metrika", "success"],
   ]);
   assert.ok(f.events.includes("lock:yandex_webmaster"));
   assert.ok(f.events.includes("lock:google_search_console"));
@@ -90,6 +105,22 @@ test("Google reimports a lag-safe rolling window and never requires yesterday", 
   const report = await collector.run();
   assert.ok(f.events.includes("google:2026-09-09:2026-09-22"));
   assert.equal(report.sources.find((source) => source.source === "google_search_console")?.latestObservationDate, "2026-09-22");
+});
+
+test("Yandex Metrica refreshes fourteen complete days ending yesterday", async () => {
+  const f = fixture();
+  const collector = createSeoCollector({ config: { ...enabledConfig, yandex: { enabled: false }, google: { enabled: false } },
+    repository: f.repository, yandexMetrika: f.yandexMetrika, clock: () => new Date("2026-09-27T06:00:00Z"),
+    sleep: async () => {}, random: () => 0 });
+
+  const report = await collector.run("yandex_metrika");
+
+  assert.ok(f.events.includes("metrika:2026-09-13:2026-09-26"));
+  assert.ok(f.events.includes("store:yandex_metrika:1"));
+  assert.deepEqual(report.sources[0], {
+    source: "yandex_metrika", status: "success", receivedCount: 1, storedCount: 1,
+    latestObservationDate: "2026-09-26",
+  });
 });
 
 test("Yandex refreshes authoritative regions and collects only resolved desired city/device slices", async () => {
@@ -139,8 +170,8 @@ test("a failed Yandex slice keeps completed batches and marks the run partial", 
 
 test("disabled sources are explicit and make no provider request", async () => {
   const f = fixture();
-  const collector = createSeoCollector({ config: { yandex: { enabled: false }, google: { enabled: false }, yandexSearch: { enabled: false } }, repository: f.repository,
+  const collector = createSeoCollector({ config: { yandex: { enabled: false }, google: { enabled: false }, yandexMetrika: { enabled: false }, yandexSearch: { enabled: false } }, repository: f.repository,
     clock: () => new Date("2026-09-25T06:00:00Z"), sleep: async () => {}, random: () => 0 });
-  assert.deepEqual((await collector.run()).sources.map((item) => item.status), ["disabled", "disabled"]);
+  assert.deepEqual((await collector.run()).sources.map((item) => item.status), ["disabled", "disabled", "disabled"]);
   assert.equal(f.events.some((event) => event.startsWith("start:")), false);
 });

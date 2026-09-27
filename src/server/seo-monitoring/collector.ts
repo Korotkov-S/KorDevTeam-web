@@ -1,4 +1,4 @@
-import type { NormalizedSeoObservation, SeoConfig, SeoDevice, SeoSourceId } from "./contracts";
+import type { NormalizedSeoObservation, NormalizedTrafficObservation, SeoConfig, SeoDevice, SeoSourceId } from "./contracts";
 import type { YandexRegion } from "./providers/yandex";
 import { SeoProviderError } from "./providers/provider-error";
 
@@ -25,6 +25,7 @@ type CollectorRepository = {
     metadata?: Record<string, unknown>;
   }): Promise<unknown>;
   upsertObservations(rows: readonly NormalizedSeoObservation[]): Promise<number>;
+  upsertTrafficObservations(rows: readonly NormalizedTrafficObservation[]): Promise<number>;
   syncYandexRegions(regions: readonly YandexRegion[]): Promise<Array<{
     code: string;
     displayName: string;
@@ -42,6 +43,11 @@ type YandexProvider = {
 type GoogleProvider = {
   check(): Promise<unknown>;
   collect(window: Window): Promise<NormalizedSeoObservation[]>;
+};
+
+type YandexMetrikaProvider = {
+  check(): Promise<unknown>;
+  collect(window: Window): Promise<NormalizedTrafficObservation[]>;
 };
 
 type Logger = { write(record: Record<string, unknown>): void };
@@ -69,7 +75,7 @@ function safeError(error: unknown): { code: string; retryable: boolean; retryAft
   return { code: "seo_collection_failed", retryable: false };
 }
 
-function latestDate(rows: readonly NormalizedSeoObservation[]): string | null {
+function latestDate(rows: readonly { observationDate: string }[]): string | null {
   let latest: string | null = null;
   for (const row of rows) if (latest === null || row.observationDate > latest) latest = row.observationDate;
   return latest;
@@ -96,6 +102,7 @@ export function createSeoCollector(dependencies: {
   repository: CollectorRepository;
   yandex?: YandexProvider;
   google?: GoogleProvider;
+  yandexMetrika?: YandexMetrikaProvider;
   clock?: () => Date;
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
@@ -178,6 +185,28 @@ export function createSeoCollector(dependencies: {
     });
   }
 
+  async function runYandexMetrika(): Promise<CollectionSourceReport> {
+    const source = "yandex_metrika" as const;
+    const provider = dependencies.yandexMetrika;
+    if (!provider) return { source, status: "failed", receivedCount: 0, storedCount: 0, latestObservationDate: null, errorCode: "seo_yandex_metrika_provider_missing" };
+    const window = windowEnding(clock(), 1, 14);
+    return dependencies.repository.withSourceLock(source, async () => {
+      const run = await dependencies.repository.startRun(source, window.from, window.to);
+      try {
+        const rows = await retry(() => provider.collect(window), sleep, random);
+        const storedCount = await dependencies.repository.upsertTrafficObservations(rows);
+        await dependencies.repository.finishRun(run.id, "success", { receivedCount: rows.length, storedCount });
+        logger.write({ event: "seo_collection_finished", source, status: "success", receivedCount: rows.length, storedCount });
+        return { source, status: "success", receivedCount: rows.length, storedCount, latestObservationDate: latestDate(rows) };
+      } catch (error) {
+        const { code } = safeError(error);
+        await dependencies.repository.finishRun(run.id, "failed", { receivedCount: 0, storedCount: 0, errorCode: code });
+        logger.write({ event: "seo_collection_finished", source, status: "failed", receivedCount: 0, storedCount: 0, errorCode: code });
+        return { source, status: "failed", receivedCount: 0, storedCount: 0, latestObservationDate: null, errorCode: code };
+      }
+    });
+  }
+
   async function safeRun(source: SeoSourceId, operation: () => Promise<CollectionSourceReport>): Promise<CollectionSourceReport> {
     try {
       return await operation();
@@ -194,6 +223,7 @@ export function createSeoCollector(dependencies: {
       const sources: Array<[SeoSourceId, boolean, () => Promise<CollectionSourceReport>]> = [
         ["yandex_webmaster", dependencies.config.yandex.enabled, runYandex],
         ["google_search_console", dependencies.config.google.enabled, runGoogle],
+        ["yandex_metrika", dependencies.config.yandexMetrika.enabled, runYandexMetrika],
       ];
       for (const [source, enabled, operation] of sources) {
         await dependencies.repository.setSourceEnabled(source, enabled);
