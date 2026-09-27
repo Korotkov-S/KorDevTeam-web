@@ -1,0 +1,37 @@
+import React from "react";
+import { Link, useLoaderData } from "react-router";
+
+import { getAdminAuthService } from "../../server/auth/runtime";
+import { getSeoMonitoringService } from "../../server/seo-monitoring/runtime";
+import { CtrChart, PositionChart, TrafficChart } from "./seo-charts";
+import { adminRouteHeaders } from "./headers";
+import { createSeoSectionLoader } from "./seo-read.server";
+import { decimal, duration, formatDate, integer, MetricCard, PageHeader, Panel, percent, position, SearchFilters, type SearchDashboard, type SeoFilters, type TrafficDimension, type TrafficReport } from "./seo-shared";
+
+type QueryRow = { id: string; queryText: string; targetPath: string | null; impressions: number; clicks: number;
+  ctr: number | null; averagePosition: number | null };
+type Data = { filters: SeoFilters; dashboard: SearchDashboard; traffic: TrafficReport;
+  queries: { items: QueryRow[]; nextCursor: string | null } };
+
+export const loader = (args: Parameters<ReturnType<typeof createSeoSectionLoader>>[0]) => createSeoSectionLoader("traffic", getAdminAuthService(), getSeoMonitoringService())(args);
+export const headers = adminRouteHeaders;
+export function meta() { return [{ title: "Трафик и запросы SEO | KorDevTeam" }]; }
+
+function TrafficBreakdown({ rows, dimension }: { rows: TrafficDimension[]; dimension: string }) {
+  if (!rows.length) return null;
+  return <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr><th className="p-2">{dimension}</th><th className="p-2">Посетители</th><th className="p-2">Визиты</th><th className="p-2">Просмотры страниц</th><th className="p-2">Отказы, %</th><th className="p-2">Глубина</th><th className="p-2">Время, сек.</th></tr></thead><tbody>{rows.map((row) => <tr key={row.dimensionKey} className="border-t border-border"><td className="p-2 font-medium">{row.dimensionLabel}</td><td className="p-2">{integer.format(row.users)}</td><td className="p-2">{integer.format(row.visits)}</td><td className="p-2">{integer.format(row.pageviews)}</td><td className="p-2">{percent(row.bounceRate)}</td><td className="p-2">{row.pageDepth === null ? "—" : decimal.format(row.pageDepth)}</td><td className="p-2">{row.avgVisitDurationSeconds === null ? "—" : decimal.format(row.avgVisitDurationSeconds)}</td></tr>)}</tbody></table></div>;
+}
+
+export function SeoTrafficPage({ data }: { data: Data }) {
+  return <section className="space-y-6">
+    <PageHeader title="Трафик и запросы" description="Поисковые показы и клики — из Яндекс Вебмастера или Google Search Console. Посетители, визиты и поведение — отдельно из Яндекс Метрики." />
+    <SearchFilters filters={data.filters} dashboard={data.dashboard} />
+    <Panel title="Поисковые показатели"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard title="Показы" value={integer.format(data.dashboard.overview.impressions)} /><MetricCard title="Клики" value={integer.format(data.dashboard.overview.clicks)} /><MetricCard title="CTR" value={percent(data.dashboard.overview.ctr)} /><MetricCard title="Средняя позиция по показам" value={position(data.dashboard.overview.averagePosition)} /></div>{data.dashboard.daily.length ? <><div className="mt-5"><TrafficChart data={data.dashboard.daily} changes={[]} /></div><div className="mt-5 grid gap-6 xl:grid-cols-2"><CtrChart data={data.dashboard.daily} changes={[]} /><PositionChart data={data.dashboard.daily} changes={[]} /></div></> : <p className="mt-4 text-muted-foreground">Данных поисковых систем за период пока нет.</p>}</Panel>
+    <Panel title="Органическое поведение из Яндекс Метрики"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard title="Посетители, сумма по дням" value={integer.format(data.traffic.overview.users)} /><MetricCard title="Новые посетители" value={integer.format(data.traffic.overview.newUsers)} /><MetricCard title="Визиты" value={integer.format(data.traffic.overview.visits)} /><MetricCard title="Просмотры страниц" value={integer.format(data.traffic.overview.pageviews)} /><MetricCard title="Отказы, %" value={percent(data.traffic.overview.bounceRate)} /><MetricCard title="Глубина" value={data.traffic.overview.pageDepth === null ? "—" : decimal.format(data.traffic.overview.pageDepth)} /><MetricCard title="Среднее время" value={duration(data.traffic.overview.avgVisitDurationSeconds)} note="мин:сек" /></div></Panel>
+    <Panel title="Метрика по дням">{data.traffic.daily.length ? <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr><th className="p-2">Дата</th><th className="p-2">Посетители</th><th className="p-2">Новые</th><th className="p-2">Визиты</th><th className="p-2">Просмотры страниц</th><th className="p-2">Отказы, %</th><th className="p-2">Глубина</th><th className="p-2">Время, сек.</th></tr></thead><tbody>{data.traffic.daily.map((row) => <tr key={row.date} className="border-t border-border"><td className="p-2">{formatDate(row.date)}</td><td className="p-2">{integer.format(row.users)}</td><td className="p-2">{integer.format(row.newUsers)}</td><td className="p-2">{integer.format(row.visits)}</td><td className="p-2">{integer.format(row.pageviews)}</td><td className="p-2">{percent(row.bounceRate)}</td><td className="p-2">{row.pageDepth === null ? "—" : decimal.format(row.pageDepth)}</td><td className="p-2">{row.avgVisitDurationSeconds === null ? "—" : decimal.format(row.avgVisitDurationSeconds)}</td></tr>)}</tbody></table></div> : <p className="text-muted-foreground">Данных Метрики за выбранный период пока нет.</p>}</Panel>
+    <div className="grid gap-6 xl:grid-cols-2"><Panel title="Устройства в Метрике"><TrafficBreakdown rows={data.traffic.devices} dimension="Устройство" />{data.traffic.devices.length === 0 ? <p className="text-muted-foreground">Данных по устройствам пока нет.</p> : null}</Panel><Panel title="Города в Метрике"><TrafficBreakdown rows={data.traffic.regions} dimension="Город" />{data.traffic.regions.length === 0 ? <p className="text-muted-foreground">По городам данных Метрики пока нет.</p> : null}</Panel></div>
+    <Panel title="Фактические поисковые запросы"><p className="mb-4 text-sm text-muted-foreground">Запросы, по которым поисковая система реально зафиксировала показы или клики. Это не весь утверждённый список ключей.</p>{data.queries.items.length ? <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr><th className="p-2">Запрос</th><th className="p-2">Показы</th><th className="p-2">Клики</th><th className="p-2">CTR</th><th className="p-2">Средняя позиция</th><th className="p-2">Страница</th></tr></thead><tbody>{data.queries.items.map((row) => <tr key={row.id} className="border-t border-border"><td className="p-2 font-medium">{row.queryText}</td><td className="p-2">{integer.format(row.impressions)}</td><td className="p-2">{integer.format(row.clicks)}</td><td className="p-2">{percent(row.ctr)}</td><td className="p-2">{position(row.averagePosition)}</td><td className="p-2">{row.targetPath ?? "не назначена"}</td></tr>)}</tbody></table></div> : <p className="text-muted-foreground">Фактических запросов за период пока нет.</p>}{data.queries.nextCursor ? <Link className="mt-4 inline-block underline" to={`?cursor=${encodeURIComponent(data.queries.nextCursor)}`}>Следующие запросы</Link> : null}</Panel>
+  </section>;
+}
+
+export default function SeoTrafficRoute() { return <SeoTrafficPage data={useLoaderData<Data>()} />; }
