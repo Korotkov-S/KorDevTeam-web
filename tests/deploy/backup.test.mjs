@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.mcp_tokens': '0', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
 const postMigrationTableCounts = {
   ...preMigrationTableCounts,
-  'drizzle.__drizzle_migrations': '11',
+  'drizzle.__drizzle_migrations': '12',
   'public.leads': '0',
   'public.lead_attachments': '0',
   'public.lead_delivery_jobs': '0',
@@ -28,6 +28,18 @@ const postMigrationTableCounts = {
   'public.seo_regions': '9',
   'public.seo_sources': '3',
   'public.seo_traffic_metrics': '0',
+  'public.geo_topics': '0',
+  'public.geo_entities': '0',
+  'public.geo_prompts': '0',
+  'public.geo_runs': '0',
+  'public.geo_observations': '0',
+  'public.geo_observation_mentions': '0',
+  'public.geo_citations': '0',
+  'public.geo_fanout_queries': '0',
+  'public.geo_referral_daily_metrics': '0',
+  'public.geo_crawler_checks': '0',
+  'public.geo_experiments': '0',
+  'public.geo_experiment_prompts': '0',
 };
 const preMigrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0000_content_foundation.sql')).digest('hex'), created_at: '1789122602054' },
@@ -44,6 +56,7 @@ const migrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0008_seo_semantic_core.sql')).digest('hex'), created_at: '1790453494948' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0009_yandex_metrika.sql')).digest('hex'), created_at: '1790482078740' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0010_yandex_metrika_source.sql')).digest('hex'), created_at: '1790484327389' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0011_geo_ai_visibility.sql')).digest('hex'), created_at: '1790493945985' },
 ];
 const tableCounts = postMigrationTableCounts;
 function inventoryQuery(sql, tables = tableCounts) {
@@ -123,7 +136,7 @@ test('database inventory counts all actual tables and fails when a required tabl
   const { databaseInventory } = await import('../../scripts/postgres-backup.mjs');
   const client = { query: async sql => inventoryQuery(sql) };
   assert.deepEqual(await databaseInventory(client), { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } });
-  for (const missing of ['seo_daily_metrics', 'content_release_items', 'content_release_runs']) {
+  for (const missing of ['seo_daily_metrics', 'content_release_items', 'content_release_runs', 'geo_runs']) {
     await assert.rejects(databaseInventory({ query: async sql => {
       const result = inventoryQuery(sql);
       if (sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== missing);

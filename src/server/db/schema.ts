@@ -67,6 +67,36 @@ export const seoRecommendationStatus = pgEnum("seo_recommendation_status", [
   "implemented",
   "dismissed",
 ]);
+export const geoPlatform = pgEnum("geo_platform", ["yandex_alice", "chatgpt_search", "google_ai", "bing_copilot"]);
+export const geoRunMode = pgEnum("geo_run_mode", ["official_report", "live_ui", "api_probe"]);
+export const geoRunStatus = pgEnum("geo_run_status", ["running", "success", "partial", "failed"]);
+export const geoPromptCategory = pgEnum("geo_prompt_category", ["commercial", "informational", "comparison", "local", "brand"]);
+export const geoPromptStatus = pgEnum("geo_prompt_status", ["candidate", "active", "archived"]);
+export const geoEntityType = pgEnum("geo_entity_type", ["owned", "competitor"]);
+export const geoEntityStatus = pgEnum("geo_entity_status", ["candidate", "active", "archived"]);
+export const geoSentiment = pgEnum("geo_sentiment", ["positive", "neutral", "negative", "unknown"]);
+export const geoCitationCategory = pgEnum("geo_citation_category", ["owned", "competitor", "media", "blog", "forum", "directory", "other"]);
+export const geoCrawlerStatus = pgEnum("geo_crawler_status", ["pass", "fail", "unavailable"]);
+export const geoExperimentStatus = pgEnum("geo_experiment_status", ["proposed", "approved", "active", "completed", "cancelled"]);
+export const geoExperimentActionType = pgEnum("geo_experiment_action_type", [
+  "content_answer",
+  "first_party_evidence",
+  "internal_linking",
+  "technical_indexing",
+  "structured_data",
+  "authority_outreach",
+]);
+export const geoExperimentMetric = pgEnum("geo_experiment_metric", [
+  "mention_rate",
+  "citation_rate",
+  "citation_share",
+  "owned_source_coverage",
+  "share_of_voice",
+  "ai_referrals",
+  "crawler_health",
+]);
+export const geoExperimentDirection = pgEnum("geo_experiment_direction", ["increase", "decrease"]);
+export const geoExperimentVerdict = pgEnum("geo_experiment_verdict", ["pending", "won", "lost", "inconclusive", "cancelled"]);
 
 export const adminUsers = pgTable(
   "admin_users",
@@ -754,6 +784,325 @@ export const seoRecommendations = pgTable(
   ],
 );
 
+export const geoTopics = pgTable(
+  "geo_topics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 160 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull(),
+    serviceKey: varchar("service_key", { length: 160 }),
+    targetPath: varchar("target_path", { length: 500 }),
+    priority: integer("priority").notNull().default(0),
+    status: geoPromptStatus("status").notNull().default("candidate"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("geo_topics_slug_uq").on(table.slug),
+    index("geo_topics_status_priority_idx").on(table.status, table.priority),
+    check("geo_topics_name_nonempty", sql`length(btrim(${table.name})) > 0`),
+    check("geo_topics_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'`),
+    check("geo_topics_target_path_valid", sql`${table.targetPath} IS NULL OR ${table.targetPath} LIKE '/%'`),
+    check("geo_topics_priority_non_negative", sql`${table.priority} >= 0`),
+  ],
+);
+
+export const geoEntities = pgTable(
+  "geo_entities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalName: varchar("canonical_name", { length: 240 }).notNull(),
+    type: geoEntityType("type").notNull(),
+    aliases: text("aliases").array().notNull().default(sql`ARRAY[]::text[]`),
+    domains: text("domains").array().notNull().default(sql`ARRAY[]::text[]`),
+    status: geoEntityStatus("status").notNull().default("candidate"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("geo_entities_canonical_name_uq").on(table.canonicalName),
+    index("geo_entities_type_status_idx").on(table.type, table.status),
+    check("geo_entities_name_nonempty", sql`length(btrim(${table.canonicalName})) > 0`),
+    check("geo_entities_aliases_bounded", sql`cardinality(${table.aliases}) <= 50`),
+    check("geo_entities_domains_bounded", sql`cardinality(${table.domains}) <= 50`),
+  ],
+);
+
+export const geoPrompts = pgTable(
+  "geo_prompts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    promptText: text("prompt_text").notNull(),
+    normalizedText: text("normalized_text").notNull(),
+    topicId: uuid("topic_id").notNull().references(() => geoTopics.id, { onDelete: "restrict" }),
+    tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+    category: geoPromptCategory("category").notNull(),
+    status: geoPromptStatus("status").notNull().default("candidate"),
+    priority: integer("priority").notNull().default(0),
+    language: varchar("language", { length: 16 }).notNull(),
+    region: varchar("region", { length: 120 }).notNull(),
+    targetPath: varchar("target_path", { length: 500 }),
+    seoQueryId: uuid("seo_query_id").references(() => seoQueries.id, { onDelete: "set null" }),
+    expectedEntityDomain: varchar("expected_entity_domain", { length: 253 }),
+    source: varchar("source", { length: 120 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("geo_prompts_normalized_language_region_uq").on(table.normalizedText, table.language, table.region),
+    index("geo_prompts_status_priority_idx").on(table.status, table.priority),
+    index("geo_prompts_topic_status_idx").on(table.topicId, table.status),
+    index("geo_prompts_seo_query_idx").on(table.seoQueryId),
+    check("geo_prompts_text_nonempty", sql`length(btrim(${table.promptText})) > 0`),
+    check("geo_prompts_text_bounded", sql`char_length(${table.promptText}) <= 2000`),
+    check("geo_prompts_normalized_nonempty", sql`length(btrim(${table.normalizedText})) > 0`),
+    check("geo_prompts_tags_bounded", sql`cardinality(${table.tags}) <= 20`),
+    check("geo_prompts_priority_non_negative", sql`${table.priority} >= 0`),
+    check("geo_prompts_language_nonempty", sql`length(btrim(${table.language})) > 0`),
+    check("geo_prompts_region_nonempty", sql`length(btrim(${table.region})) > 0`),
+    check("geo_prompts_target_path_valid", sql`${table.targetPath} IS NULL OR ${table.targetPath} LIKE '/%'`),
+    check("geo_prompts_source_nonempty", sql`length(btrim(${table.source})) > 0`),
+  ],
+);
+
+export const geoRuns = pgTable(
+  "geo_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    platform: geoPlatform("platform").notNull(),
+    surface: varchar("surface", { length: 120 }).notNull(),
+    mode: geoRunMode("mode").notNull(),
+    region: varchar("region", { length: 120 }).notNull(),
+    language: varchar("language", { length: 16 }).notNull(),
+    status: geoRunStatus("status").notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    plannedCount: integer("planned_count").notNull(),
+    completedCount: integer("completed_count").notNull().default(0),
+    storedCount: integer("stored_count").notNull().default(0),
+    errorCode: varchar("error_code", { length: 120 }),
+    initiatedByMcpTokenId: uuid("initiated_by_mcp_token_id").references(() => mcpTokens.id, { onDelete: "set null" }),
+    promptSetFingerprint: varchar("prompt_set_fingerprint", { length: 64 }).notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    index("geo_runs_period_platform_mode_idx").on(table.startedAt, table.platform, table.mode),
+    index("geo_runs_principal_status_idx").on(table.initiatedByMcpTokenId, table.status),
+    check("geo_runs_surface_nonempty", sql`length(btrim(${table.surface})) > 0`),
+    check("geo_runs_region_nonempty", sql`length(btrim(${table.region})) > 0`),
+    check("geo_runs_language_nonempty", sql`length(btrim(${table.language})) > 0`),
+    check("geo_runs_counts_non_negative", sql`${table.plannedCount} >= 0 AND ${table.completedCount} >= 0 AND ${table.storedCount} >= 0`),
+    check("geo_runs_counts_bounded", sql`${table.completedCount} <= ${table.plannedCount} AND ${table.storedCount} <= ${table.completedCount}`),
+    check("geo_runs_completed_after_start", sql`${table.completedAt} IS NULL OR ${table.completedAt} >= ${table.startedAt}`),
+    check("geo_runs_prompt_set_sha256", sql`${table.promptSetFingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("geo_runs_metadata_object", sql`jsonb_typeof(${table.metadata}) = 'object'`),
+    check("geo_runs_metadata_bounded", sql`octet_length(${table.metadata}::text) <= 16384`),
+  ],
+);
+
+export const geoObservations = pgTable(
+  "geo_observations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").notNull().references(() => geoRuns.id, { onDelete: "cascade" }),
+    promptId: uuid("prompt_id").notNull().references(() => geoPrompts.id, { onDelete: "restrict" }),
+    repetition: integer("repetition").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    mentioned: boolean("mentioned").notNull(),
+    linked: boolean("linked").notNull(),
+    cited: boolean("cited").notNull(),
+    sourceOrder: integer("source_order"),
+    responseExcerpt: text("response_excerpt").notNull().default(""),
+    responseSnapshot: text("response_snapshot").notNull().default(""),
+    snapshotTruncated: boolean("snapshot_truncated").notNull().default(false),
+    responseHash: varchar("response_hash", { length: 64 }).notNull(),
+    modelName: varchar("model_name", { length: 160 }),
+    sourceCount: integer("source_count").notNull().default(0),
+    sessionPersonalized: boolean("session_personalized").notNull().default(false),
+  },
+  (table) => [
+    uniqueIndex("geo_observations_run_prompt_repetition_uq").on(table.runId, table.promptId, table.repetition),
+    index("geo_observations_prompt_observed_idx").on(table.promptId, table.observedAt),
+    index("geo_observations_run_idx").on(table.runId),
+    check("geo_observations_repetition_range", sql`${table.repetition} BETWEEN 1 AND 3`),
+    check("geo_observations_flags_coherent", sql`NOT ${table.cited} OR ${table.linked}`),
+    check("geo_observations_source_order_coherent", sql`(${table.cited} AND ${table.sourceOrder} IS NOT NULL AND ${table.sourceOrder} > 0) OR (NOT ${table.cited} AND ${table.sourceOrder} IS NULL)`),
+    check("geo_observations_excerpt_bounded", sql`octet_length(${table.responseExcerpt}) <= 2048`),
+    check("geo_observations_snapshot_bounded", sql`octet_length(${table.responseSnapshot}) <= 16384`),
+    check("geo_observations_response_sha256", sql`${table.responseHash} ~ '^[0-9a-f]{64}$'`),
+    check("geo_observations_source_count_non_negative", sql`${table.sourceCount} >= 0`),
+  ],
+);
+
+export const geoObservationMentions = pgTable(
+  "geo_observation_mentions",
+  {
+    observationId: uuid("observation_id").notNull().references(() => geoObservations.id, { onDelete: "cascade" }),
+    entityId: uuid("entity_id").notNull().references(() => geoEntities.id, { onDelete: "restrict" }),
+    firstMentionOrder: integer("first_mention_order").notNull(),
+    recommended: boolean("recommended").notNull().default(false),
+    sentiment: geoSentiment("sentiment").notNull().default("unknown"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.observationId, table.entityId] }),
+    index("geo_observation_mentions_entity_observation_idx").on(table.entityId, table.observationId),
+    check("geo_observation_mentions_order_positive", sql`${table.firstMentionOrder} > 0`),
+  ],
+);
+
+export const geoCitations = pgTable(
+  "geo_citations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    observationId: uuid("observation_id").notNull().references(() => geoObservations.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    hostname: varchar("hostname", { length: 253 }).notNull(),
+    title: text("title"),
+    sourceOrder: integer("source_order").notNull(),
+    isOwned: boolean("is_owned").notNull().default(false),
+    category: geoCitationCategory("category").notNull(),
+    localPath: varchar("local_path", { length: 500 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("geo_citations_observation_url_uq").on(table.observationId, table.url),
+    index("geo_citations_hostname_path_idx").on(table.hostname, table.localPath),
+    index("geo_citations_observation_order_idx").on(table.observationId, table.sourceOrder),
+    check("geo_citations_url_http", sql`${table.url} ~ '^https?://'`),
+    check("geo_citations_url_bounded", sql`char_length(${table.url}) <= 2000`),
+    check("geo_citations_hostname_nonempty", sql`length(btrim(${table.hostname})) > 0`),
+    check("geo_citations_order_positive", sql`${table.sourceOrder} > 0`),
+    check("geo_citations_owned_coherent", sql`(${table.isOwned} AND ${table.category} = 'owned' AND ${table.localPath} LIKE '/%') OR (NOT ${table.isOwned} AND ${table.category} <> 'owned' AND ${table.localPath} IS NULL)`),
+  ],
+);
+
+export const geoFanoutQueries = pgTable(
+  "geo_fanout_queries",
+  {
+    observationId: uuid("observation_id").notNull().references(() => geoObservations.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    queryText: text("query_text").notNull(),
+    source: varchar("source", { length: 120 }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.observationId, table.position] }),
+    uniqueIndex("geo_fanout_queries_observation_text_uq").on(table.observationId, table.queryText),
+    check("geo_fanout_queries_position_positive", sql`${table.position} > 0`),
+    check("geo_fanout_queries_text_nonempty", sql`length(btrim(${table.queryText})) > 0`),
+    check("geo_fanout_queries_text_bounded", sql`char_length(${table.queryText}) <= 2000`),
+    check("geo_fanout_queries_source_nonempty", sql`length(btrim(${table.source})) > 0`),
+  ],
+);
+
+export const geoReferralDailyMetrics = pgTable(
+  "geo_referral_daily_metrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    observationDate: date("observation_date", { mode: "string" }).notNull(),
+    platform: geoPlatform("platform").notNull(),
+    users: integer("users").notNull(),
+    newUsers: integer("new_users").notNull(),
+    visits: integer("visits").notNull(),
+    pageviews: integer("pageviews").notNull(),
+    landingPath: varchar("landing_path", { length: 500 }).notNull(),
+    importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("geo_referral_daily_metrics_date_platform_path_uq").on(table.observationDate, table.platform, table.landingPath),
+    index("geo_referral_daily_metrics_date_platform_idx").on(table.observationDate, table.platform),
+    check("geo_referral_daily_metrics_counts_non_negative", sql`${table.users} >= 0 AND ${table.newUsers} >= 0 AND ${table.visits} >= 0 AND ${table.pageviews} >= 0`),
+    check("geo_referral_daily_metrics_counts_coherent", sql`${table.newUsers} <= ${table.users} AND ${table.users} <= ${table.visits} AND ${table.visits} <= ${table.pageviews}`),
+    check("geo_referral_daily_metrics_path_valid", sql`${table.landingPath} LIKE '/%'`),
+  ],
+);
+
+export const geoCrawlerChecks = pgTable(
+  "geo_crawler_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    checkDate: date("check_date", { mode: "string" }).notNull(),
+    target: varchar("target", { length: 500 }).notNull(),
+    bot: varchar("bot", { length: 120 }).notNull(),
+    status: geoCrawlerStatus("status").notNull(),
+    reasonCode: varchar("reason_code", { length: 120 }),
+    httpStatus: integer("http_status"),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    uniqueIndex("geo_crawler_checks_date_target_bot_uq").on(table.checkDate, table.target, table.bot),
+    index("geo_crawler_checks_date_target_idx").on(table.checkDate, table.target),
+    check("geo_crawler_checks_target_nonempty", sql`length(btrim(${table.target})) > 0`),
+    check("geo_crawler_checks_bot_nonempty", sql`length(btrim(${table.bot})) > 0`),
+    check("geo_crawler_checks_http_status_valid", sql`${table.httpStatus} IS NULL OR ${table.httpStatus} BETWEEN 100 AND 599`),
+    check("geo_crawler_checks_metadata_object", sql`jsonb_typeof(${table.metadata}) = 'object'`),
+    check("geo_crawler_checks_metadata_bounded", sql`octet_length(${table.metadata}::text) <= 4096`),
+  ],
+);
+
+export const geoExperiments = pgTable(
+  "geo_experiments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    recommendationId: uuid("recommendation_id").notNull().references(() => seoRecommendations.id, { onDelete: "restrict" }),
+    pagePath: varchar("page_path", { length: 500 }).notNull(),
+    actionType: geoExperimentActionType("action_type").notNull(),
+    hypothesis: text("hypothesis").notNull(),
+    platform: geoPlatform("platform").notNull(),
+    mode: geoRunMode("mode").notNull(),
+    language: varchar("language", { length: 16 }).notNull(),
+    region: varchar("region", { length: 120 }).notNull(),
+    promptSetFingerprint: varchar("prompt_set_fingerprint", { length: 64 }).notNull(),
+    primaryMetric: geoExperimentMetric("primary_metric").notNull(),
+    direction: geoExperimentDirection("direction").notNull(),
+    minimumDelta: numeric("minimum_delta", { precision: 12, scale: 6 }).notNull(),
+    evaluationWindows: integer("evaluation_windows").array().notNull().default(sql`ARRAY[7,14,28]::integer[]`),
+    expectedSignal: text("expected_signal").notNull(),
+    status: geoExperimentStatus("status").notNull().default("proposed"),
+    baseline: jsonb("baseline").$type<Record<string, unknown>>().notNull().default({}),
+    evaluationResults: jsonb("evaluation_results").$type<Record<string, unknown>>().notNull().default({}),
+    verdict: geoExperimentVerdict("verdict").notNull().default("pending"),
+    seoChangeId: uuid("seo_change_id").references(() => seoChanges.id, { onDelete: "restrict" }),
+    implementedAt: timestamp("implemented_at", { withTimezone: true }),
+    createdByMcpTokenId: uuid("created_by_mcp_token_id").references(() => mcpTokens.id, { onDelete: "set null" }),
+    approvedByAdminUserId: uuid("approved_by_admin_user_id").references(() => adminUsers.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("geo_experiments_status_created_idx").on(table.status, table.createdAt),
+    index("geo_experiments_page_platform_idx").on(table.pagePath, table.platform),
+    uniqueIndex("geo_experiments_one_active_page_set_uq")
+      .on(table.pagePath, table.promptSetFingerprint)
+      .where(sql`${table.status} = 'active'`),
+    check("geo_experiments_page_path_valid", sql`${table.pagePath} LIKE '/%'`),
+    check("geo_experiments_hypothesis_nonempty", sql`length(btrim(${table.hypothesis})) > 0`),
+    check("geo_experiments_prompt_set_sha256", sql`${table.promptSetFingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("geo_experiments_minimum_delta_positive", sql`${table.minimumDelta} > 0`),
+    check("geo_experiments_windows_exact", sql`${table.evaluationWindows} = ARRAY[7,14,28]::integer[]`),
+    check("geo_experiments_expected_signal_nonempty", sql`length(btrim(${table.expectedSignal})) > 0`),
+    check("geo_experiments_baseline_object", sql`jsonb_typeof(${table.baseline}) = 'object'`),
+    check("geo_experiments_evaluations_object", sql`jsonb_typeof(${table.evaluationResults}) = 'object'`),
+    check("geo_experiments_implementation_coherent", sql`(${table.seoChangeId} IS NULL AND ${table.implementedAt} IS NULL) OR (${table.seoChangeId} IS NOT NULL AND ${table.implementedAt} IS NOT NULL)`),
+  ],
+);
+
+export const geoExperimentPrompts = pgTable(
+  "geo_experiment_prompts",
+  {
+    experimentId: uuid("experiment_id").notNull().references(() => geoExperiments.id, { onDelete: "cascade" }),
+    promptId: uuid("prompt_id").notNull().references(() => geoPrompts.id, { onDelete: "restrict" }),
+    promptTextSnapshot: text("prompt_text_snapshot").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.experimentId, table.promptId] }),
+    index("geo_experiment_prompts_prompt_idx").on(table.promptId),
+    check("geo_experiment_prompts_snapshot_nonempty", sql`length(btrim(${table.promptTextSnapshot})) > 0`),
+    check("geo_experiment_prompts_snapshot_bounded", sql`char_length(${table.promptTextSnapshot}) <= 2000`),
+  ],
+);
+
 export const schema = {
   adminUsers,
   adminSessions,
@@ -781,4 +1130,16 @@ export const schema = {
   seoCollectionRuns,
   seoChanges,
   seoRecommendations,
+  geoTopics,
+  geoEntities,
+  geoPrompts,
+  geoRuns,
+  geoObservations,
+  geoObservationMentions,
+  geoCitations,
+  geoFanoutQueries,
+  geoReferralDailyMetrics,
+  geoCrawlerChecks,
+  geoExperiments,
+  geoExperimentPrompts,
 };

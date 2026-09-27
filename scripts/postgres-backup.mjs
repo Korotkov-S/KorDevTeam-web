@@ -46,16 +46,19 @@ const coreRequiredTables = ['drizzle.__drizzle_migrations', 'public.admin_users'
 const seoRequiredTables = ['public.seo_changes', 'public.seo_collection_runs', 'public.seo_daily_metrics', 'public.seo_queries', 'public.seo_recommendations', 'public.seo_regions', 'public.seo_sources'];
 const metrikaRequiredTables = ['public.seo_traffic_metrics'];
 const contentReleaseRequiredTables = ['public.content_release_items', 'public.content_release_runs'];
-const requiredTables = [...coreRequiredTables, ...seoRequiredTables, ...metrikaRequiredTables, ...contentReleaseRequiredTables];
+const geoRequiredTables = ['public.geo_topics', 'public.geo_entities', 'public.geo_prompts', 'public.geo_runs', 'public.geo_observations', 'public.geo_observation_mentions', 'public.geo_citations', 'public.geo_fanout_queries', 'public.geo_referral_daily_metrics', 'public.geo_crawler_checks', 'public.geo_experiments', 'public.geo_experiment_prompts'];
+const requiredTables = [...coreRequiredTables, ...seoRequiredTables, ...metrikaRequiredTables, ...contentReleaseRequiredTables, ...geoRequiredTables];
 const seoMigrationCreatedAt = '1790333729506';
 const contentReleaseMigrationCreatedAt = '1790350786115';
 const metrikaMigrationCreatedAt = '1790484327389';
+const geoMigrationCreatedAt = '1790493945985';
 const migrationSeedCounts = { 'public.seo_regions': '9', 'public.seo_sources': '3' };
 const requiredTablesForHistory = history => [
   ...coreRequiredTables,
   ...(history.some(row => row.created_at === seoMigrationCreatedAt) ? seoRequiredTables : []),
   ...(history.some(row => row.created_at === contentReleaseMigrationCreatedAt) ? contentReleaseRequiredTables : []),
   ...(history.some(row => row.created_at === metrikaMigrationCreatedAt) ? metrikaRequiredTables : []),
+  ...(history.some(row => row.created_at === geoMigrationCreatedAt) ? geoRequiredTables : []),
 ];
 const quoteIdentifier = value => `"${value.replaceAll('"', '""')}"`;
 export async function databaseInventory(client, requiredInventoryTables = requiredTables) {
