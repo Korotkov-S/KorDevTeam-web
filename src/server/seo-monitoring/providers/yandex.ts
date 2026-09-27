@@ -100,11 +100,14 @@ function parseAnalyticsPage(
     const byDate = new Map<string, DailyStatistics>();
     for (const statistic of item.statistics) {
       if (!plainObject(statistic) || !validDate(statistic.date)
-        || statistic.date < window.from || statistic.date > window.to
         || !["IMPRESSIONS", "CLICKS", "CTR", "POSITION", "DEMAND"].includes(String(statistic.field))
         || typeof statistic.value !== "number" || !Number.isFinite(statistic.value) || statistic.value < 0) {
         return invalidResponse();
       }
+      // Query Analytics uses the requested interval to filter matching query/URL pairs,
+      // but may still return statistics for its wider rolling horizon. Persist only the
+      // dates this collection run requested while validating every returned statistic.
+      if (statistic.date < window.from || statistic.date > window.to) continue;
       const field = statistic.field as keyof DailyStatistics;
       const daily = byDate.get(statistic.date) ?? {};
       if (daily[field] !== undefined) return invalidResponse();

@@ -166,6 +166,42 @@ test("collect skips zero-impression days where Yandex omits position", async () 
   assert.deepEqual(rows.map((row) => row.observationDate), ["2026-09-23"]);
 });
 
+test("collect imports only the requested dates when Yandex returns its wider statistics horizon", async () => {
+  const daily = (date: string) => [
+    { date, field: "IMPRESSIONS", value: 10 },
+    { date, field: "CLICKS", value: 1 },
+    { date, field: "CTR", value: 10 },
+    { date, field: "POSITION", value: 4.5 },
+  ];
+  const provider = createYandexWebmasterProvider(config, async (input) => {
+    const url = String(input);
+    if (url.endsWith("/v4/user")) return json({ user_id: 42 });
+    if (url.includes("/pro/regions")) return json({ regions: [{ id: 225, name: "Россия" }] });
+    return json({
+      count: 1,
+      text_indicator_to_statistics: [{
+        text_indicator: { type: "QUERY", value: "Внедрение CRM" },
+        popular_complementary_indicator: { type: "URL", value: "/services/crm/" },
+        statistics: [
+          ...daily("2026-09-21"),
+          ...daily("2026-09-22"),
+          ...daily("2026-09-23"),
+          ...daily("2026-09-24"),
+        ],
+      }],
+    });
+  });
+  await provider.listAvailableRegions();
+
+  const rows = await provider.collect(
+    { from: "2026-09-22", to: "2026-09-23" },
+    { id: 225, name: "Россия" },
+    "desktop",
+  );
+
+  assert.deepEqual(rows.map((row) => row.observationDate), ["2026-09-22", "2026-09-23"]);
+});
+
 test("analytics pagination continues until a page is shorter than the requested limit", async () => {
   let analyticsCalls = 0;
   const fullPage = Array.from({ length: 500 }, (_, index) => ({
