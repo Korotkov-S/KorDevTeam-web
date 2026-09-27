@@ -90,6 +90,35 @@ test('backup holds a snapshot through dump, encrypts manifest and uploads only e
   assert.equal(uploads.length, 2);
 });
 
+test('pre-release backup accepts the current pre-migration schema before a new migration is applied', async t => {
+  const { backupDatabase } = await import('../../scripts/postgres-backup.mjs');
+  const dir = mkdtempSync(path.join(tmpdir(), 'backup-pre-migration-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  let archivedManifest;
+  const client = { async query(sql) {
+    const inventory = inventoryQuery(sql, preMigrationTableCounts);
+    if (inventory) return inventory;
+    if (sql.includes('pg_export_snapshot')) return { rows: [{ snapshot: '0001-0002-2' }] };
+    if (sql.includes('GROUP BY kind')) return { rows: [{ kind: 'article', count: '2' }] };
+    if (sql.includes('SELECT hash, created_at')) return { rows: preMigrationHistory };
+    return { rows: [] };
+  } };
+  const run = async (command, args, options = {}) => {
+    if (command === 'pg_dump') writeFileSync(args[args.indexOf('--file') + 1], 'PGDMP fixture');
+    else if (command === 'tar') {
+      archivedManifest = JSON.parse(readFileSync(path.join(options.cwd, 'manifest.json')));
+      writeFileSync(args[1], 'archive fixture');
+    } else if (command === 'age') writeFileSync(args[args.indexOf('-o') + 1], 'encrypted fixture');
+    else if (command !== 'aws') throw Error(`Unexpected external command: ${command}`);
+    return '';
+  };
+
+  await backupDatabase({ directory: dir, recipient: 'age1fixture', s3Uri: 's3://private/private/backups', endpoint: 'https://s3.twcstorage.ru', databaseUrl: 'postgresql://u:secret@db/team', reason: 'pre-release' }, client, run);
+
+  assert.deepEqual(archivedManifest.migrations, preMigrationHistory);
+  assert.deepEqual(archivedManifest.inventory.tables, preMigrationTableCounts);
+});
+
 test('database inventory counts all actual tables and fails when a required table is missing', async () => {
   const { databaseInventory } = await import('../../scripts/postgres-backup.mjs');
   const client = { query: async sql => inventoryQuery(sql) };

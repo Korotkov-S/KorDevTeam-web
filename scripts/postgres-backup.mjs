@@ -115,8 +115,9 @@ export async function backupDatabase(config, client, run = runCommand) {
   let counts, migrations, inventory;
   try {
     const snapshot = (await client.query('SELECT pg_export_snapshot() AS snapshot')).rows[0].snapshot;
-    inventory = await databaseInventory(client);
-    counts = await publishedCounts(client); migrations = await migrationRows(client);
+    migrations = await migrationRows(client);
+    inventory = await databaseInventory(client, requiredTablesForHistory(migrations));
+    counts = await publishedCounts(client);
     await run('pg_dump', ['--format=custom', `--snapshot=${snapshot}`, '--no-owner', '--no-privileges', '--file', dump], { env: pgEnvironment(source) });
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK'); throw error; }
