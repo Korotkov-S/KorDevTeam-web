@@ -35,7 +35,7 @@ export function syncSeoSemanticCore() {
   return createSeoRepository(getDb()).syncSemanticCore(loadSemanticCore());
 }
 
-export async function runSeoCollection(options: { source?: SeoCollectionTarget } = {}) {
+export async function runSeoCollection(options: { source?: SeoCollectionTarget; skipYandexRank?: boolean } = {}) {
   const config = readSeoConfig(process.env);
   const repository = createSeoRepository(getDb());
   const geoRepository = createGeoRepository(getDb());
@@ -52,7 +52,7 @@ export async function runSeoCollection(options: { source?: SeoCollectionTarget }
   if (options.source && options.source !== "yandex_search" && options.source !== "geo_crawler") return metricReport;
   const sources: Array<Record<string, unknown>> = [...metricReport.sources];
   let failed = metricReport.failed;
-  if (!options.source || options.source === "yandex_search") {
+  if ((!options.source && !options.skipYandexRank) || options.source === "yandex_search") {
     if (!config.yandexSearch.enabled) {
       sources.push({ source: "yandex_search", status: "disabled", plannedCount: 0, completedCount: 0, storedCount: 0, checkDate: null });
     } else {

@@ -70,14 +70,21 @@ test("Yandex Search API key is not exposed to web or lead-worker services", () =
   assert.doesNotMatch(leadBlock, /YANDEX_METRIKA_OAUTH_TOKEN/u);
 });
 
-test("systemd schedules collection before the 09:00 Moscow analysis", (t) => {
+test("systemd separates daily free collection from weekly night rank control", (t) => {
   const service = readFileSync("deploy/systemd/kordevteam-seo-collect.service", "utf8");
   const timer = readFileSync("deploy/systemd/kordevteam-seo-collect.timer", "utf8");
+  const rankService = readFileSync("deploy/systemd/kordevteam-seo-rank-collect.service", "utf8");
+  const rankTimer = readFileSync("deploy/systemd/kordevteam-seo-rank-collect.timer", "utf8");
   assert.match(service, /^ExecStart=\/bin\/bash \/opt\/kordevteam\/current\/scripts\/run-seo-collect\.sh$/m);
+  assert.match(rankService, /^ExecStart=\/bin\/bash \/opt\/kordevteam\/current\/scripts\/run-seo-rank-collect\.sh$/m);
   assert.match(timer, /^OnCalendar=\*-\*-\* 07:30:00 Europe\/Moscow$/m);
+  assert.match(rankTimer, /^OnCalendar=Mon \*-\*-\* 00:30:00 Europe\/Moscow$/m);
   assert.match(timer, /^Persistent=true$/m);
+  assert.match(rankTimer, /^Persistent=true$/m);
   assert.match(timer, /^RandomizedDelaySec=/m);
+  assert.match(rankTimer, /^RandomizedDelaySec=/m);
   if (process.platform !== "linux") return t.diagnostic("systemd-analyze verification is Linux-only");
-  const result = spawnSync("systemd-analyze", ["verify", "deploy/systemd/kordevteam-seo-collect.service", "deploy/systemd/kordevteam-seo-collect.timer"], { encoding: "utf8" });
+  const result = spawnSync("systemd-analyze", ["verify", "deploy/systemd/kordevteam-seo-collect.service", "deploy/systemd/kordevteam-seo-collect.timer",
+    "deploy/systemd/kordevteam-seo-rank-collect.service", "deploy/systemd/kordevteam-seo-rank-collect.timer"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
 });

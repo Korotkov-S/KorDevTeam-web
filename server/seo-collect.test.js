@@ -4,14 +4,26 @@ import test from "node:test";
 import { parseSeoCollectArgs, runSeoCollectCommand } from "./seo-collect.mjs";
 
 test("CLI accepts only --check and exact source selection", () => {
-  assert.deepEqual(parseSeoCollectArgs([]), { check: false });
-  assert.deepEqual(parseSeoCollectArgs(["--check", "--source=yandex"]), { check: true, source: "yandex_webmaster" });
-  assert.deepEqual(parseSeoCollectArgs(["--source=google"]), { check: false, source: "google_search_console" });
-  assert.deepEqual(parseSeoCollectArgs(["--source=metrika"]), { check: false, source: "yandex_metrika" });
-  assert.deepEqual(parseSeoCollectArgs(["--source=yandex-rank"]), { check: false, source: "yandex_search" });
-  assert.deepEqual(parseSeoCollectArgs(["--source=geo-crawler"]), { check: false, source: "geo_crawler" });
+  assert.deepEqual(parseSeoCollectArgs([]), { check: false, skipYandexRank: false });
+  assert.deepEqual(parseSeoCollectArgs(["--skip-yandex-rank"]), { check: false, skipYandexRank: true });
+  assert.deepEqual(parseSeoCollectArgs(["--check", "--source=yandex"]), { check: true, skipYandexRank: false, source: "yandex_webmaster" });
+  assert.deepEqual(parseSeoCollectArgs(["--source=google"]), { check: false, skipYandexRank: false, source: "google_search_console" });
+  assert.deepEqual(parseSeoCollectArgs(["--source=metrika"]), { check: false, skipYandexRank: false, source: "yandex_metrika" });
+  assert.deepEqual(parseSeoCollectArgs(["--source=yandex-rank"]), { check: false, skipYandexRank: false, source: "yandex_search" });
+  assert.deepEqual(parseSeoCollectArgs(["--source=geo-crawler"]), { check: false, skipYandexRank: false, source: "geo_crawler" });
   assert.throws(() => parseSeoCollectArgs(["--source=bing"]), /seo_collect_arguments_invalid/u);
   assert.throws(() => parseSeoCollectArgs(["--check", "--check"]), /seo_collect_arguments_invalid/u);
+  assert.throws(() => parseSeoCollectArgs(["--source=yandex-rank", "--skip-yandex-rank"]), /seo_collect_arguments_invalid/u);
+});
+
+test("daily collection forwards the paid-rank exclusion", async () => {
+  let collectedWith;
+  const build = { entry: { module: {
+    checkSeoCollectionReady: async () => ({ sources: [] }),
+    runSeoCollection: async (options) => { collectedWith = options; return { sources: [], failed: false }; },
+  } } };
+  assert.equal(await runSeoCollectCommand(["--skip-yandex-rank"], async () => build, { info() {}, error() {} }), 0);
+  assert.deepEqual(collectedWith, { skipYandexRank: true });
 });
 
 test("check and collection emit compact summaries and return nonzero on failure", async () => {

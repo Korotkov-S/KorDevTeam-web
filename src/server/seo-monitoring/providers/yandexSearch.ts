@@ -3,7 +3,8 @@ import { load } from "cheerio";
 import type { SeoDevice, YandexSearchConfig } from "../contracts";
 import { boundedRetryAfter, SeoProviderError } from "./provider-error";
 
-const API_URL = "https://searchapi.api.cloud.yandex.net/v2/web/search";
+const API_URL = "https://searchapi.api.cloud.yandex.net/v2/web/searchAsync";
+const OPERATIONS_URL = "https://operation.api.cloud.yandex.net/operations";
 const REQUEST_TIMEOUT_MS = 20_000;
 const RESULT_LIMIT = 100;
 const MAX_RAW_BYTES = 8 * 1024 * 1024;
@@ -28,6 +29,42 @@ function invalidResponse(): never {
 
 function plainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function operationId(payload: unknown): string {
+  if (!plainObject(payload) || typeof payload.id !== "string" || !/^[a-zA-Z0-9_-]{1,200}$/u.test(payload.id)) {
+    return invalidResponse();
+  }
+  return payload.id;
+}
+
+async function requestJson(fetchImpl: typeof fetch, url: string, apiKey: string, init: RequestInit = {}): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetchImpl(url, {
+      ...init,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      headers: {
+        accept: "application/json",
+        authorization: `Api-Key ${apiKey}`,
+        ...init.headers,
+      },
+    });
+  } catch {
+    throw new SeoProviderError("seo_yandex_search_retryable", true);
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new SeoProviderError("seo_yandex_search_auth_failed", false);
+  }
+  if (response.status === 429 || response.status >= 500) {
+    throw new SeoProviderError("seo_yandex_search_retryable", true, boundedRetryAfter(response));
+  }
+  if (!response.ok) throw new SeoProviderError("seo_yandex_search_request_failed", false);
+  try {
+    return await response.json();
+  } catch {
+    return invalidResponse();
+  }
 }
 
 function decodeRawData(payload: unknown): string {
@@ -66,60 +103,48 @@ export function createYandexSearchProvider(
   config: Extract<YandexSearchConfig, { enabled: true }>,
   fetchImpl: typeof fetch = fetch,
 ) {
-  async function search(queryText: string, regionId: number, device: Extract<SeoDevice, "desktop" | "mobile">): Promise<YandexRankResult> {
+  async function startSearch(queryText: string, regionId: number, device: Extract<SeoDevice, "desktop" | "mobile">): Promise<string> {
     const query = queryText.trim();
     if (!query || query.length > 400) throw new SeoProviderError("seo_yandex_search_query_invalid", false);
     if (!Number.isSafeInteger(regionId) || regionId < 1) throw new SeoProviderError("seo_yandex_search_region_invalid", false);
-    let response: Response;
-    try {
-      response = await fetchImpl(API_URL, {
-        method: "POST",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        headers: {
-          accept: "application/json",
-          authorization: `Api-Key ${config.apiKey}`,
-          "content-type": "application/json",
+    const payload = await requestJson(fetchImpl, API_URL, config.apiKey, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        query: {
+          searchType: "SEARCH_TYPE_RU",
+          queryText: query,
+          familyMode: "FAMILY_MODE_MODERATE",
+          page: "0",
+          fixTypoMode: "FIX_TYPO_MODE_OFF",
         },
-        body: JSON.stringify({
-          query: {
-            searchType: "SEARCH_TYPE_RU",
-            queryText: query,
-            familyMode: "FAMILY_MODE_MODERATE",
-            page: "0",
-            fixTypoMode: "FIX_TYPO_MODE_OFF",
-          },
-          groupSpec: { groupMode: "GROUP_MODE_FLAT", groupsOnPage: String(RESULT_LIMIT), docsInGroup: "1" },
-          maxPassages: "1",
-          region: String(regionId),
-          l10n: "LOCALIZATION_RU",
-          folderId: config.folderId,
-          responseFormat: "FORMAT_XML",
-          userAgent: device === "mobile" ? MOBILE_USER_AGENT : DESKTOP_USER_AGENT,
-        }),
-      });
-    } catch {
-      throw new SeoProviderError("seo_yandex_search_retryable", true);
-    }
-    if (response.status === 401 || response.status === 403) {
-      throw new SeoProviderError("seo_yandex_search_auth_failed", false);
-    }
-    if (response.status === 429 || response.status >= 500) {
-      throw new SeoProviderError("seo_yandex_search_retryable", true, boundedRetryAfter(response));
-    }
-    if (!response.ok) throw new SeoProviderError("seo_yandex_search_request_failed", false);
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      return invalidResponse();
-    }
-    return parseResult(decodeRawData(payload), config.targetHost);
+        groupSpec: { groupMode: "GROUP_MODE_FLAT", groupsOnPage: String(RESULT_LIMIT), docsInGroup: "1" },
+        maxPassages: "1",
+        region: String(regionId),
+        l10n: "LOCALIZATION_RU",
+        folderId: config.folderId,
+        responseFormat: "FORMAT_XML",
+        userAgent: device === "mobile" ? MOBILE_USER_AGENT : DESKTOP_USER_AGENT,
+      }),
+    });
+    return operationId(payload);
+  }
+
+  async function pollSearch(id: string): Promise<YandexRankResult | null> {
+    if (!/^[a-zA-Z0-9_-]{1,200}$/u.test(id)) throw new SeoProviderError("seo_yandex_search_operation_invalid", false);
+    const payload = await requestJson(fetchImpl, `${OPERATIONS_URL}/${encodeURIComponent(id)}`, config.apiKey);
+    if (!plainObject(payload)) return invalidResponse();
+    if (payload.error !== undefined) throw new SeoProviderError("seo_yandex_search_operation_failed", false);
+    if (payload.done !== true) return null;
+    if (!plainObject(payload.response)) return invalidResponse();
+    return parseResult(decodeRawData(payload.response), config.targetHost);
   }
 
   return {
-    search,
+    startSearch,
+    pollSearch,
     async check() {
-      await search(config.targetHost, 225, "desktop");
+      await startSearch(config.targetHost, 225, "desktop");
       return { targetHost: config.targetHost };
     },
   };
