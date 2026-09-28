@@ -136,6 +136,13 @@ export const saveContentSchema = z.discriminatedUnion("kind", [
     coverUrl: z.string().optional(), imageUrls: z.array(z.string()).optional(), readTime: z.string().optional(),
     category: z.enum(BLOG_CATEGORY_SLUGS).optional(),
     relatedArticleSlugs: z.array(z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)).length(3).optional(),
+    telegramPostId: z.string().regex(/^[1-9]\d*$/).optional(),
+    telegramSourceUrl: z.url().regex(/^https:\/\/t\.me\/korotkovsStudio\/[1-9]\d*$/).optional(),
+    contentOrigin: z.literal("telegram:korotkovsStudio").optional(),
+    sourcePublishedAt: z.iso.datetime({ offset: true }).optional(),
+    primarySeoQuery: z.string().trim().min(1).optional(),
+    wordstatFrequency: z.number().int().nonnegative().nullable().optional(),
+    wordstatFrequencyStatus: z.enum(["confirmed", "unconfirmed"]).optional(),
   }).default({}) }),
   z.strictObject({ ...base, kind: z.literal("page"), payload: z.strictObject({
     h1: z.string().optional(), sections: z.array(block).optional(), cta: cta.optional(),

@@ -62,6 +62,37 @@ test("case payload accepts structured local media and commercial fields", () => 
   assert.deepEqual(command.payload.screenshots, [localCover]);
 });
 
+test("article payload preserves Telegram provenance and search metadata", () => {
+  const command = parseContentCommand({
+    kind: "article",
+    slug: "industrial-automation-isa-95",
+    title: "Промышленная автоматизация",
+    seoTitle: "Промышленная автоматизация: от робота до ISA-95",
+    seoDescription: "Практический разбор промышленной автоматизации.",
+    payload: {
+      h1: "Промышленная автоматизация: почему установить робота недостаточно",
+      telegramPostId: "1242",
+      telegramSourceUrl: "https://t.me/korotkovsStudio/1242",
+      contentOrigin: "telegram:korotkovsStudio",
+      sourcePublishedAt: "2026-09-24T18:35:00+03:00",
+      primarySeoQuery: "промышленная автоматизация",
+      wordstatFrequency: null,
+      wordstatFrequencyStatus: "unconfirmed",
+    },
+  });
+
+  assert.deepEqual(command.payload, {
+    h1: "Промышленная автоматизация: почему установить робота недостаточно",
+    telegramPostId: "1242",
+    telegramSourceUrl: "https://t.me/korotkovsStudio/1242",
+    contentOrigin: "telegram:korotkovsStudio",
+    sourcePublishedAt: "2026-09-24T18:35:00+03:00",
+    primarySeoQuery: "промышленная автоматизация",
+    wordstatFrequency: null,
+    wordstatFrequencyStatus: "unconfirmed",
+  });
+});
+
 databaseTest("draft is invisible and publish is immediately visible", async () => {
   const service = createContentService(db);
   const draft = await service.saveDraft(draftCommand(), adminId);
