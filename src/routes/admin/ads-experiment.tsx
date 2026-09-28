@@ -5,7 +5,7 @@ import { getAdvertisingService } from "../../server/advertising/runtime";
 import { readAdminAuthConfig } from "../../server/auth/config";
 import { getAdminAuthService } from "../../server/auth/runtime";
 import { createAdsExperimentLoader, createAdsNoteAction } from "./ads-notes.server";
-import { AdsEmpty, AdsMetric, AdsPageHeader, AdsPanel, AdsTable, AdsTd, AdsTh, adsFormatDate, adsInteger, adsMoney, adsStatus, type AdsRecord } from "./ads-shared";
+import { AdsEmpty, AdsMetric, AdsPageHeader, AdsPanel, AdsRouteGuard, AdsTable, AdsTd, AdsTh, adsFormatDate, adsInteger, adsMoney, adsStatus, type AdsRecord } from "./ads-shared";
 import { adminRouteHeaders } from "./headers";
 
 type Data = { experiment: AdsRecord; noteIdempotencyKey: string; csrfToken?: string };
@@ -44,7 +44,7 @@ export function AdsExperimentPage({ data }: { data: Data }) {
 }
 
 export default function AdsExperimentRoute() {
-  const data = useLoaderData<Data>();
+  const data = useLoaderData<Data | { error: string }>();
   const csrfToken = useMatches().map(match => match.data).find((value): value is { csrfToken: string } => Boolean(value && typeof value === "object" && "csrfToken" in value))?.csrfToken ?? "";
-  return <AdsExperimentPage data={{ ...data, csrfToken }} />;
+  return <AdsRouteGuard data={data}><AdsExperimentPage data={{ ...(data as Data), csrfToken }} /></AdsRouteGuard>;
 }

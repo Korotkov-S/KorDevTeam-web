@@ -39,7 +39,6 @@ import { canonicalJson, sha256Fingerprint } from "./canonical";
 import type { AdvertisingCommandRepository, AdvertisingRepository } from "./repository";
 
 const text = (max = 2000) => z.string().trim().min(1).max(max);
-const nullableText = (max = 2000) => text(max).nullable().optional();
 const isoDateTime = z.string().datetime({ offset: true }).refine(value => {
   const milliseconds = Date.parse(value);
   return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
@@ -58,8 +57,21 @@ const forbiddenKeys = new Set([
   "name", "phone", "email", "file", "token", "secret", "authorization", "cookie", "rawresponse",
 ]);
 const emailLike = /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u;
-const phoneLike = /(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u;
+const phoneCandidate = /\+?\d[\d\s().-]{8,}\d/gu;
 const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const fingerprintLike = /^[0-9a-f]{64}$/iu;
+
+function containsPhoneLike(value: string): boolean {
+  return [...value.matchAll(phoneCandidate)].some(match => {
+    const digitCount = match[0].replace(/\D/gu, "").length;
+    return digitCount >= 10 && digitCount <= 15;
+  });
+}
+
+const contactSafeText = (max = 2000) => text(max).refine(value => !emailLike.test(value) && !containsPhoneLike(value));
+const opaqueIdentifier = (max = 2000) => text(max).refine(value => !emailLike.test(value) && !containsPhoneLike(value));
+const nullableContactSafeText = (max = 2000) => contactSafeText(max).nullable().optional();
+const nullableOpaqueIdentifier = (max = 2000) => opaqueIdentifier(max).nullable().optional();
 
 function inspectFreeForm(value: unknown): boolean {
   try {
@@ -68,7 +80,8 @@ function inspectFreeForm(value: unknown): boolean {
     return false;
   }
   const visit = (item: unknown): boolean => {
-    if (typeof item === "string") return uuidLike.test(item) || (!emailLike.test(item) && !phoneLike.test(item));
+    if (typeof item === "string") return uuidLike.test(item) || fingerprintLike.test(item)
+      || (!emailLike.test(item) && !containsPhoneLike(item));
     if (Array.isArray(item)) return item.every(visit);
     if (!item || typeof item !== "object") return true;
     return Object.entries(item as Record<string, unknown>).every(([key, nested]) => (
@@ -79,12 +92,12 @@ function inspectFreeForm(value: unknown): boolean {
 }
 
 const jsonRecord = z.record(z.string(), z.unknown()).refine(inspectFreeForm);
-const actorSchema = z.strictObject({ kind: z.enum(AD_ACTOR_KINDS), id: text(240) });
+const actorSchema = z.strictObject({ kind: z.enum(AD_ACTOR_KINDS), id: opaqueIdentifier(240) });
 const idempotencySchema = z.uuid();
 
 const sourceSchema = z.strictObject({
   url: safeUrl,
-  publisher: text(240),
+  publisher: contactSafeText(240),
   sourceType: z.enum(AD_RESEARCH_SOURCE_TYPES),
   channel: z.enum(AD_CHANNELS),
   publishedAt: nullableDateTime,
@@ -93,19 +106,19 @@ const sourceSchema = z.strictObject({
   metadata: jsonRecord.optional(),
 });
 const signalSchema = z.strictObject({
-  sourceId: z.uuid(), hook: text(), offer: text(), proof: text(), format: text(160), cta: text(), audience: text(),
-  landingUrl: safeUrl.nullable().optional(), disclosedMetrics: jsonRecord.optional(), applicability: text(),
+  sourceId: z.uuid(), hook: contactSafeText(), offer: contactSafeText(), proof: contactSafeText(), format: contactSafeText(160), cta: contactSafeText(), audience: contactSafeText(),
+  landingUrl: safeUrl.nullable().optional(), disclosedMetrics: jsonRecord.optional(), applicability: contactSafeText(),
   evidenceGrade: z.enum(AD_EVIDENCE_GRADES),
 });
 const hypothesisSchema = z.strictObject({
-  service: text(), problem: text(), audience: text(), offer: text(), proof: text(), creativeAngle: text(),
+  service: contactSafeText(), problem: contactSafeText(), audience: contactSafeText(), offer: contactSafeText(), proof: contactSafeText(), creativeAngle: contactSafeText(),
   conversionPath: z.enum(AD_CONVERSION_PATHS), changedVariable: z.enum(AD_CHANGED_VARIABLES),
   controls: jsonRecord, primaryMetric: z.enum(AD_PRIMARY_METRICS), guardMetrics: jsonRecord,
-  expectedEffect: text(), minimumData: jsonRecord, dailyBudget: money, totalBudget: money,
+  expectedEffect: contactSafeText(), minimumData: jsonRecord, dailyBudget: money, totalBudget: money,
   durationDays: z.number().int().positive().max(365), stopConditions: jsonRecord,
   impact: z.number().int().min(1).max(5), confidence: z.number().int().min(1).max(5),
   ease: z.number().int().min(1).max(5), evidenceQuality: z.number().int().min(1).max(5),
-  rationale: text(), sourceSignalIds: z.array(z.uuid()).max(100).optional(),
+  rationale: contactSafeText(), sourceSignalIds: z.array(z.uuid()).max(100).optional(),
 });
 const experimentSchema = z.strictObject({
   hypothesisId: z.uuid(), hypothesisVersion: positiveVersion, passport: jsonRecord,
@@ -114,43 +127,43 @@ const experimentSchema = z.strictObject({
 }).refine(value => !value.startsAt || !value.endsAt || value.endsAt > value.startsAt);
 const approvalSchema = z.strictObject({
   experimentId: z.uuid(), expectedVersion: positiveVersion, passportFingerprint: fingerprint,
-  approvalTaskId: text(240), approvalText: text(), approvedAt: isoDateTime,
+  approvalTaskId: opaqueIdentifier(240), approvalText: contactSafeText(), approvedAt: isoDateTime,
 });
 const variantSchema = z.strictObject({
-  experimentId: z.uuid(), role: text(80), name: text(240), textVersion: jsonRecord, creativeVersion: jsonRecord,
+  experimentId: z.uuid(), role: contactSafeText(80), name: contactSafeText(240), textVersion: jsonRecord, creativeVersion: jsonRecord,
   audienceFingerprint: fingerprint, conversionPath: z.enum(AD_CONVERSION_PATHS),
-  vkCampaignId: nullableText(120), vkGroupId: nullableText(120), vkBannerId: nullableText(120),
-  vkFormId: nullableText(120), status: z.enum(AD_VARIANT_STATUSES).optional(),
+  vkCampaignId: nullableOpaqueIdentifier(120), vkGroupId: nullableOpaqueIdentifier(120), vkBannerId: nullableOpaqueIdentifier(120),
+  vkFormId: nullableOpaqueIdentifier(120), status: z.enum(AD_VARIANT_STATUSES).optional(),
 });
 const metricSchema = z.strictObject({
-  experimentId: z.uuid(), variantId: z.uuid().nullable().optional(), externalObjectId: text(160),
+  experimentId: z.uuid(), variantId: z.uuid().nullable().optional(), externalObjectId: opaqueIdentifier(160),
   granularity: z.enum(AD_METRIC_GRANULARITIES), periodStart: isoDateTime, periodEnd: isoDateTime,
   spend: money, impressions: count, reach: count, clicks: count, formOpens: count, leads: count,
   extras: jsonRecord.optional(),
 }).refine(value => value.periodEnd > value.periodStart);
 const leadSchema = z.strictObject({
   leadUuid: z.uuid(), externalLeadHash: fingerprint.nullable().optional(), experimentId: z.uuid(),
-  variantId: z.uuid().nullable().optional(), crmDealId: nullableText(160), crmPipelineId: nullableText(160),
-  crmStageId: nullableText(160), crmActivityId: nullableText(160), classification: z.enum(AD_LEAD_CLASSIFICATIONS),
-  amount: money.nullable().optional(), potentialAmount: money.nullable().optional(), lostReasonCode: nullableText(160),
+  variantId: z.uuid().nullable().optional(), crmDealId: nullableOpaqueIdentifier(160), crmPipelineId: nullableOpaqueIdentifier(160),
+  crmStageId: nullableOpaqueIdentifier(160), crmActivityId: nullableOpaqueIdentifier(160), classification: z.enum(AD_LEAD_CLASSIFICATIONS),
+  amount: money.nullable().optional(), potentialAmount: money.nullable().optional(), lostReasonCode: nullableContactSafeText(160),
   submittedAt: isoDateTime, contactedAt: nullableDateTime, qualifiedAt: nullableDateTime, closedAt: nullableDateTime,
 });
 const eventSchema = z.strictObject({
-  experimentId: z.uuid().nullable().optional(), variantId: z.uuid().nullable().optional(), action: text(160),
-  reason: text(), previousState: nullableText(120), newState: nullableText(120), requestId: nullableText(160),
-  errorCode: nullableText(160), payload: jsonRecord.optional(),
+  experimentId: z.uuid().nullable().optional(), variantId: z.uuid().nullable().optional(), action: contactSafeText(160),
+  reason: contactSafeText(), previousState: nullableContactSafeText(120), newState: nullableContactSafeText(120), requestId: nullableOpaqueIdentifier(160),
+  errorCode: nullableOpaqueIdentifier(160), payload: jsonRecord.optional(),
 }).refine(value => inspectFreeForm({ reason: value.reason }));
 const verdictSchema = z.strictObject({
   experimentId: z.uuid(), expectedVersion: positiveVersion, verdict: z.enum(AD_EXPERIMENT_VERDICTS).nullable().optional(),
-  evidence: jsonRecord, reason: text(),
+  evidence: jsonRecord, reason: contactSafeText(),
 }).refine(value => inspectFreeForm({ reason: value.reason }));
 const supersedesSchema = z.strictObject({ id: z.uuid(), expectedVersion: positiveVersion });
 const learningSchema = z.strictObject({
-  conclusion: text(), evidenceSnapshot: jsonRecord, applicability: text(), confidence: z.enum(AD_LEARNING_CONFIDENCES),
+  conclusion: contactSafeText(), evidenceSnapshot: jsonRecord, applicability: contactSafeText(), confidence: z.enum(AD_LEARNING_CONFIDENCES),
   hypothesisId: z.uuid().nullable().optional(), experimentId: z.uuid().nullable().optional(),
   reviewAt: nullableDateTime, supersededById: z.uuid().nullable().optional(), supersedes: supersedesSchema.optional(),
 });
-const noteSchema = z.strictObject({ experimentId: z.uuid().nullable().optional(), note: text(2000) })
+const noteSchema = z.strictObject({ experimentId: z.uuid().nullable().optional(), note: contactSafeText(2000) })
   .refine(value => inspectFreeForm({ note: value.note }));
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {

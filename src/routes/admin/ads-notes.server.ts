@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { ActionFunction, ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "react-router";
+import { redirect, type ActionFunction, type ActionFunctionArgs, type LoaderFunction, type LoaderFunctionArgs } from "react-router";
 
 import type { AdvertisingService } from "../../server/advertising/service";
 import type { AdminAuthConfig } from "../../server/auth/config";
@@ -74,12 +74,15 @@ export function createAdsNoteAction(auth: Authenticator, service: NoteWriter, co
       if (!UUID.test(idempotencyKey) || (experimentId && !UUID.test(experimentId)) || note.length < 1 || note.length > 2000) {
         throw new Error("ads_note_invalid");
       }
-      const event = await service.addManualNote(
+      await service.addManualNote(
         { ...(experimentId ? { experimentId } : {}), note },
         { kind: "admin", id: principal.userId },
         idempotencyKey,
       );
-      return Response.json(sanitizeAdsReadModel({ event }), { headers: adminHeaders(requestCspNonce(request)) });
+      return redirect(new URL(request.url).pathname, {
+        status: 303,
+        headers: adminHeaders(requestCspNonce(request)),
+      });
     } catch (error) {
       return noteError(request, error);
     }

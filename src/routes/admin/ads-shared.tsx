@@ -45,6 +45,9 @@ export function AdsEmpty({ children = "Данных пока нет." }: { child
 
 export function AdsLoading() { return <p className="p-6 text-muted-foreground">Загрузка данных…</p>; }
 export function AdsError() { return <p role="alert" className="rounded-lg border border-destructive/40 p-4">Рекламные данные временно недоступны. Попробуйте обновить страницу.</p>; }
+export function AdsRouteGuard({ data, children }: { data: unknown; children: React.ReactNode }) {
+  return Boolean(data && typeof data === "object" && "error" in data) ? <AdsError /> : <>{children}</>;
+}
 
 export function AdsTable({ children, minWidth = "900px" }: { children: React.ReactNode; minWidth?: string }) {
   const widthClass = minWidth === "1000px" ? "min-w-[1000px]" : "min-w-[900px]";

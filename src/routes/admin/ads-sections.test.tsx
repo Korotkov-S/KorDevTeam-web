@@ -14,6 +14,7 @@ import { AdsExperimentsPage } from "./ads-experiments";
 import { AdsHypothesesPage } from "./ads-hypotheses";
 import { AdsLearningsPage } from "./ads-learnings";
 import { AdsOverviewPage } from "./ads-overview";
+import AdsOverviewRoute from "./ads-overview";
 import { AdsRadarPage } from "./ads-radar";
 import { AdsEmpty, AdsError, AdsLoading } from "./ads-shared";
 
@@ -69,6 +70,18 @@ test("shared advertising states cover empty, loading and safe errors", () => {
   const error = html(<AdsError />);
   assert.match(error, /временно недоступны/u);
   assert.doesNotMatch(error, /database|token|stack/iu);
+});
+
+test("advertising route renders a safe state when its loader returns an error payload", () => {
+  const router = createMemoryRouter([{
+    id: "ads-overview", path: "/", element: <AdsOverviewRoute />,
+  }], {
+    initialEntries: ["/"],
+    hydrationData: { loaderData: { "ads-overview": { error: "database stack token" } } },
+  });
+  const rendered = html(<RouterProvider router={router} />);
+  assert.match(rendered, /временно недоступны/u);
+  assert.doesNotMatch(rendered, /database|stack|token/iu);
 });
 
 test("overview shows stored active state and approved versus remaining limits without a fake score", () => {

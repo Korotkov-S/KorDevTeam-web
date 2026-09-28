@@ -125,6 +125,8 @@ test("service rejects malformed commands, unexpected fields, secrets and contact
   await assert.rejects(service.createResearchSource({ ...source, url: "javascript:alert(1)" }, actor, uuid()), /ads_validation_error/u);
   await assert.rejects(service.createResearchSource({ ...source, publishedAt: "28.09.2026" }, actor, uuid()), /ads_validation_error/u);
   await assert.rejects(service.createHypothesis({ ...hypothesis(), dailyBudget: -1 }, actor, uuid()), /ads_validation_error/u);
+  await assert.rejects(service.createHypothesis({ ...hypothesis(), offer: "Написать owner@example.test" }, actor, uuid()), /ads_validation_error/u);
+  await assert.rejects(service.createHypothesis({ ...hypothesis(), expectedEffect: "Ответ owner@example.test" }, actor, uuid()), /ads_validation_error/u);
   for (const forbidden of ["name", "phone", "email", "file", "token", "secret", "authorization", "cookie", "rawResponse"]) {
     await assert.rejects(
       service.createHypothesis({ ...hypothesis(), controls: { [forbidden]: "private" } }, actor, uuid()),
@@ -148,6 +150,14 @@ test("service rejects malformed commands, unexpected fields, secrets and contact
   await assert.rejects(service.appendEvent({ action: "note", reason: "mail me", payload: { note: "owner@example.test" } }, actor, uuid()), /ads_validation_error/u);
   await assert.rejects(service.createLearning({
     conclusion: "Есть лид", evidenceSnapshot: { contact: "+7 999 111-22-33" }, applicability: "B2B", confidence: "low",
+  }, actor, uuid()), /ads_validation_error/u);
+  await assert.rejects(service.recordLeadAttribution({
+    leadUuid: uuid(), experimentId: uuid(), crmDealId: "owner@example.test", classification: "submitted",
+    submittedAt: "2026-09-28T09:00:00.000Z",
+  }, actor, uuid()), /ads_validation_error/u);
+  await assert.rejects(service.recordLeadAttribution({
+    leadUuid: uuid(), experimentId: uuid(), crmDealId: "7999-111-22-33", classification: "submitted",
+    submittedAt: "2026-09-28T09:00:00.000Z",
   }, actor, uuid()), /ads_validation_error/u);
   await assert.rejects(service.addManualNote({ note: "Позвонить +7 999 111-22-33" }, actor, uuid()), /ads_validation_error/u);
 });

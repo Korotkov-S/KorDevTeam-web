@@ -4,7 +4,7 @@ import { useLoaderData } from "react-router";
 import { getAdvertisingService } from "../../server/advertising/runtime";
 import { getAdminAuthService } from "../../server/auth/runtime";
 import { createAdsSectionLoader } from "./ads-read.server";
-import { AdsEmpty, AdsPageHeader, AdsPanel, AdsTable, AdsTd, AdsTh, adsFormatDate, type AdsRecord } from "./ads-shared";
+import { AdsEmpty, AdsPageHeader, AdsPanel, AdsRouteGuard, AdsTable, AdsTd, AdsTh, adsFormatDate, type AdsRecord } from "./ads-shared";
 import { adminRouteHeaders } from "./headers";
 
 type Page = { items: AdsRecord[]; nextCursor: string | null };
@@ -19,4 +19,4 @@ export function AdsRadarPage({ data }: { data: Data }) {
     <AdsPanel title="Рыночные сигналы">{data.signals.items.length ? <ul className="space-y-3">{data.signals.items.map(item => <li key={item.id} className="rounded-lg border border-border p-4"><p className="font-medium">{item.title ?? item.signal ?? "Наблюдение"}</p><p className="mt-1 text-sm text-muted-foreground">{item.summary ?? item.description ?? "—"}</p><p className="mt-2 text-xs">Доказательства: {item.evidenceGrade ?? "не указаны"}</p></li>)}</ul> : <AdsEmpty>Сигналов рынка пока нет.</AdsEmpty>}</AdsPanel>
   </section>;
 }
-export default function AdsRadarRoute() { return <AdsRadarPage data={useLoaderData<Data>()} />; }
+export default function AdsRadarRoute() { const data = useLoaderData<Data | { error: string }>(); return <AdsRouteGuard data={data}><AdsRadarPage data={data as Data} /></AdsRouteGuard>; }

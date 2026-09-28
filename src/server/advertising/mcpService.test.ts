@@ -72,12 +72,14 @@ test("MCP advertising adapter exposes the exact read and write operation surface
 });
 
 test("MCP advertising adapter strips forbidden nested response fields", async () => {
+  const passportFingerprint = `${"1234567890"}${"a".repeat(54)}`;
   const service = createMcpAdvertisingService(backing({
     async getExperiment() {
       return {
         id: ID,
-        passportFingerprint: "a".repeat(64),
+        passportFingerprint,
         lead: { phone: "+7 999 111-22-33", email: "owner@example.test", crmDealId: "deal-1" },
+        summary: "Написать owner@example.test или позвонить +7 999 111-22-33",
         payload: { rawResponse: "vendor secret", safe: true },
         token: "secret-token",
       } as never;
@@ -85,7 +87,25 @@ test("MCP advertising adapter strips forbidden nested response fields", async ()
   }), TOKEN_ID);
   const serialized = JSON.stringify(await service.getExperiment(ID));
   assert.doesNotMatch(serialized, /phone|email|rawResponse|secret-token|owner@example/u);
-  assert.match(serialized, /passportFingerprint|crmDealId/u);
+  assert.doesNotMatch(serialized, /\+7 999/u);
+  assert.match(serialized, /\[redacted\]/u);
+  assert.match(serialized, new RegExp(`passportFingerprint[^}]*${passportFingerprint}`, "u"));
+  assert.match(serialized, /crmDealId/u);
+});
+
+test("MCP advertising adapter preserves ISO timestamps while redacting phone numbers", async () => {
+  const createdAt = "2026-09-28T07:09:34.350Z";
+  const service = createMcpAdvertisingService(backing({
+    async createResearchSource() {
+      return { id: ID, createdAt, summary: "Позвонить +7 999 111-22-33" } as never;
+    },
+  }), TOKEN_ID);
+
+  assert.deepEqual(await service.createResearchSource({} as never, KEY), {
+    id: ID,
+    createdAt,
+    summary: "[redacted]",
+  });
 });
 
 test("MCP advertising lists return compact summaries instead of raw rule payloads", async () => {

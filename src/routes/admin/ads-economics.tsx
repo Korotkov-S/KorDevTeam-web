@@ -4,7 +4,7 @@ import { useLoaderData } from "react-router";
 import { getAdvertisingService } from "../../server/advertising/runtime";
 import { getAdminAuthService } from "../../server/auth/runtime";
 import { createAdsSectionLoader } from "./ads-read.server";
-import { AdsMetric, AdsPageHeader, AdsPanel, adsInteger, adsMoney, type AdsRecord } from "./ads-shared";
+import { AdsMetric, AdsPageHeader, AdsPanel, AdsRouteGuard, adsInteger, adsMoney, type AdsRecord } from "./ads-shared";
 import { adminRouteHeaders } from "./headers";
 
 type Data = { economics: AdsRecord };
@@ -20,4 +20,4 @@ export function AdsEconomicsPage({ data }: { data: Data }) {
     <AdsPanel title="Деньги"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><AdsMetric title="Расход" value={adsMoney.format(spend)} /><AdsMetric title="Стоимость клика" value={clicks ? adsMoney.format(spend / clicks) : "—"} /><AdsMetric title="Стоимость лида" value={leads ? adsMoney.format(spend / leads) : "—"} /><AdsMetric title="Победившие сделки" value={adsInteger.format(Number(value.won ?? 0))} /><AdsMetric title="Фактическая выручка" value={adsMoney.format(Number(value.revenue ?? 0))} /><AdsMetric title="Потенциальная сумма" value={adsMoney.format(Number(value.potentialRevenue ?? 0))} note="Открытые квалифицированные возможности, не выручка" /></div></AdsPanel>
   </section>;
 }
-export default function AdsEconomicsRoute() { return <AdsEconomicsPage data={useLoaderData<Data>()} />; }
+export default function AdsEconomicsRoute() { const data = useLoaderData<Data | { error: string }>(); return <AdsRouteGuard data={data}><AdsEconomicsPage data={data as Data} /></AdsRouteGuard>; }

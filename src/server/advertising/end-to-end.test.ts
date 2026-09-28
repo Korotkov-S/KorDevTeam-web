@@ -55,7 +55,7 @@ databaseTest("local advertising knowledge flow is idempotent, auditable, safe an
 
   async function call(name: string, args: Record<string, unknown>) {
     const result = await client.callTool({ name, arguments: args });
-    assert.equal(result.isError, undefined, `${name}: ${JSON.stringify(result.structuredContent)}`);
+    assert.equal(result.isError, undefined, `${name}: ${JSON.stringify(result.structuredContent ?? result.content)}`);
     return record(result.structuredContent);
   }
 

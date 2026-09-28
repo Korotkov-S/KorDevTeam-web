@@ -81,7 +81,8 @@ test("manual note action binds the authenticated admin and preserves browser ret
     const response = await action({
       request: request(`/admin/ads/experiments/${EXPERIMENT_ID}/`, form()), params: {}, context: {},
     });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get("Location"), `/admin/ads/experiments/${EXPERIMENT_ID}/`);
   }
   assert.deepEqual(calls, [
     { command: { experimentId: EXPERIMENT_ID, note: "Клиент подтвердил качество лида" }, actor: { kind: "admin", id: ADMIN_ID }, key: IDEMPOTENCY_KEY },
@@ -97,7 +98,8 @@ test("manual note supports a knowledge-wide note without experiment mutation", a
   const response = await createAdsNoteAction(auth, service, config)({
     request: request("/admin/ads/events/", form({ experimentId: null })), params: {}, context: {},
   });
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("Location"), "/admin/ads/events/");
   assert.deepEqual(command, { note: "Клиент подтвердил качество лида" });
 });
 

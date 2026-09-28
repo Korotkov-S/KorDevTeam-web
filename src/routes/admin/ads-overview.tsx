@@ -4,7 +4,7 @@ import { useLoaderData } from "react-router";
 import { getAdvertisingService } from "../../server/advertising/runtime";
 import { getAdminAuthService } from "../../server/auth/runtime";
 import { createAdsSectionLoader } from "./ads-read.server";
-import { AdsEmpty, AdsMetric, AdsPageHeader, AdsPanel, adsFormatDate, adsInteger, adsMoney, adsStatus, type AdsRecord } from "./ads-shared";
+import { AdsEmpty, AdsMetric, AdsPageHeader, AdsPanel, AdsRouteGuard, adsFormatDate, adsInteger, adsMoney, adsStatus, type AdsRecord } from "./ads-shared";
 import { adminRouteHeaders } from "./headers";
 
 type Data = { overview: AdsRecord };
@@ -37,4 +37,4 @@ export function AdsOverviewPage({ data }: { data: Data }) {
     </div></AdsPanel>
   </section>;
 }
-export default function AdsOverviewRoute() { return <AdsOverviewPage data={useLoaderData<Data>()} />; }
+export default function AdsOverviewRoute() { const data = useLoaderData<Data | { error: string }>(); return <AdsRouteGuard data={data}><AdsOverviewPage data={data as Data} /></AdsRouteGuard>; }

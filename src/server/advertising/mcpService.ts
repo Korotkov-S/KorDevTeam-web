@@ -28,11 +28,26 @@ type Backing = Pick<AdvertisingService,
 
 type Page = { limit?: number; cursor?: string | null };
 const forbiddenResponseKeys = /^(?:phone|email|file|token|secret|authorization|cookie|rawresponse|passport)$/iu;
+const emailLike = /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u;
+const phoneCandidate = /\+?\d[\d\s().-]{8,}\d/gu;
+const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const fingerprintLike = /^[0-9a-f]{64}$/iu;
+
+function containsPhoneLike(value: string): boolean {
+  return [...value.matchAll(phoneCandidate)].some(match => {
+    const digitCount = match[0].replace(/\D/gu, "").length;
+    return digitCount >= 10 && digitCount <= 15;
+  });
+}
 
 function safeJson<T>(value: T, depth = 0): T {
   if (depth > 8) return null as T;
   if (value instanceof Date) return value.toISOString() as T;
-  if (typeof value === "string") return value.slice(0, 4000) as T;
+  if (typeof value === "string") {
+    const isSafeTechnicalIdentifier = uuidLike.test(value) || fingerprintLike.test(value);
+    if (!isSafeTechnicalIdentifier && (emailLike.test(value) || containsPhoneLike(value))) return "[redacted]" as T;
+    return value.slice(0, 4000) as T;
+  }
   if (Array.isArray(value)) return value.slice(0, 100).map(item => safeJson(item, depth + 1)) as T;
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value as Record<string, unknown>)
