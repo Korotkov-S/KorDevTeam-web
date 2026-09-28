@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly KorDevTeam Yandex control ranks during the night tariff
+
+[Timer]
+OnCalendar=Mon *-*-* 00:30:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=5m
+Unit=kordevteam-seo-rank-collect.service
+
+[Install]
+WantedBy=timers.target

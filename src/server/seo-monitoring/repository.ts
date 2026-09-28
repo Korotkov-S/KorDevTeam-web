@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
 import {
@@ -360,6 +360,15 @@ export function createSeoRepository(db: SeoDatabase) {
           eq(seoRegions.active, true),
           isNotNull(seoRegions.externalId),
         )).orderBy(asc(seoRegions.sortOrder)) as Promise<Array<{ id: string; externalId: string; displayName: string }>>;
+    },
+
+    async hasRankRunInWindow(dateFrom: string, dateTo: string) {
+      const rows = await db.select({ id: seoRankRuns.id }).from(seoRankRuns).where(and(
+        gte(seoRankRuns.checkDate, dateFrom),
+        lte(seoRankRuns.checkDate, dateTo),
+        gt(seoRankRuns.plannedCount, 0),
+      )).limit(1);
+      return rows.length > 0;
     },
 
     async startRankRun(checkDate: string, plannedCount: number) {

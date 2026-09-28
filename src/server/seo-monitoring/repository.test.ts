@@ -9,6 +9,7 @@ import {
   seoDailyMetrics,
   seoQueries,
   seoRankChecks,
+  seoRankRuns,
   seoRecommendations,
   seoRegions,
   seoTrafficMetrics,
@@ -237,6 +238,20 @@ databaseTest("rank checks upsert one daily query-region-device snapshot without 
   assert.equal(await repository.upsertRankChecks([{ ...base, position: 24 }]), 1);
   assert.deepEqual(await db.select({ position: seoRankChecks.position }).from(seoRankChecks), [{ position: 24 }]);
   assert.equal(await repository.upsertRankChecks([]), 0);
+});
+
+databaseTest("weekly rank guard detects only charged runs inside the requested window", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await db.insert(seoRankRuns).values([
+    { checkDate: "2026-09-27", plannedCount: 960 },
+    { checkDate: "2026-09-28", plannedCount: 0 },
+  ]);
+
+  assert.equal(await repository.hasRankRunInWindow("2026-09-28", "2026-10-04"), false);
+  await db.insert(seoRankRuns).values({ checkDate: "2026-10-01", plannedCount: 960 });
+  assert.equal(await repository.hasRankRunInWindow("2026-09-28", "2026-10-04"), true);
 });
 
 databaseTest("tracked queries are ordered by priority, intent, creation time, and id", async () => {

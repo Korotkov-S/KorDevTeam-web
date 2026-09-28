@@ -7,7 +7,8 @@ test("SEO runbook covers credentials, collection, MCP, diagnosis, and safe disab
   for (const pattern of [
     /Яндекс Вебмастер/u, /Search Console/u, /base64/u, /--check/u, /--source=yandex/u, /--source=google/u,
     /seo:read/u, /seo:write/u, /429/u, /partial/u, /Google.*задерж/isu, /не удаляет.*истори/isu,
-    /systemctl enable --now kordevteam-seo-collect\.timer/u, /ротац/iu, /Яндекс Метрик/u, /--source=metrika/u,
+    /systemctl enable --now kordevteam-seo-collect\.timer/u, /kordevteam-seo-rank-collect\.timer/u,
+    /асинхрон/iu, /раз в неделю/iu, /ротац/iu, /Яндекс Метрик/u, /--source=metrika/u,
   ]) assert.match(text, pattern);
 });
 test("operations environment documents disabled-by-default SEO switches and every credential", () => {
