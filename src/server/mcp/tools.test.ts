@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
@@ -30,7 +31,7 @@ function snapshot(bodyMd = "Текст") {
   };
 }
 
-function services(overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]>; seo?: Partial<McpServices["seo"]>; geo?: Partial<McpServices["geo"]>; ads?: Partial<McpServices["ads"]> } = {}): McpServices {
+function services(overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]>; seo?: Partial<McpServices["seo"]>; geo?: Partial<McpServices["geo"]>; ads?: Partial<McpServices["ads"]>; vkAds?: Partial<McpServices["vkAds"]> } = {}): McpServices {
   const content = {
     async list() { return { items: [{ id: ENTRY_ID, kind: "article", slug: "mcp-article", status: "draft", title: "MCP статья", version: 1, updatedAt: new Date("2026-09-25T10:00:00.000Z"), publishedAt: null }] }; },
     async get() { return { entry: { id: ENTRY_ID, ...snapshot(), status: "draft", version: 1 }, relations: [], mediaRefs: [] }; },
@@ -103,7 +104,17 @@ function services(overrides: { content?: Partial<McpServices["content"]>; media?
     async createLearning() { return { id: ENTRY_ID }; },
     ...overrides.ads,
   };
-  return { content, media, seo, geo, ads } as McpServices;
+  const vkAds = {
+    async getSyncStatus() { return null; },
+    async listCampaigns() { return { items: [], nextCursor: null }; },
+    async listAdGroups() { return { items: [], nextCursor: null }; },
+    async listAds() { return { items: [], nextCursor: null }; },
+    async getAd() { return null; },
+    async getStatistics() { return []; },
+    async getCreativeImage() { throw new Error("ads_vk_unavailable"); },
+    ...overrides.vkAds,
+  };
+  return { content, media, seo, geo, ads, vkAds } as McpServices;
 }
 
 async function connected(scopes: McpScope[], provided = services(), logger?: (record: McpAuditRecord) => void) {
@@ -143,15 +154,19 @@ test("scope combinations register only their exact tool surface", async t => {
       "unpublish_content", "update_content_draft", "upload_image",
     ]],
     [["ads:read"], [
-      "get_ad_economics", "get_ad_experiment", "get_ad_hypothesis", "get_ads_overview", "list_ad_events",
+      "get_ad_economics", "get_ad_experiment", "get_ad_hypothesis", "get_ads_overview", "get_vk_ad",
+      "get_vk_ads_statistics", "get_vk_ads_sync_status", "get_vk_creative_image", "list_ad_events",
       "list_ad_experiments", "list_ad_hypotheses", "list_ad_learnings", "list_ad_market_signals", "list_ad_research_sources",
+      "list_vk_ad_groups", "list_vk_ads", "list_vk_campaigns",
     ]],
     [["ads:write"], []],
     [["ads:read", "ads:write"], [
       "append_ad_event", "create_ad_experiment", "create_ad_hypothesis", "create_ad_learning",
       "create_ad_market_signal", "create_ad_research_source", "finish_ad_experiment", "get_ad_economics",
-      "get_ad_experiment", "get_ad_hypothesis", "get_ads_overview", "list_ad_events", "list_ad_experiments",
+      "get_ad_experiment", "get_ad_hypothesis", "get_ads_overview", "get_vk_ad", "get_vk_ads_statistics",
+      "get_vk_ads_sync_status", "get_vk_creative_image", "list_ad_events", "list_ad_experiments",
       "list_ad_hypotheses", "list_ad_learnings", "list_ad_market_signals", "list_ad_research_sources",
+      "list_vk_ad_groups", "list_vk_ads", "list_vk_campaigns",
       "record_ad_lead_attribution", "record_ad_metric_snapshot", "record_ad_variant_binding", "save_ad_approval",
       "transition_ad_experiment", "transition_ad_hypothesis",
     ]],
@@ -281,15 +296,65 @@ test("advertising tools require exact scopes and never expose unrelated capabili
   } }));
   t.after(async () => { await read.client.close(); await read.server.close(); });
   const readTools = (await read.client.listTools()).tools;
-  assert.equal(readTools.length, 10);
+  assert.equal(readTools.length, 17);
   assert.ok(readTools.every(tool => tool.annotations?.readOnlyHint === true));
-  assert.ok(readTools.every(tool => tool.name.includes("ad")));
+  assert.ok(readTools.every(tool => /^(?:get|list)_(?:ad|ads|vk_)/u.test(tool.name)));
+  assert.equal(readTools.some(tool => /(?:backfill|daily|refresh|start|stop|budget|bid)/u.test(tool.name)), false);
+  assert.deepEqual(readTools.map(tool => tool.name).filter(name => name.includes("_vk_") || name.startsWith("list_vk_")).sort(), [
+    "get_vk_ad", "get_vk_ads_statistics", "get_vk_ads_sync_status", "get_vk_creative_image",
+    "list_vk_ad_groups", "list_vk_ads", "list_vk_campaigns",
+  ]);
   await assert.rejects(read.client.callTool({ name: "create_ad_hypothesis", arguments: {} }), /not found|Method not found/u);
   assert.equal(writes, 0);
 
   const writeOnly = await connected(["ads:write"]);
   t.after(async () => { await writeOnly.client.close(); await writeOnly.server.close(); });
   assert.equal((await writeOnly.client.listTools()).tools.length, 0);
+});
+
+test("VK mirror tools validate inputs and creative image audit omits bytes", async t => {
+  const records: McpAuditRecord[] = [];
+  let reads = 0;
+  const imageBytes = Buffer.from("private-image-bytes");
+  const sha256 = createHash("sha256").update(imageBytes).digest("hex");
+  const connection = await connected(["ads:read"], services({ vkAds: {
+    async listCampaigns() { reads += 1; return { items: [], nextCursor: null }; },
+    async getStatistics() { reads += 1; return []; },
+    async getCreativeImage() { return { bytes: imageBytes, mimeType: "image/png", sha256 }; },
+  } }), record => records.push(record));
+  t.after(async () => { await connection.client.close(); await connection.server.close(); });
+
+  for (const args of [{ limit: 101 }, { cursor: "bad" }, { unexpected: true }]) {
+    assert.equal((await connection.client.callTool({ name: "list_vk_campaigns", arguments: args })).isError, true);
+  }
+  for (const args of [
+    { objectKind: "ad", externalIds: ["ad-1"], dateFrom: "bad", dateTo: "2030-01-01" },
+    { objectKind: "ad", externalIds: [], dateFrom: "2030-01-01", dateTo: "2030-01-01" },
+    { objectKind: "ad", externalIds: ["ad-1"], dateFrom: "2030-01-02", dateTo: "2030-01-01" },
+  ]) {
+    assert.equal((await connection.client.callTool({ name: "get_vk_ads_statistics", arguments: args })).isError, true);
+  }
+  assert.equal(reads, 0);
+
+  const id = "00000000-0000-4000-8000-000000000123";
+  const image = await connection.client.callTool({ name: "get_vk_creative_image", arguments: { id } });
+  assert.equal(image.isError, undefined);
+  assert.deepEqual(image.structuredContent, { id, mimeType: "image/png", byteSize: imageBytes.length, sha256 });
+  assert.equal(image.content[0]?.type, "image");
+  assert.equal(image.content[0]?.type === "image" ? image.content[0].data : "", imageBytes.toString("base64"));
+  const serializedAudit = JSON.stringify(records);
+  assert.doesNotMatch(serializedAudit, new RegExp(imageBytes.toString("base64"), "u"));
+  assert.doesNotMatch(JSON.stringify(image.structuredContent), /objectKey|https?:|token|secret/iu);
+  assert.equal(records.at(-1)?.tool, "get_vk_creative_image");
+
+  const unavailable = await connected(["ads:read"], services({ vkAds: {
+    async getCreativeImage() { throw new Error("ads_vk_storage_unavailable"); },
+  } }));
+  t.after(async () => { await unavailable.client.close(); await unavailable.server.close(); });
+  const failed = await unavailable.client.callTool({ name: "get_vk_creative_image", arguments: { id } });
+  assert.equal(failed.isError, true);
+  assert.equal((failed.structuredContent as { code: string }).code, "ads_vk_storage_unavailable");
+  assert.doesNotMatch(JSON.stringify(failed), /objectKey|private-image-bytes|https?:/iu);
 });
 
 test("every advertising write requires a UUID idempotency key and strict input", async t => {

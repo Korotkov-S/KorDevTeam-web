@@ -142,7 +142,7 @@ function conversions(value: Record<string, unknown>): Record<string, string> {
   const normalized: Record<string, string> = {};
   for (const [key, entry] of entries) {
     if (!key || key.length > 160 || (!["string", "number", "boolean"].includes(typeof entry) && entry !== null)) return unavailable();
-    normalized[key] = String(entry);
+    normalized[key] = safeText(String(entry));
   }
   if (Buffer.byteLength(JSON.stringify(normalized), "utf8") > 16_384) return unavailable();
   return normalized;

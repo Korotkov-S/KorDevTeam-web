@@ -12,10 +12,26 @@ import { getGeoMonitoringService } from "../geo-monitoring/runtime";
 import { createMcpGeoService } from "../geo-monitoring/mcpService";
 import { getAdvertisingService } from "../advertising/runtime";
 import { createMcpAdvertisingService } from "../advertising/mcpService";
+import { createMcpVkAdsService, type McpVkAdsService } from "../advertising/vk/mcpService";
+import { getVkAdsReadService } from "../advertising/vk/runtime";
 
 let repository: McpTokenRepository | undefined;
 let service: McpTokenService | undefined;
 let services: ReturnType<typeof buildMcpServices> | undefined;
+let vkAds: McpVkAdsService | undefined;
+
+function getMcpVkAdsService(): McpVkAdsService {
+  const current = () => vkAds ??= createMcpVkAdsService(getVkAdsReadService());
+  return {
+    getSyncStatus: () => current().getSyncStatus(),
+    listCampaigns: input => current().listCampaigns(input),
+    listAdGroups: input => current().listAdGroups(input),
+    listAds: input => current().listAds(input),
+    getAd: id => current().getAd(id),
+    getStatistics: input => current().getStatistics(input),
+    getCreativeImage: id => current().getCreativeImage(id),
+  };
+}
 
 function buildMcpServices() {
   return {
@@ -25,6 +41,7 @@ function buildMcpServices() {
     seoForToken: (tokenId: string) => createMcpSeoService(getSeoMonitoringService(), tokenId),
     geoForToken: (tokenId: string) => createMcpGeoService(getGeoMonitoringService(), tokenId),
     adsForToken: (tokenId: string) => createMcpAdvertisingService(getAdvertisingService(), tokenId),
+    vkAds: getMcpVkAdsService(),
   };
 }
 

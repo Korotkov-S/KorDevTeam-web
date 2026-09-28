@@ -44,6 +44,15 @@ function services(): McpServices {
       async listEvents() { return { items: [], nextCursor: null }; },
       async getEconomics() { return { spend: 0 }; },
     },
+    vkAds: {
+      async getSyncStatus() { return null; },
+      async listCampaigns() { return { items: [], nextCursor: null }; },
+      async listAdGroups() { return { items: [], nextCursor: null }; },
+      async listAds() { return { items: [], nextCursor: null }; },
+      async getAd() { return null; },
+      async getStatistics() { return []; },
+      async getCreativeImage() { throw new Error("ads_vk_unavailable"); },
+    },
   } as McpServices;
 }
 
@@ -230,8 +239,8 @@ test("HTTP principal with advertising scope receives only advertising read tools
   const origin = await start(t);
   const response = await post(origin, legacyList, { authorization: "Bearer ads-token" });
   const names = (await readMcpJson(response)).result.tools.map((tool: { name: string }) => tool.name).sort();
-  assert.equal(names.length, 10);
-  assert.ok(names.every((name: string) => name.includes("ad")));
+  assert.equal(names.length, 17);
+  assert.ok(names.every((name: string) => /^(?:get|list)_(?:ad|ads|vk_)/u.test(name)));
 });
 
 test("successful MCP tool logs safe identifiers without authorization or arguments", async t => {

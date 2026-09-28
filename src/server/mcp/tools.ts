@@ -8,6 +8,7 @@ import type { McpMediaService } from "./mediaService";
 import type { McpSeoService } from "../seo-monitoring/mcpService";
 import type { McpGeoService } from "../geo-monitoring/mcpService";
 import type { McpAdvertisingService } from "../advertising/mcpService";
+import type { McpVkAdsService } from "../advertising/vk/mcpService";
 import {
   AD_CHANGED_VARIABLES,
   AD_CHANNELS,
@@ -30,6 +31,7 @@ export type McpServices = {
   seo: McpSeoService;
   geo: McpGeoService;
   ads: McpAdvertisingService;
+  vkAds: McpVkAdsService;
 };
 
 export type McpAuditRecord = {
@@ -228,6 +230,30 @@ const adPageFields = {
   limit: z.number().int().min(1).max(100).optional(),
   cursor: z.string().min(1).max(1024).optional(),
 };
+const vkAdsPageFields = {
+  limit: z.number().int().min(1).max(100).optional(),
+  cursor: z.string().min(10).max(1_024).regex(/^[A-Za-z0-9_.-]+$/u).optional(),
+};
+const vkAdsExternalId = z.string().min(1).max(160);
+const vkAdsStatus = z.string().trim().min(1).max(80);
+const vkAdsCampaignListInput = z.strictObject({ ...vkAdsPageFields, status: vkAdsStatus.optional() });
+const vkAdsGroupListInput = z.strictObject({
+  ...vkAdsPageFields,
+  campaignExternalId: vkAdsExternalId.optional(),
+  status: vkAdsStatus.optional(),
+});
+const vkAdsAdListInput = z.strictObject({
+  ...vkAdsPageFields,
+  campaignExternalId: vkAdsExternalId.optional(),
+  adGroupExternalId: vkAdsExternalId.optional(),
+  status: vkAdsStatus.optional(),
+});
+const vkAdsStatisticsInput = z.strictObject({
+  objectKind: z.enum(["campaign", "ad_group", "ad"]),
+  externalIds: z.array(vkAdsExternalId).min(1).max(100),
+  dateFrom: isoDate,
+  dateTo: isoDate,
+}).superRefine(validateSeoRange);
 const adText = (max = 2_000) => z.string().trim().min(1).max(max);
 const adNullableText = (max = 2_000) => adText(max).nullable().optional();
 const adFingerprint = z.string().regex(/^[0-9a-f]{64}$/u);
@@ -416,6 +442,9 @@ const errorMessages: Record<string, string> = {
   ads_experiment_transition_invalid: "Недопустимый переход рекламного эксперимента.",
   ads_verdict_invalid: "Итог эксперимента не соответствует состоянию или не содержит фактов выборки.",
   ads_unavailable: "Сервис рекламных знаний временно недоступен.",
+  ads_vk_contract_invalid: "Параметры чтения VK некорректны.",
+  ads_vk_storage_unavailable: "Закрытое изображение VK временно недоступно.",
+  ads_vk_unavailable: "Локальное зеркало VK временно недоступно.",
 };
 
 function compactEntry(entry: Pick<ContentEntry, "id" | "slug" | "status" | "version"> & Partial<Pick<ContentEntry, "kind" | "title" | "updatedAt" | "publishedAt">>) {
@@ -500,6 +529,41 @@ export function createKordevMcpServer(
       });
     } catch {
       // Audit delivery must not expose or change the tool result.
+    }
+    return result;
+  };
+  const runImage = async (tool: string, id: string, operation: () => Promise<{ bytes: Buffer; mimeType: string; sha256: string }>) => {
+    const startedAt = Date.now();
+    let result;
+    let errorCode: string | undefined;
+    try {
+      const image = await operation();
+      const structuredContent = {
+        id,
+        mimeType: image.mimeType,
+        byteSize: image.bytes.length,
+        sha256: image.sha256,
+      };
+      result = {
+        content: [{ type: "image" as const, data: image.bytes.toString("base64"), mimeType: image.mimeType }],
+        structuredContent,
+      };
+    } catch (error) {
+      result = failure(error);
+      errorCode = (result.structuredContent as { code: string }).code;
+    }
+    try {
+      logger({
+        tokenId: principal.tokenId,
+        adminUserId: principal.adminUserId,
+        tool,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startedAt,
+        status: result.isError ? "error" : "success",
+        ...(errorCode ? { errorCode } : {}),
+      });
+    } catch {
+      // Binary payloads and metadata never enter the audit envelope.
     }
     return result;
   };
@@ -810,6 +874,39 @@ export function createKordevMcpServer(
   }
 
   if (has("ads:read")) {
+    server.registerTool("get_vk_ads_sync_status", {
+      title: "Состояние синхронизации VK Ads",
+      description: "Возвращает состояние последней фоновой синхронизации локального зеркала.",
+      inputSchema: z.strictObject({}), outputSchema: withError(z.union([genericRecord, z.null()])), annotations: annotations(true),
+    }, () => run("get_vk_ads_sync_status", () => services.vkAds.getSyncStatus()));
+    server.registerTool("list_vk_campaigns", {
+      title: "Кампании VK Ads", description: "Читает ограниченную страницу кампаний из локального зеркала.",
+      inputSchema: vkAdsCampaignListInput, outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_vk_campaigns", () => services.vkAds.listCampaigns(input)));
+    server.registerTool("list_vk_ad_groups", {
+      title: "Группы VK Ads", description: "Читает ограниченную страницу групп из локального зеркала без targeting-списков.",
+      inputSchema: vkAdsGroupListInput, outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_vk_ad_groups", () => services.vkAds.listAdGroups(input)));
+    server.registerTool("list_vk_ads", {
+      title: "Объявления VK Ads", description: "Читает ограниченную страницу объявлений из локального зеркала.",
+      inputSchema: vkAdsAdListInput, outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_vk_ads", () => services.vkAds.listAds(input)));
+    server.registerTool("get_vk_ad", {
+      title: "Объявление VK Ads", description: "Возвращает объявление и текущую безопасную версию креатива.",
+      inputSchema: z.strictObject({ id: vkAdsExternalId }), outputSchema: withError(z.union([genericRecord, z.null()])), annotations: annotations(true),
+    }, ({ id }) => run("get_vk_ad", () => services.vkAds.getAd(id)));
+    server.registerTool("get_vk_ads_statistics", {
+      title: "Статистика VK Ads", description: "Возвращает локальные дневные метрики за диапазон не более 366 дней.",
+      inputSchema: vkAdsStatisticsInput, outputSchema: withError(z.array(genericRecord)), annotations: annotations(true),
+    }, input => run("get_vk_ads_statistics", () => services.vkAds.getStatistics(input)));
+    server.registerTool("get_vk_creative_image", {
+      title: "Изображение креатива VK Ads", description: "Возвращает проверенное закрытое изображение размером не более 5 МБ.",
+      inputSchema: z.strictObject({ id: z.uuid() }),
+      outputSchema: withError(z.strictObject({ id: z.uuid(), mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+        byteSize: z.number().int().positive().max(5 * 1024 * 1024), sha256: z.string().regex(/^[a-f0-9]{64}$/u) })),
+      annotations: annotations(true),
+    }, ({ id }) => runImage("get_vk_creative_image", id, () => services.vkAds.getCreativeImage(id)));
+
     server.registerTool("get_ads_overview", {
       title: "Сводка рекламных экспериментов",
       description: "Возвращает компактную сводку гипотез, активных экспериментов и экономики.",
