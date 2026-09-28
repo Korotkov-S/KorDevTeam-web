@@ -250,6 +250,32 @@ databaseTest("command claims are concurrency-safe and distinguish replay from co
   assert.deepEqual(failed, { state: "failed", errorCode: "ads_vendor_unavailable" });
 });
 
+databaseTest("command execution atomically commits results and rolls back failed domain writes", async () => {
+  const repository = await repositoryFixture();
+  const failedKey = randomUUID();
+  const failed = await repository.executeCommand("create_hypothesis", failedKey, "f".repeat(64), async commands => {
+    await commands.createHypothesis(hypothesisCommand("rolled-back"));
+    throw new Error("ads_test_failure");
+  });
+  assert.deepEqual(failed, { state: "failed", errorCode: "ads_test_failure" });
+  assert.equal((await repository.listHypotheses({}, {})).items.length, 0);
+  assert.deepEqual(await repository.claimCommand("create_hypothesis", failedKey, "f".repeat(64)), failed);
+
+  const successKey = randomUUID();
+  let executions = 0;
+  const execute = () => repository.executeCommand("create_hypothesis", successKey, "9".repeat(64), async commands => {
+    executions++;
+    const row = await commands.createHypothesis(hypothesisCommand("committed"));
+    return { id: row.id, version: row.version };
+  });
+  const first = await execute();
+  const replay = await execute();
+  assert.equal(first.state, "replay");
+  assert.deepEqual(replay, first);
+  assert.equal(executions, 1);
+  assert.equal((await repository.listHypotheses({}, {})).items.length, 1);
+});
+
 databaseTest("superseding a learning is atomic and checks the previous version", async () => {
   const { repository, hypothesis, experiment } = await experimentFixture();
   const previous = await repository.createLearning({
@@ -289,6 +315,6 @@ databaseTest("repository exposes the bounded service primitive surface", async (
     "claimCommand", "completeCommand", "failCommand", "createResearchSource", "createMarketSignal",
     "createHypothesis", "updateHypothesis", "createExperiment", "saveApproval", "transitionExperiment",
     "upsertVariantBinding", "insertMetricSnapshot", "upsertLeadAttribution", "appendEvent", "finishExperiment",
-    "createLearning", "appendManualNote",
+    "createLearning", "appendManualNote", "executeCommand",
   ]) assert.equal(typeof repository[method as keyof typeof repository], "function", method);
 });

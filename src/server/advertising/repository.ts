@@ -45,6 +45,8 @@ import type {
 } from "./contracts";
 
 export type AdvertisingDatabase = ReturnType<typeof createDb>;
+export type AdvertisingTransaction = Parameters<Parameters<AdvertisingDatabase["transaction"]>[0]>[0];
+type AdvertisingExecutor = AdvertisingDatabase | AdvertisingTransaction;
 type Cursor = { createdAt: Date; id: string };
 
 export type ResearchSourceFilters = {
@@ -78,6 +80,27 @@ export type CommandClaim =
   | { state: "replay"; result: JsonRecord }
   | { state: "failed"; errorCode: string }
   | { state: "conflict" };
+
+export interface AdvertisingCommandRepository {
+  getHypothesis(id: string): Promise<typeof adHypotheses.$inferSelect | null>;
+  getExperiment(id: string): Promise<(Pick<typeof adExperiments.$inferSelect,
+    "id" | "status" | "version" | "passportFingerprint"> & JsonRecord) | null>;
+  createResearchSource(input: ResearchSourceCommand & { fingerprint: string }): Promise<typeof adResearchSources.$inferSelect>;
+  createMarketSignal(input: MarketSignalCommand & { fingerprint: string }): Promise<typeof adMarketSignals.$inferSelect>;
+  createHypothesis(input: HypothesisCommand): Promise<typeof adHypotheses.$inferSelect>;
+  updateHypothesis(id: string, expectedVersion: number,
+    input: Partial<Omit<typeof adHypotheses.$inferInsert, "id" | "version" | "createdAt" | "updatedAt">>): Promise<typeof adHypotheses.$inferSelect>;
+  createExperiment(input: ExperimentCommand & { passportFingerprint: string }): Promise<typeof adExperiments.$inferSelect>;
+  saveApproval(input: ApprovalCommand, approvedBy: AdActor): Promise<typeof adExperiments.$inferSelect>;
+  transitionExperiment(id: string, expectedVersion: number, status: AdExperimentStatus): Promise<typeof adExperiments.$inferSelect>;
+  upsertVariantBinding(input: VariantBindingCommand): Promise<typeof adExperimentVariants.$inferSelect>;
+  insertMetricSnapshot(input: MetricSnapshotCommand): Promise<typeof adMetricSnapshots.$inferSelect>;
+  upsertLeadAttribution(input: LeadAttributionCommand): Promise<typeof adLeadAttributions.$inferSelect>;
+  appendEvent(input: ExperimentEventCommand, actor: AdActor): Promise<typeof adExperimentEvents.$inferSelect>;
+  finishExperiment(input: ExperimentVerdictCommand, status?: AdExperimentStatus): Promise<typeof adExperiments.$inferSelect>;
+  createLearning(input: LearningCommand, supersedes?: { id: string; expectedVersion: number }): Promise<typeof adLearnings.$inferSelect>;
+  appendManualNote(input: ManualNoteCommand, actor: AdActor): Promise<typeof adExperimentEvents.$inferSelect>;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -164,8 +187,31 @@ function experimentSummarySelection() {
   };
 }
 
-export function createAdvertisingRepository(db: AdvertisingDatabase) {
+export function createAdvertisingRepository(db: AdvertisingExecutor) {
   return {
+    async executeCommand(
+      commandName: string,
+      idempotencyKey: string,
+      requestHash: string,
+      operation: (repository: AdvertisingCommandRepository) => Promise<JsonRecord>,
+    ): Promise<CommandClaim> {
+      return db.transaction(async outer => {
+        const receiptRepository = createAdvertisingRepository(outer);
+        const claim = await receiptRepository.claimCommand(commandName, idempotencyKey, requestHash);
+        if (claim.state !== "claimed") return claim;
+        try {
+          const result = await outer.transaction(async nested => operation(createAdvertisingRepository(nested)));
+          await receiptRepository.completeCommand(idempotencyKey, result);
+          return { state: "replay", result };
+        } catch (error) {
+          const errorCode = error instanceof Error && /^ads_[a-z0-9_]+$/u.test(error.message)
+            ? error.message : "ads_unavailable";
+          await receiptRepository.failCommand(idempotencyKey, errorCode);
+          return { state: "failed", errorCode };
+        }
+      });
+    },
+
     async getOverview() {
       const [counts] = await db.select({
         activeExperiments: sql<number>`count(*) filter (where ${adExperiments.status} in ('creating','moderation','scheduled','running','stopping'))::int`,
