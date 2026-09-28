@@ -6,6 +6,16 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 import { createDb } from "./client";
 import {
+  adCommandReceipts,
+  adExperimentEvents,
+  adExperimentVariants,
+  adExperiments,
+  adHypotheses,
+  adLeadAttributions,
+  adLearnings,
+  adMarketSignals,
+  adMetricSnapshots,
+  adResearchSources,
   adminAuthLimits,
   adminSessions,
   adminUsers,
@@ -37,6 +47,31 @@ import { resetTestDatabase } from "./testDatabase";
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
 
+test("advertising schema exposes the ten bounded knowledge tables", () => {
+  for (const table of [
+    adResearchSources,
+    adMarketSignals,
+    adHypotheses,
+    adExperiments,
+    adExperimentVariants,
+    adMetricSnapshots,
+    adLeadAttributions,
+    adExperimentEvents,
+    adLearnings,
+    adCommandReceipts,
+  ]) assert.ok(table);
+
+  assert.equal("fingerprint" in adResearchSources, true);
+  assert.equal("evidenceQuality" in adHypotheses, true);
+  assert.equal("passportFingerprint" in adExperiments, true);
+  assert.equal("periodEnd" in adMetricSnapshots, true);
+  assert.equal("updatedAt" in adMetricSnapshots, false);
+  assert.equal("updatedAt" in adExperimentEvents, false);
+  assert.equal("phone" in adLeadAttributions, false);
+  assert.equal("email" in adLeadAttributions, false);
+  assert.equal("idempotencyKey" in adCommandReceipts, true);
+});
+
 test("SEO schema exposes separate Yandex control-rank checks and runs", () => {
   assert.ok(seoRankChecks);
   assert.ok(seoRankRuns);
@@ -62,6 +97,7 @@ test("SEO schema keeps Yandex Metrica traffic separate from search observations"
 databaseTest("0012 reconstructs legacy GEO prompt sets and distrusts incomplete runs", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropAdvertisingSchema(db);
   await db.execute(sql`ALTER TABLE geo_runs
     DROP CONSTRAINT geo_runs_prompt_ids_bounded,
     DROP CONSTRAINT geo_runs_plan_matches_prompts,
@@ -187,6 +223,112 @@ async function assertDatabaseCode(operation: () => Promise<unknown>, expectedCod
   });
 }
 
+databaseTest("advertising schema enforces fingerprints, scores, budgets, periods and idempotency", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+
+  await assertConstraintViolation(() => db.insert(adResearchSources).values({
+    url: "https://ads.vk.ru/guide",
+    publisher: "VK",
+    sourceType: "official_guide",
+    channel: "vk",
+    evidenceGrade: "A",
+    fingerprint: "bad",
+  }));
+
+  const [source] = await db.insert(adResearchSources).values({
+    url: "https://ads.vk.ru/guide",
+    publisher: "VK",
+    sourceType: "official_guide",
+    channel: "vk",
+    evidenceGrade: "A",
+    fingerprint: "a".repeat(64),
+  }).returning();
+  assert.ok(source);
+
+  const hypothesisValues = {
+    service: "Техническая поддержка",
+    problem: "Сайт регулярно ломается",
+    audience: "Владелец работающего сайта",
+    offer: "Берём поддержку на себя",
+    proof: "Кейс восстановления",
+    creativeAngle: "Сайт снова работает",
+    conversionPath: "site" as const,
+    changedVariable: "offer" as const,
+    controls: {},
+    primaryMetric: "qualified_lead_cost" as const,
+    guardMetrics: {},
+    expectedEffect: "Получить квалифицированные обращения",
+    minimumData: { qualifiedLeads: 3 },
+    dailyBudget: "1500.00",
+    totalBudget: "10000.00",
+    durationDays: 7,
+    stopConditions: { maximumSpend: 10000 },
+    impact: 4,
+    confidence: 3,
+    ease: 4,
+    evidenceQuality: 3,
+    rationale: "Проверяем оффер отдельно",
+  };
+  await assertConstraintViolation(() => db.insert(adHypotheses).values({ ...hypothesisValues, impact: 0 }));
+  await assertConstraintViolation(() => db.insert(adHypotheses).values({ ...hypothesisValues, totalBudget: "-1.00" }));
+
+  const [hypothesis] = await db.insert(adHypotheses).values(hypothesisValues).returning();
+  assert.ok(hypothesis);
+  const [experiment] = await db.insert(adExperiments).values({
+    hypothesisId: hypothesis.id,
+    hypothesisVersion: hypothesis.version,
+    passport: { offer: hypothesis.offer },
+    passportFingerprint: "b".repeat(64),
+    dailyBudget: "1500.00",
+    totalBudget: "10000.00",
+    schedule: {},
+    kpi: { primary: "qualified_lead_cost" },
+    decisionRules: {},
+  }).returning();
+  assert.ok(experiment);
+  const [variant] = await db.insert(adExperimentVariants).values({
+    experimentId: experiment.id,
+    role: "control",
+    name: "Оффер поддержки",
+    textVersion: { headline: "Поддержка сайта" },
+    creativeVersion: { assetId: "creative-1" },
+    audienceFingerprint: "c".repeat(64),
+    conversionPath: "site",
+  }).returning();
+  assert.ok(variant);
+
+  const snapshot = {
+    experimentId: experiment.id,
+    variantId: variant.id,
+    source: "vk_ads",
+    externalObjectId: "banner-1",
+    granularity: "hour" as const,
+    periodStart: new Date("2026-09-28T07:00:00.000Z"),
+    periodEnd: new Date("2026-09-28T08:00:00.000Z"),
+    spend: "100.00",
+    impressions: 100,
+    reach: 90,
+    clicks: 3,
+    formOpens: 1,
+    leads: 0,
+  };
+  await assertConstraintViolation(() => db.insert(adMetricSnapshots).values({ ...snapshot, periodEnd: snapshot.periodStart }));
+  await db.insert(adMetricSnapshots).values(snapshot);
+  await assertConstraintViolation(() => db.insert(adMetricSnapshots).values(snapshot));
+
+  const receipt = {
+    idempotencyKey: "00000000-0000-4000-8000-000000000099",
+    commandName: "create_ad_hypothesis",
+    requestHash: "d".repeat(64),
+    status: "completed" as const,
+    completedAt: new Date("2026-09-28T09:00:00.000Z"),
+    safeResult: { id: hypothesis.id },
+  };
+  await db.insert(adCommandReceipts).values(receipt);
+  await assertConstraintViolation(() => db.insert(adCommandReceipts).values(receipt));
+});
+
 async function dropGeoSchema(db: ReturnType<typeof createDb>) {
   await db.execute(sql`DROP TABLE IF EXISTS
     geo_experiment_prompts,
@@ -217,6 +359,36 @@ async function dropGeoSchema(db: ReturnType<typeof createDb>) {
     geo_run_mode,
     geo_run_status,
     geo_sentiment`);
+}
+
+async function dropAdvertisingSchema(db: ReturnType<typeof createDb>) {
+  await db.execute(sql`DROP TABLE IF EXISTS
+    ad_command_receipts,
+    ad_experiment_events,
+    ad_metric_snapshots,
+    ad_lead_attributions,
+    ad_learnings,
+    ad_experiment_variants,
+    ad_experiments,
+    ad_hypotheses,
+    ad_market_signals,
+    ad_research_sources CASCADE`);
+  await db.execute(sql`DROP TYPE IF EXISTS
+    ad_actor_kind,
+    ad_changed_variable,
+    ad_channel,
+    ad_command_status,
+    ad_conversion_path,
+    ad_evidence_grade,
+    ad_experiment_status,
+    ad_experiment_verdict,
+    ad_hypothesis_status,
+    ad_lead_classification,
+    ad_learning_confidence,
+    ad_metric_granularity,
+    ad_primary_metric,
+    ad_research_source_type,
+    ad_variant_status`);
 }
 
 async function seoMetricFixture(databaseUrl: string) {
@@ -468,6 +640,7 @@ databaseTest("SEO query lifecycle defaults to a candidate and rejects incoherent
 databaseTest("0008 promotes non-API tracked queries but turns legacy API noise into candidates", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropAdvertisingSchema(db);
   await dropGeoSchema(db);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS status`);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS kind`);
@@ -697,6 +870,7 @@ databaseTest("lead delivery and rate-limit counters reject negative values", asy
 databaseTest("0002 additively upgrades existing delivery jobs with a zero provider counter", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropAdvertisingSchema(db);
   await dropGeoSchema(db);
   const [lead] = await db.insert(leads).values(leadFixture).returning();
   await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });

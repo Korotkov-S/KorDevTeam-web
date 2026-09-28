@@ -25,6 +25,8 @@ const scopeLabels: Record<McpScope, string> = {
   "media:write": "Загружать изображения",
   "seo:read": "Читать SEO-метрики, изменения и рекомендации",
   "seo:write": "Записывать SEO-рекомендации и журнал изменений",
+  "ads:read": "Читать рекламные гипотезы, эксперименты и экономику",
+  "ads:write": "Записывать рекламные исследования и результаты экспериментов",
 };
 
 function formatDate(value: string | null): string {

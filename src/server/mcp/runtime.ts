@@ -10,6 +10,8 @@ import { getSeoMonitoringService } from "../seo-monitoring/runtime";
 import { createMcpSeoService } from "../seo-monitoring/mcpService";
 import { getGeoMonitoringService } from "../geo-monitoring/runtime";
 import { createMcpGeoService } from "../geo-monitoring/mcpService";
+import { getAdvertisingService } from "../advertising/runtime";
+import { createMcpAdvertisingService } from "../advertising/mcpService";
 
 let repository: McpTokenRepository | undefined;
 let service: McpTokenService | undefined;
@@ -22,6 +24,7 @@ function buildMcpServices() {
     media: createMcpMediaService(getMediaService()),
     seoForToken: (tokenId: string) => createMcpSeoService(getSeoMonitoringService(), tokenId),
     geoForToken: (tokenId: string) => createMcpGeoService(getGeoMonitoringService(), tokenId),
+    adsForToken: (tokenId: string) => createMcpAdvertisingService(getAdvertisingService(), tokenId),
   };
 }
 
