@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import * as databaseSchema from "../../db/schema";
@@ -32,7 +32,13 @@ import { redactVkAdsLogRecord, VkAdsError } from "./errors";
 
 type Db = NodePgDatabase<typeof databaseSchema>;
 type Counters = Record<string, number>;
-type PageWrite<T> = { runId: string; items: T[]; checkpoint: VkAdsCheckpoint | null; counters: Counters };
+type PageWrite<T> = {
+  runId: string;
+  items: T[];
+  checkpoint: VkAdsCheckpoint | null;
+  counters: Counters;
+  stage?: string;
+};
 type CursorKey = { lastSeenAt: Date; id: string };
 
 function unavailable(): never {
@@ -135,15 +141,82 @@ function conversions(value: Record<string, unknown>): Record<string, string> {
   if (entries.length > 100) return unavailable();
   const normalized: Record<string, string> = {};
   for (const [key, entry] of entries) {
-    if (!key || key.length > 160 || !["string", "number", "boolean"].includes(typeof entry) && entry !== null) return unavailable();
+    if (!key || key.length > 160 || (!["string", "number", "boolean"].includes(typeof entry) && entry !== null)) return unavailable();
     normalized[key] = String(entry);
   }
   if (Buffer.byteLength(JSON.stringify(normalized), "utf8") > 16_384) return unavailable();
   return normalized;
 }
 
+async function storeCreativeVersionTx(
+  tx: Parameters<Parameters<Db["transaction"]>[0]>[0],
+  record: VkAdsCreativeVersionRecord,
+): Promise<"created" | "unchanged"> {
+  const ads = await tx.select({ id: adVkAds.id }).from(adVkAds)
+    .innerJoin(adVkAccounts, eq(adVkAds.accountId, adVkAccounts.id))
+    .where(and(
+      eq(adVkAds.externalId, record.adExternalId),
+      eq(adVkAccounts.externalId, record.accountExternalId),
+    )).limit(2);
+  if (ads.length !== 1) return unavailable();
+  const textBlocks = record.textBlocks.map(safeText);
+  const cta = record.cta ? safeText(record.cta) : null;
+  const recordFingerprint = vkAdsFingerprint({
+    adExternalId: record.adExternalId,
+    accountExternalId: record.accountExternalId,
+    mediaKind: record.mediaKind,
+    format: record.format,
+    textBlocks,
+    cta,
+    width: record.width,
+    height: record.height,
+    durationSeconds: record.durationSeconds,
+    contentIds: record.contentIds,
+    imageSha256: record.imageSha256,
+    videoSourceUrl: record.videoSourceUrl,
+  });
+  const [existing] = await tx.select().from(adVkCreativeVersions).where(and(
+    eq(adVkCreativeVersions.adId, ads[0].id),
+    eq(adVkCreativeVersions.fingerprint, recordFingerprint),
+  ));
+  if (existing) return "unchanged";
+  const activeFrom = date(record.activeFrom)!;
+  const [current] = await tx.select({ activeFrom: adVkCreativeVersions.activeFrom }).from(adVkCreativeVersions).where(and(
+    eq(adVkCreativeVersions.adId, ads[0].id),
+    isNull(adVkCreativeVersions.activeTo),
+  )).limit(1);
+  if (current && activeFrom <= current.activeFrom) return unavailable();
+  await tx.update(adVkCreativeVersions).set({ activeTo: activeFrom }).where(and(
+    eq(adVkCreativeVersions.adId, ads[0].id),
+    isNull(adVkCreativeVersions.activeTo),
+    lt(adVkCreativeVersions.activeFrom, activeFrom),
+  ));
+  await tx.insert(adVkCreativeVersions).values({
+    adId: ads[0].id,
+    fingerprint: recordFingerprint,
+    mediaKind: record.mediaKind,
+    textBlocks,
+    cta,
+    format: record.format,
+    width: record.width,
+    height: record.height,
+    durationSeconds: record.durationSeconds,
+    contentIds: record.contentIds,
+    imageSha256: record.imageSha256,
+    imageObjectKey: record.imageObjectKey,
+    videoSourceUrl: record.videoSourceUrl,
+    activeFrom,
+    activeTo: date(record.activeTo),
+  });
+  return "created";
+}
+
 export function createVkAdsRepository(db: Db) {
   return {
+    async checkReady(): Promise<void> {
+      await db.execute(sql`SELECT 1`);
+    },
+
     async startRun(input: { mode: VkAdsSyncMode; stage: string; checkpoint: VkAdsCheckpoint | null }) {
       const [run] = await db.insert(adVkSyncRuns).values({
         mode: input.mode,
@@ -166,7 +239,23 @@ export function createVkAdsRepository(db: Db) {
         checkpoint: run.checkpoint,
         counters: run.counters,
         correlationId: run.correlationId,
+        coveredDateFrom: run.coveredDateFrom,
+        coveredDateTo: run.coveredDateTo,
       } : null;
+    },
+
+    async resumeBackfillRun(runId: string) {
+      const [run] = await db.update(adVkSyncRuns).set({
+        status: "running",
+        errorCode: null,
+        finishedAt: null,
+      }).where(and(
+        eq(adVkSyncRuns.id, runId),
+        eq(adVkSyncRuns.mode, "backfill"),
+        eq(adVkSyncRuns.status, "partial"),
+      )).returning();
+      if (!run) return unavailable();
+      return { id: run.id, correlationId: run.correlationId, startedAt: run.startedAt.toISOString() };
     },
 
     async storeAccount(record: VkAdsAccountRecord): Promise<void> {
@@ -288,7 +377,7 @@ export function createVkAdsRepository(db: Db) {
       });
     },
 
-    async storeAdPage(input: PageWrite<VkAdsAdRecord>): Promise<void> {
+    async storeAdPage(input: PageWrite<VkAdsAdRecord> & { creatives?: VkAdsCreativeVersionRecord[] }): Promise<void> {
       await db.transaction(async (tx) => {
         for (const record of input.items) {
           const parentAccountId = await accountId(tx, record.accountExternalId);
@@ -331,6 +420,7 @@ export function createVkAdsRepository(db: Db) {
             set: { ...values, firstSeenAt: sql`${adVkAds.firstSeenAt}` },
           });
         }
+        for (const creative of input.creatives ?? []) await storeCreativeVersionTx(tx, creative);
         await advanceRun(tx, input.runId, input);
       });
     },
@@ -342,59 +432,37 @@ export function createVkAdsRepository(db: Db) {
     },
 
     async storeCreativeVersion(record: VkAdsCreativeVersionRecord): Promise<"created" | "unchanged"> {
-      return db.transaction(async (tx) => {
-        const ads = await tx.select({ id: adVkAds.id }).from(adVkAds).where(eq(adVkAds.externalId, record.adExternalId)).limit(2);
-        if (ads.length !== 1) return unavailable();
-        const textBlocks = record.textBlocks.map(safeText);
-        const cta = record.cta ? safeText(record.cta) : null;
-        const recordFingerprint = vkAdsFingerprint({
-          adExternalId: record.adExternalId,
-          mediaKind: record.mediaKind,
-          format: record.format,
-          textBlocks,
-          cta,
-          width: record.width,
-          height: record.height,
-          durationSeconds: record.durationSeconds,
-          contentIds: record.contentIds,
-          imageSha256: record.imageSha256,
-          videoSourceUrl: record.videoSourceUrl,
-        });
-        const [existing] = await tx.select().from(adVkCreativeVersions).where(and(
-          eq(adVkCreativeVersions.adId, ads[0].id),
-          eq(adVkCreativeVersions.fingerprint, recordFingerprint),
-        ));
-        if (existing) return "unchanged";
-        const activeFrom = date(record.activeFrom)!;
-        const [current] = await tx.select({ activeFrom: adVkCreativeVersions.activeFrom }).from(adVkCreativeVersions).where(and(
-          eq(adVkCreativeVersions.adId, ads[0].id),
-          isNull(adVkCreativeVersions.activeTo),
-        )).limit(1);
-        if (current && activeFrom <= current.activeFrom) return unavailable();
-        await tx.update(adVkCreativeVersions).set({ activeTo: activeFrom }).where(and(
-          eq(adVkCreativeVersions.adId, ads[0].id),
-          isNull(adVkCreativeVersions.activeTo),
-          lt(adVkCreativeVersions.activeFrom, activeFrom),
-        ));
-        await tx.insert(adVkCreativeVersions).values({
-          adId: ads[0].id,
-          fingerprint: recordFingerprint,
-          mediaKind: record.mediaKind,
-          textBlocks,
-          cta,
-          format: record.format,
-          width: record.width,
-          height: record.height,
-          durationSeconds: record.durationSeconds,
-          contentIds: record.contentIds,
-          imageSha256: record.imageSha256,
-          imageObjectKey: record.imageObjectKey,
-          videoSourceUrl: record.videoSourceUrl,
-          activeFrom,
-          activeTo: date(record.activeTo),
-        });
-        return "created";
-      });
+      return db.transaction((tx) => storeCreativeVersionTx(tx, record));
+    },
+
+    async getEarliestCampaignCreatedAt(): Promise<Date | null> {
+      const [row] = await db.select({ value: adVkCampaigns.sourceCreatedAt }).from(adVkCampaigns)
+        .where(isNotNull(adVkCampaigns.sourceCreatedAt)).orderBy(asc(adVkCampaigns.sourceCreatedAt)).limit(1);
+      return row?.value ?? null;
+    },
+
+    async getLatestSourceUpdate(kind: "ad_group" | "ad"): Promise<Date | null> {
+      if (kind === "ad_group") {
+        const [row] = await db.select({ value: adVkAdGroups.sourceUpdatedAt }).from(adVkAdGroups)
+          .where(isNotNull(adVkAdGroups.sourceUpdatedAt)).orderBy(desc(adVkAdGroups.sourceUpdatedAt)).limit(1);
+        return row?.value ?? null;
+      }
+      const [row] = await db.select({ value: adVkAds.sourceUpdatedAt }).from(adVkAds)
+        .where(isNotNull(adVkAds.sourceUpdatedAt)).orderBy(desc(adVkAds.sourceUpdatedAt)).limit(1);
+      return row?.value ?? null;
+    },
+
+    async listExternalIds(kind: VkAdsObjectKind): Promise<string[]> {
+      if (kind === "campaign") {
+        return (await db.select({ externalId: adVkCampaigns.externalId }).from(adVkCampaigns).orderBy(adVkCampaigns.externalId))
+          .map((row) => row.externalId);
+      }
+      if (kind === "ad_group") {
+        return (await db.select({ externalId: adVkAdGroups.externalId }).from(adVkAdGroups).orderBy(adVkAdGroups.externalId))
+          .map((row) => row.externalId);
+      }
+      return (await db.select({ externalId: adVkAds.externalId }).from(adVkAds).orderBy(adVkAds.externalId))
+        .map((row) => row.externalId);
     },
 
     async storeMetricWindow(input: PageWrite<VkAdsDailyMetricRecord>): Promise<void> {

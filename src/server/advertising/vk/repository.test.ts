@@ -50,7 +50,7 @@ const ad: VkAdsAdRecord = {
   firstSeenAt: seen, lastSeenAt: seen, inactiveAt: null,
 };
 const creative = (fingerprint: string, activeFrom: string, imageSha256 = "e".repeat(64)): VkAdsCreativeVersionRecord => ({
-  adExternalId: "ad-1", mediaKind: "image", format: "square", textBlocks: ["Support"], cta: "More",
+  adExternalId: "ad-1", accountExternalId: "account-1", mediaKind: "image", format: "square", textBlocks: ["Support"], cta: "More",
   width: 1080, height: 1080, durationSeconds: null, contentIds: ["content-1"], imageSourceUrl: null,
   videoSourceUrl: null, fingerprint, imageSha256, imageObjectKey: `ads/vk/creatives/11111111-2222-4333-8444-${fingerprint.slice(0, 12)}`,
   activeFrom, activeTo: null,

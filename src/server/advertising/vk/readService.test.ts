@@ -84,7 +84,7 @@ databaseTest("local reads filter hierarchy, preserve numeric precision and redac
   }] });
   const objectKey = "ads/vk/creatives/11111111-2222-4333-8444-555555555555";
   await repository.storeCreativeVersion({
-    adExternalId: "ad-1", mediaKind: "image", format: "square", textBlocks: ["Write owner@example.test"],
+    adExternalId: "ad-1", accountExternalId: "account-1", mediaKind: "image", format: "square", textBlocks: ["Write owner@example.test"],
     cta: "Call +7 999 123-45-67", width: 1080, height: 1080, durationSeconds: null, contentIds: [],
     imageSourceUrl: null, videoSourceUrl: null, fingerprint: "e".repeat(64), imageSha256: "f".repeat(64),
     imageObjectKey: objectKey, activeFrom: seen, activeTo: null,

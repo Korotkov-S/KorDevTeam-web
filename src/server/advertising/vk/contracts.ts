@@ -168,6 +168,7 @@ export type VkAdsAdRecord = Omit<VkAdsAdSource, "creative"> & {
 
 export type VkAdsCreativeVersionRecord = VkAdsCreativeSource & {
   adExternalId: string;
+  accountExternalId: string;
   fingerprint: string;
   imageSha256: string | null;
   imageObjectKey: string | null;
