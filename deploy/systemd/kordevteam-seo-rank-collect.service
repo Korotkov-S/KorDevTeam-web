@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=kordevteam
+User=root
 WorkingDirectory=/opt/kordevteam/current
 EnvironmentFile=/etc/kordevteam/operations.env
 ExecStart=/bin/bash /opt/kordevteam/current/scripts/run-seo-rank-collect.sh

@@ -77,6 +77,8 @@ test("systemd separates daily free collection from weekly night rank control", (
   const rankTimer = readFileSync("deploy/systemd/kordevteam-seo-rank-collect.timer", "utf8");
   assert.match(service, /^ExecStart=\/bin\/bash \/opt\/kordevteam\/current\/scripts\/run-seo-collect\.sh$/m);
   assert.match(rankService, /^ExecStart=\/bin\/bash \/opt\/kordevteam\/current\/scripts\/run-seo-rank-collect\.sh$/m);
+  assert.match(service, /^User=root$/m);
+  assert.match(rankService, /^User=root$/m);
   assert.match(timer, /^OnCalendar=\*-\*-\* 07:30:00 Europe\/Moscow$/m);
   assert.match(rankTimer, /^OnCalendar=Mon \*-\*-\* 00:30:00 Europe\/Moscow$/m);
   assert.match(timer, /^Persistent=true$/m);
