@@ -12,6 +12,16 @@ export default [
     route("admin/", "routes/admin/index.tsx"),
     route("admin/media/", "routes/admin/media.tsx"),
     route("admin/mcp/", "routes/admin/mcp.tsx"),
+    layout("routes/admin/ads-layout.tsx", [
+      route("admin/ads/", "routes/admin/ads-overview.tsx"),
+      route("admin/ads/hypotheses/", "routes/admin/ads-hypotheses.tsx"),
+      route("admin/ads/experiments/", "routes/admin/ads-experiments.tsx"),
+      route("admin/ads/experiments/:id/", "routes/admin/ads-experiment.tsx"),
+      route("admin/ads/radar/", "routes/admin/ads-radar.tsx"),
+      route("admin/ads/learnings/", "routes/admin/ads-learnings.tsx"),
+      route("admin/ads/economics/", "routes/admin/ads-economics.tsx"),
+      route("admin/ads/events/", "routes/admin/ads-events.tsx"),
+    ]),
     layout("routes/admin/seo-layout.tsx", [
       route("admin/seo/", "routes/admin/seo-overview.tsx"),
       route("admin/seo/positions/", "routes/admin/seo-positions.tsx"),

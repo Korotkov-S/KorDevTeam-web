@@ -222,6 +222,16 @@ export function createAdvertisingRepository(db: AdvertisingExecutor) {
       const economics = await this.getEconomics({});
       const [latest] = await db.select({ createdAt: adMetricSnapshots.createdAt })
         .from(adMetricSnapshots).orderBy(desc(adMetricSnapshots.createdAt)).limit(1);
+      const [active] = await db.select({
+        id: adExperiments.id,
+        status: adExperiments.status,
+        dailyBudget: adExperiments.dailyBudget,
+        totalBudget: adExperiments.totalBudget,
+      }).from(adExperiments)
+        .where(sql`${adExperiments.status} in ('creating','moderation','scheduled','running','stopping')`)
+        .orderBy(desc(adExperiments.updatedAt), desc(adExperiments.id)).limit(1);
+      const activeEconomics = active ? await this.getEconomics({ experimentId: active.id }) : null;
+      const activeSpent = activeEconomics?.spend ?? 0;
       return {
         activeExperiments: counts?.activeExperiments ?? 0,
         awaitingApproval: counts?.awaitingApproval ?? 0,
@@ -229,6 +239,14 @@ export function createAdvertisingRepository(db: AdvertisingExecutor) {
         learnings: learnings?.count ?? 0,
         ...economics,
         lastMetricAt: latest?.createdAt ?? null,
+        activeExperiment: active ? {
+          id: active.id,
+          status: active.status,
+          dailyBudget: number(active.dailyBudget),
+          totalBudget: number(active.totalBudget),
+          spentAmount: activeSpent,
+          remainingBudget: Math.max(0, number(active.totalBudget) - activeSpent),
+        } : null,
       };
     },
 

@@ -165,6 +165,7 @@ databaseTest("repository applies optimistic versions and keeps list/detail read 
 
 databaseTest("repository preserves append-only measurements and computes commercial economics", async () => {
   const { repository, experiment } = await experimentFixture();
+  await repository.transitionExperiment(experiment.id, 1, "running");
   const variant = await repository.upsertVariantBinding({
     experimentId: experiment.id,
     role: "control",
@@ -224,6 +225,14 @@ databaseTest("repository preserves append-only measurements and computes commerc
   const overview = await repository.getOverview();
   assert.equal(overview.spend, 120);
   assert.equal(overview.qualified, 2);
+  assert.deepEqual(overview.activeExperiment, {
+    id: experiment.id,
+    status: "running",
+    dailyBudget: 1500,
+    totalBudget: 10500,
+    spentAmount: 120,
+    remainingBudget: 10380,
+  });
 });
 
 databaseTest("command claims are concurrency-safe and distinguish replay from conflict", async () => {
