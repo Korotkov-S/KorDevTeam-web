@@ -238,9 +238,9 @@ const adForbiddenKeys = /^(?:name|phone|email|file|token|secret|authorization|co
 function adSafeEvidence(value: unknown): boolean {
   const visit = (item: unknown, depth: number): boolean => {
     if (depth > 8) return false;
-    if (typeof item === "string") return item.length <= 4_000
-      && !/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u.test(item)
-      && !/(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u.test(item);
+    if (typeof item === "string") return item.length <= 4_000 && (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(item)
+      || (!/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u.test(item)
+        && !/(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u.test(item)));
     if (typeof item === "number") return Number.isFinite(item);
     if (item === null || typeof item === "boolean") return true;
     if (Array.isArray(item)) return item.length <= 100 && item.every(value => visit(value, depth + 1));

@@ -31,6 +31,7 @@ const forbiddenResponseKeys = /^(?:phone|email|file|token|secret|authorization|c
 
 function safeJson<T>(value: T, depth = 0): T {
   if (depth > 8) return null as T;
+  if (value instanceof Date) return value.toISOString() as T;
   if (typeof value === "string") return value.slice(0, 4000) as T;
   if (Array.isArray(value)) return value.slice(0, 100).map(item => safeJson(item, depth + 1)) as T;
   if (!value || typeof value !== "object") return value;

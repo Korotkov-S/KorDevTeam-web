@@ -59,6 +59,7 @@ const forbiddenKeys = new Set([
 ]);
 const emailLike = /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u;
 const phoneLike = /(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u;
+const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function inspectFreeForm(value: unknown): boolean {
   try {
@@ -67,7 +68,7 @@ function inspectFreeForm(value: unknown): boolean {
     return false;
   }
   const visit = (item: unknown): boolean => {
-    if (typeof item === "string") return !emailLike.test(item) && !phoneLike.test(item);
+    if (typeof item === "string") return uuidLike.test(item) || (!emailLike.test(item) && !phoneLike.test(item));
     if (Array.isArray(item)) return item.every(visit);
     if (!item || typeof item !== "object") return true;
     return Object.entries(item as Record<string, unknown>).every(([key, nested]) => (

@@ -100,5 +100,6 @@ test("MCP advertising lists return compact summaries instead of raw rule payload
   }), TOKEN_ID);
   const serialized = JSON.stringify(await service.listHypotheses({}));
   assert.match(serialized, /Поддержка|Диагностика/u);
+  assert.match(serialized, /2026-09-28T09:00:00.000Z/u);
   assert.doesNotMatch(serialized, /RAW_CONTROLS|RAW_RULES|controls|stopConditions/u);
 });
