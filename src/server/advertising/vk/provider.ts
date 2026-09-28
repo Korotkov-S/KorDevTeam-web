@@ -10,6 +10,7 @@ import type {
   VkAdsProviderPageInput,
 } from "./contracts";
 import { VK_ADS_ORIGIN } from "./config";
+import type { DownloadedVkCreativeImage } from "./creativeDownloader";
 import { redactVkAdsLogRecord, VkAdsError, type VkAdsErrorCode } from "./errors";
 import type { VkAdsTokenManager } from "./tokenManager";
 import {
@@ -46,12 +47,7 @@ const MAX_STATISTICS_IDS = 10_000;
 const STATISTICS_BATCH_SIZE = 100;
 const MAX_ATTEMPTS = 4;
 
-export type VkAdsCreativeDownload = {
-  bytes: Buffer;
-  mimeType: "image/jpeg" | "image/png" | "image/webp";
-  sha256: string;
-  sourceUrl: string;
-};
+export type VkAdsCreativeDownload = DownloadedVkCreativeImage;
 
 type VkAdsProviderDependencies = {
   tokenManager: Pick<VkAdsTokenManager, "getAccessToken" | "forceRefresh">;
