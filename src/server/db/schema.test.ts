@@ -363,6 +363,15 @@ async function dropGeoSchema(db: ReturnType<typeof createDb>) {
 
 async function dropAdvertisingSchema(db: ReturnType<typeof createDb>) {
   await db.execute(sql`DROP TABLE IF EXISTS
+    ad_vk_experiment_links,
+    ad_vk_daily_metrics,
+    ad_vk_creative_versions,
+    ad_vk_ads,
+    ad_vk_ad_groups,
+    ad_vk_campaigns,
+    ad_vk_accounts,
+    ad_vk_sync_runs,
+    ad_vk_oauth_states,
     ad_command_receipts,
     ad_experiment_events,
     ad_metric_snapshots,
@@ -374,6 +383,10 @@ async function dropAdvertisingSchema(db: ReturnType<typeof createDb>) {
     ad_market_signals,
     ad_research_sources CASCADE`);
   await db.execute(sql`DROP TYPE IF EXISTS
+    ad_vk_media_kind,
+    ad_vk_object_kind,
+    ad_vk_sync_mode,
+    ad_vk_sync_status,
     ad_actor_kind,
     ad_changed_variable,
     ad_channel,

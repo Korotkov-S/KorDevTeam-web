@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
+  customType,
   date,
   foreignKey,
   index,
@@ -20,6 +22,11 @@ import {
 } from "drizzle-orm/pg-core";
 
 import type { AcceptedResponse } from "../leads/contracts";
+import type { VkAdsCheckpoint } from "../advertising/vk/contracts";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() { return "bytea"; },
+});
 
 export const contentKind = pgEnum("content_kind", ["service", "case", "article", "page", "faq"]);
 export const contentStatus = pgEnum("content_status", ["draft", "published"]);
@@ -112,6 +119,10 @@ export const adExperimentVerdict = pgEnum("ad_experiment_verdict", ["winner", "l
 export const adLearningConfidence = pgEnum("ad_learning_confidence", ["low", "medium", "high"]);
 export const adActorKind = pgEnum("ad_actor_kind", ["agent", "admin", "mcp", "system", "vendor"]);
 export const adCommandStatus = pgEnum("ad_command_status", ["processing", "completed", "failed"]);
+export const adVkSyncMode = pgEnum("ad_vk_sync_mode", ["check", "backfill", "daily"]);
+export const adVkSyncStatus = pgEnum("ad_vk_sync_status", ["running", "succeeded", "partial", "failed"]);
+export const adVkObjectKind = pgEnum("ad_vk_object_kind", ["campaign", "ad_group", "ad"]);
+export const adVkMediaKind = pgEnum("ad_vk_media_kind", ["image", "video"]);
 
 export const adminUsers = pgTable(
   "admin_users",
@@ -1431,6 +1442,255 @@ export const adCommandReceipts = pgTable(
   ],
 );
 
+export const adVkOauthStates = pgTable(
+  "ad_vk_oauth_states",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    clientFingerprint: varchar("client_fingerprint", { length: 64 }).notNull(),
+    encryptedEnvelope: bytea("encrypted_envelope").notNull(),
+    nonce: bytea("nonce").notNull(),
+    authTag: bytea("auth_tag").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    version: integer("version").notNull().default(1),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_oauth_states_client_fingerprint_uq").on(table.clientFingerprint),
+    check("ad_vk_oauth_states_client_sha256", sql`${table.clientFingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_oauth_states_crypto_lengths", sql`octet_length(${table.encryptedEnvelope}) > 0 AND octet_length(${table.nonce}) = 12 AND octet_length(${table.authTag}) = 16`),
+    check("ad_vk_oauth_states_version_positive", sql`${table.version} > 0`),
+  ],
+);
+
+export const adVkSyncRuns = pgTable(
+  "ad_vk_sync_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    mode: adVkSyncMode("mode").notNull(),
+    status: adVkSyncStatus("status").notNull().default("running"),
+    stage: varchar("stage", { length: 80 }).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    coveredDateFrom: date("covered_date_from"),
+    coveredDateTo: date("covered_date_to"),
+    checkpoint: jsonb("checkpoint").$type<VkAdsCheckpoint>(),
+    counters: jsonb("counters").$type<Record<string, number>>().notNull().default({}),
+    errorCode: varchar("error_code", { length: 160 }),
+    correlationId: uuid("correlation_id").notNull().defaultRandom(),
+  },
+  (table) => [
+    index("ad_vk_sync_runs_status_started_idx").on(table.status, table.startedAt),
+    index("ad_vk_sync_runs_mode_started_idx").on(table.mode, table.startedAt),
+    check("ad_vk_sync_runs_stage_nonempty", sql`length(btrim(${table.stage})) > 0`),
+    check("ad_vk_sync_runs_checkpoint_bounded", sql`${table.checkpoint} IS NULL OR (jsonb_typeof(${table.checkpoint}) = 'object' AND octet_length(${table.checkpoint}::text) <= 4096)`),
+    check("ad_vk_sync_runs_counters_bounded", sql`jsonb_typeof(${table.counters}) = 'object' AND octet_length(${table.counters}::text) <= 4096`),
+    check("ad_vk_sync_runs_error_code_safe", sql`${table.errorCode} IS NULL OR ${table.errorCode} ~ '^ads_vk_[a-z0-9_]{1,150}$'`),
+    check("ad_vk_sync_runs_period_valid", sql`${table.coveredDateFrom} IS NULL OR ${table.coveredDateTo} IS NULL OR ${table.coveredDateTo} >= ${table.coveredDateFrom}`),
+    check("ad_vk_sync_runs_status_coherent", sql`(${table.status} = 'running' AND ${table.finishedAt} IS NULL) OR (${table.status} IN ('succeeded', 'partial', 'failed') AND ${table.finishedAt} IS NOT NULL)`),
+  ],
+);
+
+export const adVkAccounts = pgTable(
+  "ad_vk_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    accountType: varchar("account_type", { length: 80 }),
+    displayName: varchar("display_name", { length: 240 }),
+    currency: varchar("currency", { length: 12 }),
+    timezone: varchar("timezone", { length: 80 }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_accounts_external_id_uq").on(table.externalId),
+    index("ad_vk_accounts_last_seen_idx").on(table.lastSeenAt),
+    check("ad_vk_accounts_external_nonempty", sql`length(btrim(${table.externalId})) > 0`),
+    check("ad_vk_accounts_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_accounts_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkCampaigns = pgTable(
+  "ad_vk_campaigns",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accountId: uuid("account_id").notNull().references(() => adVkAccounts.id, { onDelete: "restrict" }),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    name: varchar("name", { length: 500 }).notNull(),
+    status: varchar("status", { length: 80 }).notNull(),
+    objective: varchar("objective", { length: 120 }),
+    campaignType: varchar("campaign_type", { length: 120 }),
+    budget: numeric("budget", { precision: 18, scale: 6 }),
+    schedule: jsonb("schedule").$type<Record<string, unknown>>().notNull().default({}),
+    sourceCreatedAt: timestamp("source_created_at", { withTimezone: true }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_campaigns_account_external_uq").on(table.accountId, table.externalId),
+    index("ad_vk_campaigns_account_status_idx").on(table.accountId, table.status),
+    index("ad_vk_campaigns_source_updated_idx").on(table.sourceUpdatedAt),
+    check("ad_vk_campaigns_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.name})) > 0 AND length(btrim(${table.status})) > 0`),
+    check("ad_vk_campaigns_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_campaigns_budget_nonnegative", sql`${table.budget} IS NULL OR ${table.budget} >= 0`),
+    check("ad_vk_campaigns_schedule_bounded", sql`jsonb_typeof(${table.schedule}) = 'object' AND octet_length(${table.schedule}::text) <= 16384`),
+    check("ad_vk_campaigns_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkAdGroups = pgTable(
+  "ad_vk_ad_groups",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accountId: uuid("account_id").notNull().references(() => adVkAccounts.id, { onDelete: "restrict" }),
+    campaignId: uuid("campaign_id").notNull().references(() => adVkCampaigns.id, { onDelete: "restrict" }),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    name: varchar("name", { length: 500 }).notNull(),
+    status: varchar("status", { length: 80 }).notNull(),
+    packageSummary: varchar("package_summary", { length: 240 }),
+    optimizationSummary: varchar("optimization_summary", { length: 240 }),
+    bidStrategySummary: varchar("bid_strategy_summary", { length: 240 }),
+    targetingLabels: jsonb("targeting_labels").$type<string[]>().notNull().default([]),
+    sourceCreatedAt: timestamp("source_created_at", { withTimezone: true }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_ad_groups_account_external_uq").on(table.accountId, table.externalId),
+    index("ad_vk_ad_groups_campaign_status_idx").on(table.campaignId, table.status),
+    index("ad_vk_ad_groups_source_updated_idx").on(table.sourceUpdatedAt),
+    check("ad_vk_ad_groups_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.name})) > 0 AND length(btrim(${table.status})) > 0`),
+    check("ad_vk_ad_groups_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_ad_groups_targeting_bounded", sql`jsonb_typeof(${table.targetingLabels}) = 'array' AND jsonb_array_length(${table.targetingLabels}) <= 100 AND octet_length(${table.targetingLabels}::text) <= 16384`),
+    check("ad_vk_ad_groups_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkAds = pgTable(
+  "ad_vk_ads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accountId: uuid("account_id").notNull().references(() => adVkAccounts.id, { onDelete: "restrict" }),
+    campaignId: uuid("campaign_id").notNull().references(() => adVkCampaigns.id, { onDelete: "restrict" }),
+    adGroupId: uuid("ad_group_id").notNull().references(() => adVkAdGroups.id, { onDelete: "restrict" }),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    name: varchar("name", { length: 500 }).notNull(),
+    status: varchar("status", { length: 80 }).notNull(),
+    moderationStatus: varchar("moderation_status", { length: 80 }),
+    moderationReasonCode: varchar("moderation_reason_code", { length: 160 }),
+    landingOrigin: varchar("landing_origin", { length: 500 }),
+    landingPath: varchar("landing_path", { length: 1000 }),
+    sourceCreatedAt: timestamp("source_created_at", { withTimezone: true }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_ads_account_external_uq").on(table.accountId, table.externalId),
+    index("ad_vk_ads_group_status_idx").on(table.adGroupId, table.status),
+    index("ad_vk_ads_source_updated_idx").on(table.sourceUpdatedAt),
+    check("ad_vk_ads_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.name})) > 0 AND length(btrim(${table.status})) > 0`),
+    check("ad_vk_ads_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_ads_landing_safe", sql`(${table.landingOrigin} IS NULL OR ${table.landingOrigin} ~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?$') AND (${table.landingPath} IS NULL OR (${table.landingPath} ~ '^/' AND ${table.landingPath} !~ '[?#]'))`),
+    check("ad_vk_ads_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkCreativeVersions = pgTable(
+  "ad_vk_creative_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adId: uuid("ad_id").notNull().references(() => adVkAds.id, { onDelete: "restrict" }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    mediaKind: adVkMediaKind("media_kind").notNull(),
+    textBlocks: jsonb("text_blocks").$type<string[]>().notNull().default([]),
+    cta: varchar("cta", { length: 240 }),
+    format: varchar("format", { length: 120 }),
+    width: integer("width"),
+    height: integer("height"),
+    durationSeconds: integer("duration_seconds"),
+    contentIds: jsonb("content_ids").$type<string[]>().notNull().default([]),
+    imageSha256: varchar("image_sha256", { length: 64 }),
+    imageObjectKey: varchar("image_object_key", { length: 500 }),
+    videoSourceUrl: text("video_source_url"),
+    activeFrom: timestamp("active_from", { withTimezone: true }).notNull(),
+    activeTo: timestamp("active_to", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_creative_versions_ad_fingerprint_uq").on(table.adId, table.fingerprint),
+    index("ad_vk_creative_versions_ad_active_idx").on(table.adId, table.activeTo),
+    index("ad_vk_creative_versions_image_sha_idx").on(table.imageSha256),
+    check("ad_vk_creative_versions_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$' AND (${table.imageSha256} IS NULL OR ${table.imageSha256} ~ '^[0-9a-f]{64}$')`),
+    check("ad_vk_creative_versions_content_bounded", sql`jsonb_typeof(${table.textBlocks}) = 'array' AND jsonb_array_length(${table.textBlocks}) <= 100 AND octet_length(${table.textBlocks}::text) <= 16384 AND jsonb_typeof(${table.contentIds}) = 'array' AND jsonb_array_length(${table.contentIds}) <= 100 AND octet_length(${table.contentIds}::text) <= 16384`),
+    check("ad_vk_creative_versions_dimensions_valid", sql`(${table.width} IS NULL OR ${table.width} > 0) AND (${table.height} IS NULL OR ${table.height} > 0) AND (${table.durationSeconds} IS NULL OR ${table.durationSeconds} >= 0)`),
+    check("ad_vk_creative_versions_image_paired", sql`(${table.imageSha256} IS NULL) = (${table.imageObjectKey} IS NULL)`),
+    check("ad_vk_creative_versions_media_coherent", sql`(${table.mediaKind} = 'image' AND ${table.videoSourceUrl} IS NULL) OR (${table.mediaKind} = 'video' AND ${table.imageSha256} IS NULL AND ${table.imageObjectKey} IS NULL AND (${table.videoSourceUrl} IS NULL OR (${table.videoSourceUrl} ~ '^https://' AND ${table.videoSourceUrl} !~ '[?#]')))`),
+    check("ad_vk_creative_versions_period_valid", sql`${table.activeTo} IS NULL OR ${table.activeTo} > ${table.activeFrom}`),
+  ],
+);
+
+export const adVkDailyMetrics = pgTable(
+  "ad_vk_daily_metrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    objectKind: adVkObjectKind("object_kind").notNull(),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    metricDate: date("metric_date").notNull(),
+    timezone: varchar("timezone", { length: 80 }).notNull(),
+    spend: numeric("spend", { precision: 18, scale: 6 }).notNull().default("0"),
+    impressions: bigint("impressions", { mode: "bigint" }).notNull().default(sql`0`),
+    reach: bigint("reach", { mode: "bigint" }).notNull().default(sql`0`),
+    clicks: bigint("clicks", { mode: "bigint" }).notNull().default(sql`0`),
+    conversions: jsonb("conversions").$type<Record<string, string>>().notNull().default({}),
+    sourceRevision: varchar("source_revision", { length: 160 }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    collectedAt: timestamp("collected_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_daily_metrics_object_date_uq").on(table.objectKind, table.externalId, table.metricDate),
+    index("ad_vk_daily_metrics_date_kind_idx").on(table.metricDate, table.objectKind),
+    check("ad_vk_daily_metrics_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.timezone})) > 0`),
+    check("ad_vk_daily_metrics_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_daily_metrics_nonnegative", sql`${table.spend} >= 0 AND ${table.impressions} >= 0 AND ${table.reach} >= 0 AND ${table.clicks} >= 0`),
+    check("ad_vk_daily_metrics_conversions_bounded", sql`jsonb_typeof(${table.conversions}) = 'object' AND octet_length(${table.conversions}::text) <= 16384`),
+  ],
+);
+
+export const adVkExperimentLinks = pgTable(
+  "ad_vk_experiment_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    experimentId: uuid("experiment_id").notNull().references(() => adExperiments.id, { onDelete: "restrict" }),
+    variantId: uuid("variant_id").notNull().references(() => adExperimentVariants.id, { onDelete: "restrict" }),
+    objectKind: adVkObjectKind("object_kind").notNull(),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    actorKind: adActorKind("actor_kind").notNull(),
+    actorId: varchar("actor_id", { length: 240 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_experiment_links_variant_object_uq").on(table.variantId, table.objectKind, table.externalId),
+    index("ad_vk_experiment_links_experiment_idx").on(table.experimentId, table.createdAt),
+    check("ad_vk_experiment_links_external_nonempty", sql`length(btrim(${table.externalId})) > 0`),
+    check("ad_vk_experiment_links_actor_nonempty", sql`length(btrim(${table.actorId})) > 0`),
+  ],
+);
+
 export const schema = {
   adminUsers,
   adminSessions,
@@ -1480,4 +1740,13 @@ export const schema = {
   adExperimentEvents,
   adLearnings,
   adCommandReceipts,
+  adVkOauthStates,
+  adVkSyncRuns,
+  adVkAccounts,
+  adVkCampaigns,
+  adVkAdGroups,
+  adVkAds,
+  adVkCreativeVersions,
+  adVkDailyMetrics,
+  adVkExperimentLinks,
 };

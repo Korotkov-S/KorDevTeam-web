@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.mcp_tokens': '0', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
 const postMigrationTableCounts = {
   ...preMigrationTableCounts,
-  'drizzle.__drizzle_migrations': '14',
+  'drizzle.__drizzle_migrations': '15',
   'public.leads': '0',
   'public.lead_attachments': '0',
   'public.lead_delivery_jobs': '0',
@@ -50,6 +50,15 @@ const postMigrationTableCounts = {
   'public.ad_experiment_events': '0',
   'public.ad_learnings': '0',
   'public.ad_command_receipts': '0',
+  'public.ad_vk_oauth_states': '0',
+  'public.ad_vk_sync_runs': '0',
+  'public.ad_vk_accounts': '0',
+  'public.ad_vk_campaigns': '0',
+  'public.ad_vk_ad_groups': '0',
+  'public.ad_vk_ads': '0',
+  'public.ad_vk_creative_versions': '0',
+  'public.ad_vk_daily_metrics': '0',
+  'public.ad_vk_experiment_links': '0',
 };
 const preMigrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0000_content_foundation.sql')).digest('hex'), created_at: '1789122602054' },
@@ -69,6 +78,7 @@ const migrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0011_geo_ai_visibility.sql')).digest('hex'), created_at: '1790493945985' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0012_geo_run_prompt_sets.sql')).digest('hex'), created_at: '1790499950906' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0013_advertising_knowledge.sql')).digest('hex'), created_at: '1790573403259' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0014_vk_ads_readonly_sync.sql')).digest('hex'), created_at: '1790608600969' },
 ];
 const tableCounts = postMigrationTableCounts;
 function inventoryQuery(sql, tables = tableCounts) {
@@ -148,7 +158,11 @@ test('database inventory counts all actual tables and fails when a required tabl
   const { databaseInventory } = await import('../../scripts/postgres-backup.mjs');
   const client = { query: async sql => inventoryQuery(sql) };
   assert.deepEqual(await databaseInventory(client), { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } });
-  for (const missing of ['seo_daily_metrics', 'content_release_items', 'content_release_runs', 'geo_runs', 'ad_hypotheses']) {
+  for (const missing of [
+    'seo_daily_metrics', 'content_release_items', 'content_release_runs', 'geo_runs', 'ad_hypotheses',
+    'ad_vk_oauth_states', 'ad_vk_sync_runs', 'ad_vk_accounts', 'ad_vk_campaigns', 'ad_vk_ad_groups',
+    'ad_vk_ads', 'ad_vk_creative_versions', 'ad_vk_daily_metrics', 'ad_vk_experiment_links',
+  ]) {
     await assert.rejects(databaseInventory({ query: async sql => {
       const result = inventoryQuery(sql);
       if (sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== missing);

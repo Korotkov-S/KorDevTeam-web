@@ -99,6 +99,13 @@
       "when": 1790573403259,
       "tag": "0013_advertising_knowledge",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790608600969,
+      "tag": "0014_vk_ads_readonly_sync",
+      "breakpoints": true
     }
   ]
 }
