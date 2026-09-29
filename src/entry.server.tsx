@@ -18,6 +18,7 @@ export { checkLeadWorkerReady, createLeadWorker } from "./server/leads/worker";
 export { createMcpRouter } from "./server/mcp/http";
 export { runSeoCollection, checkSeoCollectionReady, syncSeoSemanticCore } from "./server/seo-monitoring/runtime";
 export { syncGeoPromptCatalog } from "./server/geo-monitoring/runtime";
+export { runVkAdsCollection, checkVkAdsCollectionReady } from "./server/advertising/vk/runtime";
 
 export async function runLeadRetention(options: { limit?: number } = {}): Promise<RetentionReport> {
   const config = readLeadWebConfig(process.env);

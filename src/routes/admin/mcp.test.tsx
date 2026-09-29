@@ -57,7 +57,7 @@ function createForm(overrides: { scopes?: string[]; ttlDays?: string; csrf?: str
   form.set("_csrf", overrides.csrf ?? csrf);
   form.set("name", "Codex MacBook");
   form.set("ttlDays", overrides.ttlDays ?? "365");
-  for (const scope of overrides.scopes ?? ["content:read", "content:write"]) form.append("scope", scope);
+  for (const scope of overrides.scopes ?? ["content:read", "content:write", "ads:read", "ads:write"]) form.append("scope", scope);
   return form;
 }
 
@@ -78,7 +78,7 @@ test("MCP admin action creates a token with selected scopes and no-store", async
   assert.deepEqual(issued, {
     adminUserId: adminId,
     name: "Codex MacBook",
-    scopes: ["content:read", "content:write"],
+    scopes: ["content:read", "content:write", "ads:read", "ads:write"],
     ttlDays: 365,
   });
   assert.equal((await response.json()).token, fullToken);

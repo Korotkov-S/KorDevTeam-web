@@ -132,6 +132,7 @@
     "build:content-release": "node scripts/build-content-release.mjs",
     "seo:crawl": "tsx scripts/seo-crawl.ts",
     "seo:collect": "node server/seo-collect.mjs",
+    "ads:collect": "node server/vk-ads-collect.mjs",
     "seo:core:sync": "node server/seo-core-sync.mjs",
     "geo:core:sync": "node server/geo-core-sync.mjs",
     "admin:create": "tsx scripts/create-admin.ts",

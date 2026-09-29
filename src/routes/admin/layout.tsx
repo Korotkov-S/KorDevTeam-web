@@ -9,6 +9,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Settings,
   Wrench,
 } from "lucide-react";
@@ -43,6 +44,7 @@ const navigation = [
   ["/admin/content/page/", "Страницы", Files],
   ["/admin/media/", "Медиатека", Images],
   ["/admin/mcp/", "MCP-доступ", KeyRound],
+  ["/admin/ads/", "Реклама", Megaphone],
   ["/admin/seo/", "SEO-мониторинг", ChartNoAxesCombined],
   ["/admin/settings/", "Настройки", Settings],
 ] as const;

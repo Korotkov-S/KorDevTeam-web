@@ -32,6 +32,27 @@ function services(): McpServices {
       async list() { return { items: [] }; },
       async uploadImage() { throw new Error("unused"); },
     },
+    ads: {
+      async getOverview() { return { spend: 0 }; },
+      async listResearchSources() { return { items: [], nextCursor: null }; },
+      async listMarketSignals() { return { items: [], nextCursor: null }; },
+      async listHypotheses() { return { items: [], nextCursor: null }; },
+      async getHypothesis() { return null; },
+      async listExperiments() { return { items: [], nextCursor: null }; },
+      async getExperiment() { return null; },
+      async listLearnings() { return { items: [], nextCursor: null }; },
+      async listEvents() { return { items: [], nextCursor: null }; },
+      async getEconomics() { return { spend: 0 }; },
+    },
+    vkAds: {
+      async getSyncStatus() { return null; },
+      async listCampaigns() { return { items: [], nextCursor: null }; },
+      async listAdGroups() { return { items: [], nextCursor: null }; },
+      async listAds() { return { items: [], nextCursor: null }; },
+      async getAd() { return null; },
+      async getStatistics() { return []; },
+      async getCreativeImage() { throw new Error("ads_vk_unavailable"); },
+    },
   } as McpServices;
 }
 
@@ -40,6 +61,7 @@ function tokenService() {
     async authenticate(token: string) {
       if (token === "read-token") return principal("read-token-id", ["content:read"]);
       if (token === "write-token") return principal("write-token-id", ["content:write"]);
+      if (token === "ads-token") return principal("ads-token-id", ["ads:read"]);
       return null;
     },
   };
@@ -211,6 +233,14 @@ test("parallel callers receive tool surfaces for their own principal", async t =
   const writeNames = (await readMcpJson(writeResponse)).result.tools.map((tool: { name: string }) => tool.name).sort();
   assert.deepEqual(readNames, ["get_content", "list_content"]);
   assert.deepEqual(writeNames, ["create_content_draft"]);
+});
+
+test("HTTP principal with advertising scope receives only advertising read tools", async t => {
+  const origin = await start(t);
+  const response = await post(origin, legacyList, { authorization: "Bearer ads-token" });
+  const names = (await readMcpJson(response)).result.tools.map((tool: { name: string }) => tool.name).sort();
+  assert.equal(names.length, 17);
+  assert.ok(names.every((name: string) => /^(?:get|list)_(?:ad|ads|vk_)/u.test(name)));
 });
 
 test("successful MCP tool logs safe identifiers without authorization or arguments", async t => {

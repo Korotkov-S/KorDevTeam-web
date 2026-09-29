@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
+  customType,
   date,
   foreignKey,
   index,
@@ -20,6 +22,11 @@ import {
 } from "drizzle-orm/pg-core";
 
 import type { AcceptedResponse } from "../leads/contracts";
+import type { VkAdsCheckpoint } from "../advertising/vk/contracts";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() { return "bytea"; },
+});
 
 export const contentKind = pgEnum("content_kind", ["service", "case", "article", "page", "faq"]);
 export const contentStatus = pgEnum("content_status", ["draft", "published"]);
@@ -97,6 +104,25 @@ export const geoExperimentMetric = pgEnum("geo_experiment_metric", [
 ]);
 export const geoExperimentDirection = pgEnum("geo_experiment_direction", ["increase", "decrease"]);
 export const geoExperimentVerdict = pgEnum("geo_experiment_verdict", ["pending", "won", "lost", "inconclusive", "cancelled"]);
+export const adEvidenceGrade = pgEnum("ad_evidence_grade", ["A", "B", "C"]);
+export const adResearchSourceType = pgEnum("ad_research_source_type", ["official_guide", "case_study", "public_ad", "competitor_landing", "wordstat", "product", "internal"]);
+export const adChannel = pgEnum("ad_channel", ["vk", "yandex", "telegram", "web", "internal"]);
+export const adHypothesisStatus = pgEnum("ad_hypothesis_status", ["candidate", "proposed", "approved", "testing", "validated", "rejected", "inconclusive", "archived"]);
+export const adConversionPath = pgEnum("ad_conversion_path", ["vk_lead_form", "site", "message"]);
+export const adChangedVariable = pgEnum("ad_changed_variable", ["offer", "audience", "creative_angle", "conversion_path"]);
+export const adPrimaryMetric = pgEnum("ad_primary_metric", ["qualified_lead_cost", "sale_cost", "romi"]);
+export const adExperimentStatus = pgEnum("ad_experiment_status", ["draft", "awaiting_approval", "approved", "creating", "moderation", "scheduled", "running", "stopping", "completed", "analyzed", "rejected_moderation", "invalid_tracking", "stopped_safety", "failed_reconciliation"]);
+export const adVariantStatus = pgEnum("ad_variant_status", ["draft", "moderation", "scheduled", "running", "paused", "rejected", "completed"]);
+export const adMetricGranularity = pgEnum("ad_metric_granularity", ["hour", "day"]);
+export const adLeadClassification = pgEnum("ad_lead_classification", ["submitted", "contacted", "qualified", "won", "lost", "open"]);
+export const adExperimentVerdict = pgEnum("ad_experiment_verdict", ["winner", "loser", "inconclusive", "invalid_tracking", "stopped_safety"]);
+export const adLearningConfidence = pgEnum("ad_learning_confidence", ["low", "medium", "high"]);
+export const adActorKind = pgEnum("ad_actor_kind", ["agent", "admin", "mcp", "system", "vendor"]);
+export const adCommandStatus = pgEnum("ad_command_status", ["processing", "completed", "failed"]);
+export const adVkSyncMode = pgEnum("ad_vk_sync_mode", ["check", "backfill", "daily"]);
+export const adVkSyncStatus = pgEnum("ad_vk_sync_status", ["running", "succeeded", "partial", "failed"]);
+export const adVkObjectKind = pgEnum("ad_vk_object_kind", ["campaign", "ad_group", "ad"]);
+export const adVkMediaKind = pgEnum("ad_vk_media_kind", ["image", "video"]);
 
 export const adminUsers = pgTable(
   "admin_users",
@@ -1106,6 +1132,565 @@ export const geoExperimentPrompts = pgTable(
   ],
 );
 
+export const adResearchSources = pgTable(
+  "ad_research_sources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    url: text("url").notNull(),
+    publisher: varchar("publisher", { length: 240 }).notNull(),
+    sourceType: adResearchSourceType("source_type").notNull(),
+    channel: adChannel("channel").notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true }).notNull().defaultNow(),
+    evidenceGrade: adEvidenceGrade("evidence_grade").notNull(),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_research_sources_fingerprint_uq").on(table.fingerprint),
+    index("ad_research_sources_channel_discovered_idx").on(table.channel, table.discoveredAt),
+    check("ad_research_sources_url_nonempty", sql`length(btrim(${table.url})) > 0`),
+    check("ad_research_sources_publisher_nonempty", sql`length(btrim(${table.publisher})) > 0`),
+    check("ad_research_sources_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_research_sources_metadata_object", sql`jsonb_typeof(${table.metadata}) = 'object'`),
+    check("ad_research_sources_metadata_bounded", sql`octet_length(${table.metadata}::text) <= 16384`),
+  ],
+);
+
+export const adMarketSignals = pgTable(
+  "ad_market_signals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceId: uuid("source_id").notNull().references(() => adResearchSources.id, { onDelete: "restrict" }),
+    hook: text("hook").notNull(),
+    offer: text("offer").notNull(),
+    proof: text("proof").notNull(),
+    format: varchar("format", { length: 160 }).notNull(),
+    cta: text("cta").notNull(),
+    audience: text("audience").notNull(),
+    landingUrl: text("landing_url"),
+    disclosedMetrics: jsonb("disclosed_metrics").$type<Record<string, unknown>>().notNull().default({}),
+    applicability: text("applicability").notNull(),
+    evidenceGrade: adEvidenceGrade("evidence_grade").notNull(),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_market_signals_fingerprint_uq").on(table.fingerprint),
+    index("ad_market_signals_source_created_idx").on(table.sourceId, table.createdAt),
+    check("ad_market_signals_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_market_signals_text_nonempty", sql`length(btrim(${table.hook})) > 0 AND length(btrim(${table.offer})) > 0 AND length(btrim(${table.proof})) > 0 AND length(btrim(${table.format})) > 0 AND length(btrim(${table.cta})) > 0 AND length(btrim(${table.audience})) > 0 AND length(btrim(${table.applicability})) > 0`),
+    check("ad_market_signals_metrics_object", sql`jsonb_typeof(${table.disclosedMetrics}) = 'object'`),
+    check("ad_market_signals_metrics_bounded", sql`octet_length(${table.disclosedMetrics}::text) <= 16384`),
+  ],
+);
+
+export const adHypotheses = pgTable(
+  "ad_hypotheses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    service: text("service").notNull(),
+    problem: text("problem").notNull(),
+    audience: text("audience").notNull(),
+    offer: text("offer").notNull(),
+    proof: text("proof").notNull(),
+    creativeAngle: text("creative_angle").notNull(),
+    conversionPath: adConversionPath("conversion_path").notNull(),
+    changedVariable: adChangedVariable("changed_variable").notNull(),
+    controls: jsonb("controls").$type<Record<string, unknown>>().notNull().default({}),
+    primaryMetric: adPrimaryMetric("primary_metric").notNull(),
+    guardMetrics: jsonb("guard_metrics").$type<Record<string, unknown>>().notNull().default({}),
+    expectedEffect: text("expected_effect").notNull(),
+    minimumData: jsonb("minimum_data").$type<Record<string, unknown>>().notNull().default({}),
+    dailyBudget: numeric("daily_budget", { precision: 14, scale: 2 }).notNull(),
+    totalBudget: numeric("total_budget", { precision: 14, scale: 2 }).notNull(),
+    durationDays: integer("duration_days").notNull(),
+    stopConditions: jsonb("stop_conditions").$type<Record<string, unknown>>().notNull().default({}),
+    impact: integer("impact").notNull(),
+    confidence: integer("confidence").notNull(),
+    ease: integer("ease").notNull(),
+    evidenceQuality: integer("evidence_quality").notNull(),
+    rationale: text("rationale").notNull(),
+    sourceSignalIds: uuid("source_signal_ids").array().notNull().default(sql`ARRAY[]::uuid[]`),
+    status: adHypothesisStatus("status").notNull().default("candidate"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("ad_hypotheses_status_created_idx").on(table.status, table.createdAt),
+    check("ad_hypotheses_text_nonempty", sql`length(btrim(${table.service})) > 0 AND length(btrim(${table.problem})) > 0 AND length(btrim(${table.audience})) > 0 AND length(btrim(${table.offer})) > 0 AND length(btrim(${table.proof})) > 0 AND length(btrim(${table.creativeAngle})) > 0 AND length(btrim(${table.expectedEffect})) > 0 AND length(btrim(${table.rationale})) > 0`),
+    check("ad_hypotheses_json_objects", sql`jsonb_typeof(${table.controls}) = 'object' AND jsonb_typeof(${table.guardMetrics}) = 'object' AND jsonb_typeof(${table.minimumData}) = 'object' AND jsonb_typeof(${table.stopConditions}) = 'object'`),
+    check("ad_hypotheses_budgets_nonnegative", sql`${table.dailyBudget} >= 0 AND ${table.totalBudget} >= 0`),
+    check("ad_hypotheses_duration_positive", sql`${table.durationDays} > 0`),
+    check("ad_hypotheses_scores_bounded", sql`${table.impact} BETWEEN 1 AND 5 AND ${table.confidence} BETWEEN 1 AND 5 AND ${table.ease} BETWEEN 1 AND 5 AND ${table.evidenceQuality} BETWEEN 1 AND 5`),
+    check("ad_hypotheses_version_positive", sql`${table.version} > 0`),
+  ],
+);
+
+export const adExperiments = pgTable(
+  "ad_experiments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    hypothesisId: uuid("hypothesis_id").notNull().references(() => adHypotheses.id, { onDelete: "restrict" }),
+    hypothesisVersion: integer("hypothesis_version").notNull(),
+    passport: jsonb("passport").$type<Record<string, unknown>>().notNull(),
+    passportFingerprint: varchar("passport_fingerprint", { length: 64 }).notNull(),
+    status: adExperimentStatus("status").notNull().default("draft"),
+    approvalTaskId: varchar("approval_task_id", { length: 240 }),
+    approvalText: text("approval_text"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedByActorKind: adActorKind("approved_by_actor_kind"),
+    approvedByActorId: varchar("approved_by_actor_id", { length: 240 }),
+    dailyBudget: numeric("daily_budget", { precision: 14, scale: 2 }).notNull(),
+    totalBudget: numeric("total_budget", { precision: 14, scale: 2 }).notNull(),
+    schedule: jsonb("schedule").$type<Record<string, unknown>>().notNull().default({}),
+    kpi: jsonb("kpi").$type<Record<string, unknown>>().notNull().default({}),
+    decisionRules: jsonb("decision_rules").$type<Record<string, unknown>>().notNull().default({}),
+    spentAmount: numeric("spent_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+    verdict: adExperimentVerdict("verdict"),
+    verdictEvidence: jsonb("verdict_evidence").$type<Record<string, unknown>>().notNull().default({}),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("ad_experiments_status_created_idx").on(table.status, table.createdAt),
+    index("ad_experiments_hypothesis_idx").on(table.hypothesisId, table.hypothesisVersion),
+    check("ad_experiments_hypothesis_version_positive", sql`${table.hypothesisVersion} > 0`),
+    check("ad_experiments_passport_object", sql`jsonb_typeof(${table.passport}) = 'object'`),
+    check("ad_experiments_passport_sha256", sql`${table.passportFingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_experiments_budgets_nonnegative", sql`${table.dailyBudget} >= 0 AND ${table.totalBudget} >= 0 AND ${table.spentAmount} >= 0`),
+    check("ad_experiments_json_objects", sql`jsonb_typeof(${table.schedule}) = 'object' AND jsonb_typeof(${table.kpi}) = 'object' AND jsonb_typeof(${table.decisionRules}) = 'object' AND jsonb_typeof(${table.verdictEvidence}) = 'object'`),
+    check("ad_experiments_period_valid", sql`${table.startsAt} IS NULL OR ${table.endsAt} IS NULL OR ${table.endsAt} > ${table.startsAt}`),
+    check("ad_experiments_approval_coherent", sql`(${table.approvalTaskId} IS NULL AND ${table.approvalText} IS NULL AND ${table.approvedAt} IS NULL AND ${table.approvedByActorKind} IS NULL AND ${table.approvedByActorId} IS NULL) OR (${table.approvalTaskId} IS NOT NULL AND ${table.approvalText} IS NOT NULL AND ${table.approvedAt} IS NOT NULL AND ${table.approvedByActorKind} IS NOT NULL AND ${table.approvedByActorId} IS NOT NULL)`),
+    check("ad_experiments_version_positive", sql`${table.version} > 0`),
+  ],
+);
+
+export const adExperimentVariants = pgTable(
+  "ad_experiment_variants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    experimentId: uuid("experiment_id").notNull().references(() => adExperiments.id, { onDelete: "restrict" }),
+    role: varchar("role", { length: 80 }).notNull(),
+    name: varchar("name", { length: 240 }).notNull(),
+    textVersion: jsonb("text_version").$type<Record<string, unknown>>().notNull().default({}),
+    creativeVersion: jsonb("creative_version").$type<Record<string, unknown>>().notNull().default({}),
+    audienceFingerprint: varchar("audience_fingerprint", { length: 64 }).notNull(),
+    conversionPath: adConversionPath("conversion_path").notNull(),
+    vkCampaignId: varchar("vk_campaign_id", { length: 120 }),
+    vkGroupId: varchar("vk_group_id", { length: 120 }),
+    vkBannerId: varchar("vk_banner_id", { length: 120 }),
+    vkFormId: varchar("vk_form_id", { length: 120 }),
+    status: adVariantStatus("status").notNull().default("draft"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_experiment_variants_experiment_role_uq").on(table.experimentId, table.role),
+    index("ad_experiment_variants_experiment_status_idx").on(table.experimentId, table.status),
+    check("ad_experiment_variants_text_nonempty", sql`length(btrim(${table.role})) > 0 AND length(btrim(${table.name})) > 0`),
+    check("ad_experiment_variants_audience_sha256", sql`${table.audienceFingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_experiment_variants_json_objects", sql`jsonb_typeof(${table.textVersion}) = 'object' AND jsonb_typeof(${table.creativeVersion}) = 'object'`),
+    check("ad_experiment_variants_version_positive", sql`${table.version} > 0`),
+  ],
+);
+
+export const adMetricSnapshots = pgTable(
+  "ad_metric_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    experimentId: uuid("experiment_id").notNull().references(() => adExperiments.id, { onDelete: "restrict" }),
+    variantId: uuid("variant_id").references(() => adExperimentVariants.id, { onDelete: "restrict" }),
+    source: varchar("source", { length: 40 }).notNull().default("vk_ads"),
+    externalObjectId: varchar("external_object_id", { length: 160 }).notNull(),
+    granularity: adMetricGranularity("granularity").notNull(),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    spend: numeric("spend", { precision: 14, scale: 2 }).notNull().default("0"),
+    impressions: integer("impressions").notNull().default(0),
+    reach: integer("reach").notNull().default(0),
+    clicks: integer("clicks").notNull().default(0),
+    formOpens: integer("form_opens").notNull().default(0),
+    leads: integer("leads").notNull().default(0),
+    extras: jsonb("extras").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_metric_snapshots_object_period_uq").on(table.source, table.externalObjectId, table.granularity, table.periodStart, table.periodEnd),
+    index("ad_metric_snapshots_experiment_period_idx").on(table.experimentId, table.periodStart),
+    check("ad_metric_snapshots_period_valid", sql`${table.periodEnd} > ${table.periodStart}`),
+    check("ad_metric_snapshots_nonnegative", sql`${table.spend} >= 0 AND ${table.impressions} >= 0 AND ${table.reach} >= 0 AND ${table.clicks} >= 0 AND ${table.formOpens} >= 0 AND ${table.leads} >= 0`),
+    check("ad_metric_snapshots_extras_object", sql`jsonb_typeof(${table.extras}) = 'object'`),
+    check("ad_metric_snapshots_extras_bounded", sql`octet_length(${table.extras}::text) <= 16384`),
+  ],
+);
+
+export const adLeadAttributions = pgTable(
+  "ad_lead_attributions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    leadUuid: uuid("lead_uuid").notNull(),
+    externalLeadHash: varchar("external_lead_hash", { length: 64 }),
+    experimentId: uuid("experiment_id").notNull().references(() => adExperiments.id, { onDelete: "restrict" }),
+    variantId: uuid("variant_id").references(() => adExperimentVariants.id, { onDelete: "restrict" }),
+    crmDealId: varchar("crm_deal_id", { length: 160 }),
+    crmPipelineId: varchar("crm_pipeline_id", { length: 160 }),
+    crmStageId: varchar("crm_stage_id", { length: 160 }),
+    crmActivityId: varchar("crm_activity_id", { length: 160 }),
+    classification: adLeadClassification("classification").notNull().default("submitted"),
+    amount: numeric("amount", { precision: 14, scale: 2 }),
+    potentialAmount: numeric("potential_amount", { precision: 14, scale: 2 }),
+    lostReasonCode: varchar("lost_reason_code", { length: 160 }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull(),
+    contactedAt: timestamp("contacted_at", { withTimezone: true }),
+    qualifiedAt: timestamp("qualified_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_lead_attributions_lead_uuid_uq").on(table.leadUuid),
+    uniqueIndex("ad_lead_attributions_external_hash_uq").on(table.externalLeadHash).where(sql`${table.externalLeadHash} IS NOT NULL`),
+    index("ad_lead_attributions_experiment_class_idx").on(table.experimentId, table.classification),
+    check("ad_lead_attributions_external_sha256", sql`${table.externalLeadHash} IS NULL OR ${table.externalLeadHash} ~ '^[0-9a-f]{64}$'`),
+    check("ad_lead_attributions_amounts_nonnegative", sql`(${table.amount} IS NULL OR ${table.amount} >= 0) AND (${table.potentialAmount} IS NULL OR ${table.potentialAmount} >= 0)`),
+  ],
+);
+
+export const adExperimentEvents = pgTable(
+  "ad_experiment_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    experimentId: uuid("experiment_id").references(() => adExperiments.id, { onDelete: "restrict" }),
+    variantId: uuid("variant_id").references(() => adExperimentVariants.id, { onDelete: "restrict" }),
+    actorKind: adActorKind("actor_kind").notNull(),
+    actorId: varchar("actor_id", { length: 240 }).notNull(),
+    action: varchar("action", { length: 160 }).notNull(),
+    reason: text("reason").notNull(),
+    previousState: varchar("previous_state", { length: 120 }),
+    newState: varchar("new_state", { length: 120 }),
+    requestId: varchar("request_id", { length: 160 }),
+    errorCode: varchar("error_code", { length: 160 }),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("ad_experiment_events_experiment_created_idx").on(table.experimentId, table.createdAt),
+    index("ad_experiment_events_action_created_idx").on(table.action, table.createdAt),
+    check("ad_experiment_events_text_nonempty", sql`length(btrim(${table.actorId})) > 0 AND length(btrim(${table.action})) > 0 AND length(btrim(${table.reason})) > 0`),
+    check("ad_experiment_events_payload_object", sql`jsonb_typeof(${table.payload}) = 'object'`),
+    check("ad_experiment_events_payload_bounded", sql`octet_length(${table.payload}::text) <= 16384`),
+  ],
+);
+
+export const adLearnings = pgTable(
+  "ad_learnings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conclusion: text("conclusion").notNull(),
+    evidenceSnapshot: jsonb("evidence_snapshot").$type<Record<string, unknown>>().notNull(),
+    applicability: text("applicability").notNull(),
+    confidence: adLearningConfidence("confidence").notNull(),
+    hypothesisId: uuid("hypothesis_id").references(() => adHypotheses.id, { onDelete: "restrict" }),
+    experimentId: uuid("experiment_id").references(() => adExperiments.id, { onDelete: "restrict" }),
+    reviewAt: timestamp("review_at", { withTimezone: true }),
+    supersededById: uuid("superseded_by_id"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ columns: [table.supersededById], foreignColumns: [table.id], name: "ad_learnings_superseded_by_fk" }).onDelete("restrict"),
+    index("ad_learnings_confidence_created_idx").on(table.confidence, table.createdAt),
+    check("ad_learnings_text_nonempty", sql`length(btrim(${table.conclusion})) > 0 AND length(btrim(${table.applicability})) > 0`),
+    check("ad_learnings_evidence_object", sql`jsonb_typeof(${table.evidenceSnapshot}) = 'object'`),
+    check("ad_learnings_evidence_bounded", sql`octet_length(${table.evidenceSnapshot}::text) <= 16384`),
+    check("ad_learnings_version_positive", sql`${table.version} > 0`),
+    check("ad_learnings_not_self_superseded", sql`${table.supersededById} IS NULL OR ${table.supersededById} <> ${table.id}`),
+  ],
+);
+
+export const adCommandReceipts = pgTable(
+  "ad_command_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    idempotencyKey: uuid("idempotency_key").notNull(),
+    commandName: varchar("command_name", { length: 160 }).notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    status: adCommandStatus("status").notNull().default("processing"),
+    safeResult: jsonb("safe_result").$type<Record<string, unknown>>().notNull().default({}),
+    errorCode: varchar("error_code", { length: 160 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("ad_command_receipts_idempotency_key_uq").on(table.idempotencyKey),
+    index("ad_command_receipts_status_created_idx").on(table.status, table.createdAt),
+    check("ad_command_receipts_command_nonempty", sql`length(btrim(${table.commandName})) > 0`),
+    check("ad_command_receipts_request_sha256", sql`${table.requestHash} ~ '^[0-9a-f]{64}$'`),
+    check("ad_command_receipts_result_object", sql`jsonb_typeof(${table.safeResult}) = 'object'`),
+    check("ad_command_receipts_result_bounded", sql`octet_length(${table.safeResult}::text) <= 16384`),
+    check("ad_command_receipts_completion_coherent", sql`(${table.status} = 'processing' AND ${table.completedAt} IS NULL) OR (${table.status} IN ('completed', 'failed') AND ${table.completedAt} IS NOT NULL)`),
+  ],
+);
+
+export const adVkOauthStates = pgTable(
+  "ad_vk_oauth_states",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    clientFingerprint: varchar("client_fingerprint", { length: 64 }).notNull(),
+    encryptedEnvelope: bytea("encrypted_envelope").notNull(),
+    nonce: bytea("nonce").notNull(),
+    authTag: bytea("auth_tag").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    version: integer("version").notNull().default(1),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_oauth_states_client_fingerprint_uq").on(table.clientFingerprint),
+    check("ad_vk_oauth_states_client_sha256", sql`${table.clientFingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_oauth_states_crypto_lengths", sql`octet_length(${table.encryptedEnvelope}) > 0 AND octet_length(${table.nonce}) = 12 AND octet_length(${table.authTag}) = 16`),
+    check("ad_vk_oauth_states_version_positive", sql`${table.version} > 0`),
+  ],
+);
+
+export const adVkSyncRuns = pgTable(
+  "ad_vk_sync_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    mode: adVkSyncMode("mode").notNull(),
+    status: adVkSyncStatus("status").notNull().default("running"),
+    stage: varchar("stage", { length: 80 }).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    coveredDateFrom: date("covered_date_from"),
+    coveredDateTo: date("covered_date_to"),
+    checkpoint: jsonb("checkpoint").$type<VkAdsCheckpoint>(),
+    counters: jsonb("counters").$type<Record<string, number>>().notNull().default({}),
+    errorCode: varchar("error_code", { length: 160 }),
+    correlationId: uuid("correlation_id").notNull().defaultRandom(),
+  },
+  (table) => [
+    index("ad_vk_sync_runs_status_started_idx").on(table.status, table.startedAt),
+    index("ad_vk_sync_runs_mode_started_idx").on(table.mode, table.startedAt),
+    check("ad_vk_sync_runs_stage_nonempty", sql`length(btrim(${table.stage})) > 0`),
+    check("ad_vk_sync_runs_checkpoint_bounded", sql`${table.checkpoint} IS NULL OR (jsonb_typeof(${table.checkpoint}) = 'object' AND octet_length(${table.checkpoint}::text) <= 4096)`),
+    check("ad_vk_sync_runs_counters_bounded", sql`jsonb_typeof(${table.counters}) = 'object' AND octet_length(${table.counters}::text) <= 4096`),
+    check("ad_vk_sync_runs_error_code_safe", sql`${table.errorCode} IS NULL OR ${table.errorCode} ~ '^ads_vk_[a-z0-9_]{1,150}$'`),
+    check("ad_vk_sync_runs_period_valid", sql`${table.coveredDateFrom} IS NULL OR ${table.coveredDateTo} IS NULL OR ${table.coveredDateTo} >= ${table.coveredDateFrom}`),
+    check("ad_vk_sync_runs_status_coherent", sql`(${table.status} = 'running' AND ${table.finishedAt} IS NULL) OR (${table.status} IN ('succeeded', 'partial', 'failed') AND ${table.finishedAt} IS NOT NULL)`),
+  ],
+);
+
+export const adVkAccounts = pgTable(
+  "ad_vk_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    accountType: varchar("account_type", { length: 80 }),
+    displayName: varchar("display_name", { length: 240 }),
+    currency: varchar("currency", { length: 12 }),
+    timezone: varchar("timezone", { length: 80 }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_accounts_external_id_uq").on(table.externalId),
+    index("ad_vk_accounts_last_seen_idx").on(table.lastSeenAt),
+    check("ad_vk_accounts_external_nonempty", sql`length(btrim(${table.externalId})) > 0`),
+    check("ad_vk_accounts_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_accounts_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkCampaigns = pgTable(
+  "ad_vk_campaigns",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accountId: uuid("account_id").notNull().references(() => adVkAccounts.id, { onDelete: "restrict" }),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    name: varchar("name", { length: 500 }).notNull(),
+    status: varchar("status", { length: 80 }).notNull(),
+    objective: varchar("objective", { length: 120 }),
+    campaignType: varchar("campaign_type", { length: 120 }),
+    budget: numeric("budget", { precision: 18, scale: 6 }),
+    schedule: jsonb("schedule").$type<Record<string, unknown>>().notNull().default({}),
+    sourceCreatedAt: timestamp("source_created_at", { withTimezone: true }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_campaigns_account_external_uq").on(table.accountId, table.externalId),
+    index("ad_vk_campaigns_account_status_idx").on(table.accountId, table.status),
+    index("ad_vk_campaigns_source_updated_idx").on(table.sourceUpdatedAt),
+    check("ad_vk_campaigns_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.name})) > 0 AND length(btrim(${table.status})) > 0`),
+    check("ad_vk_campaigns_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_campaigns_budget_nonnegative", sql`${table.budget} IS NULL OR ${table.budget} >= 0`),
+    check("ad_vk_campaigns_schedule_bounded", sql`jsonb_typeof(${table.schedule}) = 'object' AND octet_length(${table.schedule}::text) <= 16384`),
+    check("ad_vk_campaigns_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkAdGroups = pgTable(
+  "ad_vk_ad_groups",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accountId: uuid("account_id").notNull().references(() => adVkAccounts.id, { onDelete: "restrict" }),
+    campaignId: uuid("campaign_id").notNull().references(() => adVkCampaigns.id, { onDelete: "restrict" }),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    name: varchar("name", { length: 500 }).notNull(),
+    status: varchar("status", { length: 80 }).notNull(),
+    packageSummary: varchar("package_summary", { length: 240 }),
+    optimizationSummary: varchar("optimization_summary", { length: 240 }),
+    bidStrategySummary: varchar("bid_strategy_summary", { length: 240 }),
+    targetingLabels: jsonb("targeting_labels").$type<string[]>().notNull().default([]),
+    sourceCreatedAt: timestamp("source_created_at", { withTimezone: true }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_ad_groups_account_external_uq").on(table.accountId, table.externalId),
+    index("ad_vk_ad_groups_campaign_status_idx").on(table.campaignId, table.status),
+    index("ad_vk_ad_groups_source_updated_idx").on(table.sourceUpdatedAt),
+    check("ad_vk_ad_groups_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.name})) > 0 AND length(btrim(${table.status})) > 0`),
+    check("ad_vk_ad_groups_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_ad_groups_targeting_bounded", sql`jsonb_typeof(${table.targetingLabels}) = 'array' AND jsonb_array_length(${table.targetingLabels}) <= 100 AND octet_length(${table.targetingLabels}::text) <= 16384`),
+    check("ad_vk_ad_groups_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkAds = pgTable(
+  "ad_vk_ads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accountId: uuid("account_id").notNull().references(() => adVkAccounts.id, { onDelete: "restrict" }),
+    campaignId: uuid("campaign_id").notNull().references(() => adVkCampaigns.id, { onDelete: "restrict" }),
+    adGroupId: uuid("ad_group_id").notNull().references(() => adVkAdGroups.id, { onDelete: "restrict" }),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    name: varchar("name", { length: 500 }).notNull(),
+    status: varchar("status", { length: 80 }).notNull(),
+    moderationStatus: varchar("moderation_status", { length: 80 }),
+    moderationReasonCode: varchar("moderation_reason_code", { length: 160 }),
+    landingOrigin: varchar("landing_origin", { length: 500 }),
+    landingPath: varchar("landing_path", { length: 1000 }),
+    sourceCreatedAt: timestamp("source_created_at", { withTimezone: true }),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_ads_account_external_uq").on(table.accountId, table.externalId),
+    index("ad_vk_ads_group_status_idx").on(table.adGroupId, table.status),
+    index("ad_vk_ads_source_updated_idx").on(table.sourceUpdatedAt),
+    check("ad_vk_ads_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.name})) > 0 AND length(btrim(${table.status})) > 0`),
+    check("ad_vk_ads_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_ads_landing_safe", sql`(${table.landingOrigin} IS NULL OR ${table.landingOrigin} ~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?$') AND (${table.landingPath} IS NULL OR (${table.landingPath} ~ '^/' AND ${table.landingPath} !~ '[?#]'))`),
+    check("ad_vk_ads_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
+  ],
+);
+
+export const adVkCreativeVersions = pgTable(
+  "ad_vk_creative_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adId: uuid("ad_id").notNull().references(() => adVkAds.id, { onDelete: "restrict" }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    mediaKind: adVkMediaKind("media_kind").notNull(),
+    textBlocks: jsonb("text_blocks").$type<string[]>().notNull().default([]),
+    cta: varchar("cta", { length: 240 }),
+    format: varchar("format", { length: 120 }),
+    width: integer("width"),
+    height: integer("height"),
+    durationSeconds: integer("duration_seconds"),
+    contentIds: jsonb("content_ids").$type<string[]>().notNull().default([]),
+    imageSha256: varchar("image_sha256", { length: 64 }),
+    imageObjectKey: varchar("image_object_key", { length: 500 }),
+    videoSourceUrl: text("video_source_url"),
+    activeFrom: timestamp("active_from", { withTimezone: true }).notNull(),
+    activeTo: timestamp("active_to", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_creative_versions_ad_fingerprint_uq").on(table.adId, table.fingerprint),
+    index("ad_vk_creative_versions_ad_active_idx").on(table.adId, table.activeTo),
+    index("ad_vk_creative_versions_image_sha_idx").on(table.imageSha256),
+    check("ad_vk_creative_versions_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$' AND (${table.imageSha256} IS NULL OR ${table.imageSha256} ~ '^[0-9a-f]{64}$')`),
+    check("ad_vk_creative_versions_content_bounded", sql`jsonb_typeof(${table.textBlocks}) = 'array' AND jsonb_array_length(${table.textBlocks}) <= 100 AND octet_length(${table.textBlocks}::text) <= 16384 AND jsonb_typeof(${table.contentIds}) = 'array' AND jsonb_array_length(${table.contentIds}) <= 100 AND octet_length(${table.contentIds}::text) <= 16384`),
+    check("ad_vk_creative_versions_dimensions_valid", sql`(${table.width} IS NULL OR ${table.width} > 0) AND (${table.height} IS NULL OR ${table.height} > 0) AND (${table.durationSeconds} IS NULL OR ${table.durationSeconds} >= 0)`),
+    check("ad_vk_creative_versions_image_paired", sql`(${table.imageSha256} IS NULL) = (${table.imageObjectKey} IS NULL)`),
+    check("ad_vk_creative_versions_media_coherent", sql`(${table.mediaKind} = 'image' AND ${table.videoSourceUrl} IS NULL) OR (${table.mediaKind} = 'video' AND ${table.imageSha256} IS NULL AND ${table.imageObjectKey} IS NULL AND (${table.videoSourceUrl} IS NULL OR (${table.videoSourceUrl} ~ '^https://' AND ${table.videoSourceUrl} !~ '[?#]')))`),
+    check("ad_vk_creative_versions_period_valid", sql`${table.activeTo} IS NULL OR ${table.activeTo} > ${table.activeFrom}`),
+  ],
+);
+
+export const adVkDailyMetrics = pgTable(
+  "ad_vk_daily_metrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    objectKind: adVkObjectKind("object_kind").notNull(),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    metricDate: date("metric_date").notNull(),
+    timezone: varchar("timezone", { length: 80 }).notNull(),
+    spend: numeric("spend", { precision: 18, scale: 6 }).notNull().default("0"),
+    impressions: bigint("impressions", { mode: "bigint" }).notNull().default(sql`0`),
+    reach: bigint("reach", { mode: "bigint" }).notNull().default(sql`0`),
+    clicks: bigint("clicks", { mode: "bigint" }).notNull().default(sql`0`),
+    conversions: jsonb("conversions").$type<Record<string, string>>().notNull().default({}),
+    sourceRevision: varchar("source_revision", { length: 160 }),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    collectedAt: timestamp("collected_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_daily_metrics_object_date_uq").on(table.objectKind, table.externalId, table.metricDate),
+    index("ad_vk_daily_metrics_date_kind_idx").on(table.metricDate, table.objectKind),
+    check("ad_vk_daily_metrics_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.timezone})) > 0`),
+    check("ad_vk_daily_metrics_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("ad_vk_daily_metrics_nonnegative", sql`${table.spend} >= 0 AND ${table.impressions} >= 0 AND ${table.reach} >= 0 AND ${table.clicks} >= 0`),
+    check("ad_vk_daily_metrics_conversions_bounded", sql`jsonb_typeof(${table.conversions}) = 'object' AND octet_length(${table.conversions}::text) <= 16384`),
+  ],
+);
+
+export const adVkExperimentLinks = pgTable(
+  "ad_vk_experiment_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    experimentId: uuid("experiment_id").notNull().references(() => adExperiments.id, { onDelete: "restrict" }),
+    variantId: uuid("variant_id").notNull().references(() => adExperimentVariants.id, { onDelete: "restrict" }),
+    objectKind: adVkObjectKind("object_kind").notNull(),
+    externalId: varchar("external_id", { length: 160 }).notNull(),
+    actorKind: adActorKind("actor_kind").notNull(),
+    actorId: varchar("actor_id", { length: 240 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ad_vk_experiment_links_variant_object_uq").on(table.variantId, table.objectKind, table.externalId),
+    index("ad_vk_experiment_links_experiment_idx").on(table.experimentId, table.createdAt),
+    check("ad_vk_experiment_links_external_nonempty", sql`length(btrim(${table.externalId})) > 0`),
+    check("ad_vk_experiment_links_actor_nonempty", sql`length(btrim(${table.actorId})) > 0`),
+  ],
+);
+
 export const schema = {
   adminUsers,
   adminSessions,
@@ -1145,4 +1730,23 @@ export const schema = {
   geoCrawlerChecks,
   geoExperiments,
   geoExperimentPrompts,
+  adResearchSources,
+  adMarketSignals,
+  adHypotheses,
+  adExperiments,
+  adExperimentVariants,
+  adMetricSnapshots,
+  adLeadAttributions,
+  adExperimentEvents,
+  adLearnings,
+  adCommandReceipts,
+  adVkOauthStates,
+  adVkSyncRuns,
+  adVkAccounts,
+  adVkCampaigns,
+  adVkAdGroups,
+  adVkAds,
+  adVkCreativeVersions,
+  adVkDailyMetrics,
+  adVkExperimentLinks,
 };

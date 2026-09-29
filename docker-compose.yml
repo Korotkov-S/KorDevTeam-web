@@ -30,10 +30,17 @@ x-admin-media-environment: &admin-media-environment
   PUBLIC_MEDIA_S3_PREFIX: ${PUBLIC_MEDIA_S3_PREFIX:-media}
   PUBLIC_MEDIA_BASE_URL: ${PUBLIC_MEDIA_BASE_URL:-https://cdn.example.invalid/}
   PUBLIC_MEDIA_S3_SSE: ${PUBLIC_MEDIA_S3_SSE:-AES256}
+x-vk-ads-read-environment: &vk-ads-read-environment
+  VK_ADS_S3_ENDPOINT: ${VK_ADS_S3_ENDPOINT:-https://s3.example.invalid}
+  VK_ADS_S3_REGION: ${VK_ADS_S3_REGION:-ru-1}
+  VK_ADS_S3_BUCKET: ${VK_ADS_S3_BUCKET:-kordev-vk-ads-private-local}
+  VK_ADS_S3_ACCESS_KEY_ID: ${VK_ADS_S3_READ_ACCESS_KEY_ID:-local-vk-read-access}
+  VK_ADS_S3_SECRET_ACCESS_KEY: ${VK_ADS_S3_READ_SECRET_ACCESS_KEY:-local-vk-read-secret}
+  VK_ADS_S3_SSE: ${VK_ADS_S3_SSE:-AES256}
 x-web: &web
   <<: *app
   environment:
-    <<: [*lead-web-environment, *admin-media-environment]
+    <<: [*lead-web-environment, *admin-media-environment, *vk-ads-read-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
@@ -139,6 +146,34 @@ services:
       options:
         max-size: 20m
         max-file: "30"
+  vk-ads-job:
+    <<: *app
+    profiles: [vk-ads]
+    init: true
+    read_only: true
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
+      VK_ADS_SYNC_ENABLED: ${VK_ADS_SYNC_ENABLED:-false}
+      VK_ADS_CLIENT_ID: ${VK_ADS_CLIENT_ID:-}
+      VK_ADS_CLIENT_SECRET: ${VK_ADS_CLIENT_SECRET:-}
+      VK_ADS_TOKEN_ENCRYPTION_KEY_B64: ${VK_ADS_TOKEN_ENCRYPTION_KEY_B64:-}
+      VK_ADS_S3_ENDPOINT: ${VK_ADS_S3_ENDPOINT:-https://s3.example.invalid}
+      VK_ADS_S3_REGION: ${VK_ADS_S3_REGION:-ru-1}
+      VK_ADS_S3_BUCKET: ${VK_ADS_S3_BUCKET:-kordev-vk-ads-private-local}
+      VK_ADS_S3_ACCESS_KEY_ID: ${VK_ADS_S3_WRITE_ACCESS_KEY_ID:-local-vk-write-access}
+      VK_ADS_S3_SECRET_ACCESS_KEY: ${VK_ADS_S3_WRITE_SECRET_ACCESS_KEY:-local-vk-write-secret}
+      VK_ADS_S3_SSE: ${VK_ADS_S3_SSE:-AES256}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      backend: {}
+      egress:
+        gw_priority: 1
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   kordevteam-blue:
     <<: *web
     container_name: kordevteam-blue

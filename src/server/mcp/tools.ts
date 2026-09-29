@@ -7,12 +7,31 @@ import type { McpContentSelector, McpContentService, McpContentSnapshot } from "
 import type { McpMediaService } from "./mediaService";
 import type { McpSeoService } from "../seo-monitoring/mcpService";
 import type { McpGeoService } from "../geo-monitoring/mcpService";
+import type { McpAdvertisingService } from "../advertising/mcpService";
+import type { McpVkAdsService } from "../advertising/vk/mcpService";
+import {
+  AD_CHANGED_VARIABLES,
+  AD_CHANNELS,
+  AD_CONVERSION_PATHS,
+  AD_EVIDENCE_GRADES,
+  AD_EXPERIMENT_STATUSES,
+  AD_EXPERIMENT_VERDICTS,
+  AD_HYPOTHESIS_STATUSES,
+  AD_LEAD_CLASSIFICATIONS,
+  AD_LEARNING_CONFIDENCES,
+  AD_METRIC_GRANULARITIES,
+  AD_PRIMARY_METRICS,
+  AD_RESEARCH_SOURCE_TYPES,
+  AD_VARIANT_STATUSES,
+} from "../advertising/contracts";
 
 export type McpServices = {
   content: McpContentService;
   media: McpMediaService;
   seo: McpSeoService;
   geo: McpGeoService;
+  ads: McpAdvertisingService;
+  vkAds: McpVkAdsService;
 };
 
 export type McpAuditRecord = {
@@ -207,6 +226,127 @@ const geoExperimentCandidateInput = z.strictObject({
   minimumDelta: z.number().positive().max(1_000_000),
   expectedSignal: z.string().trim().min(1).max(2_000),
 });
+const adPageFields = {
+  limit: z.number().int().min(1).max(100).optional(),
+  cursor: z.string().min(1).max(1024).optional(),
+};
+const vkAdsPageFields = {
+  limit: z.number().int().min(1).max(100).optional(),
+  cursor: z.string().min(10).max(1_024).regex(/^[A-Za-z0-9_.-]+$/u).optional(),
+};
+const vkAdsExternalId = z.string().min(1).max(160);
+const vkAdsStatus = z.string().trim().min(1).max(80);
+const vkAdsCampaignListInput = z.strictObject({ ...vkAdsPageFields, status: vkAdsStatus.optional() });
+const vkAdsGroupListInput = z.strictObject({
+  ...vkAdsPageFields,
+  campaignExternalId: vkAdsExternalId.optional(),
+  status: vkAdsStatus.optional(),
+});
+const vkAdsAdListInput = z.strictObject({
+  ...vkAdsPageFields,
+  campaignExternalId: vkAdsExternalId.optional(),
+  adGroupExternalId: vkAdsExternalId.optional(),
+  status: vkAdsStatus.optional(),
+});
+const vkAdsStatisticsInput = z.strictObject({
+  objectKind: z.enum(["campaign", "ad_group", "ad"]),
+  externalIds: z.array(vkAdsExternalId).min(1).max(100),
+  dateFrom: isoDate,
+  dateTo: isoDate,
+}).superRefine(validateSeoRange);
+const adText = (max = 2_000) => z.string().trim().min(1).max(max);
+const adNullableText = (max = 2_000) => adText(max).nullable().optional();
+const adFingerprint = z.string().regex(/^[0-9a-f]{64}$/u);
+const adMoney = z.number().finite().nonnegative().max(1_000_000_000);
+const adCount = z.number().int().nonnegative().max(2_000_000_000);
+const adIsoDateTime = z.iso.datetime({ offset: true });
+const adForbiddenKeys = /^(?:name|phone|email|file|token|secret|authorization|cookie|rawresponse)$/iu;
+function adSafeEvidence(value: unknown): boolean {
+  const visit = (item: unknown, depth: number): boolean => {
+    if (depth > 8) return false;
+    if (typeof item === "string") return item.length <= 4_000 && (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(item)
+      || (!/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u.test(item)
+        && !/(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u.test(item)));
+    if (typeof item === "number") return Number.isFinite(item);
+    if (item === null || typeof item === "boolean") return true;
+    if (Array.isArray(item)) return item.length <= 100 && item.every(value => visit(value, depth + 1));
+    if (!item || typeof item !== "object") return false;
+    const entries = Object.entries(item as Record<string, unknown>);
+    return entries.length <= 100 && entries.every(([key, nested]) => (
+      !adForbiddenKeys.test(key.replace(/[_-]/gu, "")) && visit(nested, depth + 1)
+    ));
+  };
+  return visit(value, 0);
+}
+const adRecord = z.record(z.string(), z.unknown()).refine(adSafeEvidence);
+const adIdempotency = { idempotencyKey: z.uuid() };
+const adSourceInput = z.strictObject({
+  ...adIdempotency, url: z.url(), publisher: adText(240), sourceType: z.enum(AD_RESEARCH_SOURCE_TYPES),
+  channel: z.enum(AD_CHANNELS), publishedAt: adIsoDateTime.nullable().optional(), discoveredAt: adIsoDateTime.optional(),
+  evidenceGrade: z.enum(AD_EVIDENCE_GRADES), metadata: adRecord.optional(),
+});
+const adSignalInput = z.strictObject({
+  ...adIdempotency, sourceId: z.uuid(), hook: adText(), offer: adText(), proof: adText(), format: adText(160),
+  cta: adText(), audience: adText(), landingUrl: z.url().nullable().optional(), disclosedMetrics: adRecord.optional(),
+  applicability: adText(), evidenceGrade: z.enum(AD_EVIDENCE_GRADES),
+});
+const adHypothesisFields = {
+  service: adText(), problem: adText(), audience: adText(), offer: adText(), proof: adText(), creativeAngle: adText(),
+  conversionPath: z.enum(AD_CONVERSION_PATHS), changedVariable: z.enum(AD_CHANGED_VARIABLES), controls: adRecord,
+  primaryMetric: z.enum(AD_PRIMARY_METRICS), guardMetrics: adRecord, expectedEffect: adText(), minimumData: adRecord,
+  dailyBudget: adMoney, totalBudget: adMoney, durationDays: z.number().int().min(1).max(365), stopConditions: adRecord,
+  impact: z.number().int().min(1).max(5), confidence: z.number().int().min(1).max(5),
+  ease: z.number().int().min(1).max(5), evidenceQuality: z.number().int().min(1).max(5),
+  rationale: adText(), sourceSignalIds: z.array(z.uuid()).max(100).optional(),
+};
+const adHypothesisInput = z.strictObject({ ...adIdempotency, ...adHypothesisFields });
+const adExperimentFields = {
+  hypothesisId: z.uuid(), hypothesisVersion: z.number().int().positive(), passport: adRecord,
+  dailyBudget: adMoney, totalBudget: adMoney, schedule: adRecord, kpi: adRecord, decisionRules: adRecord,
+  startsAt: adIsoDateTime.nullable().optional(), endsAt: adIsoDateTime.nullable().optional(),
+};
+const adExperimentInput = z.strictObject({ ...adIdempotency, ...adExperimentFields });
+const adApprovalInput = z.strictObject({
+  ...adIdempotency, experimentId: z.uuid(), expectedVersion: z.number().int().positive(),
+  passportFingerprint: adFingerprint, approvalTaskId: adText(240), approvalText: adText(), approvedAt: adIsoDateTime,
+});
+const adVariantInput = z.strictObject({
+  ...adIdempotency, experimentId: z.uuid(), role: adText(80), name: adText(240), textVersion: adRecord,
+  creativeVersion: adRecord, audienceFingerprint: adFingerprint, conversionPath: z.enum(AD_CONVERSION_PATHS),
+  vkCampaignId: adNullableText(120), vkGroupId: adNullableText(120), vkBannerId: adNullableText(120),
+  vkFormId: adNullableText(120), status: z.enum(AD_VARIANT_STATUSES).optional(),
+});
+const adMetricInput = z.strictObject({
+  ...adIdempotency, experimentId: z.uuid(), variantId: z.uuid().nullable().optional(), externalObjectId: adText(160),
+  granularity: z.enum(AD_METRIC_GRANULARITIES), periodStart: adIsoDateTime, periodEnd: adIsoDateTime,
+  spend: adMoney, impressions: adCount, reach: adCount, clicks: adCount, formOpens: adCount, leads: adCount,
+  extras: adRecord.optional(),
+});
+const adLeadInput = z.strictObject({
+  ...adIdempotency, leadUuid: z.uuid(), externalLeadHash: adFingerprint.nullable().optional(), experimentId: z.uuid(),
+  variantId: z.uuid().nullable().optional(), crmDealId: adNullableText(160), crmPipelineId: adNullableText(160),
+  crmStageId: adNullableText(160), crmActivityId: adNullableText(160), classification: z.enum(AD_LEAD_CLASSIFICATIONS),
+  amount: adMoney.nullable().optional(), potentialAmount: adMoney.nullable().optional(), lostReasonCode: adNullableText(160),
+  submittedAt: adIsoDateTime, contactedAt: adIsoDateTime.nullable().optional(),
+  qualifiedAt: adIsoDateTime.nullable().optional(), closedAt: adIsoDateTime.nullable().optional(),
+});
+const adEventFields = {
+  experimentId: z.uuid().nullable().optional(), variantId: z.uuid().nullable().optional(), action: adText(160),
+  reason: adText(), previousState: adNullableText(120), newState: adNullableText(120), requestId: adNullableText(160),
+  errorCode: adNullableText(160), payload: adRecord.optional(),
+};
+const adEventInput = z.strictObject({ ...adIdempotency, ...adEventFields });
+const adVerdictInput = z.strictObject({
+  ...adIdempotency, experimentId: z.uuid(), expectedVersion: z.number().int().positive(),
+  verdict: z.enum(AD_EXPERIMENT_VERDICTS).nullable().optional(), evidence: adRecord, reason: adText(),
+});
+const adLearningFields = {
+  conclusion: adText(), evidenceSnapshot: adRecord, applicability: adText(), confidence: z.enum(AD_LEARNING_CONFIDENCES),
+  hypothesisId: z.uuid().nullable().optional(), experimentId: z.uuid().nullable().optional(),
+  reviewAt: adIsoDateTime.nullable().optional(), supersededById: z.uuid().nullable().optional(),
+  supersedes: z.strictObject({ id: z.uuid(), expectedVersion: z.number().int().positive() }).optional(),
+};
+const adLearningInput = z.strictObject({ ...adIdempotency, ...adLearningFields });
 const genericRecord = z.record(z.string(), z.unknown());
 const genericPage = z.strictObject({ items: z.array(genericRecord), nextCursor: z.string().nullable().optional() });
 const listContentInput = z.strictObject({
@@ -292,6 +432,19 @@ const errorMessages: Record<string, string> = {
   seo_wordstat_frequency_invalid: "Некорректная частотность Wordstat.",
   seo_query_priority_invalid: "Некорректный приоритет ключевого запроса.",
   seo_query_updated_at_invalid: "Некорректная версия ключевого запроса.",
+  ads_validation_error: "Рекламная команда не прошла проверку.",
+  ads_idempotency_conflict: "Ключ повтора уже использован для другой рекламной команды.",
+  ads_idempotency_in_progress: "Рекламная команда с этим ключом ещё выполняется.",
+  ads_hypothesis_conflict: "Рекламная гипотеза уже изменилась. Сначала прочитайте актуальную версию.",
+  ads_experiment_conflict: "Рекламный эксперимент уже изменился. Сначала прочитайте актуальную версию.",
+  ads_learning_conflict: "Рекламный вывод уже изменился. Сначала прочитайте актуальную версию.",
+  ads_hypothesis_transition_invalid: "Недопустимый переход рекламной гипотезы.",
+  ads_experiment_transition_invalid: "Недопустимый переход рекламного эксперимента.",
+  ads_verdict_invalid: "Итог эксперимента не соответствует состоянию или не содержит фактов выборки.",
+  ads_unavailable: "Сервис рекламных знаний временно недоступен.",
+  ads_vk_contract_invalid: "Параметры чтения VK некорректны.",
+  ads_vk_storage_unavailable: "Закрытое изображение VK временно недоступно.",
+  ads_vk_unavailable: "Локальное зеркало VK временно недоступно.",
 };
 
 function compactEntry(entry: Pick<ContentEntry, "id" | "slug" | "status" | "version"> & Partial<Pick<ContentEntry, "kind" | "title" | "updatedAt" | "publishedAt">>) {
@@ -327,9 +480,10 @@ function success(value: unknown) {
 
 function failure(error: unknown) {
   const raw = error instanceof Error ? error.message : "internal_error";
-  const code = Object.hasOwn(errorMessages, raw) || /^geo_[a-z0-9_]+$/u.test(raw) ? raw : "internal_error";
+  const code = Object.hasOwn(errorMessages, raw) || /^(?:geo|ads)_[a-z0-9_]+$/u.test(raw) ? raw : "internal_error";
   const result = { code, message: errorMessages[code] ?? (code.startsWith("geo_")
     ? "GEO-операция отклонена. Проверьте параметры и состояние запуска."
+    : code.startsWith("ads_") ? "Рекламная операция отклонена. Проверьте параметры и состояние эксперимента."
     : "Внутренняя ошибка MCP. Повторите запрос позже.") };
   return {
     content: [{ type: "text" as const, text: JSON.stringify(result) }],
@@ -375,6 +529,41 @@ export function createKordevMcpServer(
       });
     } catch {
       // Audit delivery must not expose or change the tool result.
+    }
+    return result;
+  };
+  const runImage = async (tool: string, id: string, operation: () => Promise<{ bytes: Buffer; mimeType: string; sha256: string }>) => {
+    const startedAt = Date.now();
+    let result;
+    let errorCode: string | undefined;
+    try {
+      const image = await operation();
+      const structuredContent = {
+        id,
+        mimeType: image.mimeType,
+        byteSize: image.bytes.length,
+        sha256: image.sha256,
+      };
+      result = {
+        content: [{ type: "image" as const, data: image.bytes.toString("base64"), mimeType: image.mimeType }],
+        structuredContent,
+      };
+    } catch (error) {
+      result = failure(error);
+      errorCode = (result.structuredContent as { code: string }).code;
+    }
+    try {
+      logger({
+        tokenId: principal.tokenId,
+        adminUserId: principal.adminUserId,
+        tool,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startedAt,
+        status: result.isError ? "error" : "success",
+        ...(errorCode ? { errorCode } : {}),
+      });
+    } catch {
+      // Binary payloads and metadata never enter the audit envelope.
     }
     return result;
   };
@@ -682,6 +871,150 @@ export function createKordevMcpServer(
     }, input => run("record_geo_experiment_evaluation", () => services.geo.evaluateExperiment(
       input as Parameters<McpGeoService["evaluateExperiment"]>[0],
     )));
+  }
+
+  if (has("ads:read")) {
+    server.registerTool("get_vk_ads_sync_status", {
+      title: "Состояние синхронизации VK Ads",
+      description: "Возвращает состояние последней фоновой синхронизации локального зеркала.",
+      inputSchema: z.strictObject({}), outputSchema: withError(z.union([genericRecord, z.null()])), annotations: annotations(true),
+    }, () => run("get_vk_ads_sync_status", () => services.vkAds.getSyncStatus()));
+    server.registerTool("list_vk_campaigns", {
+      title: "Кампании VK Ads", description: "Читает ограниченную страницу кампаний из локального зеркала.",
+      inputSchema: vkAdsCampaignListInput, outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_vk_campaigns", () => services.vkAds.listCampaigns(input)));
+    server.registerTool("list_vk_ad_groups", {
+      title: "Группы VK Ads", description: "Читает ограниченную страницу групп из локального зеркала без targeting-списков.",
+      inputSchema: vkAdsGroupListInput, outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_vk_ad_groups", () => services.vkAds.listAdGroups(input)));
+    server.registerTool("list_vk_ads", {
+      title: "Объявления VK Ads", description: "Читает ограниченную страницу объявлений из локального зеркала.",
+      inputSchema: vkAdsAdListInput, outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_vk_ads", () => services.vkAds.listAds(input)));
+    server.registerTool("get_vk_ad", {
+      title: "Объявление VK Ads", description: "Возвращает объявление и текущую безопасную версию креатива.",
+      inputSchema: z.strictObject({ id: vkAdsExternalId }), outputSchema: withError(z.union([genericRecord, z.null()])), annotations: annotations(true),
+    }, ({ id }) => run("get_vk_ad", () => services.vkAds.getAd(id)));
+    server.registerTool("get_vk_ads_statistics", {
+      title: "Статистика VK Ads", description: "Возвращает локальные дневные метрики за диапазон не более 366 дней.",
+      inputSchema: vkAdsStatisticsInput, outputSchema: withError(z.array(genericRecord)), annotations: annotations(true),
+    }, input => run("get_vk_ads_statistics", () => services.vkAds.getStatistics(input)));
+    server.registerTool("get_vk_creative_image", {
+      title: "Изображение креатива VK Ads", description: "Возвращает проверенное закрытое изображение размером не более 5 МБ.",
+      inputSchema: z.strictObject({ id: z.uuid() }),
+      outputSchema: withError(z.strictObject({ id: z.uuid(), mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+        byteSize: z.number().int().positive().max(5 * 1024 * 1024), sha256: z.string().regex(/^[a-f0-9]{64}$/u) })),
+      annotations: annotations(true),
+    }, ({ id }) => runImage("get_vk_creative_image", id, () => services.vkAds.getCreativeImage(id)));
+
+    server.registerTool("get_ads_overview", {
+      title: "Сводка рекламных экспериментов",
+      description: "Возвращает компактную сводку гипотез, активных экспериментов и экономики.",
+      inputSchema: z.strictObject({}), outputSchema: withError(genericRecord), annotations: annotations(true),
+    }, () => run("get_ads_overview", () => services.ads.getOverview()));
+    server.registerTool("list_ad_research_sources", {
+      title: "Источники рекламных практик", description: "Возвращает проверенные источники без сырых ответов поставщиков.",
+      inputSchema: z.strictObject({ channel: z.enum(AD_CHANNELS).optional(), sourceType: z.enum(AD_RESEARCH_SOURCE_TYPES).optional(),
+        evidenceGrade: z.enum(AD_EVIDENCE_GRADES).optional(), ...adPageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_ad_research_sources", () => services.ads.listResearchSources(input)));
+    server.registerTool("list_ad_market_signals", {
+      title: "Рыночные рекламные сигналы", description: "Возвращает компактные hooks, офферы и доказательства.",
+      inputSchema: z.strictObject({ sourceId: z.uuid().optional(), evidenceGrade: z.enum(AD_EVIDENCE_GRADES).optional(), ...adPageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_ad_market_signals", () => services.ads.listMarketSignals(input)));
+    server.registerTool("list_ad_hypotheses", {
+      title: "Рекламные гипотезы", description: "Возвращает ограниченную страницу гипотез и их состояния.",
+      inputSchema: z.strictObject({ status: z.enum(AD_HYPOTHESIS_STATUSES).optional(), service: adText().optional(), ...adPageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_ad_hypotheses", () => services.ads.listHypotheses(input)));
+    server.registerTool("get_ad_hypothesis", {
+      title: "Рекламная гипотеза", description: "Возвращает одну версию гипотезы.",
+      inputSchema: z.strictObject({ id: z.uuid() }), outputSchema: withError(z.union([genericRecord, z.null()])), annotations: annotations(true),
+    }, ({ id }) => run("get_ad_hypothesis", () => services.ads.getHypothesis(id)));
+    server.registerTool("list_ad_experiments", {
+      title: "Рекламные эксперименты", description: "Возвращает безопасные сводки экспериментов без сырого паспорта.",
+      inputSchema: z.strictObject({ status: z.enum(AD_EXPERIMENT_STATUSES).optional(), hypothesisId: z.uuid().optional(), ...adPageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_ad_experiments", () => services.ads.listExperiments(input)));
+    server.registerTool("get_ad_experiment", {
+      title: "Карточка рекламного эксперимента", description: "Возвращает ограниченную безопасную карточку, варианты, метрики и audit trail.",
+      inputSchema: z.strictObject({ id: z.uuid() }), outputSchema: withError(z.union([genericRecord, z.null()])), annotations: annotations(true),
+    }, ({ id }) => run("get_ad_experiment", () => services.ads.getExperiment(id)));
+    server.registerTool("list_ad_learnings", {
+      title: "Выводы рекламных экспериментов", description: "Возвращает проверяемые выводы и область применимости.",
+      inputSchema: z.strictObject({ confidence: z.enum(AD_LEARNING_CONFIDENCES).optional(), hypothesisId: z.uuid().optional(),
+        experimentId: z.uuid().optional(), ...adPageFields }), outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_ad_learnings", () => services.ads.listLearnings(input)));
+    server.registerTool("list_ad_events", {
+      title: "Журнал рекламных действий", description: "Возвращает append-only audit trail без сырых payload.",
+      inputSchema: z.strictObject({ experimentId: z.uuid().optional(), action: adText(160).optional(), ...adPageFields }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_ad_events", () => services.ads.listEvents(input)));
+    server.registerTool("get_ad_economics", {
+      title: "Экономика рекламы", description: "Возвращает расходы, лиды, квалификацию, победы и выручку.",
+      inputSchema: z.strictObject({ experimentId: z.uuid().optional(), from: adIsoDateTime.optional(), to: adIsoDateTime.optional() }),
+      outputSchema: withError(genericRecord), annotations: annotations(true),
+    }, input => run("get_ad_economics", () => services.ads.getEconomics(input)));
+  }
+
+  if (has("ads:read", "ads:write")) {
+    server.registerTool("create_ad_research_source", {
+      title: "Сохранить рекламный источник", description: "Сохраняет источник исследования; не управляет рекламным кабинетом.",
+      inputSchema: adSourceInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("create_ad_research_source", () => services.ads.createResearchSource(command, idempotencyKey)));
+    server.registerTool("create_ad_market_signal", {
+      title: "Сохранить рыночный сигнал", description: "Сохраняет структурированный рекламный паттерн.",
+      inputSchema: adSignalInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("create_ad_market_signal", () => services.ads.createMarketSignal(command, idempotencyKey)));
+    server.registerTool("create_ad_hypothesis", {
+      title: "Создать рекламную гипотезу", description: "Создаёт кандидатную гипотезу, не запускает рекламу.",
+      inputSchema: adHypothesisInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("create_ad_hypothesis", () => services.ads.createHypothesis(command, idempotencyKey)));
+    server.registerTool("transition_ad_hypothesis", {
+      title: "Изменить состояние рекламной гипотезы", description: "Выполняет только разрешённый переход с проверкой версии.",
+      inputSchema: z.strictObject({ ...adIdempotency, id: z.uuid(), expectedVersion: z.number().int().positive(), status: z.enum(AD_HYPOTHESIS_STATUSES) }),
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, id, expectedVersion, status }) => run("transition_ad_hypothesis",
+      () => services.ads.transitionHypothesis(id, expectedVersion, status, idempotencyKey)));
+    server.registerTool("create_ad_experiment", {
+      title: "Создать паспорт рекламного эксперимента", description: "Фиксирует паспорт и лимиты до отдельного согласования.",
+      inputSchema: adExperimentInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("create_ad_experiment", () => services.ads.createExperiment(command, idempotencyKey)));
+    server.registerTool("save_ad_approval", {
+      title: "Сохранить согласование эксперимента", description: "Фиксирует уже выраженное согласование; не обращается к VK.",
+      inputSchema: adApprovalInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("save_ad_approval", () => services.ads.saveApproval(command, idempotencyKey)));
+    server.registerTool("transition_ad_experiment", {
+      title: "Изменить состояние рекламного эксперимента", description: "Фиксирует разрешённый этап внешнего жизненного цикла.",
+      inputSchema: z.strictObject({ ...adIdempotency, id: z.uuid(), expectedVersion: z.number().int().positive(), status: z.enum(AD_EXPERIMENT_STATUSES) }),
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, id, expectedVersion, status }) => run("transition_ad_experiment",
+      () => services.ads.transitionExperiment(id, expectedVersion, status, idempotencyKey)));
+    server.registerTool("record_ad_variant_binding", {
+      title: "Записать привязку варианта", description: "Сохраняет безопасные ID объектов VK и версию варианта.",
+      inputSchema: adVariantInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("record_ad_variant_binding", () => services.ads.recordVariantBinding(command, idempotencyKey)));
+    server.registerTool("record_ad_metric_snapshot", {
+      title: "Записать снимок рекламных метрик", description: "Добавляет идемпотентный часовой или дневной снимок.",
+      inputSchema: adMetricInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("record_ad_metric_snapshot", () => services.ads.recordMetricSnapshot(command, idempotencyKey)));
+    server.registerTool("record_ad_lead_attribution", {
+      title: "Записать атрибуцию лида", description: "Сохраняет только внутренние и CRM ID без контактных данных.",
+      inputSchema: adLeadInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("record_ad_lead_attribution", () => services.ads.recordLeadAttribution(command, idempotencyKey)));
+    server.registerTool("append_ad_event", {
+      title: "Добавить событие рекламного эксперимента", description: "Добавляет безопасное append-only событие.",
+      inputSchema: adEventInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("append_ad_event", () => services.ads.appendEvent(command, idempotencyKey)));
+    server.registerTool("finish_ad_experiment", {
+      title: "Завершить рекламный эксперимент", description: "Фиксирует совместимый терминальный статус, факты выборки и ограничения.",
+      inputSchema: adVerdictInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("finish_ad_experiment", () => services.ads.finishExperiment(command, idempotencyKey)));
+    server.registerTool("create_ad_learning", {
+      title: "Сохранить вывод рекламного эксперимента", description: "Сохраняет проверяемый вывод и при необходимости замещает старую версию.",
+      inputSchema: adLearningInput, outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, ({ idempotencyKey, ...command }) => run("create_ad_learning", () => services.ads.createLearning(command, idempotencyKey)));
   }
 
   return server;

@@ -62,7 +62,7 @@ const loaderData = {
   sidebarOpen: true,
 };
 
-function renderLayout(width: number, sidebarOpen = true) {
+function renderLayout(width: number, sidebarOpen = true, initialPath = "/admin/seo/positions/") {
   installViewport(width);
   const router = createMemoryRouter([{
     id: "admin-layout",
@@ -70,7 +70,7 @@ function renderLayout(width: number, sidebarOpen = true) {
     element: <AdminLayout />,
     loader: () => ({ ...loaderData, sidebarOpen }),
   }], {
-    initialEntries: ["/admin/seo/positions/"],
+    initialEntries: [initialPath],
     hydrationData: { loaderData: { "admin-layout": { ...loaderData, sidebarOpen } } },
   });
   return render(<RouterProvider router={router} />);
@@ -109,4 +109,11 @@ test("admin content owns the available width instead of expanding the page", asy
   assert.ok(inset?.classList.contains("min-w-0"));
   assert.ok(inset?.classList.contains("overflow-x-hidden"));
   assert.ok(view.container.querySelector('[data-admin-content="true"]')?.classList.contains("min-w-0"));
+});
+
+test("advertising cabinet has one active sidebar destination", async () => {
+  const view = renderLayout(1280, true, "/admin/ads/experiments/");
+  const advertising = await view.findByRole("link", { name: "Реклама" });
+  assert.equal(advertising.getAttribute("aria-current"), "page");
+  assert.equal(view.getByRole("link", { name: "SEO-мониторинг" }).getAttribute("aria-current"), null);
 });

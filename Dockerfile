@@ -89,7 +89,7 @@ COPY --from=build --chown=node:node /app/content/seo/geo-prompts.ru.json /app/co
 COPY --from=build --chown=node:node /app/drizzle /app/drizzle
 COPY --from=build --chown=node:node /app/scripts/migrate-production.mjs /app/scripts/migrate-production.mjs
 COPY --from=build --chown=node:node /app/scripts/runtime-entrypoint.sh /app/scripts/runtime-entrypoint.sh
-RUN test -f /app/server/lead-worker.mjs && test -f /app/server/lead-retention.mjs && test -f /app/server/seo-collect.mjs && test -f /app/server/seo-core-sync.mjs && test -f /app/server/geo-core-sync.mjs
+RUN test -f /app/server/lead-worker.mjs && test -f /app/server/lead-retention.mjs && test -f /app/server/seo-collect.mjs && test -f /app/server/vk-ads-collect.mjs && test -f /app/server/seo-core-sync.mjs && test -f /app/server/geo-core-sync.mjs
 RUN mkdir -p /app/server/data /tmp/kordev-leads && chown node:node /app/server/data /tmp/kordev-leads && chmod 0700 /tmp/kordev-leads /app/scripts/runtime-entrypoint.sh
 USER node
 EXPOSE 3001

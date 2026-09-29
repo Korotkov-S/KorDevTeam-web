@@ -96,11 +96,11 @@ test("issue trims names and deduplicates scopes in canonical order", async () =>
   await service.issue({
     adminUserId: ADMIN_ID,
     name: "  Integration token  ",
-    scopes: ["media:write", "content:read", "media:write", "content:publish"],
+    scopes: ["ads:write", "media:write", "content:read", "ads:read", "media:write", "content:publish"],
     ttlDays: null,
   });
   assert.equal(saved[0]?.name, "Integration token");
-  assert.deepEqual(saved[0]?.scopes, ["content:read", "content:publish", "media:write"]);
+  assert.deepEqual(saved[0]?.scopes, ["content:read", "content:publish", "media:write", "ads:read", "ads:write"]);
   assert.equal(saved[0]?.expiresAt, null);
 });
 
