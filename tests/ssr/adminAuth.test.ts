@@ -31,7 +31,7 @@ test("production runtime permanently retires legacy admin API authentication", a
   }
 });
 
-test("legacy read-only admin API is absent while the SSR admin route remains", async t => {
+test("legacy read-only admin API is absent while admin login exposes password recovery", async t => {
   const runtime = await startTestRuntime({ ...runtimeConfig, NODE_ENV: "production", TRUST_PROXY_HOPS: "0" });
   t.after(runtime.close);
 
@@ -39,4 +39,21 @@ test("legacy read-only admin API is absent while the SSR admin route remains", a
   const login = await fetch(`${runtime.origin}/admin/login/`);
   assert.equal(login.status, 200);
   assert.equal(login.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.match(await login.text(), /href="\/admin\/forgot-password\/"[^>]*>Забыли пароль\?/);
+
+  const forgot = await fetch(`${runtime.origin}/admin/forgot-password/`);
+  assert.equal(forgot.status, 200);
+  assert.equal(forgot.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.match(await forgot.text(), /name="login"/);
+
+  const resetCapture = await fetch(`${runtime.origin}/admin/reset-password/?token=${"t".repeat(43)}`, { redirect: "manual" });
+  assert.equal(resetCapture.status, 302);
+  assert.equal(resetCapture.headers.get("location"), "/admin/reset-password/");
+  const resetCookie = (resetCapture.headers.get("set-cookie") ?? "").split(";", 1)[0];
+  const reset = await fetch(`${runtime.origin}/admin/reset-password/`, { headers: { cookie: resetCookie } });
+  assert.equal(reset.status, 200);
+  assert.equal(reset.headers.get("x-robots-tag"), "noindex, nofollow");
+  const resetHtml = await reset.text();
+  assert.match(resetHtml, /name="newPassword"/);
+  assert.match(resetHtml, /name="confirmPassword"/);
 });

@@ -69,3 +69,49 @@ databaseTest("logout and password change revoke sessions", async () => {
   await assert.rejects(() => service.login({ login: "owner", password: oldPassword, ip: "203.0.113.9" }));
   assert.equal((await service.login({ login: "owner", password: newPassword, ip: "203.0.113.9" })).principal.login, "owner");
 });
+
+databaseTest("password reset tokens are single-use, expire after thirty minutes and revoke existing sessions", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const oldPassword = "очень-длинный-пароль-2026";
+  const newPassword = "совершенно-новый-пароль-2026";
+  await createAdminUser(db, { login: "owner", password: oldPassword });
+  let current = new Date("2026-09-29T09:00:00.000Z");
+  let byte = 1;
+  const service = createAuthService(db, config, {
+    now: () => current,
+    randomBytes: () => Buffer.alloc(32, byte++),
+  });
+  const session = await service.login({ login: "owner", password: oldPassword, ip: "203.0.113.10" });
+
+  const requested = await service.requestPasswordReset({ login: "owner", ip: "203.0.113.10" });
+  assert.match(requested?.token ?? "", /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(requested?.expiresAt.toISOString(), "2026-09-29T09:30:00.000Z");
+  assert.equal(await service.resetPassword({ token: requested?.token ?? "", newPassword }), true);
+  assert.equal(await service.authenticate(session.token), null);
+  await assert.rejects(() => service.login({ login: "owner", password: oldPassword, ip: "203.0.113.11" }));
+  assert.equal((await service.login({ login: "owner", password: newPassword, ip: "203.0.113.11" })).principal.login, "owner");
+  assert.equal(await service.resetPassword({ token: requested?.token ?? "", newPassword: "ещё-один-новый-пароль-2026" }), false);
+
+  current = new Date("2026-09-29T10:00:00.000Z");
+  const expired = await service.requestPasswordReset({ login: "owner", ip: "203.0.113.12" });
+  current = new Date("2026-09-29T10:30:00.001Z");
+  assert.equal(await service.resetPassword({ token: expired?.token ?? "", newPassword: "ещё-один-новый-пароль-2026" }), false);
+});
+
+databaseTest("password reset request is generic for unknown and rate-limited logins", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  await createAdminUser(db, { login: "owner", password: "очень-длинный-пароль-2026" });
+  let byte = 1;
+  const service = createAuthService(db, config, {
+    now: () => new Date("2026-09-29T09:00:00.000Z"),
+    randomBytes: () => Buffer.alloc(32, byte++),
+  });
+
+  assert.equal(await service.requestPasswordReset({ login: "unknown", ip: "203.0.113.20" }), null);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    assert.notEqual(await service.requestPasswordReset({ login: "owner", ip: "203.0.113.21" }), null);
+  }
+  assert.equal(await service.requestPasswordReset({ login: "owner", ip: "203.0.113.21" }), null);
+});

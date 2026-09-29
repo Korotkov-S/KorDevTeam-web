@@ -30,6 +30,13 @@ x-admin-media-environment: &admin-media-environment
   PUBLIC_MEDIA_S3_PREFIX: ${PUBLIC_MEDIA_S3_PREFIX:-media}
   PUBLIC_MEDIA_BASE_URL: ${PUBLIC_MEDIA_BASE_URL:-https://cdn.example.invalid/}
   PUBLIC_MEDIA_S3_SSE: ${PUBLIC_MEDIA_S3_SSE:-AES256}
+x-email-environment: &email-environment
+  SMTP_HOST: ${SMTP_HOST:-smtp.example.invalid}
+  SMTP_PORT: ${SMTP_PORT:-465}
+  SMTP_SECURE: ${SMTP_SECURE:-true}
+  SMTP_USER: ${SMTP_USER:-local-user}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-local-password}
+  SMTP_FROM: ${SMTP_FROM:-team@korotkov.dev}
 x-vk-ads-read-environment: &vk-ads-read-environment
   VK_ADS_S3_ENDPOINT: ${VK_ADS_S3_ENDPOINT:-https://s3.example.invalid}
   VK_ADS_S3_REGION: ${VK_ADS_S3_REGION:-ru-1}
@@ -40,7 +47,7 @@ x-vk-ads-read-environment: &vk-ads-read-environment
 x-web: &web
   <<: *app
   environment:
-    <<: [*lead-web-environment, *admin-media-environment, *vk-ads-read-environment]
+    <<: [*lead-web-environment, *admin-media-environment, *email-environment, *vk-ads-read-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
@@ -110,17 +117,11 @@ services:
     restart: unless-stopped
     read_only: true
     environment:
-      <<: *lead-web-environment
+      <<: [*lead-web-environment, *email-environment]
       NODE_ENV: production
       DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
       CRM_INTAKE_ENDPOINT: ${CRM_INTAKE_ENDPOINT:-https://crm.example.invalid/api/v1/board-intake/brd_local/requests}
       CRM_INTAKE_TOKEN: ${CRM_INTAKE_TOKEN:-local-board-token}
-      SMTP_HOST: ${SMTP_HOST:-smtp.example.invalid}
-      SMTP_PORT: ${SMTP_PORT:-465}
-      SMTP_SECURE: ${SMTP_SECURE:-true}
-      SMTP_USER: ${SMTP_USER:-local-user}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-local-password}
-      SMTP_FROM: ${SMTP_FROM:-team@korotkov.dev}
       LEAD_EMAIL_TO: team@korotkov.dev
     depends_on:
       postgres:

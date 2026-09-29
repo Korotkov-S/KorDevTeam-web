@@ -2,7 +2,7 @@ import { Form, useActionData, useLoaderData } from "react-router";
 
 export { action, headers, loader } from "./login.server";
 
-type LoginData = { loginCsrf: string; returnTo: string };
+type LoginData = { loginCsrf: string; returnTo: string; passwordReset: boolean };
 type LoginActionData = { error?: string; login?: string; returnTo?: string; loginCsrf?: string };
 
 export function meta() { return [{ title: "Вход в админку | KorDevTeam" }]; }
@@ -16,6 +16,7 @@ export default function AdminLogin() {
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
         <p className="text-sm text-muted-foreground">KorDevTeam</p>
         <h1 className="mt-2 text-2xl font-semibold">Вход в админку</h1>
+        {initial.passwordReset && <div role="status" className="mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3">Пароль изменён. Войдите с новым паролем.</div>}
         {result?.error && <div role="alert" tabIndex={-1} className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3">{result.error}</div>}
         <Form method="post" action="/admin/login/" className="mt-6 space-y-4">
           <input type="hidden" name="_loginCsrf" value={loginCsrf} />
@@ -28,6 +29,7 @@ export default function AdminLogin() {
             className="w-full rounded-lg border border-input bg-background px-3 py-2" />
           <button type="submit" className="w-full rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground">Войти</button>
         </Form>
+        <a href="/admin/forgot-password/" className="mt-5 block text-center text-sm text-primary underline underline-offset-4">Забыли пароль?</a>
       </div>
     </main>
   );

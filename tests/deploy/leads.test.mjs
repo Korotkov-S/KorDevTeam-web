@@ -16,10 +16,10 @@ const webLeadKeys = [
   'LEAD_S3_SECRET_ACCESS_KEY', 'LEAD_S3_PREFIX', 'LEAD_S3_SSE',
   'CLAMAV_HOST', 'CLAMAV_PORT',
 ];
-const workerOnlyKeys = [
-  'CRM_INTAKE_ENDPOINT', 'CRM_INTAKE_TOKEN',
-  'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM', 'LEAD_EMAIL_TO',
+const sharedEmailKeys = [
+  'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM',
 ];
+const workerOnlyKeys = ['CRM_INTAKE_ENDPOINT', 'CRM_INTAKE_TOKEN', 'LEAD_EMAIL_TO'];
 
 test('production topology has one private lead worker and internal ClamAV', () => {
   const { services, networks, volumes } = productionCompose();
@@ -62,6 +62,9 @@ test('production web and worker receive private server-side lead settings with b
     assert.equal(service.logging.options['max-size'], '20m');
     assert.equal(service.logging.options['max-file'], '30');
   }
+  for (const name of ['kordevteam-blue', 'kordevteam-green', 'lead-worker']) {
+    for (const key of sharedEmailKeys) assert.ok(services[name].environment[key], `${name} misses ${key}`);
+  }
   for (const key of workerOnlyKeys) assert.ok(services['lead-worker'].environment[key], `worker misses ${key}`);
   for (const name of ['kordevteam-blue', 'kordevteam-green']) {
     for (const key of workerOnlyKeys) assert.equal(services[name].environment[key], undefined, `${key} belongs only in the worker`);
@@ -73,7 +76,7 @@ test('production web and worker receive private server-side lead settings with b
 
 test('production compose fails closed when any lead delivery setting is missing', () => {
   const values = Object.fromEntries(readFileSync(fixture, 'utf8').trim().split('\n').map(line => line.split(/=(.*)/s).slice(0, 2)));
-  const required = [...webLeadKeys, ...workerOnlyKeys, 'WORKER_IMAGE', 'CLAMAV_IMAGE'];
+  const required = [...webLeadKeys, ...sharedEmailKeys, ...workerOnlyKeys, 'WORKER_IMAGE', 'CLAMAV_IMAGE'];
   for (const key of required) {
     const result = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.team.yml', 'config'], {
       encoding: 'utf8', env: { ...process.env, ...values, [key]: '' },

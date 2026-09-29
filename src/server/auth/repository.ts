@@ -1,7 +1,7 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, gte, isNull, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
-import { adminAuthLimits, adminSessions, adminUsers } from "../db/schema";
+import { adminAuthLimits, adminPasswordResetRequests, adminSessions, adminUsers } from "../db/schema";
 
 export type AuthDatabase = ReturnType<typeof createDb>;
 export type AuthLimitSubjects = { ipHash: string; loginHash: string; globalHash: string };
@@ -88,6 +88,81 @@ export function createAuthRepository(db: AuthDatabase) {
         if (changed.length !== 1) return false;
         await tx.update(adminSessions).set({ revokedAt: now }).where(and(
           eq(adminSessions.adminUserId, userId),
+          isNull(adminSessions.revokedAt),
+        ));
+        return true;
+      });
+    },
+    async readPasswordResetRequestCounts(input: {
+      loginHash: string;
+      requestIpHash: string;
+      since: Date;
+    }): Promise<{ ip: number; login: number; global: number }> {
+      const [counts] = await db.select({
+        ip: sql<number>`count(*) filter (where ${adminPasswordResetRequests.requestIpHash} = ${input.requestIpHash})::int`,
+        login: sql<number>`count(*) filter (where ${adminPasswordResetRequests.loginHash} = ${input.loginHash})::int`,
+        global: sql<number>`count(*)::int`,
+      }).from(adminPasswordResetRequests).where(gte(adminPasswordResetRequests.createdAt, input.since));
+      return { ip: counts?.ip ?? 0, login: counts?.login ?? 0, global: counts?.global ?? 0 };
+    },
+    async createPasswordResetRequest(input: {
+      adminUserId: string | null;
+      loginHash: string;
+      requestIpHash: string;
+      tokenHash: string | null;
+      now: Date;
+      expiresAt: Date;
+    }) {
+      await db.transaction(async tx => {
+        if (input.adminUserId) {
+          await tx.update(adminPasswordResetRequests).set({ usedAt: input.now }).where(and(
+            eq(adminPasswordResetRequests.adminUserId, input.adminUserId),
+            isNull(adminPasswordResetRequests.usedAt),
+          ));
+        }
+        await tx.insert(adminPasswordResetRequests).values({
+          adminUserId: input.adminUserId,
+          loginHash: input.loginHash,
+          requestIpHash: input.requestIpHash,
+          tokenHash: input.tokenHash,
+          createdAt: input.now,
+          expiresAt: input.expiresAt,
+        });
+      });
+    },
+    async consumePasswordResetToken(
+      tokenHash: string,
+      password: { digest: string; salt: string },
+      now: Date,
+    ): Promise<boolean> {
+      return db.transaction(async tx => {
+        const [request] = await tx.select({ adminUserId: adminPasswordResetRequests.adminUserId })
+          .from(adminPasswordResetRequests)
+          .innerJoin(adminUsers, eq(adminUsers.id, adminPasswordResetRequests.adminUserId))
+          .where(and(
+            eq(adminPasswordResetRequests.tokenHash, tokenHash),
+            isNull(adminPasswordResetRequests.usedAt),
+            gt(adminPasswordResetRequests.expiresAt, now),
+            eq(adminUsers.active, true),
+          ))
+          .limit(1)
+          .for("update");
+        if (!request?.adminUserId) return false;
+        const changed = await tx.update(adminUsers).set({
+          passwordDigest: password.digest,
+          passwordSalt: password.salt,
+          updatedAt: now,
+        }).where(and(
+          eq(adminUsers.id, request.adminUserId),
+          eq(adminUsers.active, true),
+        )).returning({ id: adminUsers.id });
+        if (changed.length !== 1) return false;
+        await tx.update(adminPasswordResetRequests).set({ usedAt: now }).where(and(
+          eq(adminPasswordResetRequests.adminUserId, request.adminUserId),
+          isNull(adminPasswordResetRequests.usedAt),
+        ));
+        await tx.update(adminSessions).set({ revokedAt: now }).where(and(
+          eq(adminSessions.adminUserId, request.adminUserId),
           isNull(adminSessions.revokedAt),
         ));
         return true;

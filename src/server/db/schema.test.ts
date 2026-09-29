@@ -98,6 +98,7 @@ databaseTest("0012 reconstructs legacy GEO prompt sets and distrusts incomplete 
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
   await dropAdvertisingSchema(db);
+  await db.execute(sql`DROP TABLE admin_password_reset_requests`);
   await db.execute(sql`ALTER TABLE geo_runs
     DROP CONSTRAINT geo_runs_prompt_ids_bounded,
     DROP CONSTRAINT geo_runs_plan_matches_prompts,
@@ -655,6 +656,7 @@ databaseTest("0008 promotes non-API tracked queries but turns legacy API noise i
   const db = createDb(TEST_DATABASE_URL);
   await dropAdvertisingSchema(db);
   await dropGeoSchema(db);
+  await db.execute(sql`DROP TABLE admin_password_reset_requests`);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS status`);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS kind`);
   await db.execute(sql`ALTER TABLE seo_queries DROP COLUMN IF EXISTS priority`);
@@ -885,6 +887,7 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
   const db = createDb(TEST_DATABASE_URL);
   await dropAdvertisingSchema(db);
   await dropGeoSchema(db);
+  await db.execute(sql`DROP TABLE admin_password_reset_requests`);
   const [lead] = await db.insert(leads).values(leadFixture).returning();
   await db.insert(leadDeliveryJobs).values({ leadId: lead.id, channel: "crm" });
   await db.execute(sql`DROP TABLE content_release_items, content_release_runs`);

@@ -8,6 +8,8 @@ export default [
   route("sitemap-blog.xml", "routes/sitemap-blog.xml.ts"),
   route("robots.txt", "routes/robots.txt.ts"),
   route("admin/login/", "routes/admin/login.tsx"),
+  route("admin/forgot-password/", "routes/admin/forgot-password.tsx"),
+  route("admin/reset-password/", "routes/admin/reset-password.tsx"),
   layout("routes/admin/layout.tsx", [
     route("admin/", "routes/admin/index.tsx"),
     route("admin/media/", "routes/admin/media.tsx"),

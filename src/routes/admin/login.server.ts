@@ -35,7 +35,11 @@ export function createLoginLoader(
     const url = new URL(request.url);
     const headers = responseHeaders(request);
     headers.append("Set-Cookie", createLoginCsrfCookie(loginCsrf));
-    return Response.json({ loginCsrf, returnTo: safeAdminReturnPath(url.searchParams.get("returnTo")) }, { headers });
+    return Response.json({
+      loginCsrf,
+      returnTo: safeAdminReturnPath(url.searchParams.get("returnTo")),
+      passwordReset: url.searchParams.get("reset") === "success",
+    }, { headers });
   };
 }
 

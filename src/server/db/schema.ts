@@ -162,6 +162,38 @@ export const adminSessions = pgTable(
   ],
 );
 
+export const adminPasswordResetRequests = pgTable(
+  "admin_password_reset_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminUserId: uuid("admin_user_id")
+      .references(() => adminUsers.id, { onDelete: "cascade" }),
+    loginHash: varchar("login_hash", { length: 64 }).notNull(),
+    requestIpHash: varchar("request_ip_hash", { length: 64 }).notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("admin_password_reset_requests_token_hash_uq").on(table.tokenHash),
+    index("admin_password_reset_requests_ip_created_idx").on(table.requestIpHash, table.createdAt),
+    index("admin_password_reset_requests_login_created_idx").on(table.loginHash, table.createdAt),
+    index("admin_password_reset_requests_expires_at_idx").on(table.expiresAt),
+    check("admin_password_reset_requests_login_hash_sha256", sql`${table.loginHash} ~ '^[0-9a-f]{64}$'`),
+    check("admin_password_reset_requests_ip_hash_sha256", sql`${table.requestIpHash} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "admin_password_reset_requests_token_hash_sha256",
+      sql`${table.tokenHash} IS NULL OR ${table.tokenHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check("admin_password_reset_requests_expiry_valid", sql`${table.expiresAt} > ${table.createdAt}`),
+    check(
+      "admin_password_reset_requests_token_owner_pair",
+      sql`(${table.tokenHash} IS NULL) = (${table.adminUserId} IS NULL)`,
+    ),
+  ],
+);
+
 export const mcpTokens = pgTable(
   "mcp_tokens",
   {

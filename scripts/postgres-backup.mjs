@@ -49,13 +49,15 @@ const contentReleaseRequiredTables = ['public.content_release_items', 'public.co
 const geoRequiredTables = ['public.geo_topics', 'public.geo_entities', 'public.geo_prompts', 'public.geo_runs', 'public.geo_observations', 'public.geo_observation_mentions', 'public.geo_citations', 'public.geo_fanout_queries', 'public.geo_referral_daily_metrics', 'public.geo_crawler_checks', 'public.geo_experiments', 'public.geo_experiment_prompts'];
 const advertisingRequiredTables = ['public.ad_research_sources', 'public.ad_market_signals', 'public.ad_hypotheses', 'public.ad_experiments', 'public.ad_experiment_variants', 'public.ad_metric_snapshots', 'public.ad_lead_attributions', 'public.ad_experiment_events', 'public.ad_learnings', 'public.ad_command_receipts'];
 const vkAdsRequiredTables = ['public.ad_vk_oauth_states', 'public.ad_vk_sync_runs', 'public.ad_vk_accounts', 'public.ad_vk_campaigns', 'public.ad_vk_ad_groups', 'public.ad_vk_ads', 'public.ad_vk_creative_versions', 'public.ad_vk_daily_metrics', 'public.ad_vk_experiment_links'];
-const requiredTables = [...coreRequiredTables, ...seoRequiredTables, ...metrikaRequiredTables, ...contentReleaseRequiredTables, ...geoRequiredTables, ...advertisingRequiredTables, ...vkAdsRequiredTables];
+const passwordResetRequiredTables = ['public.admin_password_reset_requests'];
+const requiredTables = [...coreRequiredTables, ...seoRequiredTables, ...metrikaRequiredTables, ...contentReleaseRequiredTables, ...geoRequiredTables, ...advertisingRequiredTables, ...vkAdsRequiredTables, ...passwordResetRequiredTables];
 const seoMigrationCreatedAt = '1790333729506';
 const contentReleaseMigrationCreatedAt = '1790350786115';
 const metrikaMigrationCreatedAt = '1790484327389';
 const geoMigrationCreatedAt = '1790493945985';
 const advertisingMigrationCreatedAt = '1790573403259';
 const vkAdsMigrationCreatedAt = '1790608600969';
+const passwordResetMigrationCreatedAt = '1790673808500';
 const migrationSeedCounts = { 'public.seo_regions': '9', 'public.seo_sources': '3' };
 const requiredTablesForHistory = history => [
   ...coreRequiredTables,
@@ -65,6 +67,7 @@ const requiredTablesForHistory = history => [
   ...(history.some(row => row.created_at === geoMigrationCreatedAt) ? geoRequiredTables : []),
   ...(history.some(row => row.created_at === advertisingMigrationCreatedAt) ? advertisingRequiredTables : []),
   ...(history.some(row => row.created_at === vkAdsMigrationCreatedAt) ? vkAdsRequiredTables : []),
+  ...(history.some(row => row.created_at === passwordResetMigrationCreatedAt) ? passwordResetRequiredTables : []),
 ];
 const quoteIdentifier = value => `"${value.replaceAll('"', '""')}"`;
 export async function databaseInventory(client, requiredInventoryTables = requiredTables) {

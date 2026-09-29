@@ -33,6 +33,7 @@ const dummyPassword: PasswordRecord = {
 };
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const WINDOW_MS = 15 * 60_000;
+const PASSWORD_RESET_TTL_MS = 30 * 60_000;
 
 function hexHmac(key: Buffer, domain: string, value: string): string {
   return createHmac("sha256", key).update(`${domain}\0${value}`).digest("hex");
@@ -69,6 +70,7 @@ export function createAuthService(
     globalHash: hexHmac(config.rateLimitHmacKey, "admin-login-global", "all"),
   });
   const tokenHash = (token: string) => hexHmac(config.sessionHmacKey, "admin-session", token);
+  const passwordResetTokenHash = (token: string) => hexHmac(config.sessionHmacKey, "admin-password-reset", token);
   const csrfHash = (csrf: string) => hexHmac(config.sessionHmacKey, "admin-csrf-proof", csrf);
 
   async function authenticate(token: string): Promise<AdminPrincipal | null> {
@@ -134,6 +136,36 @@ export function createAuthService(
       if (!await repository.replacePasswordAndRevokeSessions(user.id, next, runtime.now())) {
         throw new AdminAuthError("admin_session_invalid", 401);
       }
+    },
+    async requestPasswordReset(input: { login: string; ip: string }) {
+      const identity = loginIdentity(input.login);
+      const now = runtime.now();
+      const loginHash = hexHmac(config.rateLimitHmacKey, "admin-password-reset-login", identity.rate);
+      const requestIpHash = hexHmac(config.rateLimitHmacKey, "admin-password-reset-ip", input.ip || "unknown");
+      const counts = await repository.readPasswordResetRequestCounts({
+        loginHash,
+        requestIpHash,
+        since: new Date(now.getTime() - WINDOW_MS),
+      });
+      if (counts.ip >= 3 || counts.login >= 3 || counts.global >= 30) return null;
+      const user = identity.lookup ? await repository.findUserByLogin(identity.lookup) : null;
+      const token = runtime.randomBytes(32).toString("base64url");
+      const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TTL_MS);
+      const allowedUser = user?.active ? user : null;
+      await repository.createPasswordResetRequest({
+        adminUserId: allowedUser?.id ?? null,
+        loginHash,
+        requestIpHash,
+        tokenHash: allowedUser ? passwordResetTokenHash(token) : null,
+        now,
+        expiresAt,
+      });
+      return allowedUser ? { token, expiresAt } : null;
+    },
+    async resetPassword(input: { token: string; newPassword: string }) {
+      const next = await hashPassword(input.newPassword);
+      if (!TOKEN_PATTERN.test(input.token)) return false;
+      return repository.consumePasswordResetToken(passwordResetTokenHash(input.token), next, runtime.now());
     },
     cleanupExpiredLimits: (limit = 500) => repository.cleanupExpiredLimits(runtime.now(), limit),
   };
