@@ -434,6 +434,33 @@ jobs:
             fi
             [[ -d "$RELEASES_DIR" && ! -L "$RELEASES_DIR" ]]
             [[ "$(realpath -e -- "$RELEASES_DIR")" == "$RELEASES_DIR" ]]
+            reclaim_release_caches() {
+              local current_release='' candidate name marker cache
+              if [[ -L /opt/kordevteam/current ]]; then
+                current_release="$(realpath -e -- /opt/kordevteam/current)"
+                [[ "${current_release%/*}" == "$RELEASES_DIR" ]]
+                [[ "${current_release##*/}" =~ ^[a-f0-9]{40}$ ]]
+              fi
+              shopt -s nullglob
+              for candidate in "$RELEASES_DIR"/*; do
+                [[ -d "$candidate" && ! -L "$candidate" ]] || continue
+                name="${candidate##*/}"
+                [[ "$name" =~ ^[a-f0-9]{40}$ ]] || continue
+                [[ "$(realpath -e -- "$candidate")" == "$candidate" ]]
+                marker="$candidate/.kordev-release"
+                [[ -f "$marker" && ! -L "$marker" ]] || continue
+                [[ "$(cat -- "$marker")" == release ]] || continue
+                [[ "$candidate" == "$current_release" ]] && continue
+                for cache in "$candidate/node_modules" "$candidate/.yarn/cache"; do
+                  [[ ! -L "$cache" ]] || { echo "Refusing symlinked release cache: $cache" >&2; return 1; }
+                  [[ -e "$cache" ]] || continue
+                  [[ -d "$cache" ]] || { echo "Release cache is not a directory: $cache" >&2; return 1; }
+                  rm -rf -- "$cache"
+                done
+              done
+              shopt -u nullglob
+            }
+            reclaim_release_caches
             release_dir="$RELEASES_DIR/$RELEASE_SHA"
             if [[ ! -e "$release_dir" && ! -L "$release_dir" ]]; then
               incoming="$RELEASES_DIR/.incoming-$RELEASE_SHA-$$"
