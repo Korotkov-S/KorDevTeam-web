@@ -48,6 +48,7 @@ app.use(async (req, res, next) => {
 app.use(createApiApp({
   checkReady: build.entry.module.checkApplicationReady,
   leadRouter: build.entry.module.createLeadRouter(),
+  vkLeadRouter: build.entry.module.createVkLeadRouter(),
 }));
 app.use(
   "/assets",

@@ -18,7 +18,7 @@ function allowCorsOrigin(origin, callback) {
   callback(null, false);
 }
 
-function createApiApp({ checkReady, leadRouter } = {}) {
+function createApiApp({ checkReady, leadRouter, vkLeadRouter } = {}) {
   const api = express.Router();
   const apiOnly = (middleware) => (req, res, next) =>
     req.path === "/api" || req.path.startsWith("/api/") ? middleware(req, res, next) : next();
@@ -26,6 +26,9 @@ function createApiApp({ checkReady, leadRouter } = {}) {
   // Retired file/SQLite write endpoints fail before body parsers or legacy modules run.
   api.use(createLegacyAdminTombstones());
   if (leadRouter) api.use("/api/leads", leadRouter);
+  // The VK callback authenticates in its path and must terminate before generic
+  // request logging/body parsers can expose that token or lead contact data.
+  if (vkLeadRouter) api.use("/api/vk/leads", vkLeadRouter);
   api.use(cors({ origin: allowCorsOrigin }));
   api.use(apiOnly(express.json({ limit: process.env.JSON_LIMIT || "25mb" })));
   api.use(apiOnly(

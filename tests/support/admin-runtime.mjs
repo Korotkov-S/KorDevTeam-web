@@ -101,6 +101,9 @@ export async function startAdminRuntime(databaseUrl) {
       LEAD_S3_SSE: "AES256",
       CLAMAV_HOST: "clamav.example.invalid",
       CLAMAV_PORT: "3310",
+      VK_LEAD_WEBHOOK_PATH_TOKEN: "a".repeat(64),
+      VK_LEAD_FORM_IDS: "1001168,1001220",
+      VK_LEAD_CONSENT_VERSION: "vk-form-2026-09-23",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

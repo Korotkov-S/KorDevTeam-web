@@ -18,6 +18,10 @@ x-lead-web-environment: &lead-web-environment
   LEAD_S3_SSE: ${LEAD_S3_SSE:-AES256}
   CLAMAV_HOST: clamav
   CLAMAV_PORT: "3310"
+x-vk-lead-webhook-environment: &vk-lead-webhook-environment
+  VK_LEAD_WEBHOOK_PATH_TOKEN: ${VK_LEAD_WEBHOOK_PATH_TOKEN:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+  VK_LEAD_FORM_IDS: ${VK_LEAD_FORM_IDS:-1001168,1001220}
+  VK_LEAD_CONSENT_VERSION: ${VK_LEAD_CONSENT_VERSION:-vk-form-2026-09-23}
 x-admin-media-environment: &admin-media-environment
   ADMIN_SESSION_HMAC_KEY: ${ADMIN_SESSION_HMAC_KEY:-YWRtaW4tc2Vzc2lvbi1maXh0dXJlLWtleS0zMi1ieXRlcy1sb2NhbCE=}
   ADMIN_RATE_LIMIT_HMAC_KEY: ${ADMIN_RATE_LIMIT_HMAC_KEY:-YWRtaW4tcmF0ZS1saW1pdC1maXh0dXJlLWtleS0zMi1ieXRlcyE=}
@@ -47,7 +51,7 @@ x-vk-ads-read-environment: &vk-ads-read-environment
 x-web: &web
   <<: *app
   environment:
-    <<: [*lead-web-environment, *admin-media-environment, *email-environment, *vk-ads-read-environment]
+    <<: [*lead-web-environment, *admin-media-environment, *email-environment, *vk-ads-read-environment, *vk-lead-webhook-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"

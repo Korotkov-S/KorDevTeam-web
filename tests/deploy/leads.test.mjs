@@ -20,6 +20,7 @@ const sharedEmailKeys = [
   'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM',
 ];
 const workerOnlyKeys = ['CRM_INTAKE_ENDPOINT', 'CRM_INTAKE_TOKEN', 'LEAD_EMAIL_TO'];
+const vkWebhookKeys = ['VK_LEAD_WEBHOOK_PATH_TOKEN', 'VK_LEAD_FORM_IDS', 'VK_LEAD_CONSENT_VERSION'];
 
 test('production topology has one private lead worker and internal ClamAV', () => {
   const { services, networks, volumes } = productionCompose();
@@ -68,7 +69,9 @@ test('production web and worker receive private server-side lead settings with b
   for (const key of workerOnlyKeys) assert.ok(services['lead-worker'].environment[key], `worker misses ${key}`);
   for (const name of ['kordevteam-blue', 'kordevteam-green']) {
     for (const key of workerOnlyKeys) assert.equal(services[name].environment[key], undefined, `${key} belongs only in the worker`);
+    for (const key of vkWebhookKeys) assert.ok(services[name].environment[key], `${name} misses ${key}`);
   }
+  for (const key of vkWebhookKeys) assert.equal(services['lead-worker'].environment[key], undefined, `${key} belongs only in web slots`);
   assert.equal(services['lead-worker'].environment.S3_ACCESS_KEY, undefined);
   assert.equal(services['lead-worker'].environment.S3_PUBLIC_BASE_URL, undefined);
   assert.equal(services['lead-worker'].environment.LEAD_S3_ACCESS_KEY_ID, 'fixture-access');
@@ -76,7 +79,7 @@ test('production web and worker receive private server-side lead settings with b
 
 test('production compose fails closed when any lead delivery setting is missing', () => {
   const values = Object.fromEntries(readFileSync(fixture, 'utf8').trim().split('\n').map(line => line.split(/=(.*)/s).slice(0, 2)));
-  const required = [...webLeadKeys, ...sharedEmailKeys, ...workerOnlyKeys, 'WORKER_IMAGE', 'CLAMAV_IMAGE'];
+  const required = [...webLeadKeys, ...sharedEmailKeys, ...workerOnlyKeys, ...vkWebhookKeys, 'WORKER_IMAGE', 'CLAMAV_IMAGE'];
   for (const key of required) {
     const result = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.team.yml', 'config'], {
       encoding: 'utf8', env: { ...process.env, ...values, [key]: '' },

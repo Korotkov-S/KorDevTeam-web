@@ -46,6 +46,8 @@ test('application readiness awaits database and MCP schema probes before structu
     PUBLIC_MEDIA_S3_BUCKET: 'public-test', PUBLIC_MEDIA_S3_ACCESS_KEY_ID: 'key',
     PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY: 'secret', PUBLIC_MEDIA_S3_PREFIX: 'media',
     PUBLIC_MEDIA_BASE_URL: 'https://cdn.example.invalid/', PUBLIC_MEDIA_S3_SSE: 'AES256',
+    VK_LEAD_WEBHOOK_PATH_TOKEN: 'a'.repeat(64), VK_LEAD_FORM_IDS: '1001168,1001220',
+    VK_LEAD_CONSENT_VERSION: 'vk-form-2026-09-23',
   };
   for (const [name, value] of Object.entries(environment)) {
     const old = process.env[name]; process.env[name] = value;

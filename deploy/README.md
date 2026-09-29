@@ -150,6 +150,12 @@ VK Ads хранится как локальное read-only зеркало. Пр
 
 `mode=activate` разрешён только после сохранения в production нового client secret: он повторяет S3-проверку, записывает конфигурацию сначала с выключенной синхронизацией, выполняет `check` и одноразовый `backfill`, а затем включает синхронизацию и timer. Старый раскрытый секрет не используется ни в одном режиме.
 
+### VK lead-form webhook
+
+Лиды из форм VK принимаются отдельным callback на `/api/vk/leads/<secret>`. Путь защищён независимым 64-символьным hex-токеном; OAuth `client_secret` VK приложению не нужен и в runtime не сохраняется. Callback принимает только ресурс `LEAD` и form IDs из `VK_LEAD_FORM_IDS`, затем кладёт заявку в существующий durable outbox. Повтор уведомления с тем же VK lead ID идемпотентен, поэтому в CRM создаётся не более одной сделки.
+
+Сгенерируйте токен локально, сохраните его как environment secret `VK_LEAD_WEBHOOK_PATH_TOKEN` в GitHub environment `production`, затем вручную запустите workflow `Configure VK lead webhook`. Workflow атомарно обновит mode-0600 `/etc/kordevteam/operations.env`; значение не выводится в лог. После deploy создайте в VK API подписку ресурса `LEAD` с callback URL `https://kordev.team/api/vk/leads/<secret>`. Для этой единственной операции разрешён краткоживущий OAuth access token; удалите его сразу после создания подписки.
+
 Первое развёртывание выполняется безопасно и поэтапно:
 
 ```bash
