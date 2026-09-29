@@ -140,14 +140,20 @@ test("production deployment is dispatch-only, protected, digest-exact and passes
   const script = remote.with.script;
   assert.match(script, /^bash -se /, "remote orchestration must run under Bash");
   const config = script.indexOf("source /etc/kordevteam/operations.env");
+  const reclaimCaches = script.indexOf("reclaim_release_caches");
   const clone = script.indexOf('git clone --filter=blob:none --no-checkout');
   const exactCheckout = script.indexOf('checkout --detach "$RELEASE_SHA"');
   const releaseCd = script.indexOf('cd "$release_dir"');
   const install = script.indexOf('yarn install --immutable --mode=skip-build');
   const currentLink = script.indexOf('current_tmp="/opt/kordevteam/');
   const checkout = script.indexOf('cd /opt/kordevteam/current');
-  assert.ok(config >= 0 && config < clone && clone < exactCheckout && exactCheckout < releaseCd && releaseCd < install && install < currentLink && currentLink < checkout,
+  assert.ok(config >= 0 && config < reclaimCaches && reclaimCaches < clone && clone < exactCheckout && exactCheckout < releaseCd && releaseCd < install && install < currentLink && currentLink < checkout,
     "remote deployment must install the exact audited release before entering its current checkout");
+  assert.match(script, /current_release=.*realpath -e -- \/opt\/kordevteam\/current/u);
+  assert.match(script, /\.kordev-release/u);
+  assert.match(script, /node_modules.*\.yarn\/cache/su);
+  assert.match(script, /rm -rf -- "\$cache"/u);
+  assert.doesNotMatch(script, /rm -rf -- "\$RELEASES_DIR"/u);
   assert.match(script, /RELEASES_DIR.*RELEASE_SHA/);
   assert.match(script, /install -d -m 0750 -- \/opt\/kordevteam/);
   assert.match(script, /production deploy failed at remote line/);
