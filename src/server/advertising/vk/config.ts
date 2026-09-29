@@ -44,7 +44,7 @@ function storageEndpoint(value: string): URL {
   return endpoint;
 }
 
-function storageConfig(environment: VkAdsEnvironment): VkAdsStorageConfig {
+export function readVkAdsStorageConfig(environment: VkAdsEnvironment): VkAdsStorageConfig {
   const serverSideEncryption = required(environment, "VK_ADS_S3_SSE");
   if (serverSideEncryption !== "AES256" && serverSideEncryption !== "provider") invalid();
   return {
@@ -69,7 +69,7 @@ export function readVkAdsConfig(environment: VkAdsEnvironment): VkAdsConfig {
     clientId: required(environment, "VK_ADS_CLIENT_ID"),
     clientSecret: required(environment, "VK_ADS_CLIENT_SECRET"),
     tokenEncryptionKey: encryptionKey(required(environment, "VK_ADS_TOKEN_ENCRYPTION_KEY_B64")),
-    storage: storageConfig(environment),
+    storage: readVkAdsStorageConfig(environment),
   };
 }
 

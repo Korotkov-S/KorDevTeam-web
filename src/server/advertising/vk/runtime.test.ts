@@ -35,7 +35,27 @@ test("disabled runtime returns before constructing database, storage, OAuth, or 
   const report = await runtime.run("daily");
   assert.deepEqual({ status: report.status, errorCode: report.errorCode }, { status: "failed", errorCode: "ads_vk_disabled" });
   assert.equal(constructed, 0);
-  assert.throws(() => runtime.getReadService(), (error: unknown) => error instanceof VkAdsError && error.code === "ads_vk_disabled");
+  assert.throws(() => runtime.getReadService(), (error: unknown) => error instanceof VkAdsError && error.code === "ads_vk_config_invalid");
+});
+
+test("read runtime needs only database and private read-storage credentials", () => {
+  let collectorBuilds = 0;
+  let readBuilds = 0;
+  const { VK_ADS_CLIENT_ID: _clientId, VK_ADS_CLIENT_SECRET: _clientSecret,
+    VK_ADS_TOKEN_ENCRYPTION_KEY_B64: _key, VK_ADS_SYNC_ENABLED: _enabled, ...readEnvironment } = enabledEnvironment;
+  const runtime = createVkAdsRuntime(readEnvironment, {
+    buildCollector() { collectorBuilds += 1; throw new Error("collector must stay isolated"); },
+    buildReadService(storage, databaseUrl) {
+      readBuilds += 1;
+      assert.equal(storage.bucket, "private-bucket");
+      assert.equal(databaseUrl, enabledEnvironment.DATABASE_URL);
+      return { marker: "read" } as never;
+    },
+  });
+  assert.deepEqual(runtime.getReadService(), { marker: "read" });
+  assert.deepEqual(runtime.getReadService(), { marker: "read" });
+  assert.equal(readBuilds, 1);
+  assert.equal(collectorBuilds, 0);
 });
 
 test("enabled runtime keeps the production origin and fixed lookback", async () => {

@@ -142,6 +142,58 @@ The `seo-job` Compose profile runs the read-only first-party importer from the r
 
 Credential setup, first import, MCP scopes, diagnosis and rotation are documented in [`docs/runbooks/seo-monitoring.md`](../docs/runbooks/seo-monitoring.md).
 
+### Read-only VK Ads mirror
+
+VK Ads хранится как локальное read-only зеркало. Провайдер вызывается только отдельным `vk-ads-job`; web, админка и MCP читают PostgreSQL и закрытый S3. Для web выдайте отдельную IAM-пару только с `GetObject` на `ads/vk/creatives/`, а job — отдельную пару с `ListBucket`, `GetObject` и `PutObject` только для этого prefix. Если S3-провайдер не позволяет разделить права, это ограничение должно быть отдельно принято владельцем; интерфейсы приложения всё равно остаются read-only.
+
+Первое развёртывание выполняется безопасно и поэтапно:
+
+```bash
+# 1. Установить релиз и миграцию при выключенной сети VK.
+VK_ADS_SYNC_ENABLED=false bash scripts/deploy-slot.sh <inactive-slot> '<web-image>' '<content-image>' '<manifest-sha256>'
+
+# 2. Создать защищённый env, если его ещё нет, и добавить новые учётные данные по примеру.
+sudo test -e /etc/kordevteam/operations.env || sudo install -o root -g kordevteam -m 0600 /dev/null /etc/kordevteam/operations.env
+sudo chmod 0600 /etc/kordevteam/operations.env
+sudoedit /etc/kordevteam/operations.env
+
+# 3. Проверить конфигурацию, OAuth, аккаунт и S3 без записи зеркала.
+WORKER_IMAGE="$(sudo cat /var/lib/kordevteam/deploy/worker-image)" \
+  docker compose --env-file /etc/kordevteam/operations.env -f deploy/docker-compose.team.yml \
+  --profile vk-ads run --rm --no-deps vk-ads-job node server/vk-ads-collect.mjs --mode=check
+
+# 4. Один раз импортировать всю доступную историю.
+WORKER_IMAGE="$(sudo cat /var/lib/kordevteam/deploy/worker-image)" \
+  docker compose --env-file /etc/kordevteam/operations.env -f deploy/docker-compose.team.yml \
+  --profile vk-ads run --rm --no-deps vk-ads-job node server/vk-ads-collect.mjs --mode=backfill
+
+# 5. После проверки /admin/ads/vk/ и MCP включить ежедневный timer.
+sudo install -o root -g root -m 0644 deploy/systemd/kordevteam-vk-ads-collect.service deploy/systemd/kordevteam-vk-ads-collect.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now kordevteam-vk-ads-collect.timer
+
+# Ручная проверка того же daily-пути, который использует systemd.
+sudo systemctl start kordevteam-vk-ads-collect.service
+WORKER_IMAGE="$(sudo cat /var/lib/kordevteam/deploy/worker-image)" \
+  docker compose --env-file /etc/kordevteam/operations.env -f deploy/docker-compose.team.yml \
+  --profile vk-ads run --rm --no-deps vk-ads-job node server/vk-ads-collect.mjs --mode=daily
+```
+
+До шага 2 выпустите новый client secret: старый раскрытый секрет скомпрометирован и никогда не должен использоваться снова. Создайте новый 32-байтовый ключ шифрования токенов; не храните его в PostgreSQL или backup. `VK_ADS_SYNC_ENABLED=false` отключает новые обращения к VK, но не удаляет накопленную историю. Backfill никогда не запускается по расписанию и выполняется только оператором. `partial` и `failed` завершают CLI ненулевым кодом; конкурирующий запуск под занятой lock не делает ни одного сетевого запроса. MCP и админка не запускают check, backfill, daily или refresh.
+
+Проверка и диагностика:
+
+```bash
+systemctl status kordevteam-vk-ads-collect.service kordevteam-vk-ads-collect.timer
+systemctl list-timers kordevteam-vk-ads-collect.timer
+journalctl -u kordevteam-vk-ads-collect.service --since today
+sudo systemctl start kordevteam-vk-ads-collect.service
+```
+
+После первого backfill сопоставьте диапазон и счётчики в `/admin/ads/vk/` с кабинетом, затем проверьте семь последних дат через MCP с `ads:read` и авторизованную выдачу креатива. Первые три ежедневных запуска контролируйте вручную. Оповещение требуется только при `partial`/`failed`, устаревшей синхронизации или необходимости действия оператора; неизменившееся успешное состояние не требует уведомления.
+
+Перед ротацией OAuth secret остановите timer, выпустите secret, обновите mode-0600 env, выполните `--mode=check` и снова включите timer. Ключ AES меняйте только вместе с безопасной переавторизацией/удалением старого зашифрованного token state по утверждённой процедуре. S3-ключи ротируйте раздельно: сначала write job, затем read web, каждый раз проверяя `--mode=check` и `/admin/ads/vk/`. Backup уже включает таблицы `ad_vk_*`; для восстановления используйте штатный точный object key и `bash scripts/restore-postgres.sh ...`, затем выполните `--mode=check`, не включая timer до проверки истории и креативов.
+
 ### GEO / AI visibility
 
 The separate `/admin/seo/ai-visibility/` report measures mentions, citations, owned-source coverage, confirmed-competitor Share of Voice, referral traffic and controlled promotion experiments. `GEO_SITE_ORIGIN` must be a bare HTTPS origin (production: `https://kordev.team`) and is exposed only to the isolated `seo-job` for same-origin crawler-health checks. No OpenAI, Google AI, Alice or Copilot key, session cookie or browser profile is required by the server.

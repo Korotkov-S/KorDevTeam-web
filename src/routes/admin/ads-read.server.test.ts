@@ -95,6 +95,9 @@ test("advertising loaders scrub contacts, secrets, vendor payloads and command r
         spend: "125.500000",
         externalId: "123456789012",
         finishedAt: "2030-01-10T03:31:00.000Z",
+        sourceUpdatedAt: "2030-01-10T03:30:00.000Z",
+        firstSeenAt: "2030-01-04T00:00:00.000Z",
+        metricDate: "2030-01-04",
         safe: "visible",
       } as never;
     },
@@ -104,6 +107,9 @@ test("advertising loaders scrub contacts, secrets, vendor payloads and command r
   assert.match(body, /125\.500000/u);
   assert.match(body, /123456789012/u);
   assert.match(body, /2030-01-10T03:31:00.000Z/u);
+  assert.match(body, /2030-01-10T03:30:00.000Z/u);
+  assert.match(body, /2030-01-04T00:00:00.000Z/u);
+  assert.match(body, /2030-01-04/u);
   assert.doesNotMatch(body, /999|owner@example|secret-token|secret-cookie|Bearer secret|VENDOR|requestHash|commandReceipt/iu);
 });
 

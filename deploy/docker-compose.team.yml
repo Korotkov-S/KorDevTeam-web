@@ -29,11 +29,18 @@ x-admin-media-environment: &admin-media-environment
   PUBLIC_MEDIA_S3_PREFIX: ${PUBLIC_MEDIA_S3_PREFIX:?Provide PUBLIC_MEDIA_S3_PREFIX}
   PUBLIC_MEDIA_BASE_URL: ${PUBLIC_MEDIA_BASE_URL:?Provide PUBLIC_MEDIA_BASE_URL}
   PUBLIC_MEDIA_S3_SSE: ${PUBLIC_MEDIA_S3_SSE:?Provide PUBLIC_MEDIA_S3_SSE}
+x-vk-ads-read-environment: &vk-ads-read-environment
+  VK_ADS_S3_ENDPOINT: ${VK_ADS_S3_ENDPOINT:?Provide private VK_ADS_S3_ENDPOINT}
+  VK_ADS_S3_REGION: ${VK_ADS_S3_REGION:?Provide VK_ADS_S3_REGION}
+  VK_ADS_S3_BUCKET: ${VK_ADS_S3_BUCKET:?Provide private VK_ADS_S3_BUCKET}
+  VK_ADS_S3_ACCESS_KEY_ID: ${VK_ADS_S3_READ_ACCESS_KEY_ID:?Provide read-only VK_ADS_S3_READ_ACCESS_KEY_ID}
+  VK_ADS_S3_SECRET_ACCESS_KEY: ${VK_ADS_S3_READ_SECRET_ACCESS_KEY:?Provide read-only VK_ADS_S3_READ_SECRET_ACCESS_KEY}
+  VK_ADS_S3_SSE: ${VK_ADS_S3_SSE:?Provide VK_ADS_S3_SSE}
 x-web: &web
   restart: unless-stopped
   init: true
   environment:
-    <<: [*lead-web-environment, *admin-media-environment]
+    <<: [*lead-web-environment, *admin-media-environment, *vk-ads-read-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
@@ -196,6 +203,35 @@ services:
     tmpfs:
       - /tmp
       - "${LEAD_TEMP_ROOT:?Provide LEAD_TEMP_ROOT}:size=1m,mode=0700,uid=1000,gid=1000"
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging: *logging
+  vk-ads-job:
+    image: ${WORKER_IMAGE:?Provide immutable WORKER_IMAGE}
+    profiles: [vk-ads]
+    init: true
+    read_only: true
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Provide shared production DATABASE_URL}
+      VK_ADS_SYNC_ENABLED: ${VK_ADS_SYNC_ENABLED:-false}
+      VK_ADS_CLIENT_ID: ${VK_ADS_CLIENT_ID:-}
+      VK_ADS_CLIENT_SECRET: ${VK_ADS_CLIENT_SECRET:-}
+      VK_ADS_TOKEN_ENCRYPTION_KEY_B64: ${VK_ADS_TOKEN_ENCRYPTION_KEY_B64:-}
+      VK_ADS_S3_ENDPOINT: ${VK_ADS_S3_ENDPOINT:?Provide private VK_ADS_S3_ENDPOINT}
+      VK_ADS_S3_REGION: ${VK_ADS_S3_REGION:?Provide VK_ADS_S3_REGION}
+      VK_ADS_S3_BUCKET: ${VK_ADS_S3_BUCKET:?Provide private VK_ADS_S3_BUCKET}
+      VK_ADS_S3_ACCESS_KEY_ID: ${VK_ADS_S3_WRITE_ACCESS_KEY_ID:?Provide write VK_ADS_S3_WRITE_ACCESS_KEY_ID}
+      VK_ADS_S3_SECRET_ACCESS_KEY: ${VK_ADS_S3_WRITE_SECRET_ACCESS_KEY:?Provide write VK_ADS_S3_WRITE_SECRET_ACCESS_KEY}
+      VK_ADS_S3_SSE: ${VK_ADS_S3_SSE:?Provide VK_ADS_S3_SSE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      backend: {}
+      egress:
+        gw_priority: 1
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     logging: *logging

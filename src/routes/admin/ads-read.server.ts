@@ -22,7 +22,7 @@ type AdsReads = Pick<AdvertisingService,
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const CURSOR = /^[A-Za-z0-9_-]{1,1024}$/u;
 const forbiddenKeys = /^(?:phone|email|file|token|secret|authorization|cookie|rawresponse|passport|commandreceipt|requesthash|targetinglabels|imageobjectkey)$/iu;
-const nonContactValueKeys = /(?:^|_)(?:id|ids|externalid|campaignexternalid|adgroupexternalid|sourceid|fingerprint|budget|spend|revenue|amount|price|cost|date|from|to|createdat|updatedat|startedat|finishedat|collectedat|lastseenat)$/iu;
+const nonContactValueKeys = /(?:^|_)(?:id|ids|externalid|campaignexternalid|adgroupexternalid|sourceid|fingerprint|budget|spend|revenue|amount|price|cost|date|from|to|createdat|updatedat|startedat|finishedat|collectedat|firstseenat|lastseenat|sourcecreatedat|sourceupdatedat|activefrom|activeto)$/iu;
 const allowedParams: Record<AdsSection, Set<string>> = {
   overview: new Set(["limit", "cursor"]),
   hypotheses: new Set(["limit", "cursor", "status", "service"]),
@@ -32,6 +32,13 @@ const allowedParams: Record<AdsSection, Set<string>> = {
   economics: new Set(["experimentId", "from", "to"]),
   events: new Set(["limit", "cursor", "experimentId", "action"]),
 };
+
+function containsPhone(value: string): boolean {
+  return [...value.matchAll(/\+?\d[\d\s()-]{8,}\d/gu)].some((match) => {
+    const digits = match[0].replace(/\D/gu, "").length;
+    return digits >= 10 && digits <= 15;
+  });
+}
 
 function member<T extends readonly string[]>(value: string | null, values: T): T[number] | undefined {
   if (value === null) return undefined;
@@ -105,7 +112,7 @@ export function sanitizeAdsReadModel<T>(value: T): T {
       const normalizedKey = key?.replace(/[-_]/gu, "") ?? "";
       const mayContainContact = !nonContactValueKeys.test(normalizedKey);
       if (/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u.test(item)
-        || (mayContainContact && /(?:^|\D)\+?\d[\d\s()-]{8,}\d(?:$|\D)/u.test(item))) return "[redacted]";
+        || (mayContainContact && containsPhone(item))) return "[redacted]";
       return item.slice(0, 4000);
     }
     if (Array.isArray(item)) return item.slice(0, 100).map(value => visit(value, depth + 1, key));

@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import type { VkAdsConfig, VkAdsSyncMode, VkAdsSyncReport } from "./contracts";
+import type { VkAdsConfig, VkAdsStorageConfig, VkAdsSyncMode, VkAdsSyncReport } from "./contracts";
 import { createVkAdsCollector, type VkAdsCollector } from "./collector";
-import { readVkAdsConfig } from "./config";
+import { readVkAdsConfig, readVkAdsStorageConfig } from "./config";
 import { downloadVkCreativeImage } from "./creativeDownloader";
 import { createPrivateVkCreativeStore } from "./creativeStore";
 import { VkAdsError, type VkAdsErrorCode } from "./errors";
@@ -20,7 +20,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 export type VkAdsRuntimeFactories = {
   buildCollector(config: EnabledConfig, databaseUrl: string): VkAdsCollector;
-  buildReadService(config: EnabledConfig, databaseUrl: string): VkAdsReadService;
+  buildReadService(storage: VkAdsStorageConfig, databaseUrl: string): VkAdsReadService;
 };
 
 function productionCollector(config: EnabledConfig, databaseUrl: string): VkAdsCollector {
@@ -41,11 +41,11 @@ function productionCollector(config: EnabledConfig, databaseUrl: string): VkAdsC
   return createVkAdsCollector({ provider, repository, store, locks, now: () => new Date() });
 }
 
-function productionReadService(config: EnabledConfig, databaseUrl: string): VkAdsReadService {
+function productionReadService(storage: VkAdsStorageConfig, databaseUrl: string): VkAdsReadService {
   const db = createDb(databaseUrl);
   return createVkAdsReadService(
     createVkAdsRepository(db),
-    createPrivateVkCreativeStore(config.storage),
+    createPrivateVkCreativeStore(storage),
   );
 }
 
@@ -101,8 +101,8 @@ export function createVkAdsRuntime(
     },
 
     getReadService(): VkAdsReadService {
-      const ready = enabled();
-      readService ??= factories.buildReadService(ready.config, ready.databaseUrl);
+      const storage = readVkAdsStorageConfig(environment);
+      readService ??= factories.buildReadService(storage, databaseUrl(environment));
       return readService;
     },
   };
