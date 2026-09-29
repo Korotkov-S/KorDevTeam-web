@@ -7,7 +7,7 @@ import { getAdminContentService } from "../../server/admin/runtime";
 import type { AdminContentService } from "../../server/admin/contentService";
 import { requireAdminPage } from "./auth.server";
 import { adminRouteHeaders } from "./headers";
-import { adminJson, commandFromForm, contentErrorMessage, contentErrorStatus, contentKind, verifyContentMutation } from "./content-http.server";
+import { adminJson, commandFromForm, contentErrorMessage, contentErrorStatus, contentKind, formString, verifyContentMutation } from "./content-http.server";
 
 export function createContentPreviewAction(
   auth: Pick<AdminAuthService, "authenticate">,
@@ -21,7 +21,8 @@ export function createContentPreviewAction(
     const form = await request.formData();
     try {
       verifyContentMutation(request, form, principal, config);
-      return adminJson(request, { preview: service.preview(commandFromForm(form, kind, "draft")) });
+      const id = formString(form, "id").trim() || undefined;
+      return adminJson(request, { preview: service.preview(commandFromForm(form, kind, "draft", id)) });
     } catch (error) {
       const status = contentErrorStatus(error);
       return adminJson(request, { error: contentErrorMessage(status) }, status);

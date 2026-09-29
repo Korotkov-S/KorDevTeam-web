@@ -32,6 +32,7 @@ test("content preview renders the draft as a readable page instead of raw JSON",
     <MemoryRouter>
       <ContentPreviewDocument preview={{
         entry: {
+          id: "00000000-0000-4000-8000-000000000003",
           kind: "article",
           slug: "draft-article",
           title: "Черновик статьи",
@@ -53,6 +54,10 @@ test("content preview renders the draft as a readable page instead of raw JSON",
   assert.ok(view.getByRole("heading", { name: "Практический раздел", level: 2 }));
   assert.ok(view.getByText("Полезный текст для читателя."));
   assert.ok(view.getByText("Краткое описание материала."));
+  assert.equal(
+    view.getByRole("link", { name: "← Вернуться в редактор" }).getAttribute("href"),
+    "/admin/content/article/00000000-0000-4000-8000-000000000003/",
+  );
   assert.equal(view.container.querySelector("pre"), null);
   assert.doesNotMatch(view.container.textContent ?? "", /\"bodyMd\"/);
 });

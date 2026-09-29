@@ -98,4 +98,8 @@ test("preview control submits the current editor form to the preview route", () 
   assert.equal(preview.getAttribute("formaction"), "/admin/content/article/preview/");
   assert.equal(preview.getAttribute("name"), "intent");
   assert.equal(preview.getAttribute("value"), "preview");
+  assert.equal(
+    view.container.querySelector<HTMLInputElement>('input[name="id"]')?.value,
+    entryId,
+  );
 });

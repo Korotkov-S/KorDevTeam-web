@@ -56,6 +56,7 @@ export default function AdminContentEditor() {
 
       <Form id="content-editor-form" method="post" onChange={() => setDirty(true)} onSubmit={() => flushSync(() => setDirty(false))} className="space-y-8">
         <input type="hidden" name="_csrf" value={csrfToken} />
+        {entry ? <input type="hidden" name="id" value={entry.id} /> : null}
         {entry ? <input type="hidden" name="expectedVersion" value={entry.version} /> : null}
         <section id="контент" className="scroll-mt-20 grid gap-4 rounded-xl border border-border bg-card p-5">
           <h2 className="text-xl font-semibold">Контент</h2>

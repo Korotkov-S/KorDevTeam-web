@@ -108,9 +108,13 @@ test("preview validates current fields without writing", async () => {
   let previews = 0;
   const fake = service({ preview(input: unknown) { previews += 1; return input; }, async save() { throw new Error("must_not_write"); } });
   const action = createContentPreviewAction(auth, fake as never, config);
-  const response = await action({ request: request("/admin/content/article/preview/", editorForm("preview")), params: { kind: "article" }, context: {} });
+  const form = editorForm("preview");
+  form.set("id", "00000000-0000-4000-8000-000000000003");
+  const response = await action({ request: request("/admin/content/article/preview/", form), params: { kind: "article" }, context: {} });
   assert.equal(response.status, 200);
   assert.equal(previews, 1);
+  const body = await response.json();
+  assert.equal(body.preview.id, "00000000-0000-4000-8000-000000000003");
 });
 
 test("settings action parses JSON and preserves optimistic version", async () => {
