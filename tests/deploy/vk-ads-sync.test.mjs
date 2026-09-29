@@ -52,6 +52,19 @@ test("production VK Ads job is isolated and OAuth credentials never reach web", 
   assert.doesNotMatch(readEnvironmentBlock, /VK_ADS_CLIENT_ID|VK_ADS_CLIENT_SECRET|VK_ADS_TOKEN_ENCRYPTION_KEY_B64/u);
 });
 
+test("production compose can deploy with VK Ads disabled before credentials are provisioned", () => {
+  const composeText = read("deploy/docker-compose.team.yml");
+  for (const name of [
+    "VK_ADS_S3_ENDPOINT", "VK_ADS_S3_REGION", "VK_ADS_S3_BUCKET", "VK_ADS_S3_SSE",
+    "VK_ADS_S3_READ_ACCESS_KEY_ID", "VK_ADS_S3_READ_SECRET_ACCESS_KEY",
+    "VK_ADS_S3_WRITE_ACCESS_KEY_ID", "VK_ADS_S3_WRITE_SECRET_ACCESS_KEY",
+  ]) {
+    assert.doesNotMatch(composeText, new RegExp(`\\$\\{${name}:\\?`, "u"), name);
+    assert.match(composeText, new RegExp(`\\$\\{${name}:-\\}`, "u"), name);
+  }
+  assert.match(composeText, /VK_ADS_SYNC_ENABLED: \$\{VK_ADS_SYNC_ENABLED:-false\}/u);
+});
+
 test("local compose preserves the same VK Ads profile and privilege boundary", () => {
   const compose = yaml.load(read("docker-compose.yml"));
   const job = compose.services["vk-ads-job"];
