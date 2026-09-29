@@ -13,7 +13,7 @@ import {
   Settings,
   Wrench,
 } from "lucide-react";
-import { Form, NavLink, Outlet, useLoaderData, useLocation } from "react-router";
+import { Form, NavLink, Outlet, useLoaderData, useLocation, type MetaFunction } from "react-router";
 
 import {
   Sidebar,
@@ -32,6 +32,10 @@ import {
 } from "../../components/ui/sidebar";
 
 export { headers, loader } from "./layout.server";
+export const meta: MetaFunction = () => [
+  { title: "Админка | KorDevTeam" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 type AdminLayoutData = { login: string; csrfToken: string; expiresAt: string; sidebarOpen: boolean };
 
