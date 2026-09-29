@@ -37,6 +37,7 @@ test("route config contains every authenticated advertising URL", () => {
   for (const path of [
     "/admin/ads/", "/admin/ads/hypotheses/", "/admin/ads/experiments/", "/admin/ads/experiments/:id/",
     "/admin/ads/radar/", "/admin/ads/learnings/", "/admin/ads/economics/", "/admin/ads/events/",
+    "/admin/ads/vk/", "/admin/ads/vk/creative/:id/",
   ]) assert.ok(configured.includes(path), path);
 });
 

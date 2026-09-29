@@ -21,7 +21,8 @@ type AdsReads = Pick<AdvertisingService,
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const CURSOR = /^[A-Za-z0-9_-]{1,1024}$/u;
-const forbiddenKeys = /^(?:phone|email|file|token|secret|authorization|cookie|rawresponse|passport|commandreceipt|requesthash)$/iu;
+const forbiddenKeys = /^(?:phone|email|file|token|secret|authorization|cookie|rawresponse|passport|commandreceipt|requesthash|targetinglabels|imageobjectkey)$/iu;
+const nonContactValueKeys = /(?:^|_)(?:id|ids|externalid|campaignexternalid|adgroupexternalid|sourceid|fingerprint|budget|spend|revenue|amount|price|cost|date|from|to|createdat|updatedat|startedat|finishedat|collectedat|lastseenat)$/iu;
 const allowedParams: Record<AdsSection, Set<string>> = {
   overview: new Set(["limit", "cursor"]),
   hypotheses: new Set(["limit", "cursor", "status", "service"]),
@@ -96,19 +97,22 @@ function parseFilters(section: AdsSection, url: URL) {
 }
 
 export function sanitizeAdsReadModel<T>(value: T): T {
-  const visit = (item: unknown, depth: number): unknown => {
+  const visit = (item: unknown, depth: number, key?: string): unknown => {
     if (depth > 8) return null;
     if (item instanceof Date) return item.toISOString();
     if (typeof item === "string") {
       if (UUID.test(item)) return item;
-      if (/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u.test(item) || /(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u.test(item)) return "[redacted]";
+      const normalizedKey = key?.replace(/[-_]/gu, "") ?? "";
+      const mayContainContact = !nonContactValueKeys.test(normalizedKey);
+      if (/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u.test(item)
+        || (mayContainContact && /(?:^|\D)\+?\d[\d\s()-]{8,}\d(?:$|\D)/u.test(item))) return "[redacted]";
       return item.slice(0, 4000);
     }
-    if (Array.isArray(item)) return item.slice(0, 100).map(value => visit(value, depth + 1));
+    if (Array.isArray(item)) return item.slice(0, 100).map(value => visit(value, depth + 1, key));
     if (!item || typeof item !== "object") return item;
     return Object.fromEntries(Object.entries(item as Record<string, unknown>)
       .filter(([key]) => !forbiddenKeys.test(key.replace(/[_-]/gu, "")))
-      .map(([key, nested]) => [key, visit(nested, depth + 1)]));
+      .map(([key, nested]) => [key, visit(nested, depth + 1, key)]));
   };
   return visit(value, 0) as T;
 }

@@ -9,6 +9,7 @@ export const ADS_SECTIONS = [
   ["/admin/ads/learnings/", "Выводы"],
   ["/admin/ads/economics/", "Экономика"],
   ["/admin/ads/events/", "Журнал"],
+  ["/admin/ads/vk/", "VK кабинет"],
 ] as const;
 
 export function AdsSectionLayout() {

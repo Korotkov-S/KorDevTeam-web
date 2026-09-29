@@ -92,12 +92,18 @@ test("advertising loaders scrub contacts, secrets, vendor payloads and command r
         authorization: "Bearer secret",
         rawResponse: "FULL VENDOR RESPONSE",
         commandReceipt: { requestHash: "a".repeat(64) },
+        spend: "125.500000",
+        externalId: "123456789012",
+        finishedAt: "2030-01-10T03:31:00.000Z",
         safe: "visible",
       } as never;
     },
   }))({ request: request("/admin/ads/"), params: {}, context: {} });
   const body = await response.text();
   assert.match(body, /visible/u);
+  assert.match(body, /125\.500000/u);
+  assert.match(body, /123456789012/u);
+  assert.match(body, /2030-01-10T03:31:00.000Z/u);
   assert.doesNotMatch(body, /999|owner@example|secret-token|secret-cookie|Bearer secret|VENDOR|requestHash|commandReceipt/iu);
 });
 
