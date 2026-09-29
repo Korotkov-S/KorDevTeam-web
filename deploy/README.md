@@ -146,6 +146,10 @@ Credential setup, first import, MCP scopes, diagnosis and rotation are documente
 
 VK Ads хранится как локальное read-only зеркало. Провайдер вызывается только отдельным `vk-ads-job`; web, админка и MCP читают PostgreSQL и закрытый S3. Для web выдайте отдельную IAM-пару только с `GetObject` на `ads/vk/creatives/`, а job — отдельную пару с `ListBucket`, `GetObject` и `PutObject` только для этого prefix. Если S3-провайдер не позволяет разделить права, это ограничение должно быть отдельно принято владельцем; интерфейсы приложения всё равно остаются read-only.
 
+Ручной GitHub Actions workflow `Prepare VK Ads integration` разделяет подготовку и запуск. `mode=prepare` проверяет отдельные read/write S3-доступы, атомарно сохраняет production-параметры с mode 0600, очищает client secret на сервере, оставляет `VK_ADS_SYNC_ENABLED=false` и отключает timer. Этот режим не обращается к VK и может выполняться до выдачи OAuth-секрета.
+
+`mode=activate` разрешён только после сохранения в production нового client secret: он повторяет S3-проверку, записывает конфигурацию сначала с выключенной синхронизацией, выполняет `check` и одноразовый `backfill`, а затем включает синхронизацию и timer. Старый раскрытый секрет не используется ни в одном режиме.
+
 Первое развёртывание выполняется безопасно и поэтапно:
 
 ```bash

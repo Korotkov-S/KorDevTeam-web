@@ -1,0 +1,194 @@
+name: Prepare VK Ads integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Prepare keeps VK disabled; activate requires a newly issued client secret
+        required: true
+        type: choice
+        options:
+          - prepare
+          - activate
+        default: prepare
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-vk-ads:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    concurrency:
+      group: kordevteam-production
+      cancel-in-progress: false
+    steps:
+      - name: Verify isolated VK Ads S3 access
+        env:
+          VK_ADS_S3_ENDPOINT: https://s3.twcstorage.ru
+          VK_ADS_S3_REGION: ru-1
+          VK_ADS_S3_BUCKET: ${{ secrets.VK_ADS_S3_BUCKET }}
+          VK_ADS_S3_READ_ACCESS_KEY_ID: ${{ secrets.VK_ADS_S3_READ_ACCESS_KEY_ID }}
+          VK_ADS_S3_READ_SECRET_ACCESS_KEY: ${{ secrets.VK_ADS_S3_READ_SECRET_ACCESS_KEY }}
+          VK_ADS_S3_WRITE_ACCESS_KEY_ID: ${{ secrets.VK_ADS_S3_WRITE_ACCESS_KEY_ID }}
+          VK_ADS_S3_WRITE_SECRET_ACCESS_KEY: ${{ secrets.VK_ADS_S3_WRITE_SECRET_ACCESS_KEY }}
+        run: |
+          set -Eeuo pipefail
+          for name in \
+            VK_ADS_S3_BUCKET \
+            VK_ADS_S3_READ_ACCESS_KEY_ID \
+            VK_ADS_S3_READ_SECRET_ACCESS_KEY \
+            VK_ADS_S3_WRITE_ACCESS_KEY_ID \
+            VK_ADS_S3_WRITE_SECRET_ACCESS_KEY
+          do
+            [[ -n "${!name}" ]] || { printf 'Missing production secret: %s\n' "$name" >&2; exit 1; }
+          done
+          [[ "$VK_ADS_S3_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]
+
+          smoke_dir="$(mktemp -d "$RUNNER_TEMP/vk-ads-s3.XXXXXX")"
+          smoke_key="ads/vk/creatives/.prepare-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          payload="$smoke_dir/payload"
+          downloaded="$smoke_dir/downloaded"
+          printf 'kordev-vk-ads-s3-smoke-v1\n' > "$payload"
+
+          cleanup() {
+            export AWS_ACCESS_KEY_ID="$VK_ADS_S3_WRITE_ACCESS_KEY_ID"
+            export AWS_SECRET_ACCESS_KEY="$VK_ADS_S3_WRITE_SECRET_ACCESS_KEY"
+            export AWS_DEFAULT_REGION="$VK_ADS_S3_REGION"
+            aws --no-cli-pager --endpoint-url "$VK_ADS_S3_ENDPOINT" s3api delete-object \
+              --bucket "$VK_ADS_S3_BUCKET" --key "$smoke_key" >/dev/null 2>&1 || true
+            rm -f -- "$payload" "$downloaded"
+            rmdir -- "$smoke_dir" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          export AWS_ACCESS_KEY_ID="$VK_ADS_S3_WRITE_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$VK_ADS_S3_WRITE_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION="$VK_ADS_S3_REGION"
+          aws --no-cli-pager --endpoint-url "$VK_ADS_S3_ENDPOINT" s3api put-object \
+            --bucket "$VK_ADS_S3_BUCKET" --key "$smoke_key" --body "$payload" >/dev/null
+
+          export AWS_ACCESS_KEY_ID="$VK_ADS_S3_READ_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$VK_ADS_S3_READ_SECRET_ACCESS_KEY"
+          aws --no-cli-pager --endpoint-url "$VK_ADS_S3_ENDPOINT" s3api get-object \
+            --bucket "$VK_ADS_S3_BUCKET" --key "$smoke_key" "$downloaded" >/dev/null
+          cmp --silent "$payload" "$downloaded"
+
+      - name: Configure disabled VK Ads production environment
+        uses: appleboy/ssh-action@v1
+        env:
+          MODE: ${{ inputs.mode }}
+          VK_ADS_CLIENT_ID: ${{ secrets.VK_ADS_CLIENT_ID }}
+          VK_ADS_CLIENT_SECRET: ${{ secrets.VK_ADS_CLIENT_SECRET }}
+          VK_ADS_TOKEN_ENCRYPTION_KEY_B64: ${{ secrets.VK_ADS_TOKEN_ENCRYPTION_KEY_B64 }}
+          VK_ADS_S3_ENDPOINT: https://s3.twcstorage.ru
+          VK_ADS_S3_REGION: ru-1
+          VK_ADS_S3_BUCKET: ${{ secrets.VK_ADS_S3_BUCKET }}
+          VK_ADS_S3_READ_ACCESS_KEY_ID: ${{ secrets.VK_ADS_S3_READ_ACCESS_KEY_ID }}
+          VK_ADS_S3_READ_SECRET_ACCESS_KEY: ${{ secrets.VK_ADS_S3_READ_SECRET_ACCESS_KEY }}
+          VK_ADS_S3_WRITE_ACCESS_KEY_ID: ${{ secrets.VK_ADS_S3_WRITE_ACCESS_KEY_ID }}
+          VK_ADS_S3_WRITE_SECRET_ACCESS_KEY: ${{ secrets.VK_ADS_S3_WRITE_SECRET_ACCESS_KEY }}
+          VK_ADS_S3_SSE: provider
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: MODE,VK_ADS_CLIENT_ID,VK_ADS_CLIENT_SECRET,VK_ADS_TOKEN_ENCRYPTION_KEY_B64,VK_ADS_S3_ENDPOINT,VK_ADS_S3_REGION,VK_ADS_S3_BUCKET,VK_ADS_S3_READ_ACCESS_KEY_ID,VK_ADS_S3_READ_SECRET_ACCESS_KEY,VK_ADS_S3_WRITE_ACCESS_KEY_ID,VK_ADS_S3_WRITE_SECRET_ACCESS_KEY,VK_ADS_S3_SSE
+          script: |
+            bash -se <<'KORDEV_VK_ADS'
+            set -Eeuo pipefail
+            fail() { printf '%s\n' "$1" >&2; exit 1; }
+            [[ "$MODE" == prepare || "$MODE" == activate ]] || fail 'Invalid VK Ads preparation mode'
+            for name in \
+              VK_ADS_CLIENT_ID \
+              VK_ADS_TOKEN_ENCRYPTION_KEY_B64 \
+              VK_ADS_S3_ENDPOINT \
+              VK_ADS_S3_REGION \
+              VK_ADS_S3_BUCKET \
+              VK_ADS_S3_READ_ACCESS_KEY_ID \
+              VK_ADS_S3_READ_SECRET_ACCESS_KEY \
+              VK_ADS_S3_WRITE_ACCESS_KEY_ID \
+              VK_ADS_S3_WRITE_SECRET_ACCESS_KEY \
+              VK_ADS_S3_SSE
+            do
+              value="${!name-}"
+              [[ -n "$value" ]] || fail "Missing $name"
+              [[ "$value" =~ ^[A-Za-z0-9_./+=:-]+$ ]] || fail "Unsafe $name"
+            done
+            [[ "$VK_ADS_CLIENT_ID" =~ ^[A-Za-z0-9]{16,128}$ ]] || fail 'Invalid VK Ads client id'
+            [[ "$VK_ADS_S3_ENDPOINT" == https://s3.twcstorage.ru ]] || fail 'Unexpected VK Ads S3 endpoint'
+            [[ "$VK_ADS_S3_REGION" == ru-1 ]] || fail 'Unexpected VK Ads S3 region'
+            [[ "$VK_ADS_S3_SSE" == provider ]] || fail 'Unexpected VK Ads S3 encryption mode'
+            [[ "$VK_ADS_S3_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || fail 'Invalid VK Ads S3 bucket'
+            decoded_key_bytes="$(printf '%s' "$VK_ADS_TOKEN_ENCRYPTION_KEY_B64" | base64 --decode 2>/dev/null | wc -c | tr -d ' ')"
+            [[ "$decoded_key_bytes" == 32 ]] || fail 'Invalid VK Ads token encryption key'
+            if [[ "$MODE" == activate ]]; then
+              [[ -n "$VK_ADS_CLIENT_SECRET" ]] || fail 'A newly issued VK Ads client secret is required for activation'
+              [[ "$VK_ADS_CLIENT_SECRET" =~ ^[A-Za-z0-9_./+=:-]+$ ]] || fail 'Unsafe VK Ads client secret'
+            else
+              VK_ADS_CLIENT_SECRET=''
+            fi
+
+            env_file=/etc/kordevteam/operations.env
+            sudo test -f "$env_file" && sudo test ! -L "$env_file" || fail 'Protected operations environment is missing or unsafe'
+            [[ "$(sudo stat -c '%a' "$env_file")" == 600 ]] || fail 'Protected operations environment must have mode 0600'
+
+            vk_env_tmp=''
+            cleanup_vk_env_tmp() {
+              [[ -z "$vk_env_tmp" ]] || sudo rm -f -- "$vk_env_tmp"
+            }
+            trap cleanup_vk_env_tmp EXIT
+
+            write_vk_env() {
+              local sync_enabled="$1" client_secret="$2"
+              vk_env_tmp="$(sudo mktemp /etc/kordevteam/.operations.env.vk.XXXXXX)"
+              sudo awk '!/^(VK_ADS_SYNC_ENABLED|VK_ADS_CLIENT_ID|VK_ADS_CLIENT_SECRET|VK_ADS_TOKEN_ENCRYPTION_KEY_B64|VK_ADS_S3_ENDPOINT|VK_ADS_S3_REGION|VK_ADS_S3_BUCKET|VK_ADS_S3_READ_ACCESS_KEY_ID|VK_ADS_S3_READ_SECRET_ACCESS_KEY|VK_ADS_S3_WRITE_ACCESS_KEY_ID|VK_ADS_S3_WRITE_SECRET_ACCESS_KEY|VK_ADS_S3_SSE)=/' "$env_file" | sudo tee "$vk_env_tmp" >/dev/null
+              {
+                printf 'VK_ADS_SYNC_ENABLED=%s\n' "$sync_enabled"
+                printf 'VK_ADS_CLIENT_ID=%s\n' "$VK_ADS_CLIENT_ID"
+                printf 'VK_ADS_CLIENT_SECRET=%s\n' "$client_secret"
+                printf 'VK_ADS_TOKEN_ENCRYPTION_KEY_B64=%s\n' "$VK_ADS_TOKEN_ENCRYPTION_KEY_B64"
+                printf 'VK_ADS_S3_ENDPOINT=%s\n' "$VK_ADS_S3_ENDPOINT"
+                printf 'VK_ADS_S3_REGION=%s\n' "$VK_ADS_S3_REGION"
+                printf 'VK_ADS_S3_BUCKET=%s\n' "$VK_ADS_S3_BUCKET"
+                printf 'VK_ADS_S3_READ_ACCESS_KEY_ID=%s\n' "$VK_ADS_S3_READ_ACCESS_KEY_ID"
+                printf 'VK_ADS_S3_READ_SECRET_ACCESS_KEY=%s\n' "$VK_ADS_S3_READ_SECRET_ACCESS_KEY"
+                printf 'VK_ADS_S3_WRITE_ACCESS_KEY_ID=%s\n' "$VK_ADS_S3_WRITE_ACCESS_KEY_ID"
+                printf 'VK_ADS_S3_WRITE_SECRET_ACCESS_KEY=%s\n' "$VK_ADS_S3_WRITE_SECRET_ACCESS_KEY"
+                printf 'VK_ADS_S3_SSE=%s\n' "$VK_ADS_S3_SSE"
+              } | sudo tee -a "$vk_env_tmp" >/dev/null
+              sudo chown --reference="$env_file" "$vk_env_tmp"
+              sudo chmod 0600 "$vk_env_tmp"
+              sudo mv -Tf -- "$vk_env_tmp" "$env_file"
+              vk_env_tmp=''
+            }
+
+            VK_ADS_SYNC_ENABLED=false
+            write_vk_env "$VK_ADS_SYNC_ENABLED" "$VK_ADS_CLIENT_SECRET"
+            if [[ "$MODE" == prepare ]]; then
+              if sudo systemctl list-unit-files --no-legend kordevteam-vk-ads-collect.timer 2>/dev/null | grep -q '^kordevteam-vk-ads-collect.timer'; then
+                sudo systemctl disable --now kordevteam-vk-ads-collect.timer
+              fi
+              printf 'VK Ads production environment prepared with provider access disabled.\n'
+              exit 0
+            fi
+
+            cd /opt/kordevteam/current
+            WORKER_IMAGE="$(sudo cat /var/lib/kordevteam/deploy/worker-image)" \
+              docker compose --env-file "$env_file" -f deploy/docker-compose.team.yml \
+              --profile vk-ads run --rm --no-deps vk-ads-job node server/vk-ads-collect.mjs --mode=check
+            WORKER_IMAGE="$(sudo cat /var/lib/kordevteam/deploy/worker-image)" \
+              docker compose --env-file "$env_file" -f deploy/docker-compose.team.yml \
+              --profile vk-ads run --rm --no-deps vk-ads-job node server/vk-ads-collect.mjs --mode=backfill
+            VK_ADS_SYNC_ENABLED=true
+            write_vk_env "$VK_ADS_SYNC_ENABLED" "$VK_ADS_CLIENT_SECRET"
+            sudo install -o root -g root -m 0644 \
+              deploy/systemd/kordevteam-vk-ads-collect.service \
+              deploy/systemd/kordevteam-vk-ads-collect.timer \
+              /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable --now kordevteam-vk-ads-collect.timer
+            KORDEV_VK_ADS
