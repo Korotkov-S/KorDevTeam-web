@@ -26,6 +26,9 @@ export default function AdminContentEditor() {
   const payload = actionData?.fields?.payload ?? JSON.stringify(entry?.payload ?? {}, null, 2);
   const relations = actionData?.fields?.relations ?? JSON.stringify(data.relations, null, 2);
   const mediaRefs = actionData?.fields?.mediaRefs ?? JSON.stringify(data.mediaRefs, null, 2);
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <section className="mx-auto max-w-5xl space-y-6">
@@ -37,13 +40,24 @@ export default function AdminContentEditor() {
       {actionData?.error ? <div role="alert" tabIndex={-1} className="rounded-xl border border-destructive p-4 text-destructive"><p>{actionData.error}</p>{actionData.currentVersion ? <p className="mt-1 text-sm">Текущая версия на сервере: {actionData.currentVersion}</p> : null}</div> : null}
 
       <nav aria-label="Разделы редактора" className="flex flex-wrap gap-2 text-sm">
-        {["Контент", "SEO", "Связи", "Предпросмотр", "История"].map(label => <a key={label} href={`#${label.toLowerCase()}`} className="rounded-full border border-input px-3 py-1">{label}</a>)}
+        {[["Контент", "контент"], ["SEO", "seo"], ["Связи", "связи"]].map(([label, id]) => (
+          <button key={id} type="button" onClick={() => scrollToSection(id)} className="rounded-full border border-input px-3 py-1">{label}</button>
+        ))}
+        <button
+          type="submit"
+          form="content-editor-form"
+          formAction={`/admin/content/${data.kind}/preview/`}
+          name="intent"
+          value="preview"
+          className="rounded-full border border-input px-3 py-1"
+        >Предпросмотр</button>
+        <button type="button" onClick={() => scrollToSection("история")} className="rounded-full border border-input px-3 py-1">История</button>
       </nav>
 
-      <Form method="post" onChange={() => setDirty(true)} onSubmit={() => flushSync(() => setDirty(false))} className="space-y-8">
+      <Form id="content-editor-form" method="post" onChange={() => setDirty(true)} onSubmit={() => flushSync(() => setDirty(false))} className="space-y-8">
         <input type="hidden" name="_csrf" value={csrfToken} />
         {entry ? <input type="hidden" name="expectedVersion" value={entry.version} /> : null}
-        <section id="контент" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+        <section id="контент" className="scroll-mt-20 grid gap-4 rounded-xl border border-border bg-card p-5">
           <h2 className="text-xl font-semibold">Контент</h2>
           <label className="grid gap-1"><span>URL-имя</span><input name="slug" required defaultValue={field("slug")} className={inputClass} /></label>
           <label className="grid gap-1"><span>Заголовок</span><input name="title" defaultValue={field("title")} className={inputClass} /></label>
@@ -51,14 +65,14 @@ export default function AdminContentEditor() {
           <label className="grid gap-1"><span>Текст Markdown</span><textarea name="bodyMd" defaultValue={field("bodyMd")} rows={18} className={`${inputClass} font-mono`} /></label>
           <label className="grid gap-1"><span>Структурированные данные JSON</span><textarea name="payload" defaultValue={payload} rows={12} className={`${inputClass} font-mono`} /></label>
         </section>
-        <section id="seo" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+        <section id="seo" className="scroll-mt-20 grid gap-4 rounded-xl border border-border bg-card p-5">
           <h2 className="text-xl font-semibold">SEO</h2>
           <label className="grid gap-1"><span>SEO-заголовок</span><input name="seoTitle" maxLength={180} defaultValue={field("seoTitle")} className={inputClass} /></label>
           <label className="grid gap-1"><span>SEO-описание</span><textarea name="seoDescription" maxLength={320} defaultValue={field("seoDescription")} rows={3} className={inputClass} /></label>
           <MediaPicker name="ogMediaId" value={field("ogMediaId")} />
           <label className="flex items-center gap-2"><input type="checkbox" name="indexable" value="true" defaultChecked={entry?.indexable !== false} /><span>Разрешить индексацию</span></label>
         </section>
-        <section id="связи" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+        <section id="связи" className="scroll-mt-20 grid gap-4 rounded-xl border border-border bg-card p-5">
           <h2 className="text-xl font-semibold">Связи</h2>
           <label className="grid gap-1"><span>Связанные материалы JSON</span><textarea name="relations" defaultValue={relations} rows={7} className={`${inputClass} font-mono`} /></label>
           <label className="grid gap-1"><span>Ссылки на изображения JSON</span><textarea name="mediaRefs" defaultValue={mediaRefs} rows={7} className={`${inputClass} font-mono`} /></label>
@@ -71,7 +85,7 @@ export default function AdminContentEditor() {
         </div>
       </Form>
 
-      {entry ? <section id="история" className="space-y-4 rounded-xl border border-border bg-card p-5"><h2 className="text-xl font-semibold">История</h2>{data.revisions.length ? <ul className="space-y-2">{data.revisions.map(revision => <li key={revision.version} className="flex items-center justify-between gap-3"><span>Версия {revision.version}</span><Form method="post"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="expectedVersion" value={entry.version} /><input type="hidden" name="revisionVersion" value={revision.version} /><button name="intent" value="restore" className="text-sm underline">Восстановить</button></Form></li>)}</ul> : <p className="text-muted-foreground">Предыдущих версий пока нет.</p>}</section> : null}
+      {entry ? <section id="история" className="scroll-mt-20 space-y-4 rounded-xl border border-border bg-card p-5"><h2 className="text-xl font-semibold">История</h2>{data.revisions.length ? <ul className="space-y-2">{data.revisions.map(revision => <li key={revision.version} className="flex items-center justify-between gap-3"><span>Версия {revision.version}</span><Form method="post"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="expectedVersion" value={entry.version} /><input type="hidden" name="revisionVersion" value={revision.version} /><button name="intent" value="restore" className="text-sm underline">Восстановить</button></Form></li>)}</ul> : <p className="text-muted-foreground">Предыдущих версий пока нет.</p>}</section> : null}
 
       {entry ? <section className="space-y-4 rounded-xl border border-destructive/40 p-5"><h2 className="text-xl font-semibold text-destructive">Опасная зона</h2>{entry.status === "published" ? <Form method="post"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="expectedVersion" value={entry.version} /><button name="intent" value="unpublish" className="underline">Снять с публикации</button></Form> : null}<Form method="post" className="grid max-w-md gap-2"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="expectedVersion" value={entry.version} /><label>Для удаления введите <strong>{entry.slug}</strong><input name="confirmSlug" className={`${inputClass} mt-1 w-full`} /></label><button name="intent" value="delete" className="justify-self-start rounded-lg bg-destructive px-4 py-2 text-destructive-foreground">Удалить без восстановления</button></Form></section> : null}
     </section>
