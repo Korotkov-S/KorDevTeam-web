@@ -1,0 +1,55 @@
+name: Configure VK lead webhook
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: none
+
+jobs:
+  configure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: kordevteam-production
+      cancel-in-progress: false
+    steps:
+      - name: Store webhook configuration in protected production environment
+        uses: appleboy/ssh-action@v1
+        env:
+          VK_LEAD_WEBHOOK_PATH_TOKEN: ${{ secrets.VK_LEAD_WEBHOOK_PATH_TOKEN }}
+          VK_LEAD_FORM_IDS: 1001168,1001220
+          VK_LEAD_CONSENT_VERSION: vk-form-2026-09-23
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: VK_LEAD_WEBHOOK_PATH_TOKEN,VK_LEAD_FORM_IDS,VK_LEAD_CONSENT_VERSION
+          script: |
+            bash -se <<'KORDEV_VK_LEAD_WEBHOOK'
+            set -Eeuo pipefail
+            fail() { printf '%s\n' "$1" >&2; exit 1; }
+            [[ "$VK_LEAD_WEBHOOK_PATH_TOKEN" =~ ^[a-f0-9]{64}$ ]] || fail 'Invalid VK lead webhook token'
+            [[ "$VK_LEAD_FORM_IDS" == 1001168,1001220 ]] || fail 'Unexpected VK lead form allowlist'
+            [[ "$VK_LEAD_CONSENT_VERSION" == vk-form-2026-09-23 ]] || fail 'Unexpected VK lead consent version'
+
+            env_file=/etc/kordevteam/operations.env
+            sudo test -f "$env_file" && sudo test ! -L "$env_file" || fail 'Protected operations environment is missing or unsafe'
+            [[ "$(sudo stat -c '%a' "$env_file")" == 600 ]] || fail 'Protected operations environment must have mode 0600'
+
+            webhook_env_tmp="$(sudo mktemp /etc/kordevteam/.operations.env.vk-lead.XXXXXX)"
+            cleanup() { [[ -z "$webhook_env_tmp" ]] || sudo rm -f -- "$webhook_env_tmp"; }
+            trap cleanup EXIT
+            sudo awk '!/^(VK_LEAD_WEBHOOK_PATH_TOKEN|VK_LEAD_FORM_IDS|VK_LEAD_CONSENT_VERSION)=/' "$env_file" | sudo tee "$webhook_env_tmp" >/dev/null
+            {
+              printf 'VK_LEAD_WEBHOOK_PATH_TOKEN=%s\n' "$VK_LEAD_WEBHOOK_PATH_TOKEN"
+              printf 'VK_LEAD_FORM_IDS=%s\n' "$VK_LEAD_FORM_IDS"
+              printf 'VK_LEAD_CONSENT_VERSION=%s\n' "$VK_LEAD_CONSENT_VERSION"
+            } | sudo tee -a "$webhook_env_tmp" >/dev/null
+            sudo chown --reference="$env_file" "$webhook_env_tmp"
+            sudo chmod 0600 "$webhook_env_tmp"
+            sudo mv -Tf -- "$webhook_env_tmp" "$env_file"
+            webhook_env_tmp=''
+            printf 'VK lead webhook configuration prepared.\n'
+            KORDEV_VK_LEAD_WEBHOOK

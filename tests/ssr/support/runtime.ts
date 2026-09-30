@@ -22,6 +22,9 @@ const runtimeSecurityDefaults = {
   PUBLIC_MEDIA_S3_PREFIX: "media",
   PUBLIC_MEDIA_BASE_URL: "https://cdn.example.invalid/",
   PUBLIC_MEDIA_S3_SSE: "AES256",
+  VK_LEAD_WEBHOOK_PATH_TOKEN: "a".repeat(64),
+  VK_LEAD_FORM_IDS: "1001168,1001220",
+  VK_LEAD_CONSENT_VERSION: "vk-form-2026-09-23",
 };
 
 async function getAvailablePort() {

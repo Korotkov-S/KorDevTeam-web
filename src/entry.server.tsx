@@ -10,10 +10,12 @@ import { runLeadRetention as executeLeadRetention, type RetentionReport } from "
 import { readAdminAuthConfig } from "./server/auth/config";
 import { readPublicMediaConfig } from "./server/media/config";
 import { checkMcpReady } from "./server/mcp/runtime";
+import { assertVkLeadWebhookConfig } from "./server/vk-leads/config";
 export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
 export { createLeadRouter } from "./server/leads/http";
+export { createVkLeadRouter } from "./server/vk-leads/http";
 export { checkLeadWorkerReady, createLeadWorker } from "./server/leads/worker";
 export { createMcpRouter } from "./server/mcp/http";
 export { runSeoCollection, checkSeoCollectionReady, syncSeoSemanticCore } from "./server/seo-monitoring/runtime";
@@ -36,6 +38,7 @@ export async function checkApplicationReady(): Promise<void> {
   await checkDatabaseReady();
   await checkMcpReady();
   assertLeadWebConfig(process.env);
+  assertVkLeadWebhookConfig(process.env);
   readAdminAuthConfig(process.env);
   readPublicMediaConfig(process.env);
 }

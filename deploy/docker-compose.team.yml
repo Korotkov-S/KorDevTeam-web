@@ -17,6 +17,10 @@ x-lead-web-environment: &lead-web-environment
   LEAD_S3_SSE: ${LEAD_S3_SSE:?Provide LEAD_S3_SSE}
   CLAMAV_HOST: ${CLAMAV_HOST:?Provide CLAMAV_HOST}
   CLAMAV_PORT: ${CLAMAV_PORT:?Provide CLAMAV_PORT}
+x-vk-lead-webhook-environment: &vk-lead-webhook-environment
+  VK_LEAD_WEBHOOK_PATH_TOKEN: ${VK_LEAD_WEBHOOK_PATH_TOKEN:?Provide VK_LEAD_WEBHOOK_PATH_TOKEN}
+  VK_LEAD_FORM_IDS: ${VK_LEAD_FORM_IDS:?Provide VK_LEAD_FORM_IDS}
+  VK_LEAD_CONSENT_VERSION: ${VK_LEAD_CONSENT_VERSION:?Provide VK_LEAD_CONSENT_VERSION}
 x-admin-media-environment: &admin-media-environment
   ADMIN_SESSION_HMAC_KEY: ${ADMIN_SESSION_HMAC_KEY:?Provide ADMIN_SESSION_HMAC_KEY}
   ADMIN_RATE_LIMIT_HMAC_KEY: ${ADMIN_RATE_LIMIT_HMAC_KEY:?Provide ADMIN_RATE_LIMIT_HMAC_KEY}
@@ -47,7 +51,7 @@ x-web: &web
   restart: unless-stopped
   init: true
   environment:
-    <<: [*lead-web-environment, *admin-media-environment, *email-environment, *vk-ads-read-environment]
+    <<: [*lead-web-environment, *admin-media-environment, *email-environment, *vk-ads-read-environment, *vk-lead-webhook-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
     PORT: "3001"
