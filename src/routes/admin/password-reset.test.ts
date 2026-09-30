@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import type { AdminAuthConfig } from "../../server/auth/config";
 import { createForgotPasswordAction } from "./forgot-password.server";
+import { resetPasswordUrlWithoutToken } from "./reset-password";
 import { createResetPasswordAction, createResetPasswordLoader } from "./reset-password.server";
 import { createLoginCsrfCookie } from "./loginCsrf";
 
@@ -30,7 +31,7 @@ function postRequest(path: string, form: FormData, resetToken?: string): Request
 });
 }
 
-test("reset-password loader moves the bearer token into a browser-compatible __Host cookie and cleans the URL", async () => {
+test("reset-password loader captures the bearer token without redirecting the browser to a tokenless URL", async () => {
   const token = "t".repeat(43);
   const loader = createResetPasswordLoader(() => csrf);
   const captured = await loader({
@@ -40,9 +41,14 @@ test("reset-password loader moves the bearer token into a browser-compatible __H
     params: {},
     context: {},
   });
-  assert.equal(captured.status, 302);
-  assert.equal(captured.headers.get("Location"), "/admin/reset-password/");
+  assert.equal(captured.status, 200);
+  assert.equal(captured.headers.get("Location"), null);
   assert.match(captured.headers.get("Set-Cookie") ?? "", new RegExp(`__Host-kordev_admin_password_reset=${token}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict`));
+  assert.deepEqual(await captured.json(), {
+    loginCsrf: csrf,
+    tokenPresent: true,
+    cleanTokenUrl: true,
+  });
 
   const clean = await loader({
     request: new Request("https://kordev.team/admin/reset-password/", {
@@ -55,7 +61,42 @@ test("reset-password loader moves the bearer token into a browser-compatible __H
     context: {},
   });
   assert.equal(clean.status, 200);
-  assert.deepEqual(await clean.json(), { loginCsrf: csrf, tokenPresent: true });
+  assert.deepEqual(await clean.json(), {
+    loginCsrf: csrf,
+    tokenPresent: true,
+    cleanTokenUrl: false,
+  });
+});
+
+test("email preview and browser can independently open the same reset link", async () => {
+  const token = "t".repeat(43);
+  const loader = createResetPasswordLoader(() => csrf);
+  const openLink = () => loader({
+    request: new Request(`https://kordev.team/admin/reset-password/?token=${token}`, {
+      headers: { "x-kordev-csp-nonce": "n".repeat(22) },
+    }),
+    params: {},
+    context: {},
+  });
+
+  const preview = await openLink();
+  const browser = await openLink();
+
+  assert.equal(preview.status, 200);
+  assert.equal(browser.status, 200);
+  assert.equal(preview.headers.get("Location"), null);
+  assert.equal(browser.headers.get("Location"), null);
+  assert.match(browser.headers.get("Set-Cookie") ?? "", new RegExp(`__Host-kordev_admin_password_reset=${token}`));
+  assert.equal((await browser.json()).tokenPresent, true);
+});
+
+test("browser URL cleanup removes only the reset token", () => {
+  assert.equal(
+    resetPasswordUrlWithoutToken(
+      `https://kordev.team/admin/reset-password/?token=${"t".repeat(43)}&source=email#password`,
+    ),
+    "/admin/reset-password/?source=email#password",
+  );
 });
 
 test("forgot-password action sends a thirty-minute link but returns a generic response", async () => {

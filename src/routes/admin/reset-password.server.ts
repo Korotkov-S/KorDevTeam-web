@@ -44,16 +44,22 @@ function clearResetCookie(): string {
 export function createResetPasswordLoader(csrfFactory: () => string = generateLoginCsrf) {
   return async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url);
-    if (url.searchParams.has("token")) {
-      const headers = responseHeaders(request);
-      const token = url.searchParams.get("token") ?? "";
-      headers.append("Set-Cookie", TOKEN_PATTERN.test(token) ? createResetCookie(token) : clearResetCookie());
-      return redirect("/admin/reset-password/", { headers });
-    }
     const loginCsrf = csrfFactory();
     const headers = responseHeaders(request);
     headers.append("Set-Cookie", createLoginCsrfCookie(loginCsrf));
-    return Response.json({ loginCsrf, tokenPresent: Boolean(readResetToken(request)) }, { headers });
+    if (url.searchParams.has("token")) {
+      const token = url.searchParams.get("token") ?? "";
+      const tokenPresent = TOKEN_PATTERN.test(token);
+      headers.append("Set-Cookie", tokenPresent ? createResetCookie(token) : clearResetCookie());
+      headers.set("Cache-Control", "no-store");
+      headers.set("Referrer-Policy", "no-referrer");
+      return Response.json({ loginCsrf, tokenPresent, cleanTokenUrl: true }, { headers });
+    }
+    return Response.json({
+      loginCsrf,
+      tokenPresent: Boolean(readResetToken(request)),
+      cleanTokenUrl: false,
+    }, { headers });
   };
 }
 

@@ -1,17 +1,32 @@
+import { useEffect } from "react";
 import { Form, useActionData, useLoaderData, useNavigation } from "react-router";
 
 export { action, headers, loader } from "./reset-password.server";
 
-type LoaderData = { loginCsrf: string; tokenPresent: boolean };
+type LoaderData = { loginCsrf: string; tokenPresent: boolean; cleanTokenUrl: boolean };
 type ActionData = { error?: string; loginCsrf?: string };
 
 export function meta() { return [{ title: "Новый пароль | KorDevTeam" }]; }
+
+export function resetPasswordUrlWithoutToken(href: string): string {
+  const url = new URL(href);
+  url.searchParams.delete("token");
+  return `${url.pathname}${url.search}${url.hash}`;
+}
 
 export default function ResetPassword() {
   const initial = useLoaderData<LoaderData>();
   const result = useActionData<ActionData>();
   const navigation = useNavigation();
   const loginCsrf = result?.loginCsrf ?? initial.loginCsrf;
+  useEffect(() => {
+    if (!initial.cleanTokenUrl) return;
+    window.history.replaceState(
+      window.history.state,
+      "",
+      resetPasswordUrlWithoutToken(window.location.href),
+    );
+  }, [initial.cleanTokenUrl]);
   return (
     <main className="min-h-screen bg-background px-4 py-16 text-foreground">
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">

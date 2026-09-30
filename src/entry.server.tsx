@@ -11,7 +11,7 @@ import { readAdminAuthConfig } from "./server/auth/config";
 import { readPublicMediaConfig } from "./server/media/config";
 import { checkMcpReady } from "./server/mcp/runtime";
 import { assertVkLeadWebhookConfig } from "./server/vk-leads/config";
-export { canonicalizeRequest } from "./server/http/canonical";
+export { canonicalizeRequest, isAdminPasswordResetTokenRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
 export { createLeadRouter } from "./server/leads/http";

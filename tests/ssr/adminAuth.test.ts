@@ -46,10 +46,43 @@ test("legacy read-only admin API is absent while admin login exposes password re
   assert.equal(forgot.headers.get("x-robots-tag"), "noindex, nofollow");
   assert.match(await forgot.text(), /name="login"/);
 
-  const resetCapture = await fetch(`${runtime.origin}/admin/reset-password/?token=${"t".repeat(43)}`, { redirect: "manual" });
-  assert.equal(resetCapture.status, 302);
-  assert.equal(resetCapture.headers.get("location"), "/admin/reset-password/");
-  const resetCookie = (resetCapture.headers.get("set-cookie") ?? "").split(";", 1)[0];
+  const resetUrl = `${runtime.origin}/admin/reset-password/?token=${"t".repeat(43)}`;
+  const browserHeaders = { accept: "text/html,application/xhtml+xml" };
+  const resetCapture = await fetch(resetUrl, { headers: browserHeaders, redirect: "manual" });
+  const resetBrowser = await fetch(resetUrl, { headers: browserHeaders, redirect: "manual" });
+  assert.equal(resetCapture.status, 200);
+  assert.equal(resetCapture.headers.get("location"), null);
+  assert.equal(resetBrowser.status, 200);
+  assert.equal(resetBrowser.headers.get("location"), null);
+  assert.equal(resetBrowser.headers.get("cache-control"), "no-store");
+  assert.equal(resetBrowser.headers.get("referrer-policy"), "no-referrer");
+  assert.ok(resetBrowser.headers.getSetCookie().some(value =>
+    value.startsWith("__Host-kordev_admin_login_csrf=") && value.includes("Path=/; Secure; HttpOnly; SameSite=Strict"),
+  ));
+  assert.ok(resetBrowser.headers.getSetCookie().some(value =>
+    value.startsWith("__Host-kordev_admin_password_reset=") && value.includes("Path=/; Secure; HttpOnly; SameSite=Strict"),
+  ));
+  assert.match(await resetBrowser.text(), /name="newPassword"/);
+
+  const resetCanonicalRedirect = await fetch(`${resetUrl}&deploy=bad`, { headers: browserHeaders, redirect: "manual" });
+  assert.equal(resetCanonicalRedirect.status, 308);
+  assert.equal(resetCanonicalRedirect.headers.get("location"), resetUrl);
+  assert.equal(resetCanonicalRedirect.headers.get("cache-control"), "no-store");
+  assert.equal(resetCanonicalRedirect.headers.get("referrer-policy"), "no-referrer");
+
+  const resetDuplicateTokenRedirect = await fetch(`${resetUrl}&token=${"t".repeat(43)}`, {
+    headers: browserHeaders,
+    redirect: "manual",
+  });
+  assert.equal(resetDuplicateTokenRedirect.status, 308);
+  assert.equal(resetDuplicateTokenRedirect.headers.get("location"), resetUrl);
+  assert.equal(resetDuplicateTokenRedirect.headers.get("cache-control"), "no-store");
+  assert.equal(resetDuplicateTokenRedirect.headers.get("referrer-policy"), "no-referrer");
+
+  const resetCookie = resetCapture.headers.getSetCookie()
+    .map(value => value.split(";", 1)[0] ?? "")
+    .find(value => value.startsWith("__Host-kordev_admin_password_reset="));
+  assert.ok(resetCookie);
   const reset = await fetch(`${runtime.origin}/admin/reset-password/`, { headers: { cookie: resetCookie } });
   assert.equal(reset.status, 200);
   assert.equal(reset.headers.get("x-robots-tag"), "noindex, nofollow");

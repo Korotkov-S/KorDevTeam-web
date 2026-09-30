@@ -1,5 +1,6 @@
 import express from "express";
 import compression from "compression";
+import onHeaders from "on-headers";
 import { createRequestHandler } from "@react-router/express";
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -41,8 +42,18 @@ app.use(async (req, res, next) => {
     }
     return next();
   }
+  const passwordResetTokenRequest = build.entry.module.isAdminPasswordResetTokenRequest(request);
+  if (passwordResetTokenRequest) {
+    onHeaders(res, function protectPasswordResetHeaders() {
+      this.setHeader("Cache-Control", "no-store");
+      this.setHeader("Referrer-Policy", "no-referrer");
+    });
+  }
   const target = build.entry.module.canonicalizeRequest(request);
-  if (target) return res.set("Cache-Control", "no-cache").redirect(308, target.href);
+  if (target) {
+    if (!passwordResetTokenRequest) res.set("Cache-Control", "no-cache");
+    return res.redirect(308, target.href);
+  }
   next();
 });
 app.use(createApiApp({
