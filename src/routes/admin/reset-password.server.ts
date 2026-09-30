@@ -10,7 +10,7 @@ import { clearLoginCsrfCookie, createLoginCsrfCookie, generateLoginCsrf, verifyL
 type ResetService = Pick<AdminAuthService, "resetPassword">;
 const RESET_COOKIE = "__Host-kordev_admin_password_reset";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-const RESET_COOKIE_SCOPE = "Path=/admin/reset-password/; Secure; HttpOnly; SameSite=Strict";
+const RESET_COOKIE_SCOPE = "Path=/; Secure; HttpOnly; SameSite=Strict";
 
 function responseHeaders(request: Request): Headers {
   return adminHeaders(requestCspNonce(request));
