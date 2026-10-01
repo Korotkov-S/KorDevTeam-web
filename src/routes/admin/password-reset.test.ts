@@ -30,7 +30,7 @@ function postRequest(path: string, form: FormData, resetToken?: string): Request
 });
 }
 
-test("reset-password loader moves the bearer token into a browser-compatible __Host cookie and cleans the URL", async () => {
+test("reset-password loader preserves the bearer token after a cross-site email navigation and cleans the URL", async () => {
   const token = "t".repeat(43);
   const loader = createResetPasswordLoader(() => csrf);
   const captured = await loader({
@@ -42,7 +42,7 @@ test("reset-password loader moves the bearer token into a browser-compatible __H
   });
   assert.equal(captured.status, 302);
   assert.equal(captured.headers.get("Location"), "/admin/reset-password/");
-  assert.match(captured.headers.get("Set-Cookie") ?? "", new RegExp(`__Host-kordev_admin_password_reset=${token}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict`));
+  assert.match(captured.headers.get("Set-Cookie") ?? "", new RegExp(`__Host-kordev_admin_password_reset=${token}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Lax`));
 
   const clean = await loader({
     request: new Request("https://kordev.team/admin/reset-password/", {
