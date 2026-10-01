@@ -12,6 +12,7 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
 
 databaseTest("sanitized observations flow through dashboard reads and token-bound MCP writes", async () => {
+  const today = new Date().toISOString().slice(0, 10);
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
   const [admin] = await db.insert(adminUsers).values({ login: "seo-fixture", passwordDigest: "digest", passwordSalt: "salt" }).returning();
@@ -29,6 +30,6 @@ databaseTest("sanitized observations flow through dashboard reads and token-boun
     pagePath: "/services/crm-development/", issueType: "low_ctr", evidence: { observationDate: "2026-09-23", impressions: 500, ctr: 0.05 }, confidence: "medium" });
   assert.equal(recommendation.status, "new");
   await mcp.recordChange({ pagePath: "/services/crm-development/", summary: "Обновлён title", type: "metadata" });
-  assert.equal((await mcp.listRecommendations({ dateFrom: "2026-09-01", dateTo: "2026-09-30", limit: 10 })).items.length, 1);
-  assert.equal((await mcp.listChanges({ dateFrom: "2026-09-01", dateTo: "2026-09-30", limit: 10 })).items.length, 1);
+  assert.equal((await mcp.listRecommendations({ dateFrom: today, dateTo: today, limit: 10 })).items.length, 1);
+  assert.equal((await mcp.listChanges({ dateFrom: today, dateTo: today, limit: 10 })).items.length, 1);
 });
