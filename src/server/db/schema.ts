@@ -660,8 +660,8 @@ export const seoDailyMetrics = pgTable(
     }).onDelete("restrict"),
     check("seo_daily_metrics_page_path_valid", sql`${table.pagePath} LIKE '/%'`),
     check("seo_daily_metrics_impressions_non_negative", sql`${table.impressions} >= 0`),
-    check("seo_daily_metrics_clicks_valid", sql`${table.clicks} >= 0 AND ${table.clicks} <= ${table.impressions}`),
-    check("seo_daily_metrics_ctr_valid", sql`${table.ctr} >= 0 AND ${table.ctr} <= 1`),
+    check("seo_daily_metrics_clicks_valid", sql`${table.clicks} >= 0 AND (${table.source} = 'yandex_webmaster' OR ${table.clicks} <= ${table.impressions})`),
+    check("seo_daily_metrics_ctr_valid", sql`${table.ctr} >= 0 AND (${table.source} = 'yandex_webmaster' OR ${table.ctr} <= 1)`),
     check("seo_daily_metrics_position_positive", sql`${table.averagePosition} > 0`),
   ],
 );

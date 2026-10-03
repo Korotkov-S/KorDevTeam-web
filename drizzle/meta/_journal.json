@@ -113,6 +113,13 @@
       "when": 1790673808500,
       "tag": "0015_admin_password_reset",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791012016606,
+      "tag": "0016_yandex_ctr_over_100",
+      "breakpoints": true
     }
   ]
 }

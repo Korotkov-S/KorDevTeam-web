@@ -187,6 +187,42 @@ test("collect skips zero-impression days where Yandex omits position", async () 
   assert.deepEqual(rows.map((row) => row.observationDate), ["2026-09-23"]);
 });
 
+test("collect preserves an official Yandex row whose attributed clicks make CTR exceed 100 percent", async () => {
+  const provider = createYandexWebmasterProvider(config, async (input) => {
+    const url = String(input);
+    if (url.endsWith("/v4/user")) return json({ user_id: 42 });
+    if (url.includes("/pro/regions")) return json({ regions: [{ id: 225, name: "Россия" }] });
+    return json({
+      count: 1,
+      text_indicator_to_statistics: [{
+        text_indicator: { type: "QUERY", value: "CRM внедрение" },
+        popular_complementary_indicator: { type: "URL", value: "/services/crm/" },
+        statistics: [
+          { date: "2026-09-29", field: "IMPRESSIONS", value: 1 },
+          { date: "2026-09-29", field: "CLICKS", value: 2 },
+          { date: "2026-09-29", field: "CTR", value: 200 },
+          { date: "2026-09-29", field: "POSITION", value: 8 },
+          { date: "2026-09-29", field: "DEMAND", value: 4 },
+        ],
+      }],
+    });
+  });
+  await provider.listAvailableRegions();
+
+  const rows = await provider.collect(
+    { from: "2026-09-29", to: "2026-09-29" },
+    { id: 225, name: "Россия" },
+    "mobile",
+  );
+
+  assert.equal(rows.length, 1);
+  assert.deepEqual({
+    impressions: rows[0].impressions,
+    clicks: rows[0].clicks,
+    ctr: rows[0].ctr,
+  }, { impressions: 1, clicks: 2, ctr: 2 });
+});
+
 test("collect imports only the requested dates when Yandex returns its wider statistics horizon", async () => {
   const daily = (date: string) => [
     { date, field: "IMPRESSIONS", value: 10 },

@@ -162,6 +162,32 @@ databaseTest("observation upsert is idempotent, updates late metrics, and never 
   assert.equal((await db.select().from(seoDailyMetrics)).length, 1);
 });
 
+databaseTest("daily metrics preserve Yandex CTR above 100 percent without weakening Google constraints", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  const repository = createSeoRepository(db);
+  await repository.syncYandexRegions([{ id: 225, name: "Россия" }]);
+
+  const yandexObservation = {
+    ...observation,
+    source: "yandex_webmaster" as const,
+    regionExternalId: "225",
+    impressions: 1,
+    clicks: 2,
+    ctr: 2,
+  };
+  assert.equal(await repository.upsertObservations([yandexObservation]), 1);
+  assert.deepEqual(
+    await db.select({ impressions: seoDailyMetrics.impressions, clicks: seoDailyMetrics.clicks, ctr: seoDailyMetrics.ctr })
+      .from(seoDailyMetrics),
+    [{ impressions: 1, clicks: 2, ctr: "2.00000000" }],
+  );
+
+  await assert.rejects(
+    repository.upsertObservations([{ ...observation, impressions: 1, clicks: 2, ctr: 2 }]),
+  );
+});
+
 databaseTest("Metrica traffic upsert is idempotent and updates late behavior metrics", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);

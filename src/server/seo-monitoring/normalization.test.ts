@@ -45,6 +45,9 @@ test("CTR and position use exact combined denominators instead of averaging aver
 test("zero-impression aggregates preserve a missing-data gap", () => {
   assert.equal(weightedPosition([{ impressions: 0, position: 12 }]), null);
   assert.equal(combinedCtr([{ clicks: 0, impressions: 0 }]), null);
-  assert.throws(() => combinedCtr([{ clicks: 2, impressions: 1 }]), { message: "seo_metric_invalid" });
   assert.throws(() => weightedPosition([{ impressions: -1, position: 2 }]), { message: "seo_metric_invalid" });
+});
+
+test("combined CTR preserves official provider attribution above one hundred percent", () => {
+  assert.equal(combinedCtr([{ clicks: 2, impressions: 1 }]), 2);
 });

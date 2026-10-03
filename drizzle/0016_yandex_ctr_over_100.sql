@@ -1,0 +1,4 @@
+ALTER TABLE "seo_daily_metrics" DROP CONSTRAINT "seo_daily_metrics_clicks_valid";--> statement-breakpoint
+ALTER TABLE "seo_daily_metrics" DROP CONSTRAINT "seo_daily_metrics_ctr_valid";--> statement-breakpoint
+ALTER TABLE "seo_daily_metrics" ADD CONSTRAINT "seo_daily_metrics_clicks_valid" CHECK ("seo_daily_metrics"."clicks" >= 0 AND ("seo_daily_metrics"."source" = 'yandex_webmaster' OR "seo_daily_metrics"."clicks" <= "seo_daily_metrics"."impressions"));--> statement-breakpoint
+ALTER TABLE "seo_daily_metrics" ADD CONSTRAINT "seo_daily_metrics_ctr_valid" CHECK ("seo_daily_metrics"."ctr" >= 0 AND ("seo_daily_metrics"."source" = 'yandex_webmaster' OR "seo_daily_metrics"."ctr" <= 1));

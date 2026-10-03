@@ -55,7 +55,7 @@ export function combinedCtr(rows: ReadonlyArray<{ clicks: number; impressions: n
   let impressions = 0;
   for (const row of rows) {
     if (!Number.isSafeInteger(row.clicks) || !Number.isSafeInteger(row.impressions)
-      || row.clicks < 0 || row.impressions < 0 || row.clicks > row.impressions) {
+      || row.clicks < 0 || row.impressions < 0 || (row.impressions === 0 && row.clicks > 0)) {
       return invalidMetric();
     }
     clicks += row.clicks;
