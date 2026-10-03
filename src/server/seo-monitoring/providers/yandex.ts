@@ -7,6 +7,7 @@ export { SeoProviderError } from "./provider-error";
 const API_ORIGIN = "https://api.webmaster.yandex.net";
 const PAGE_LIMIT = 500;
 const REQUEST_TIMEOUT_MS = 15_000;
+const AVAILABLE_DATES_PATTERN = /^All dates must be from \(inclusively\) (\d{4}-\d{2}-\d{2}) to \(inclusively\) (\d{4}-\d{2}-\d{2})$/u;
 
 const SUPPORTED_QUERY_REGIONS: YandexRegion[] = [
   { id: 225, name: "Россия" },
@@ -57,6 +58,34 @@ function validateWindow(window: SeoCollectionWindow): void {
   if (!validDate(window.from) || !validDate(window.to) || window.to < window.from) {
     throw new SeoProviderError("seo_yandex_window_invalid", false);
   }
+}
+
+function shiftWindowIntoAvailableRange(
+  requested: SeoCollectionWindow,
+  available: SeoCollectionWindow,
+): SeoCollectionWindow {
+  validateWindow(requested);
+  validateWindow(available);
+  const requestedFrom = Date.parse(`${requested.from}T00:00:00.000Z`);
+  const requestedTo = Date.parse(`${requested.to}T00:00:00.000Z`);
+  const availableFrom = Date.parse(`${available.from}T00:00:00.000Z`);
+  const availableTo = Date.parse(`${available.to}T00:00:00.000Z`);
+  const requestedSpan = requestedTo - requestedFrom;
+  const resolvedTo = Math.min(requestedTo, availableTo);
+  const resolvedFrom = Math.max(availableFrom, resolvedTo - requestedSpan);
+  if (resolvedFrom > resolvedTo) throw new SeoProviderError("seo_yandex_window_unavailable", false);
+  return {
+    from: new Date(resolvedFrom).toISOString().slice(0, 10),
+    to: new Date(resolvedTo).toISOString().slice(0, 10),
+  };
+}
+
+function parseAvailableWindow(payload: unknown): SeoCollectionWindow | null {
+  if (!plainObject(payload) || payload.error_code !== "RESTRICTIONS_VIOLATED"
+    || typeof payload.error_message !== "string") return null;
+  const match = AVAILABLE_DATES_PATTERN.exec(payload.error_message);
+  if (!match || !validDate(match[1]) || !validDate(match[2]) || match[2] < match[1]) return null;
+  return { from: match[1], to: match[2] };
 }
 
 function parseRegions(payload: unknown): YandexRegion[] {
@@ -150,7 +179,7 @@ export function createYandexWebmasterProvider(
   let availableRegionIds: Set<number> | undefined;
   const origin = hostOrigin(config.hostId);
 
-  async function request(path: string, init: RequestInit = {}): Promise<unknown> {
+  async function requestResponse(path: string, init: RequestInit = {}): Promise<Response> {
     let response: Response;
     try {
       response = await fetchImpl(`${API_ORIGIN}${path}`, {
@@ -171,6 +200,11 @@ export function createYandexWebmasterProvider(
     if (response.status === 429 || response.status >= 500) {
       throw new SeoProviderError("seo_yandex_retryable", true, boundedRetryAfter(response));
     }
+    return response;
+  }
+
+  async function request(path: string, init: RequestInit = {}): Promise<unknown> {
+    const response = await requestResponse(path, init);
     if (!response.ok) throw new SeoProviderError("seo_yandex_request_failed", false);
     try {
       return await response.json();
@@ -203,6 +237,45 @@ export function createYandexWebmasterProvider(
       const regions = [...byId.values()];
       availableRegionIds = new Set(regions.map((region) => region.id));
       return regions;
+    },
+
+    async resolveWindow(window: SeoCollectionWindow): Promise<SeoCollectionWindow> {
+      validateWindow(window);
+      const currentUserId = await userId();
+      const response = await requestResponse(
+        `/v4/user/${currentUserId}/hosts/${encodeURIComponent(config.hostId)}/query-analytics/list`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json; charset=UTF-8" },
+          body: JSON.stringify({
+            offset: 0,
+            limit: 1,
+            device_type_indicator: "ALL",
+            search_location: "WEB_LOCATION",
+            text_indicator: "QUERY",
+            filters: {
+              statistic_filters: [{
+                statistic_field: "IMPRESSIONS",
+                operation: "GREATER_EQUAL",
+                value: "0",
+                from: window.from,
+                to: window.to,
+              }],
+            },
+          }),
+        },
+      );
+      if (response.ok) return window;
+      if (response.status !== 400) throw new SeoProviderError("seo_yandex_request_failed", false);
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new SeoProviderError("seo_yandex_request_failed", false);
+      }
+      const availableWindow = parseAvailableWindow(payload);
+      if (!availableWindow) throw new SeoProviderError("seo_yandex_request_failed", false);
+      return shiftWindowIntoAvailableRange(window, availableWindow);
     },
 
     async collect(window: SeoCollectionWindow, region: YandexRegion, device: SeoDevice): Promise<NormalizedSeoObservation[]> {

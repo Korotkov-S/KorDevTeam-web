@@ -133,6 +133,27 @@ test("collect sends requested region/device/date filters and maps every actual d
   });
 });
 
+test("resolveWindow shifts the requested range to the latest dates allowed by Yandex", async () => {
+  let analyticsCalls = 0;
+  const provider = createYandexWebmasterProvider(config, async (input) => {
+    const url = String(input);
+    if (url.endsWith("/v4/user")) return json({ user_id: 42 });
+    if (url.includes("query-analytics")) {
+      analyticsCalls++;
+      return json({
+        error_code: "RESTRICTIONS_VIOLATED",
+        error_message: "All dates must be from (inclusively) 2026-09-16 to (inclusively) 2026-09-29",
+      }, { status: 400 });
+    }
+    throw new Error("unexpected request");
+  });
+
+  const resolved = await provider.resolveWindow({ from: "2026-09-20", to: "2026-09-30" });
+
+  assert.deepEqual(resolved, { from: "2026-09-19", to: "2026-09-29" });
+  assert.equal(analyticsCalls, 1);
+});
+
 test("collect skips zero-impression days where Yandex omits position", async () => {
   const provider = createYandexWebmasterProvider(config, async (input) => {
     const url = String(input);

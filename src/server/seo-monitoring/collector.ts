@@ -38,6 +38,7 @@ type CollectorRepository = {
 
 type YandexProvider = {
   check(): Promise<unknown>;
+  resolveWindow(window: Window): Promise<Window>;
   listAvailableRegions(): Promise<YandexRegion[]>;
   collect(window: Window, region: YandexRegion, device: SeoDevice): Promise<NormalizedSeoObservation[]>;
 };
@@ -120,12 +121,27 @@ export function createSeoCollector(dependencies: {
     const source = "yandex_webmaster" as const;
     const provider = dependencies.yandex;
     if (!provider) return { source, status: "failed", receivedCount: 0, storedCount: 0, latestObservationDate: null, errorCode: "seo_yandex_provider_missing" };
-    const window = windowEnding(
+    const requestedWindow = windowEnding(
       clock(),
       YANDEX_DATA_LAG_DAYS,
       YANDEX_DATA_HORIZON_DAYS - YANDEX_DATA_LAG_DAYS,
     );
     return dependencies.repository.withSourceLock(source, async () => {
+      let window: Window;
+      try {
+        window = await retry(() => provider.resolveWindow(requestedWindow), sleep, random);
+      } catch (error) {
+        const run = await dependencies.repository.startRun(source, requestedWindow.from, requestedWindow.to);
+        const { code } = safeError(error);
+        await dependencies.repository.finishRun(run.id, "failed", {
+          receivedCount: 0,
+          storedCount: 0,
+          errorCode: code,
+          metadata: { stage: "resolve_window" },
+        });
+        logger.write({ event: "seo_collection_finished", source, status: "failed", receivedCount: 0, storedCount: 0, errorCode: code });
+        return { source, status: "failed", receivedCount: 0, storedCount: 0, latestObservationDate: null, errorCode: code };
+      }
       const run = await dependencies.repository.startRun(source, window.from, window.to);
       let receivedCount = 0;
       let storedCount = 0;

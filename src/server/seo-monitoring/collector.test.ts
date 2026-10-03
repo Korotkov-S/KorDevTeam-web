@@ -51,6 +51,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
   };
   const yandex = {
     async check() { return { userId: 1 }; },
+    async resolveWindow(window: { from: string; to: string }) { return window; },
     async listAvailableRegions() { return [{ id: 213, name: "Москва" }]; },
     async collect(_window: unknown, region: { id: number }, device: SeoDevice) {
       events.push(`yandex:${region.id}:${device}`);
@@ -190,6 +191,30 @@ test("Yandex keeps its lag-safe rolling window inside the official two-week hori
     { from: "2026-09-13", to: "2026-09-23" },
   ]);
   assert.equal(report.sources[0].latestObservationDate, "2026-09-23");
+});
+
+test("Yandex resolves the available date window before creating and collecting the run", async () => {
+  const f = fixture();
+  const windows: Array<{ from: string; to: string }> = [];
+  f.yandex.resolveWindow = async (window) => {
+    assert.deepEqual(window, { from: "2026-09-20", to: "2026-09-30" });
+    return { from: "2026-09-19", to: "2026-09-29" };
+  };
+  f.yandex.collect = async (window, region) => {
+    windows.push(window);
+    return [observation("yandex_webmaster", window.to, String(region.id))];
+  };
+  const collector = createSeoCollector({ config: { ...enabledConfig, google: { enabled: false } }, repository: f.repository,
+    yandex: f.yandex, clock: () => new Date("2026-10-03T06:00:00Z"), sleep: async () => {}, random: () => 0 });
+
+  const report = await collector.run("yandex_webmaster");
+
+  assert.ok(f.events.includes("start:yandex_webmaster:2026-09-19:2026-09-29"));
+  assert.deepEqual(windows, [
+    { from: "2026-09-19", to: "2026-09-29" },
+    { from: "2026-09-19", to: "2026-09-29" },
+  ]);
+  assert.equal(report.sources[0]?.latestObservationDate, "2026-09-29");
 });
 
 test("a failed Yandex slice keeps completed batches and marks the run partial", async () => {
