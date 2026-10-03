@@ -669,6 +669,11 @@ databaseTest("0008 promotes non-API tracked queries but turns legacy API noise i
   await db.execute(sql`DROP TABLE seo_traffic_metrics`);
   await db.execute(sql`DROP TYPE seo_traffic_slice`);
   await db.execute(sql`DELETE FROM seo_sources WHERE id = 'yandex_metrika'`);
+  await db.execute(sql`ALTER TABLE seo_daily_metrics
+    DROP CONSTRAINT seo_daily_metrics_clicks_valid,
+    DROP CONSTRAINT seo_daily_metrics_ctr_valid,
+    ADD CONSTRAINT seo_daily_metrics_clicks_valid CHECK (clicks >= 0 AND clicks <= impressions),
+    ADD CONSTRAINT seo_daily_metrics_ctr_valid CHECK (ctr >= 0 AND ctr <= 1)`);
   await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1790453494948`);
 
   await migrate(db, { migrationsFolder: "drizzle" });
