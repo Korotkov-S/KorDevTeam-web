@@ -9,8 +9,10 @@ import {
   geoPrompts,
   geoRuns,
   geoCollectionAttempts,
+  geoCollectionJobs,
+  geoCoverageCycles,
 } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, ne, and, notInArray } from "drizzle-orm";
 import { createGeoRepository } from "./repository";
 import { loadGeoPromptCatalog } from "./promptCatalog";
 import { createGeoQueueRepository } from "./queueRepository";
@@ -48,6 +50,265 @@ async function fixture() {
     queue: createGeoQueueRepository(db),
   };
 }
+async function recordTriple(
+  f: Awaited<ReturnType<typeof fixture>>,
+  work: any,
+  promptId: string,
+  time: Date,
+) {
+  const repo = createGeoRepository(f.db, () => time);
+  for (const repetition of [1, 2, 3] as const) {
+    const { attemptId } = await f.queue.reserveAttempt({
+      runId: work.runId,
+      leaseId: work.leaseId,
+      tokenId: f.token,
+      promptId,
+      repetition,
+      now: time,
+    });
+    const responseSnapshot = `Observed fixture ${promptId} ${repetition}`;
+    await repo.recordObservation(work.runId, f.token, {
+      promptId,
+      repetition,
+      attemptId,
+      leaseId: work.leaseId,
+      responseSnapshot,
+      responseExcerpt: responseSnapshot,
+      responseHash: createHash("sha256").update(responseSnapshot).digest("hex"),
+      snapshotTruncated: false,
+      mentioned: false,
+      linked: false,
+      cited: false,
+      sourceCount: 0,
+      sessionPersonalized: false,
+      mentions: [],
+      citations: [],
+      fanoutQueries: [],
+    });
+  }
+}
+databaseTest(
+  "healthy GEO platforms start a later cycle despite a permanently blocked platform",
+  async () => {
+    const f = await fixture();
+    const [prompt, added] = await f.db
+      .select()
+      .from(geoPrompts)
+      .where(eq(geoPrompts.region, "RU"))
+      .limit(2);
+    await f.db
+      .update(geoPrompts)
+      .set({ status: "archived" })
+      .where(ne(geoPrompts.id, prompt.id));
+    const [blocked] = await f.queue.claimWork({
+      tokenId: f.token,
+      now,
+      limit: 1,
+    });
+    await f.queue.releaseWork({
+      leaseId: blocked.leaseId,
+      tokenId: f.token,
+      now,
+      errorCode: "platform_auth_required",
+    });
+    const healthy = await f.queue.claimWork({
+      tokenId: f.token,
+      now,
+      limit: 6,
+    });
+    assert.equal(healthy.length, 3);
+    for (const work of healthy) {
+      await recordTriple(f, work, prompt.id, now);
+      await createGeoRepository(f.db, () => now).finishRun(
+        work.runId,
+        f.token,
+        {
+          status: "success",
+          completedCount: 3,
+          storedCount: 3,
+          errorCode: null,
+          metadata: {},
+        },
+      );
+    }
+    assert.deepEqual(
+      await f.queue.claimWork({ tokenId: f.token, now, limit: 6 }),
+      [],
+    );
+    const later = new Date(+now + 86400000);
+    await f.db
+      .update(geoPrompts)
+      .set({ status: "active" })
+      .where(eq(geoPrompts.id, added.id));
+    const fresh = await f.queue.claimWork({
+      tokenId: f.token,
+      now: later,
+      limit: 6,
+    });
+    assert.equal(
+      fresh.length,
+      3,
+      "healthy platforms must not starve after a finished traversal",
+    );
+    assert.ok(fresh.every((w) => w.platform !== blocked.platform));
+    assert.ok(
+      fresh.every((w) => w.prompts.some((p) => p.promptId === added.id)),
+      "newly activated questions join the successor cycle",
+    );
+    assert.equal((await f.db.select().from(geoCoverageCycles)).length, 2);
+    const oldBlocked = await f.db
+      .select()
+      .from(geoCollectionJobs)
+      .where(
+        and(
+          eq(geoCollectionJobs.platform, blocked.platform),
+          eq(geoCollectionJobs.runId, blocked.runId),
+        ),
+      );
+    assert.equal(
+      oldBlocked[0].state,
+      "blocked",
+      "old incomplete coverage must remain in history",
+    );
+  },
+);
+databaseTest(
+  "a completed GEO question stays complete when its batch sibling is archived",
+  async () => {
+    const f = await fixture();
+    const prompts = await f.db
+      .select()
+      .from(geoPrompts)
+      .where(and(eq(geoPrompts.status, "active"), eq(geoPrompts.region, "RU")))
+      .limit(2);
+    await f.db
+      .update(geoPrompts)
+      .set({ status: "archived" })
+      .where(
+        notInArray(
+          geoPrompts.id,
+          prompts.map((p) => p.id),
+        ),
+      );
+    const [work] = await f.queue.claimWork({ tokenId: f.token, now, limit: 2 });
+    assert.equal(work.prompts.length, 2);
+    const [a, b] = work.prompts;
+    await recordTriple(f, work, a.promptId, now);
+    await f.db
+      .update(geoPrompts)
+      .set({ status: "archived" })
+      .where(eq(geoPrompts.id, b.promptId));
+    await createGeoRepository(f.db, () => now).finishRun(work.runId, f.token, {
+      status: "partial",
+      completedCount: 3,
+      storedCount: 3,
+      errorCode: null,
+      metadata: {},
+    });
+    const jobs = await f.db
+      .select()
+      .from(geoCollectionJobs)
+      .where(eq(geoCollectionJobs.runId, work.runId));
+    assert.equal(
+      jobs.find((j) => j.promptId === a.promptId)?.state,
+      "complete",
+    );
+    assert.equal(
+      jobs.find((j) => j.promptId === b.promptId)?.state,
+      "cancelled",
+    );
+    for (const time of [now, new Date(+now + 25 * 3600000)]) {
+      await assert.rejects(
+        () =>
+          f.queue.resumeRun({
+            runId: work.runId,
+            tokenId: f.token,
+            now: time,
+            sessionPersonalized: false,
+          }),
+        /geo_run_already_finished/,
+      );
+      const next = await f.queue.claimWork({
+        tokenId: f.token,
+        now: time,
+        limit: 6,
+      });
+      assert.ok(
+        next.every(
+          (w) =>
+            w.platform !== work.platform ||
+            w.prompts.every((p) => p.promptId !== a.promptId),
+        ),
+      );
+    }
+  },
+);
+databaseTest(
+  "GEO replacement after archive and expiry excludes completed questions",
+  async () => {
+    const f = await fixture();
+    const prompts = await f.db
+      .select()
+      .from(geoPrompts)
+      .where(and(eq(geoPrompts.status, "active"), eq(geoPrompts.region, "RU")))
+      .limit(3);
+    await f.db
+      .update(geoPrompts)
+      .set({ status: "archived" })
+      .where(
+        notInArray(
+          geoPrompts.id,
+          prompts.map((p) => p.id),
+        ),
+      );
+    const [work] = await f.queue.claimWork({ tokenId: f.token, now, limit: 3 });
+    const [a, b, c] = work.prompts;
+    await recordTriple(f, work, a.promptId, now);
+    await f.db
+      .update(geoPrompts)
+      .set({ status: "archived" })
+      .where(eq(geoPrompts.id, b.promptId));
+    await createGeoRepository(f.db, () => now).finishRun(work.runId, f.token, {
+      status: "partial",
+      completedCount: 3,
+      storedCount: 3,
+      errorCode: null,
+      metadata: {},
+    });
+    const resumed = await f.queue.resumeRun({
+      runId: work.runId,
+      tokenId: f.token,
+      now,
+      sessionPersonalized: false,
+    });
+    assert.notEqual(resumed.runId, work.runId);
+    assert.deepEqual(
+      resumed.prompts.map((p) => p.promptId),
+      [c.promptId],
+    );
+    const expired = await f.queue.resumeRun({
+      runId: resumed.runId,
+      tokenId: f.token,
+      now: new Date(+now + 25 * 3600000),
+      sessionPersonalized: false,
+    });
+    assert.deepEqual(
+      expired.prompts.map((p) => p.promptId),
+      [c.promptId],
+    );
+    const [complete] = await f.db
+      .select()
+      .from(geoCollectionJobs)
+      .where(
+        and(
+          eq(geoCollectionJobs.runId, work.runId),
+          eq(geoCollectionJobs.promptId, a.promptId),
+        ),
+      );
+    assert.equal(complete.state, "complete");
+    assert.equal(complete.completedRepetitions, 3);
+  },
+);
 databaseTest(
   "GEO cycle includes every active question across four platforms and all three regions",
   async () => {

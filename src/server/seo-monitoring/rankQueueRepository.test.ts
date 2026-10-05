@@ -8,6 +8,7 @@ import {
   seoRegions,
   seoRankRuns,
   seoRankChecks,
+  seoRankJobs,
 } from "../db/schema";
 import * as queueModule from "./rankQueueRepository";
 
@@ -16,19 +17,53 @@ const databaseTest = url ? test : test.skip;
 const now = new Date("2026-10-04T22:00:00Z");
 
 databaseTest(
+  "failed submission reservation cannot reopen an in-flight paid POST",
+  async () => {
+    await resetTestDatabase(url);
+    const db = createDb(url);
+    await db
+      .insert(seoQueries)
+      .values({
+        queryText: "guard",
+        normalizedQuery: "guard",
+        status: "active",
+        tracked: true,
+      });
+    const repo = queueModule.createRankQueueRepository(db);
+    const plan = (await repo.getOrCreatePlan({
+      now,
+      dailyLimit: 1000,
+      resumeOnly: false,
+    }))!;
+    const job = plan.jobs[0];
+    assert.equal(await repo.reserveSubmission(job.id, now, 1000), true);
+    assert.equal(await repo.reserveSubmission(job.id, now, 1000), false);
+    await repo.deferJob(job.id, {
+      stage: "submit",
+      errorCode: "seo_rank_daily_budget_exhausted",
+      nextAttemptAt: now,
+    });
+    const [inFlight] = await db
+      .select()
+      .from(seoRankJobs)
+      .where(eq(seoRankJobs.id, job.id));
+    assert.equal(inFlight.state, "submitting");
+    assert.equal(await repo.reserveSubmission(job.id, now, 1000), false);
+  },
+);
+
+databaseTest(
   "durable rank plan freezes complete matrices and survives restart without duplicate results",
   async () => {
     await resetTestDatabase(url);
     const db = createDb(url);
     for (let i = 0; i < 60; i++)
-      await db
-        .insert(seoQueries)
-        .values({
-          queryText: `q${i}`,
-          normalizedQuery: `q${i}`,
-          status: "active",
-          tracked: true,
-        });
+      await db.insert(seoQueries).values({
+        queryText: `q${i}`,
+        normalizedQuery: `q${i}`,
+        status: "active",
+        tracked: true,
+      });
     // Regions are installed by existing migrations.
     const regions = await db
       .select()
@@ -81,14 +116,12 @@ databaseTest(
     await resetTestDatabase(url);
     const db = createDb(url);
     for (let i = 0; i < 63; i++)
-      await db
-        .insert(seoQueries)
-        .values({
-          queryText: `q${i}`,
-          normalizedQuery: `q${i}`,
-          status: "active",
-          tracked: true,
-        });
+      await db.insert(seoQueries).values({
+        queryText: `q${i}`,
+        normalizedQuery: `q${i}`,
+        status: "active",
+        tracked: true,
+      });
     const repo = queueModule.createRankQueueRepository(db);
     const plan = (await repo.getOrCreatePlan({
       now,

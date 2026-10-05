@@ -170,14 +170,12 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
           .from(seoRankSubmissions)
           .where(eq(seoRankSubmissions.budgetDate, moscowDate(now)));
         if (count.n >= dailyLimit) return false;
-        await tx
-          .insert(seoRankSubmissions)
-          .values({
-            jobId,
-            attempt: job.submitAttempts + 1,
-            budgetDate: moscowDate(now),
-            reservedAt: now,
-          });
+        await tx.insert(seoRankSubmissions).values({
+          jobId,
+          attempt: job.submitAttempts + 1,
+          budgetDate: moscowDate(now),
+          reservedAt: now,
+        });
         await tx
           .update(seoRankJobs)
           .set({
@@ -250,6 +248,7 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
         stage: "submit" | "poll";
         nextAttemptAt: Date;
         errorCode: string | null;
+        expectedState?: string;
       },
     ) {
       await db
@@ -262,7 +261,16 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
             ? { pollErrorAttempts: sql`${seoRankJobs.pollErrorAttempts}+1` }
             : {}),
         })
-        .where(eq(seoRankJobs.id, jobId));
+        .where(
+          and(
+            eq(seoRankJobs.id, jobId),
+            input.expectedState
+              ? eq(seoRankJobs.state, input.expectedState)
+              : input.stage === "submit"
+                ? sql`${seoRankJobs.state} IN ('queued','retry_wait') AND ${seoRankJobs.operationId} IS NULL`
+                : sql`${seoRankJobs.state} IN ('polling','retry_wait') AND ${seoRankJobs.operationId} IS NOT NULL`,
+          ),
+        );
     },
     async blockJob(jobId: string, errorCode: string) {
       await db

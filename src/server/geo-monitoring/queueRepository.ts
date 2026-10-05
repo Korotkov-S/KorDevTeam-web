@@ -90,6 +90,7 @@ async function ensureCycle(tx: GeoQueueTransaction, now: Date) {
     .from(geoCoverageCycles)
     .orderBy(desc(geoCoverageCycles.startedAt))
     .limit(1);
+  let blockedJobs: Array<typeof geoCollectionJobs.$inferSelect> = [];
   if (current) {
     const [pending] = await tx
       .select({ n: sql<number>`count(*)::int` })
@@ -97,14 +98,26 @@ async function ensureCycle(tx: GeoQueueTransaction, now: Date) {
       .where(
         and(
           eq(geoCollectionJobs.cycleId, current.id),
-          sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled')`,
+          sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled','blocked')`,
         ),
       );
-    if (pending.n) return current;
-    await tx
-      .update(geoCoverageCycles)
-      .set({ completedAt: now })
-      .where(eq(geoCoverageCycles.id, current.id));
+    if (pending.n || moscowDate(now) === moscowDate(current.startedAt))
+      return current;
+    blockedJobs = await tx
+      .select()
+      .from(geoCollectionJobs)
+      .where(
+        and(
+          eq(geoCollectionJobs.cycleId, current.id),
+          eq(geoCollectionJobs.state, "blocked"),
+        ),
+      );
+    // Keep incomplete coverage intact in history; do not claim it was successful.
+    if (!blockedJobs.length)
+      await tx
+        .update(geoCoverageCycles)
+        .set({ completedAt: now })
+        .where(eq(geoCoverageCycles.id, current.id));
   }
   const prompts = await tx
     .select()
@@ -115,23 +128,27 @@ async function ensureCycle(tx: GeoQueueTransaction, now: Date) {
     .insert(geoCoverageCycles)
     .values({ startedAt: now, promptIds: prompts.map((p) => p.id) })
     .returning();
+  const blockedPlatforms = new Map(
+    blockedJobs.map((job) => [job.platform, job]),
+  );
   if (prompts.length)
-    await tx
-      .insert(geoCollectionJobs)
-      .values(
-        COVERAGE_PLATFORMS.flatMap((platform) =>
-          prompts.map((p) => ({
-            cycleId: cycle.id,
-            promptId: p.id,
-            promptText: p.promptText,
-            platform,
-            surface: GEO_SURFACES[platform],
-            language: p.language,
-            region: p.region,
-            nextAttemptAt: now,
-          })),
-        ),
-      );
+    await tx.insert(geoCollectionJobs).values(
+      COVERAGE_PLATFORMS.flatMap((platform) =>
+        prompts.map((p) => ({
+          cycleId: cycle.id,
+          promptId: p.id,
+          promptText: p.promptText,
+          platform,
+          surface: GEO_SURFACES[platform],
+          language: p.language,
+          region: p.region,
+          state: blockedPlatforms.has(platform) ? "blocked" : "queued",
+          errorCode: blockedPlatforms.get(platform)?.errorCode ?? null,
+          attempts: blockedPlatforms.get(platform)?.attempts ?? 0,
+          nextAttemptAt: blockedPlatforms.has(platform) ? null : now,
+        })),
+      ),
+    );
   return cycle;
 }
 async function budget(tx: GeoQueueTransaction, now: Date) {
@@ -226,7 +243,7 @@ async function closeOldRun(tx: GeoQueueTransaction, runId: string, now: Date) {
       completedAt: now,
     })
     .where(eq(geoRuns.id, runId));
-  await retireRunLeases(tx, runId, now);
+  await finishGeoQueue(tx, runId, count.n ? "partial" : "failed", now);
 }
 async function workFor(
   tx: GeoQueueTransaction,
@@ -256,7 +273,7 @@ async function workFor(
     deadline: new Date(+run.startedAt + 86400000),
     sessionPersonalized: run.sessionPersonalized,
     prompts: jobs
-      .filter((j) => j.state !== "cancelled")
+      .filter((j) => j.state !== "cancelled" && j.state !== "complete")
       .map((j) => ({
         promptId: j.promptId,
         promptText: j.promptText,
@@ -346,14 +363,24 @@ export async function finishGeoQueue(
           eq(geoObservations.promptId, job.promptId),
         ),
       );
+    const [prompt] = await tx
+      .select({ status: geoPrompts.status })
+      .from(geoPrompts)
+      .where(eq(geoPrompts.id, job.promptId));
     if (job.state !== "cancelled")
       await tx
         .update(geoCollectionJobs)
         .set({
           completedRepetitions: count.n,
           state:
-            status === "success" && count.n === 3 ? "complete" : "retry_wait",
-          nextAttemptAt: status === "success" ? null : now,
+            prompt?.status !== "active"
+              ? "cancelled"
+              : count.n === 3
+                ? "complete"
+                : "retry_wait",
+          nextAttemptAt:
+            prompt?.status !== "active" || count.n === 3 ? null : now,
+          errorCode: prompt?.status !== "active" ? "geo_prompt_archived" : null,
         })
         .where(eq(geoCollectionJobs.id, job.id));
   }
@@ -370,7 +397,7 @@ export async function finishGeoQueue(
       })
       .where(
         and(
-          eq(geoCollectionJobs.cycleId, jobs[0].cycleId),
+          sql`(${geoCollectionJobs.cycleId} = ${jobs[0].cycleId} OR ${geoCollectionJobs.cycleId} = (SELECT id FROM geo_coverage_cycles ORDER BY started_at DESC LIMIT 1))`,
           eq(geoCollectionJobs.platform, jobs[0].platform),
           eq(geoCollectionJobs.state, "blocked"),
           sql`${geoCollectionJobs.errorCode} IN ('platform_auth_required','live_ui_confirmation_required','captcha_required','platform_unavailable','browser_unavailable')`,
@@ -552,10 +579,20 @@ export function createGeoQueueRepository(db: Database) {
               .select()
               .from(geoRuns)
               .where(eq(geoRuns.id, jobs[0].runId));
+            const [cancelled] = await tx
+              .select({ n: sql<number>`count(*)::int` })
+              .from(geoCollectionJobs)
+              .where(
+                and(
+                  eq(geoCollectionJobs.runId, old.id),
+                  eq(geoCollectionJobs.state, "cancelled"),
+                ),
+              );
             if (
               old.initiatedByMcpTokenId === tokenId &&
               +now < +old.startedAt + 86400000 &&
-              old.status !== "success"
+              old.status !== "success" &&
+              !cancelled.n
             ) {
               run = old;
               await retireRunLeases(tx, old.id, now);
@@ -580,7 +617,7 @@ export function createGeoQueueRepository(db: Database) {
                     .where(
                       and(
                         eq(geoCollectionJobs.runId, run.id),
-                        sql`${geoCollectionJobs.state} <> 'cancelled'`,
+                        sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled')`,
                       ),
                     )
                 ).map((j) => j.id)
@@ -792,6 +829,8 @@ export function createGeoQueueRepository(db: Database) {
             errorCode: input.errorCode,
           })
           .where(eq(geoRuns.id, run.id));
+        // A platform pause must not discard fully stored sibling triples.
+        await finishGeoQueue(tx, run.id, count.n ? "partial" : "failed", now);
         await tx
           .update(geoCollectionAttempts)
           .set({ resolvedAt: now })
@@ -868,10 +907,32 @@ export function createGeoQueueRepository(db: Database) {
           .where(
             and(
               eq(geoCollectionJobs.runId, old.id),
-              sql`${geoCollectionJobs.state} <> 'cancelled'`,
+              sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled')`,
             ),
           );
-        if (!jobs.length) throw new Error("geo_prompt_archived");
+        if (!jobs.length) {
+          const [complete] = await tx
+            .select({ n: sql<number>`count(*)::int` })
+            .from(geoCollectionJobs)
+            .where(
+              and(
+                eq(geoCollectionJobs.runId, old.id),
+                eq(geoCollectionJobs.state, "complete"),
+              ),
+            );
+          throw new Error(
+            complete.n ? "geo_run_already_finished" : "geo_prompt_archived",
+          );
+        }
+        const [cancelled] = await tx
+          .select({ n: sql<number>`count(*)::int` })
+          .from(geoCollectionJobs)
+          .where(
+            and(
+              eq(geoCollectionJobs.runId, old.id),
+              eq(geoCollectionJobs.state, "cancelled"),
+            ),
+          );
         const [activeLease] = await tx
           .select()
           .from(geoCollectionLeases)
@@ -885,6 +946,7 @@ export function createGeoQueueRepository(db: Database) {
           .limit(1);
         let run = old;
         const restart =
+          cancelled.n > 0 ||
           +input.now >= +old.startedAt + 86400000 ||
           (old.sessionPersonalized !== null &&
             old.sessionPersonalized !== input.sessionPersonalized);

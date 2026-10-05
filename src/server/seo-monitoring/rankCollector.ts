@@ -44,106 +44,116 @@ export function createSeoRankCollector(dependencies: {
         if (planExpired(plan, clock()))
           await repo.expirePlan(plan.runId, clock());
         const jobs = await repo.listDueJobs(plan.runId, clock());
-        let index = 0;
-        await Promise.all(
+        let index = 0,
+          fatal = false;
+        const workers = await Promise.allSettled(
           Array.from({ length: Math.min(8, jobs.length) }, async () => {
-            while (index < jobs.length) {
-              const job = jobs[index++];
-              let operationId = job.operationId;
-              if (planExpired(plan, clock())) break;
-              if (!operationId) {
-                if (!isSubmissionWindow(clock())) {
-                  await repo.deferJob(job.id, {
-                    stage: "submit",
-                    nextAttemptAt: nextSubmissionWindow(clock()),
-                    errorCode: "seo_rank_waiting_night_window",
-                  });
-                  continue;
-                }
-                if (
-                  !(await repo.reserveSubmission(
-                    job.id,
-                    clock(),
-                    dependencies.dailyCheckLimit,
-                  ))
-                ) {
-                  await repo.deferJob(job.id, {
-                    stage: "submit",
-                    nextAttemptAt: nextSubmissionWindow(clock()),
-                    errorCode: "seo_rank_daily_budget_exhausted",
-                  });
-                  continue;
-                }
-                try {
-                  operationId = await dependencies.provider.startSearch(
-                    job.queryText,
-                    job.externalRegionId,
-                    job.device as "desktop" | "mobile",
-                  );
-                } catch (error) {
-                  if (
-                    error instanceof SeoProviderError &&
-                    error.message === "seo_rank_submit_rejected" &&
-                    job.submitAttempts + 1 < 4
-                  )
+            try {
+              while (!fatal && index < jobs.length) {
+                const job = jobs[index++];
+                let operationId = job.operationId;
+                if (planExpired(plan, clock())) break;
+                if (!operationId) {
+                  if (!isSubmissionWindow(clock())) {
                     await repo.deferJob(job.id, {
                       stage: "submit",
+                      nextAttemptAt: nextSubmissionWindow(clock()),
+                      errorCode: "seo_rank_waiting_night_window",
+                    });
+                    continue;
+                  }
+                  if (
+                    !(await repo.reserveSubmission(
+                      job.id,
+                      clock(),
+                      dependencies.dailyCheckLimit,
+                    ))
+                  ) {
+                    await repo.deferJob(job.id, {
+                      stage: "submit",
+                      nextAttemptAt: nextSubmissionWindow(clock()),
+                      errorCode: "seo_rank_daily_budget_exhausted",
+                    });
+                    continue;
+                  }
+                  try {
+                    operationId = await dependencies.provider.startSearch(
+                      job.queryText,
+                      job.externalRegionId,
+                      job.device as "desktop" | "mobile",
+                    );
+                  } catch (error) {
+                    if (
+                      error instanceof SeoProviderError &&
+                      error.message === "seo_rank_submit_rejected" &&
+                      job.submitAttempts + 1 < 4
+                    )
+                      await repo.deferJob(job.id, {
+                        stage: "submit",
+                        nextAttemptAt: nextRetryAt({
+                          now: clock(),
+                          attempt: job.submitAttempts + 1,
+                          retryAfterSeconds: error.retryAfterSeconds,
+                        }),
+                        errorCode: error.message,
+                        expectedState: "submitting",
+                      });
+                    else
+                      await repo.blockJob(
+                        job.id,
+                        error instanceof SeoProviderError
+                          ? error.message
+                          : "seo_rank_submission_uncertain",
+                      );
+                    continue;
+                  }
+                  // Never catch a persistence failure as a rejected submission. Next pass fences submitting as uncertain.
+                  await repo.saveOperation(job.id, operationId, clock());
+                }
+                if (planExpired(plan, clock())) break;
+                let result: YandexRankResult | null;
+                try {
+                  result = await dependencies.provider.pollSearch(operationId);
+                } catch (error) {
+                  const code =
+                    error instanceof SeoProviderError
+                      ? error.message
+                      : "seo_yandex_search_collection_failed";
+                  if (
+                    error instanceof SeoProviderError &&
+                    error.retryable &&
+                    job.pollErrorAttempts + 1 < 4
+                  )
+                    await repo.deferJob(job.id, {
+                      stage: "poll",
                       nextAttemptAt: nextRetryAt({
                         now: clock(),
-                        attempt: job.submitAttempts + 1,
+                        attempt: job.pollErrorAttempts + 1,
                         retryAfterSeconds: error.retryAfterSeconds,
                       }),
-                      errorCode: error.message,
+                      errorCode: code,
                     });
-                  else
-                    await repo.blockJob(
-                      job.id,
-                      error instanceof SeoProviderError
-                        ? error.message
-                        : "seo_rank_submission_uncertain",
-                    );
+                  else await repo.blockJob(job.id, code);
                   continue;
                 }
-                // Never catch a persistence failure as a rejected submission. Next pass fences submitting as uncertain.
-                await repo.saveOperation(job.id, operationId, clock());
-              }
-              if (planExpired(plan, clock())) break;
-              let result: YandexRankResult | null;
-              try {
-                result = await dependencies.provider.pollSearch(operationId);
-              } catch (error) {
-                const code =
-                  error instanceof SeoProviderError
-                    ? error.message
-                    : "seo_yandex_search_collection_failed";
-                if (
-                  error instanceof SeoProviderError &&
-                  error.retryable &&
-                  job.pollErrorAttempts + 1 < 4
-                )
+                if (planExpired(plan, clock())) break;
+                else if (result === null)
                   await repo.deferJob(job.id, {
                     stage: "poll",
-                    nextAttemptAt: nextRetryAt({
-                      now: clock(),
-                      attempt: job.pollErrorAttempts + 1,
-                      retryAfterSeconds: error.retryAfterSeconds,
-                    }),
-                    errorCode: code,
+                    nextAttemptAt: new Date(clock().getTime() + 120000),
+                    errorCode: null,
                   });
-                else await repo.blockJob(job.id, code);
-                continue;
+                else await repo.saveResult(job.id, result, clock());
               }
-              if (planExpired(plan, clock())) break;
-              else if (result === null)
-                await repo.deferJob(job.id, {
-                  stage: "poll",
-                  nextAttemptAt: new Date(clock().getTime() + 120000),
-                  errorCode: null,
-                });
-              else await repo.saveResult(job.id, result, clock());
+            } catch (error) {
+              fatal = true;
+              throw error;
             }
           }),
         );
+        // Drain outstanding provider requests before releasing the exclusive lock.
+        const failure = workers.find((worker) => worker.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
         if (planExpired(plan, clock()))
           await repo.expirePlan(plan.runId, clock());
         const progress = await repo.finishPass(plan.runId, clock());

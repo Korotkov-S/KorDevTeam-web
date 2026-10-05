@@ -1,5 +1,7 @@
 # SEO rank resume Implementation Plan
 
+Статус 05.10.2026: задачи 1–4 реализованы и проверены, финальное независимое ревью закрыто исправлениями. Основная поставка — отдельный SEO-коммит, а не четыре промежуточных: это сохраняет согласованность схемы, но укрупняет откат. Дополнительные helper-тесты частично написаны после реализации — универсальная RED-first гарантия не заявляется; сбойные сценарии воспроизведены RED→GREEN. Полный финальный прогон: 1249 passed / 2 environment skips; typecheck/build/db:check успешны. Деплой и установка таймера пока не выполнены. Исходные процедурные чекбоксы ниже не являются журналом фактического порядка действий.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Execute inline; delegation requires the user's choice.
 
 **Goal:** Продолжать известные незавершённые поисковые операции без повторной оплаты успешных запросов и явно показывать неполноту.
