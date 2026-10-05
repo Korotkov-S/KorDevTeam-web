@@ -7,10 +7,11 @@ import { requireAdminPage } from "./auth.server";
 import { adminHeaders, requestCspNonce } from "./headers";
 
 export const GEO_VIEWS = ["overview", "platforms", "prompts", "entities", "sources", "evidence", "traffic", "promotion"] as const;
-export type GeoView = typeof GEO_VIEWS[number];
+export type GeoView = (typeof GEO_VIEWS)[number];
 type Authenticator = Pick<AdminAuthService, "authenticate">;
 type Service = Pick<GeoMonitoringService, "getOverview" | "listObservations" | "listPrompts" | "listEntities" |
-  "listCitations" | "listFanoutQueries" | "getObservationEvidence" | "listReferrals" | "listCrawlerChecks" | "listExperiments">;
+  "listCitations" | "listFanoutQueries" | "getObservationEvidence" | "listReferrals" | "listCrawlerChecks" | "listExperiments"> &
+  Partial<Pick<GeoMonitoringService, "listCollectionQueue">>;
 
 const DAY_MS = 86_400_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -59,7 +60,11 @@ function safeResponse(request: Request, error: unknown) {
   });
 }
 
-export function createGeoSectionLoader(auth: Authenticator, service: Service, clock = () => new Date()): LoaderFunction {
+export function createGeoSectionLoader(
+  auth: Authenticator,
+  service: Service,
+  clock = () => new Date(),
+): LoaderFunction {
   return async ({ request }: LoaderFunctionArgs) => {
     await requireAdminPage(request, auth);
     try {
@@ -93,6 +98,13 @@ export function createGeoSectionLoader(auth: Authenticator, service: Service, cl
         from: filters.from, to: filters.to, ...(filters.platform ? { platform: filters.platform } : {}), limit: 100, cursor: parsed.cursor,
       }) };
       else payload = { experiments: await service.listExperiments({ limit: 100, cursor: parsed.cursor }) };
+      if (parsed.view === "platforms" || parsed.view === "prompts")
+        payload.collectionQueue =
+          (await service.listCollectionQueue?.({
+            platform: parsed.filters.platform ?? undefined,
+            region: parsed.filters.region ?? undefined,
+            limit: 200,
+          })) ?? null;
       return Response.json({ view: parsed.view, filters: parsed.filters, ...payload }, {
         headers: adminHeaders(requestCspNonce(request)),
       });

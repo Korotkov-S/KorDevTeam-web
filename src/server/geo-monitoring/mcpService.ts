@@ -1,6 +1,7 @@
 import type { GeoMonitoringService } from "./service";
 
-type Backing = Pick<GeoMonitoringService,
+type Backing = Pick<
+  GeoMonitoringService,
   | "getOverview"
   | "listTopics"
   | "listEntities"
@@ -17,6 +18,12 @@ type Backing = Pick<GeoMonitoringService,
   | "finishRun"
   | "createExperimentCandidate"
   | "evaluateExperiment"
+  | "listCollectionQueue"
+  | "claimCollectionWork"
+  | "reserveCollectionAttempt"
+  | "resumeCollectionRun"
+  | "renewCollectionLease"
+  | "deferCollectionWork"
 >;
 
 function json<T>(value: T): T {
@@ -33,6 +40,36 @@ function omitSnapshots<T>(value: T): T {
 
 export function createMcpGeoService(service: Backing, tokenId: string) {
   return {
+    async listCollectionQueue(
+      input: Parameters<Backing["listCollectionQueue"]>[0],
+    ) {
+      return json(await service.listCollectionQueue(input));
+    },
+    async claimCollectionWork(
+      input: Parameters<Backing["claimCollectionWork"]>[0],
+    ) {
+      return { items: json(await service.claimCollectionWork(input, tokenId)) };
+    },
+    async reserveCollectionAttempt(
+      input: Parameters<Backing["reserveCollectionAttempt"]>[0],
+    ) {
+      return json(await service.reserveCollectionAttempt(input, tokenId));
+    },
+    async resumeCollectionRun(
+      input: Parameters<Backing["resumeCollectionRun"]>[0],
+    ) {
+      return json(await service.resumeCollectionRun(input, tokenId));
+    },
+    async renewCollectionLease(
+      input: Parameters<Backing["renewCollectionLease"]>[0],
+    ) {
+      return json(await service.renewCollectionLease(input, tokenId));
+    },
+    async deferCollectionWork(
+      input: Parameters<Backing["deferCollectionWork"]>[0],
+    ) {
+      return json(await service.deferCollectionWork(input, tokenId));
+    },
     async getOverview(input: Parameters<Backing["getOverview"]>[0]) {
       return json(await service.getOverview(input));
     },

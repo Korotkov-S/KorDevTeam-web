@@ -121,7 +121,7 @@ function isoDate(value: string): number {
 function readFilters(input: GeoReadFilters): GeoReadFilters {
   const from = isoDate(input.from);
   const to = isoDate(input.to);
-  const days = ((to - from) / 86_400_000) + 1;
+  const days = (to - from) / 86_400_000 + 1;
   if (days < 1 || days > 366) throw new Error("geo_date_range_invalid");
   if (input.platform && !platforms.has(input.platform)) throw new Error("geo_run_platform_invalid");
   if (input.mode && !modes.has(input.mode)) throw new Error("geo_run_mode_invalid");
@@ -244,6 +244,12 @@ function validateObservation(input: GeoObservationInput) {
   }
 
   return {
+    ...(input.attemptId
+      ? { attemptId: uuid(input.attemptId, "geo_attempt_invalid") }
+      : {}),
+    ...(input.leaseId
+      ? { leaseId: uuid(input.leaseId, "geo_lease_invalid") }
+      : {}),
     promptId: uuid(input.promptId, "geo_prompt_invalid"),
     repetition: boundedInteger(input.repetition, 1, 3, "geo_observation_repetition_invalid") as 1 | 2 | 3,
     ...(optionalInstant(input.observedAt) ? { observedAt: optionalInstant(input.observedAt) } : {}),
@@ -265,18 +271,85 @@ function validateObservation(input: GeoObservationInput) {
   };
 }
 
-export function createGeoMonitoringService(repository: GeoRepository, clock = () => new Date()) {
+export function createGeoMonitoringService(
+  repository: GeoRepository,
+  clock = () => new Date(),
+) {
   return {
+    listCollectionQueue(
+      input: Parameters<GeoRepository["collectionQueue"]["listQueue"]>[0] = {},
+    ) {
+      if (input.platform && !platforms.has(input.platform)) throw new Error("geo_run_platform_invalid");
+      return repository.collectionQueue.listQueue(input);
+    },
+    claimCollectionWork(input: { limit: number }, tokenId: string) {
+      return repository.collectionQueue.claimWork({
+        limit: boundedInteger(input.limit, 1, 6, "geo_claim_limit_invalid"),
+        tokenId: uuid(tokenId, "geo_token_invalid"),
+        now: clock(),
+      });
+    },
+    reserveCollectionAttempt(
+      input: {
+        runId: string;
+        promptId: string;
+        repetition: number;
+        leaseId: string;
+      },
+      tokenId: string,
+    ) {
+      return repository.collectionQueue.reserveAttempt({
+        ...input,
+        tokenId: uuid(tokenId, "geo_token_invalid"),
+        now: clock(),
+      });
+    },
+    resumeCollectionRun(
+      input: { runId: string; sessionPersonalized: boolean },
+      tokenId: string,
+    ) {
+      return repository.collectionQueue.resumeRun({
+        ...input,
+        tokenId: uuid(tokenId, "geo_token_invalid"),
+        now: clock(),
+      });
+    },
+    renewCollectionLease(input: { leaseId: string }, tokenId: string) {
+      return repository.collectionQueue.renewLease(
+        input.leaseId,
+        uuid(tokenId, "geo_token_invalid"),
+        clock(),
+      );
+    },
+    deferCollectionWork(
+      input: { leaseId: string; errorCode: string },
+      tokenId: string,
+    ) {
+      return repository.collectionQueue.releaseWork({
+        ...input,
+        tokenId: uuid(tokenId, "geo_token_invalid"),
+        now: clock(),
+      });
+    },
     async getOverview(input: GeoReadFilters) {
       return repository.getOverview(readFilters(input));
     },
 
-    async listTopics(input: { status?: typeof GEO_PROMPT_STATUSES[number]; limit?: number; cursor?: string | null }) {
+    async listTopics(input: {
+      status?: (typeof GEO_PROMPT_STATUSES)[number];
+      limit?: number;
+      cursor?: string | null
+    }) {
       if (input.status && !promptStatuses.has(input.status)) throw new Error("geo_prompt_status_invalid");
       return repository.listTopics({ ...(input.status ? { status: input.status } : {}), ...page(input) });
     },
 
-    async listEntities(input: { status?: typeof GEO_ENTITY_STATUSES[number]; type?: "owned" | "competitor"; limit?: number; cursor?: string | null }) {
+    async listEntities(input: {
+      status?: (typeof GEO_ENTITY_STATUSES)[number];
+      type?: "owned" | "competitor";
+      limit?: number;
+      cursor?: string | null
+    }) {
       if (input.status && !entityStatuses.has(input.status)) throw new Error("geo_entity_status_invalid");
       if (input.type && input.type !== "owned" && input.type !== "competitor") throw new Error("geo_entity_type_invalid");
       return repository.listEntities({
@@ -287,8 +360,13 @@ export function createGeoMonitoringService(repository: GeoRepository, clock = ()
     },
 
     async listPrompts(input: {
-      status?: typeof GEO_PROMPT_STATUSES[number]; category?: typeof GEO_PROMPT_CATEGORIES[number]; topicId?: string;
-      language?: string; region?: string; limit?: number; cursor?: string | null;
+      status?: (typeof GEO_PROMPT_STATUSES)[number];
+      category?: (typeof GEO_PROMPT_CATEGORIES)[number];
+      topicId?: string;
+      language?: string;
+      region?: string;
+      limit?: number;
+      cursor?: string | null
     }) {
       if (input.status && !promptStatuses.has(input.status)) throw new Error("geo_prompt_status_invalid");
       if (input.category && !categories.has(input.category)) throw new Error("geo_prompt_category_invalid");
@@ -334,7 +412,13 @@ export function createGeoMonitoringService(repository: GeoRepository, clock = ()
       });
     },
 
-    async listReferrals(input: { from: string; to: string; platform?: typeof GEO_PLATFORMS[number]; limit?: number; cursor?: string | null }) {
+    async listReferrals(input: {
+      from: string;
+      to: string;
+      platform?: (typeof GEO_PLATFORMS)[number];
+      limit?: number;
+      cursor?: string | null
+    }) {
       const validated = readFilters({ from: input.from, to: input.to, ...(input.platform ? { platform: input.platform } : {}) });
       return repository.listReferrals({ from: validated.from, to: validated.to,
         ...(validated.platform ? { platform: validated.platform } : {}), ...page(input) });

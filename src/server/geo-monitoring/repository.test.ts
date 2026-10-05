@@ -50,9 +50,14 @@ async function createFixture() {
   return { pool, adminId, tokenId, topicId, promptId, runId };
 }
 
-async function expectConstraint(promise: Promise<unknown>, code: "23505" | "23514") {
+async function expectConstraint(
+  promise: Promise<unknown>,
+  code: "23505" | "23514",
+) {
   await assert.rejects(promise, (error: unknown) => {
-    return typeof error === "object" && error !== null && "code" in error && error.code === code;
+    return (
+      typeof error === "object" && error !== null && "code" in error && error.code === code
+    );
   });
 }
 
@@ -246,36 +251,58 @@ databaseTest("GEO repository isolates run ownership, records evidence atomically
   assert.equal(finished.status, "success");
 });
 
-databaseTest("GEO runs bind an exact active prompt set and derive the complete three-repetition plan", async (t) => {
-  const fixture = await createFixture();
-  t.after(() => fixture.pool.end());
-  await fixture.pool.query("DELETE FROM geo_runs");
-  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
-  const run = await repository.startRun({
-    platform: "chatgpt_search", surface: "search", mode: "live_ui", region: "RU", language: "ru",
-    promptIds: [fixture.promptId], metadata: {},
-  }, fixture.tokenId);
-  assert.equal(run.plannedCount, 3);
-  assert.deepEqual(run.promptIds, [fixture.promptId]);
-  assert.equal(run.promptSetFingerprint,
+databaseTest(
+  "GEO runs bind an exact active prompt set and derive the complete three-repetition plan",
+  async (t) => {
+    const fixture = await createFixture();
+    t.after(() => fixture.pool.end());
+    await fixture.pool.query("DELETE FROM geo_runs");
+    const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+    const run = await repository.startRun(
+      {
+        platform: "chatgpt_search",
+        surface: "search",
+        mode: "api_probe",
+        region: "RU",
+        language: "ru",
+        promptIds: [fixture.promptId],
+        metadata: {},
+      },
+      fixture.tokenId,
+    );
+    assert.equal(run.plannedCount, 3);
+    assert.deepEqual(run.promptIds, [fixture.promptId]);
+    assert.equal(run.promptSetFingerprint,
     createHash("sha256").update(fixture.promptId, "utf8").digest("hex"));
-  await assert.rejects(repository.startRun({
-    platform: "chatgpt_search", surface: "search", mode: "live_ui", region: "RU-MOW", language: "ru",
-    promptIds: [fixture.promptId], metadata: {},
-  }, fixture.tokenId), /geo_run_prompt_set_invalid/u);
-  const otherPromptId = randomUUID();
-  await fixture.pool.query(
+    await assert.rejects(
+      repository.startRun(
+        {
+          platform: "chatgpt_search",
+          surface: "search",
+          mode: "api_probe",
+          region: "RU-MOW",
+          language: "ru",
+          promptIds: [fixture.promptId],
+          metadata: {},
+        },
+        fixture.tokenId,
+      ),
+      /geo_run_prompt_set_invalid/u,
+    );
+    const otherPromptId = randomUUID();
+    await fixture.pool.query(
     `INSERT INTO geo_prompts
       (id, prompt_text, normalized_text, topic_id, tags, category, status, priority, language, region, target_path, source)
      VALUES ($1, 'Другая CRM?', 'другая crm?', $2, ARRAY['crm'], 'commercial', 'active', 50, 'ru', 'RU', '/services/crm/', 'manual')`,
     [otherPromptId, fixture.topicId],
   );
-  await assert.rejects(repository.recordObservation(run.id, fixture.tokenId, {
+    await assert.rejects(repository.recordObservation(run.id, fixture.tokenId, {
     promptId: otherPromptId, repetition: 1, mentioned: false, linked: false, cited: false, sourceOrder: null,
     responseExcerpt: "", responseSnapshot: "", snapshotTruncated: false, responseHash: "6".repeat(64),
     modelName: null, sourceCount: 0, sessionPersonalized: false, mentions: [], citations: [], fanoutQueries: [],
   }), /geo_run_prompt_set_invalid/u);
-});
+  },
+);
 
 databaseTest("failed GEO evidence graph rolls back the observation", async (t) => {
   const fixture = await createFixture();
@@ -352,23 +379,28 @@ databaseTest("catalog sync inserts missing prompts, promotes catalog candidates,
   ]);
 });
 
-databaseTest("a repeated competitor source creates only an unconfirmed candidate after two successful runs", async (t) => {
-  const fixture = await createFixture();
-  t.after(() => fixture.pool.end());
-  await fixture.pool.query("DELETE FROM geo_runs");
-  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+databaseTest(
+  "a repeated competitor source creates only an unconfirmed candidate after two successful runs",
+  async (t) => {
+    const fixture = await createFixture();
+    t.after(() => fixture.pool.end());
+    await fixture.pool.query("DELETE FROM geo_runs");
+    const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
 
-  for (let index = 0; index < 2; index++) {
-    const run = await repository.startRun({
-      platform: "chatgpt_search",
-      surface: "search",
-      mode: "live_ui",
-      region: "RU",
-      language: "ru",
-      promptIds: [fixture.promptId],
-      metadata: {},
-    }, fixture.tokenId);
-    for (const repetition of [1, 2, 3] as const) await repository.recordObservation(run.id, fixture.tokenId, {
+    for (let index = 0; index < 2; index++) {
+      const run = await repository.startRun(
+        {
+          platform: "chatgpt_search",
+          surface: "search",
+          mode: "api_probe",
+          region: "RU",
+          language: "ru",
+          promptIds: [fixture.promptId],
+          metadata: {},
+        },
+        fixture.tokenId,
+      );
+      for (const repetition of [1, 2, 3] as const) await repository.recordObservation(run.id, fixture.tokenId, {
       promptId: fixture.promptId,
       repetition,
       mentioned: false,
@@ -394,44 +426,50 @@ databaseTest("a repeated competitor source creates only an unconfirmed candidate
       }],
       fanoutQueries: [],
     });
-    await repository.finishRun(run.id, fixture.tokenId, {
+      await repository.finishRun(run.id, fixture.tokenId, {
       status: "success", completedCount: 3, storedCount: 3, errorCode: null, metadata: {},
     });
-    const candidates = await fixture.pool.query<{ canonical_name: string; status: string }>(
+      const candidates = await fixture.pool.query<{ canonical_name: string; status: string }>(
       "SELECT canonical_name, status FROM geo_entities WHERE canonical_name = 'competitor.example'",
     );
-    assert.equal(candidates.rowCount, index, "candidate appears only after the second independent completed run");
-    if (index === 1) assert.deepEqual(candidates.rows[0], { canonical_name: "competitor.example", status: "candidate" });
-  }
-});
+      assert.equal(candidates.rowCount, index, "candidate appears only after the second independent completed run");
+      if (index === 1) assert.deepEqual(candidates.rows[0], { canonical_name: "competitor.example", status: "candidate" });
+    }
+  },
+);
 
-databaseTest("GEO read model calculates only complete three-repetition runs and never lists private snapshots", async (t) => {
-  const fixture = await createFixture();
-  t.after(() => fixture.pool.end());
-  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
-  for (const repetition of [1, 2, 3]) {
-    await fixture.pool.query(
+databaseTest(
+  "GEO read model calculates only complete three-repetition runs and never lists private snapshots",
+  async (t) => {
+    const fixture = await createFixture();
+    t.after(() => fixture.pool.end());
+    const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+    for (const repetition of [1, 2, 3]) {
+      await fixture.pool.query(
       `INSERT INTO geo_observations
         (run_id, prompt_id, repetition, mentioned, linked, cited, source_order, response_excerpt,
          response_snapshot, response_hash, source_count, session_personalized)
        VALUES ($1, $2, $3, true, true, true, 1, 'Кратко', $4, $5, 1, false)`,
       [fixture.runId, fixture.promptId, repetition, `PRIVATE-${repetition}`, String(repetition).repeat(64)],
     );
-    const observation = await fixture.pool.query<{ id: string }>(
+      const observation = await fixture.pool.query<{ id: string }>(
       "SELECT id FROM geo_observations WHERE run_id = $1 AND prompt_id = $2 AND repetition = $3",
       [fixture.runId, fixture.promptId, repetition],
     );
-    await fixture.pool.query(
-      `INSERT INTO geo_citations (observation_id, url, hostname, source_order, is_owned, category, local_path)
+      await fixture.pool.query(
+        `INSERT INTO geo_citations (observation_id, url, hostname, source_order, is_owned, category, local_path)
        VALUES ($1, $2, 'kordev.team', 1, true, 'owned', '/services/crm/')`,
-      [observation.rows[0].id, `https://kordev.team/services/crm/?r=${repetition}`],
-    );
-  }
-  await fixture.pool.query(
+        [
+          observation.rows[0].id,
+          `https://kordev.team/services/crm/?r=${repetition}`,
+        ],
+      );
+    }
+    await fixture.pool.query(
     "UPDATE geo_runs SET status = 'success', started_at = date_trunc('day', now()) + interval '8 hours', completed_at = date_trunc('day', now()) + interval '9 hours', completed_count = 3, stored_count = 3 WHERE id = $1",
     [fixture.runId],
   );
-  await fixture.pool.query(
+    await fixture.pool.query(
     `INSERT INTO geo_runs
       (platform, surface, mode, region, language, status, started_at, completed_at, prompt_ids,
        planned_count, completed_count, stored_count, initiated_by_mcp_token_id, prompt_set_fingerprint, error_code)
@@ -439,7 +477,7 @@ databaseTest("GEO read model calculates only complete three-repetition runs and 
        date_trunc('day', now()) + interval '20 hours 1 minute', ARRAY[$1]::uuid[], 3, 0, 0, $2, $3, 'geo_probe_failed')`,
     [fixture.promptId, fixture.tokenId, "f".repeat(64)],
   );
-  await fixture.pool.query(
+    await fixture.pool.query(
     `INSERT INTO geo_runs
       (platform, surface, mode, region, language, status, started_at, completed_at, prompt_ids,
        planned_count, completed_count, stored_count, initiated_by_mcp_token_id, prompt_set_fingerprint, error_code)
@@ -447,7 +485,7 @@ databaseTest("GEO read model calculates only complete three-repetition runs and 
        date_trunc('day', now()) + interval '21 hours 1 minute', ARRAY[$1]::uuid[], 3, 0, 0, $2, $3, 'geo_ui_failed')`,
     [fixture.promptId, fixture.tokenId, "a".repeat(64)],
   );
-  await fixture.pool.query(
+    await fixture.pool.query(
     `INSERT INTO geo_crawler_checks (check_date, target, bot, status, checked_at, metadata)
      VALUES (CURRENT_DATE, '/services/crm/', 'indexability', 'pass', date_trunc('day', now()) + interval '12 hours', '{}'),
        (CURRENT_DATE, '/unrelated/', 'indexability', 'fail', date_trunc('day', now()) + interval '22 hours', '{}');
@@ -455,34 +493,37 @@ databaseTest("GEO read model calculates only complete three-repetition runs and 
        (observation_date, platform, users, new_users, visits, pageviews, landing_path, imported_at)
      VALUES (CURRENT_DATE, 'chatgpt_search', 2, 1, 2, 3, '/services/crm/', date_trunc('day', now()) + interval '13 hours')`,
   );
-  const date = new Date().toISOString().slice(0, 10);
-  const overview = await repository.getOverview({ from: date, to: date, platform: "chatgpt_search", mode: "live_ui",
+    const date = new Date().toISOString().slice(0, 10);
+    const overview = await repository.getOverview({ from: date, to: date, platform: "chatgpt_search", mode: "live_ui",
     language: "ru", region: "RU", topicId: fixture.topicId });
-  assert.deepEqual(overview.sample, { runs: 1, prompts: 1, observations: 3, requiredRepetitions: 3 });
-  assert.deepEqual(overview.citationRate, { numerator: 3, denominator: 3, value: 1 });
-  assert.equal(overview.freshness.platforms.length, 1);
-  assert.equal(overview.freshness.platforms[0]?.platform, "chatgpt_search");
-  assert.equal(overview.freshness.platforms[0]?.run?.status, "failed");
-  assert.equal(overview.freshness.platforms[0]?.run?.startedAt.getUTCHours(), 21);
-  assert.equal(overview.freshness.crawler.checks, 1);
-  assert.equal(overview.freshness.crawler.failed, 0);
-  assert.equal(new Date(overview.freshness.crawler.lastCheckedAt!).getUTCHours(), 12);
-  assert.equal(new Date(overview.freshness.referrals.lastImportedAt!).getUTCHours(), 13);
-  const otherPlatform = await repository.getOverview({ from: date, to: date, platform: "yandex_alice", mode: "live_ui",
+    assert.deepEqual(overview.sample, { runs: 1, prompts: 1, observations: 3, requiredRepetitions: 3 });
+    assert.deepEqual(overview.citationRate, { numerator: 3, denominator: 3, value: 1 });
+    assert.equal(overview.freshness.platforms.length, 1);
+    assert.equal(overview.freshness.platforms[0]?.platform, "chatgpt_search");
+    assert.equal(overview.freshness.platforms[0]?.run?.status, "failed");
+    assert.equal(overview.freshness.platforms[0]?.run?.startedAt.getUTCHours(), 21);
+    assert.equal(overview.freshness.crawler.checks, 1);
+    assert.equal(overview.freshness.crawler.failed, 0);
+    assert.equal(new Date(overview.freshness.crawler.lastCheckedAt!).getUTCHours(), 12);
+    assert.equal(new Date(overview.freshness.referrals.lastImportedAt!).getUTCHours(), 13);
+    const otherPlatform = await repository.getOverview({ from: date, to: date, platform: "yandex_alice", mode: "live_ui",
     language: "ru", region: "RU", topicId: fixture.topicId });
-  assert.equal(otherPlatform.freshness.referrals.lastImportedAt, null);
-  const listed = await repository.listObservations({ from: date, to: date, limit: 10, cursor: null });
-  assert.equal(listed.items.length, 3);
-  assert.equal(Object.hasOwn(listed.items[0], "responseSnapshot"), false);
-  assert.equal(JSON.stringify(listed).includes("PRIVATE-"), false);
-});
+    assert.equal(otherPlatform.freshness.referrals.lastImportedAt, null);
+    const listed = await repository.listObservations({ from: date, to: date, limit: 10, cursor: null });
+    assert.equal(listed.items.length, 3);
+    assert.equal(Object.hasOwn(listed.items[0], "responseSnapshot"), false);
+    assert.equal(JSON.stringify(listed).includes("PRIVATE-"), false);
+  },
+);
 
-databaseTest("GEO promotion requires evidence and permits only one active experiment per page and prompt set", async (t) => {
-  const fixture = await createFixture();
-  t.after(() => fixture.pool.end());
-  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
-  await fixture.pool.query("DELETE FROM geo_runs");
-  for (const [runIndex, startedAt] of ["2026-07-01T10:00:00Z", "2026-07-08T10:00:00Z", "2026-07-15T10:00:00Z"].entries()) {
+databaseTest(
+  "GEO promotion requires evidence and permits only one active experiment per page and prompt set",
+  async (t) => {
+    const fixture = await createFixture();
+    t.after(() => fixture.pool.end());
+    const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+    await fixture.pool.query("DELETE FROM geo_runs");
+    for (const [runIndex, startedAt] of ["2026-07-01T10:00:00Z", "2026-07-08T10:00:00Z", "2026-07-15T10:00:00Z"].entries()) {
     const runId = randomUUID();
     await fixture.pool.query(
       `INSERT INTO geo_runs
@@ -500,7 +541,7 @@ databaseTest("GEO promotion requires evidence and permits only one active experi
       [runId, fixture.promptId, repetition, String(runIndex + repetition + 1).repeat(64), startedAt],
     );
   }
-  const recommendation = await fixture.pool.query<{ id: string }>(
+    const recommendation = await fixture.pool.query<{ id: string }>(
     `INSERT INTO seo_recommendations
       (title, rationale, page_path, issue_type, evidence, confidence, fingerprint, created_by_mcp_token_id)
      VALUES ('GEO gap', 'Нет цитирования', '/services/crm/', 'geo_visibility_gap', $1::jsonb, 'high', $2, $3)
@@ -511,13 +552,13 @@ databaseTest("GEO promotion requires evidence and permits only one active experi
       promptIds: [fixture.promptId],
     }), "a".repeat(64), fixture.tokenId],
   );
-  const change = await fixture.pool.query<{ id: string }>(
+    const change = await fixture.pool.query<{ id: string }>(
     `INSERT INTO seo_changes (page_path, summary, type, applied_at, actor_admin_user_id)
      VALUES ('/services/crm/', 'Добавлен прямой ответ', 'content', '2026-08-01T10:00:00Z', $1)
      RETURNING id`,
     [fixture.adminId],
   );
-  const command = {
+    const command = {
     recommendationId: recommendation.rows[0].id,
     pagePath: "/services/crm/",
     actionType: "content_answer" as const,
@@ -534,42 +575,45 @@ databaseTest("GEO promotion requires evidence and permits only one active experi
     evaluationWindows: [7, 14, 28],
     expectedSignal: "Рост на 5 п.п.",
   };
-  const fabricated = await fixture.pool.query<{ id: string }>(
+    const fabricated = await fixture.pool.query<{ id: string }>(
     `INSERT INTO seo_recommendations
       (title, rationale, page_path, issue_type, evidence, confidence, fingerprint, created_by_mcp_token_id)
      VALUES ('Непроверенный GEO сигнал', 'Произвольный JSON', '/services/crm/', 'geo_visibility_gap',
        '{"anything":true}'::jsonb, 'high', $1, $2) RETURNING id`,
     ["e".repeat(64), fixture.tokenId],
   );
-  await assert.rejects(repository.createExperimentCandidate({ ...command, recommendationId: fabricated.rows[0].id },
+    await assert.rejects(repository.createExperimentCandidate({ ...command, recommendationId: fabricated.rows[0].id },
     { mcpTokenId: fixture.tokenId }), /geo_experiment_recommendation_invalid/u);
-  const first = await repository.createExperimentCandidate(command, { mcpTokenId: fixture.tokenId });
-  const second = await repository.createExperimentCandidate(command, { mcpTokenId: fixture.tokenId });
-  await repository.approveExperiment({ id: first.id }, { adminUserId: fixture.adminId });
-  await repository.approveExperiment({ id: second.id }, { adminUserId: fixture.adminId });
-  await repository.linkExperimentChange({ id: first.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId });
-  await assert.rejects(
-    repository.linkExperimentChange({ id: second.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId }),
-    (error: unknown) => {
-      if (typeof error !== "object" || error === null) return false;
-      if ("code" in error && error.code === "23505") return true;
-      return "cause" in error && typeof error.cause === "object" && error.cause !== null
-        && "code" in error.cause && error.cause.code === "23505";
-    },
-  );
-  await assert.rejects(repository.evaluateExperiment({ id: first.id, milestone: 14,
+    const first = await repository.createExperimentCandidate(command, { mcpTokenId: fixture.tokenId });
+    const second = await repository.createExperimentCandidate(command, { mcpTokenId: fixture.tokenId });
+    await repository.approveExperiment({ id: first.id }, { adminUserId: fixture.adminId });
+    await repository.approveExperiment({ id: second.id }, { adminUserId: fixture.adminId });
+    await repository.linkExperimentChange({ id: first.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId });
+    await assert.rejects(
+      repository.linkExperimentChange({ id: second.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId }),
+      (error: unknown) => {
+        if (typeof error !== "object" || error === null) return false;
+        if ("code" in error && error.code === "23505") return true;
+        return (
+          "cause" in error && typeof error.cause === "object" && error.cause !== null
+        && "code" in error.cause && error.cause.code === "23505"
+        );
+      },
+    );
+    await assert.rejects(repository.evaluateExperiment({ id: first.id, milestone: 14,
     evaluatedAt: new Date("2026-08-16T00:00:00Z") }, { mcpTokenId: fixture.tokenId }), /geo_experiment_milestone_order_invalid/u);
-  await repository.evaluateExperiment({ id: first.id, milestone: 7, evaluatedAt: new Date("2026-08-09T00:00:00Z") }, { mcpTokenId: fixture.tokenId });
-  await assert.rejects(repository.evaluateExperiment({ id: first.id, milestone: 7,
+    await repository.evaluateExperiment({ id: first.id, milestone: 7, evaluatedAt: new Date("2026-08-09T00:00:00Z") }, { mcpTokenId: fixture.tokenId });
+    await assert.rejects(repository.evaluateExperiment({ id: first.id, milestone: 7,
     evaluatedAt: new Date("2026-08-10T00:00:00Z") }, { mcpTokenId: fixture.tokenId }), /geo_experiment_milestone_order_invalid/u);
-  await repository.evaluateExperiment({ id: first.id, milestone: 14, evaluatedAt: new Date("2026-08-16T00:00:00Z") }, { mcpTokenId: fixture.tokenId });
-  const evaluation = await repository.evaluateExperiment({ id: first.id, milestone: 28,
+    await repository.evaluateExperiment({ id: first.id, milestone: 14, evaluatedAt: new Date("2026-08-16T00:00:00Z") }, { mcpTokenId: fixture.tokenId });
+    const evaluation = await repository.evaluateExperiment({ id: first.id, milestone: 28,
     evaluatedAt: new Date("2026-08-30T00:00:00Z") }, { mcpTokenId: fixture.tokenId });
-  assert.equal(evaluation.evaluation.verdict, "inconclusive");
-  assert.equal(evaluation.experiment.status, "completed");
-  await assert.rejects(repository.evaluateExperiment({ id: first.id, milestone: 14,
+    assert.equal(evaluation.evaluation.verdict, "inconclusive");
+    assert.equal(evaluation.experiment.status, "completed");
+    await assert.rejects(repository.evaluateExperiment({ id: first.id, milestone: 14,
     evaluatedAt: new Date("2026-09-01T00:00:00Z") }, { mcpTokenId: fixture.tokenId }), /geo_experiment_state_invalid/u);
-});
+  },
+);
 
 databaseTest("official AI referrals and complete crawler checks form measurable experiment baselines", async (t) => {
   const fixture = await createFixture();

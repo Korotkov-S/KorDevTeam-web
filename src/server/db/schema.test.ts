@@ -210,7 +210,10 @@ function attachmentFixture(leadId: string) {
 
 async function assertConstraintViolation(operation: () => Promise<unknown>) {
   await assert.rejects(operation, (error: unknown) => {
-    const cause = error instanceof Error ? error.cause as { code?: string } | undefined : undefined;
+    const cause =
+      error instanceof Error
+        ? (error.cause as { code?: string } | undefined)
+        : undefined;
     return cause?.code === "23505" || cause?.code === "23514";
   });
 }
@@ -363,7 +366,15 @@ async function dropGeoSchema(db: ReturnType<typeof createDb>) {
 }
 
 async function dropAdvertisingSchema(db: ReturnType<typeof createDb>) {
-  await db.execute(sql`DROP TABLE IF EXISTS seo_rank_submissions, seo_rank_jobs`);
+  await db.execute(
+    sql`DROP TABLE IF EXISTS seo_rank_submissions, seo_rank_jobs`,
+  );
+  await db.execute(
+    sql`DROP TABLE IF EXISTS geo_collection_attempts,geo_collection_jobs,geo_collection_leases,geo_coverage_cycles`,
+  );
+  await db.execute(
+    sql`ALTER TABLE geo_runs DROP COLUMN IF EXISTS collection_managed, DROP COLUMN IF EXISTS session_personalized, DROP COLUMN IF EXISTS previous_run_id`,
+  );
   await db.execute(sql`DROP TABLE IF EXISTS
     ad_vk_experiment_links,
     ad_vk_daily_metrics,

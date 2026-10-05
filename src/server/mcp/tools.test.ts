@@ -10,6 +10,44 @@ import { createKordevMcpServer, type McpAuditRecord, type McpServices } from "./
 const ENTRY_ID = "00000000-0000-4000-8000-000000000010";
 const ACTOR_ID = "00000000-0000-4000-8000-000000000020";
 
+test("GEO continuation reserves through a strict principal-bound write tool", async (t) => {
+  let captured;
+  const write = await connected(
+    ["seo:read", "seo:write"],
+    services({
+      geo: {
+        async reserveCollectionAttempt(input) {
+          captured = input;
+          return { attemptId: ENTRY_ID };
+        },
+      },
+    }),
+  );
+  t.after(() => write.client.close());
+  const input = {
+    runId: ENTRY_ID,
+    promptId: ACTOR_ID,
+    repetition: 3,
+    leaseId: ENTRY_ID,
+  };
+  const result = await write.client.callTool({
+    name: "reserve_geo_attempt",
+    arguments: input,
+  });
+  assert.notEqual(result.isError, true);
+  assert.deepEqual(captured, input);
+  const bad = await write.client.callTool({
+    name: "reserve_geo_attempt",
+    arguments: { ...input, tokenId: ACTOR_ID },
+  });
+  assert.equal(bad.isError, true);
+  const reader = await connected(["seo:read"], services());
+  t.after(() => reader.client.close());
+  const names = (await reader.client.listTools()).tools.map((t) => t.name);
+  assert.ok(names.includes("list_geo_collection_queue"));
+  assert.equal(names.includes("reserve_geo_attempt"), false);
+});
+
 function principal(scopes: McpScope[]): McpPrincipal {
   return { tokenId: "token-id", adminUserId: ACTOR_ID, login: "owner", scopes, expiresAt: null };
 }
@@ -31,7 +69,9 @@ function snapshot(bodyMd = "Текст") {
   };
 }
 
-function services(overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]>; seo?: Partial<McpServices["seo"]>; geo?: Partial<McpServices["geo"]>; ads?: Partial<McpServices["ads"]>; vkAds?: Partial<McpServices["vkAds"]> } = {}): McpServices {
+function services(
+  overrides: { content?: Partial<McpServices["content"]>; media?: Partial<McpServices["media"]>; seo?: Partial<McpServices["seo"]>; geo?: Partial<McpServices["geo"]>; ads?: Partial<McpServices["ads"]>; vkAds?: Partial<McpServices["vkAds"]> } = {},
+): McpServices {
   const content = {
     async list() { return { items: [{ id: ENTRY_ID, kind: "article", slug: "mcp-article", status: "draft", title: "MCP статья", version: 1, updatedAt: new Date("2026-09-25T10:00:00.000Z"), publishedAt: null }] }; },
     async get() { return { entry: { id: ENTRY_ID, ...snapshot(), status: "draft", version: 1 }, relations: [], mediaRefs: [] }; },
@@ -42,8 +82,30 @@ function services(overrides: { content?: Partial<McpServices["content"]>; media?
     ...overrides.content,
   };
   const media = {
-    async list() { return { items: [{ id: "media-id", publicUrl: "https://cdn.kordev.team/image.png", createdAt: "2026-09-25T10:00:00.000Z" }] }; },
-    async uploadImage() { return { id: "media-id", publicUrl: "https://cdn.kordev.team/image.png", width: 10, height: 10, mimeType: "image/png", altText: "Команда", decorative: false, version: 1, createdAt: "2026-09-25T10:00:00.000Z" }; },
+    async list() {
+      return {
+        items: [
+          {
+            id: "media-id",
+            publicUrl: "https://cdn.kordev.team/image.png",
+            createdAt: "2026-09-25T10:00:00.000Z",
+          },
+        ],
+      };
+    },
+    async uploadImage() {
+      return {
+        id: "media-id",
+        publicUrl: "https://cdn.kordev.team/image.png",
+        width: 10,
+        height: 10,
+        mimeType: "image/png",
+        altText: "Команда",
+        decorative: false,
+        version: 1,
+        createdAt: "2026-09-25T10:00:00.000Z",
+      };
+    },
     ...overrides.media,
   };
   const seo = {
@@ -126,12 +188,15 @@ async function connected(scopes: McpScope[], provided = services(), logger?: (re
   return { client, server };
 }
 
-test("read-only token sees no write, publish, upload, or delete tools", async t => {
+test("read-only token sees no write, publish, upload, or delete tools", async (t) => {
   const { client, server } = await connected(["content:read", "media:read"]);
   t.after(async () => { await client.close(); await server.close(); });
   const tools = (await client.listTools()).tools;
-  assert.deepEqual(tools.map(tool => tool.name).sort(), ["get_content", "list_content", "list_media"]);
-  assert.equal(tools.some(tool => tool.name.includes("delete")), false);
+  assert.deepEqual(tools.map((tool) => tool.name).sort(), ["get_content", "list_content", "list_media"]);
+  assert.equal(
+    tools.some((tool) => tool.name.includes("delete")),
+    false,
+  );
   for (const tool of tools) {
     assert.equal(tool.annotations?.readOnlyHint, true);
     assert.equal(tool.annotations?.destructiveHint, false);
@@ -139,16 +204,72 @@ test("read-only token sees no write, publish, upload, or delete tools", async t 
   }
 });
 
-test("scope combinations register only their exact tool surface", async t => {
+test("scope combinations register only their exact tool surface", async (t) => {
   const cases: Array<[McpScope[], string[]]> = [
     [["content:write"], ["create_content_draft"]],
     [["content:read", "content:write"], ["create_content_draft", "get_content", "list_content", "update_content_draft"]],
     [["content:publish"], ["publish_content", "unpublish_content"]],
     [["media:write"], ["upload_image"]],
     [["media:read", "media:write"], ["list_media", "upload_image"]],
-    [["seo:read"], ["get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_crawler_checks", "list_geo_entities", "list_geo_experiments", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core"]],
+    [
+      ["seo:read"],
+      [
+        "list_geo_collection_queue",
+        "get_geo_overview",
+        "get_seo_overview",
+        "list_geo_citations",
+        "list_geo_crawler_checks",
+        "list_geo_entities",
+        "list_geo_experiments",
+        "list_geo_fanout_queries",
+        "list_geo_observations",
+        "list_geo_prompts",
+        "list_geo_referrals",
+        "list_geo_topics",
+        "list_seo_changes",
+        "list_seo_queries",
+        "list_seo_recommendations",
+        "list_seo_semantic_core",
+      ],
+    ],
     [["seo:write"], []],
-    [["seo:read", "seo:write"], ["create_geo_experiment_candidate", "create_geo_prompt_candidate", "create_seo_candidate", "create_seo_recommendation", "finish_geo_run", "get_geo_overview", "get_seo_overview", "list_geo_citations", "list_geo_crawler_checks", "list_geo_entities", "list_geo_experiments", "list_geo_fanout_queries", "list_geo_observations", "list_geo_prompts", "list_geo_referrals", "list_geo_topics", "list_seo_changes", "list_seo_queries", "list_seo_recommendations", "list_seo_semantic_core", "record_geo_experiment_evaluation", "record_geo_observation", "record_seo_change", "start_geo_run", "update_seo_query", "update_seo_recommendation_status"]],
+    [
+      ["seo:read", "seo:write"],
+      [
+        "list_geo_collection_queue",
+        "claim_geo_collection_work",
+        "reserve_geo_attempt",
+        "resume_geo_run",
+        "renew_geo_collection_lease",
+        "defer_geo_collection_work",
+        "create_geo_experiment_candidate",
+        "create_geo_prompt_candidate",
+        "create_seo_candidate",
+        "create_seo_recommendation",
+        "finish_geo_run",
+        "get_geo_overview",
+        "get_seo_overview",
+        "list_geo_citations",
+        "list_geo_crawler_checks",
+        "list_geo_entities",
+        "list_geo_experiments",
+        "list_geo_fanout_queries",
+        "list_geo_observations",
+        "list_geo_prompts",
+        "list_geo_referrals",
+        "list_geo_topics",
+        "list_seo_changes",
+        "list_seo_queries",
+        "list_seo_recommendations",
+        "list_seo_semantic_core",
+        "record_geo_experiment_evaluation",
+        "record_geo_observation",
+        "record_seo_change",
+        "start_geo_run",
+        "update_seo_query",
+        "update_seo_recommendation_status",
+      ],
+    ],
     [["content:read", "content:write", "content:publish", "media:read", "media:write"], [
       "create_content_draft", "get_content", "list_content", "list_media", "publish_content",
       "unpublish_content", "update_content_draft", "upload_image",
@@ -174,21 +295,30 @@ test("scope combinations register only their exact tool surface", async t => {
   for (const [scopes, expected] of cases) {
     const connection = await connected(scopes);
     t.after(async () => { await connection.client.close(); await connection.server.close(); });
-    assert.deepEqual((await connection.client.listTools()).tools.map(tool => tool.name).sort(), expected);
+    assert.deepEqual(
+      (await connection.client.listTools()).tools.map((tool) => tool.name)
+        .sort(),
+      expected.sort(),
+    );
   }
 });
 
-test("SEO-only scopes never expose content mutation and crafted hidden calls do not reach services", async t => {
+test("SEO-only scopes never expose content mutation and crafted hidden calls do not reach services", async (t) => {
   let writes = 0;
   const connection = await connected(["seo:read"], services({ seo: { async createRecommendation() { writes++; return {}; } } }));
   t.after(async () => { await connection.client.close(); await connection.server.close(); });
-  const names = (await connection.client.listTools()).tools.map(tool => tool.name);
-  assert.equal(names.some(name => name.includes("content") || name.includes("publish")), false);
+  const names = (await connection.client.listTools()).tools.map(
+    (tool) => tool.name,
+  );
+  assert.equal(
+    names.some((name) => name.includes("content") || name.includes("publish")),
+    false,
+  );
   await assert.rejects(connection.client.callTool({ name: "create_seo_recommendation", arguments: {} }), /not found|Method not found/u);
   assert.equal(writes, 0);
 });
 
-test("SEO list schemas enforce hard limits, ISO date bounds, and cursors", async t => {
+test("SEO list schemas enforce hard limits, ISO date bounds, and cursors", async (t) => {
   const connection = await connected(["seo:read"]);
   t.after(async () => { await connection.client.close(); await connection.server.close(); });
   for (const args of [
@@ -201,20 +331,30 @@ test("SEO list schemas enforce hard limits, ISO date bounds, and cursors", async
   }
 });
 
-test("semantic core tools validate strict schemas, require both SEO scopes, and audit token-bound writes", async t => {
+test("semantic core tools validate strict schemas, require both SEO scopes, and audit token-bound writes", async (t) => {
   const records: McpAuditRecord[] = [];
   let updates = 0;
   const readOnly = await connected(["seo:read"]);
   t.after(async () => { await readOnly.client.close(); await readOnly.server.close(); });
-  assert.equal((await readOnly.client.listTools()).tools.some(tool => tool.name === "create_seo_candidate" || tool.name === "update_seo_query"), false);
+  assert.equal(
+    (await readOnly.client.listTools()).tools.some(
+      (tool) =>
+        tool.name === "create_seo_candidate" || tool.name === "update_seo_query",
+    ),
+    false,
+  );
   const page = await readOnly.client.callTool({ name: "list_seo_semantic_core", arguments: { status: "active", limit: 10 } });
   assert.equal(page.isError, undefined);
   const invalidList = await readOnly.client.callTool({ name: "list_seo_semantic_core", arguments: { status: "active", unexpected: true } });
   assert.equal(invalidList.isError, true);
 
-  const write = await connected(["seo:read", "seo:write"], services({ seo: {
+  const write = await connected(
+    ["seo:read", "seo:write"],
+    services({ seo: {
     async updateSemanticQuery() { updates++; throw new Error("seo_query_conflict"); },
-  } }), record => records.push(record));
+  } }),
+    (record) => records.push(record),
+  );
   t.after(async () => { await write.client.close(); await write.server.close(); });
   const invalidCreate = await write.client.callTool({ name: "create_seo_candidate", arguments: { queryText: "ключ", status: "active" } });
   assert.equal(invalidCreate.isError, true);
@@ -230,40 +370,52 @@ test("semantic core tools validate strict schemas, require both SEO scopes, and 
   assert.equal(records[0]?.errorCode, "seo_query_conflict");
 });
 
-test("GEO tools are scope-bound, read-only annotated, bounded, and return safe GEO codes", async t => {
+test("GEO tools are scope-bound, read-only annotated, bounded, and return safe GEO codes", async (t) => {
   const readOnly = await connected(["seo:read"]);
   t.after(async () => { await readOnly.client.close(); await readOnly.server.close(); });
-  const readTools = (await readOnly.client.listTools()).tools.filter(tool => tool.name.includes("geo_"));
-  assert.equal(readTools.length, 10);
-  assert.ok(readTools.every(tool => tool.annotations?.readOnlyHint === true));
-  assert.equal(readTools.some(tool => tool.name === "start_geo_run"), false);
+  const readTools = (await readOnly.client.listTools()).tools.filter((tool) =>
+    tool.name.includes("geo_"),
+  );
+  assert.equal(readTools.length, 11);
+  assert.ok(readTools.every((tool) => tool.annotations?.readOnlyHint === true));
+  assert.equal(
+    readTools.some((tool) => tool.name === "start_geo_run"),
+    false,
+  );
 
   let records = 0;
   const write = await connected(["seo:read", "seo:write"], services({ geo: {
     async recordObservation() { records++; throw new Error("geo_run_forbidden"); },
   } }));
   t.after(async () => { await write.client.close(); await write.server.close(); });
-  const writeTools = (await write.client.listTools()).tools.filter(tool => tool.name.includes("geo_"));
-  assert.equal(writeTools.length, 16);
-  const oversized = await write.client.callTool({ name: "record_geo_observation", arguments: {
-    runId: ENTRY_ID,
-    promptId: ENTRY_ID,
-    repetition: 1,
-    mentioned: false,
-    linked: false,
-    cited: false,
-    responseExcerpt: "",
-    responseSnapshot: "Ответ",
-    snapshotTruncated: false,
-    responseHash: "a".repeat(64),
-    sourceCount: 0,
-    sessionPersonalized: false,
-    mentions: [],
-    citations: Array.from({ length: 101 }, (_, index) => ({
-      url: `https://example.com/${index}`, sourceOrder: index + 1, category: "other",
-    })),
-    fanoutQueries: [],
-  } });
+  const writeTools = (await write.client.listTools()).tools.filter((tool) =>
+    tool.name.includes("geo_"),
+  );
+  assert.equal(writeTools.length, 22);
+  const oversized = await write.client.callTool({
+    name: "record_geo_observation",
+    arguments: {
+      runId: ENTRY_ID,
+      promptId: ENTRY_ID,
+      repetition: 1,
+      mentioned: false,
+      linked: false,
+      cited: false,
+      responseExcerpt: "",
+      responseSnapshot: "Ответ",
+      snapshotTruncated: false,
+      responseHash: "a".repeat(64),
+      sourceCount: 0,
+      sessionPersonalized: false,
+      mentions: [],
+      citations: Array.from({ length: 101 }, (_, index) => ({
+        url: `https://example.com/${index}`,
+        sourceOrder: index + 1,
+        category: "other",
+      })),
+      fanoutQueries: [],
+    },
+  });
   assert.equal(oversized.isError, true);
   assert.equal(records, 0);
 
@@ -289,7 +441,7 @@ test("GEO tools are scope-bound, read-only annotated, bounded, and return safe G
   assert.equal((forbidden.structuredContent as { code: string }).code, "geo_run_forbidden");
 });
 
-test("advertising tools require exact scopes and never expose unrelated capabilities", async t => {
+test("advertising tools require exact scopes and never expose unrelated capabilities", async (t) => {
   let writes = 0;
   const read = await connected(["ads:read"], services({ ads: {
     async createHypothesis() { writes++; return { id: ENTRY_ID }; },
@@ -297,13 +449,26 @@ test("advertising tools require exact scopes and never expose unrelated capabili
   t.after(async () => { await read.client.close(); await read.server.close(); });
   const readTools = (await read.client.listTools()).tools;
   assert.equal(readTools.length, 17);
-  assert.ok(readTools.every(tool => tool.annotations?.readOnlyHint === true));
-  assert.ok(readTools.every(tool => /^(?:get|list)_(?:ad|ads|vk_)/u.test(tool.name)));
-  assert.equal(readTools.some(tool => /(?:backfill|daily|refresh|start|stop|budget|bid)/u.test(tool.name)), false);
-  assert.deepEqual(readTools.map(tool => tool.name).filter(name => name.includes("_vk_") || name.startsWith("list_vk_")).sort(), [
+  assert.ok(readTools.every((tool) => tool.annotations?.readOnlyHint === true));
+  assert.ok(
+    readTools.every((tool) => /^(?:get|list)_(?:ad|ads|vk_)/u.test(tool.name)),
+  );
+  assert.equal(
+    readTools.some((tool) =>
+      /(?:backfill|daily|refresh|start|stop|budget|bid)/u.test(tool.name),
+    ),
+    false,
+  );
+  assert.deepEqual(
+    readTools
+      .map((tool) => tool.name)
+      .filter((name) => name.includes("_vk_") || name.startsWith("list_vk_"))
+      .sort(),
+    [
     "get_vk_ad", "get_vk_ads_statistics", "get_vk_ads_sync_status", "get_vk_creative_image",
     "list_vk_ad_groups", "list_vk_ads", "list_vk_campaigns",
-  ]);
+  ],
+  );
   await assert.rejects(read.client.callTool({ name: "create_ad_hypothesis", arguments: {} }), /not found|Method not found/u);
   assert.equal(writes, 0);
 
@@ -312,16 +477,20 @@ test("advertising tools require exact scopes and never expose unrelated capabili
   assert.equal((await writeOnly.client.listTools()).tools.length, 0);
 });
 
-test("VK mirror tools validate inputs and creative image audit omits bytes", async t => {
+test("VK mirror tools validate inputs and creative image audit omits bytes", async (t) => {
   const records: McpAuditRecord[] = [];
   let reads = 0;
   const imageBytes = Buffer.from("private-image-bytes");
   const sha256 = createHash("sha256").update(imageBytes).digest("hex");
-  const connection = await connected(["ads:read"], services({ vkAds: {
+  const connection = await connected(
+    ["ads:read"],
+    services({ vkAds: {
     async listCampaigns() { reads += 1; return { items: [], nextCursor: null }; },
     async getStatistics() { reads += 1; return []; },
     async getCreativeImage() { return { bytes: imageBytes, mimeType: "image/png", sha256 }; },
-  } }), record => records.push(record));
+  } }),
+    (record) => records.push(record),
+  );
   t.after(async () => { await connection.client.close(); await connection.server.close(); });
 
   for (const args of [{ limit: 101 }, { cursor: "bad" }, { unexpected: true }]) {
@@ -357,7 +526,7 @@ test("VK mirror tools validate inputs and creative image audit omits bytes", asy
   assert.doesNotMatch(JSON.stringify(failed), /objectKey|private-image-bytes|https?:/iu);
 });
 
-test("every advertising write requires a UUID idempotency key and strict input", async t => {
+test("every advertising write requires a UUID idempotency key and strict input", async (t) => {
   let writes = 0;
   const connection = await connected(["ads:read", "ads:write"], services({ ads: {
     async createResearchSource() { writes++; return { id: ENTRY_ID }; },
@@ -376,7 +545,8 @@ test("every advertising write requires a UUID idempotency key and strict input",
   } }));
   t.after(async () => { await connection.client.close(); await connection.server.close(); });
   const writeNames = (await connection.client.listTools()).tools
-    .filter(tool => tool.annotations?.readOnlyHint === false).map(tool => tool.name);
+    .filter((tool) => tool.annotations?.readOnlyHint === false)
+    .map((tool) => tool.name);
   assert.equal(writeNames.length, 13);
   for (const name of writeNames) {
     assert.equal((await connection.client.callTool({ name, arguments: {} })).isError, true, `${name}: missing key`);
@@ -385,12 +555,16 @@ test("every advertising write requires a UUID idempotency key and strict input",
   assert.equal(writes, 0);
 });
 
-test("advertising schemas bound pages, reject private evidence and audit safe errors", async t => {
+test("advertising schemas bound pages, reject private evidence and audit safe errors", async (t) => {
   const records: McpAuditRecord[] = [];
   let writes = 0;
-  const connection = await connected(["ads:read", "ads:write"], services({ ads: {
+  const connection = await connected(
+    ["ads:read", "ads:write"],
+    services({ ads: {
     async createHypothesis() { writes++; throw new Error("ads_hypothesis_conflict"); },
-  } }), record => records.push(record));
+  } }),
+    (record) => records.push(record),
+  );
   t.after(async () => { await connection.client.close(); await connection.server.close(); });
   for (const args of [{ limit: 0 }, { limit: 101 }, { cursor: "x".repeat(1100) }, { unexpected: true }]) {
     assert.equal((await connection.client.callTool({ name: "list_ad_hypotheses", arguments: args })).isError, true);
@@ -423,7 +597,7 @@ test("advertising schemas bound pages, reject private evidence and audit safe er
   assert.doesNotMatch(JSON.stringify(records), /private|Диагностика/u);
 });
 
-test("tool schemas reject unknown fields and successful calls return structured content", async t => {
+test("tool schemas reject unknown fields and successful calls return structured content", async (t) => {
   const { client, server } = await connected(["content:read"]);
   t.after(async () => { await client.close(); await server.close(); });
   const invalid = await client.callTool({ name: "list_content", arguments: { unexpected: true } });
@@ -437,11 +611,15 @@ test("tool schemas reject unknown fields and successful calls return structured 
   assert.equal(result.content[0]?.type, "text");
 });
 
-test("optimistic errors are safe and audit records omit content bodies", async t => {
+test("optimistic errors are safe and audit records omit content bodies", async (t) => {
   const records: McpAuditRecord[] = [];
-  const { client, server } = await connected(["content:read", "content:write"], services({
+  const { client, server } = await connected(
+    ["content:read", "content:write"],
+    services({
     content: { async updateDraft() { throw new Error("content_version_conflict"); } },
-  }), record => records.push(record));
+  }),
+    (record) => records.push(record),
+  );
   t.after(async () => { await client.close(); await server.close(); });
   const result = await client.callTool({ name: "update_content_draft", arguments: {
     id: ENTRY_ID, expectedVersion: 1, snapshot: snapshot("TOP SECRET MARKDOWN"),
@@ -456,7 +634,7 @@ test("optimistic errors are safe and audit records omit content bodies", async t
   assert.equal(records[0]?.errorCode, "content_version_conflict");
 });
 
-test("published replacement requires write scope in addition to publish scope", async t => {
+test("published replacement requires write scope in addition to publish scope", async (t) => {
   let calls = 0;
   const provided = services({ content: { async publish() { calls += 1; return { id: ENTRY_ID, version: 2 }; } } });
   const publishOnly = await connected(["content:publish"], provided);
@@ -477,9 +655,13 @@ test("published replacement requires write scope in addition to publish scope", 
   assert.equal(calls, 1);
 });
 
-test("upload audit records never contain base64 payloads", async t => {
+test("upload audit records never contain base64 payloads", async (t) => {
   const records: McpAuditRecord[] = [];
-  const { client, server } = await connected(["media:write"], services(), record => records.push(record));
+  const { client, server } = await connected(
+    ["media:write"],
+    services(),
+    (record) => records.push(record),
+  );
   t.after(async () => { await client.close(); await server.close(); });
   const base64Data = Buffer.from("secret image bytes").toString("base64");
   await client.callTool({ name: "upload_image", arguments: {

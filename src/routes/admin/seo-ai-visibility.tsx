@@ -1,4 +1,5 @@
 import React from "react";
+import { GeoCollectionProgress, type GeoCollectionQueue } from "./geo-collection-progress";
 import { Form, Link, useActionData, useLoaderData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 
@@ -41,7 +42,7 @@ type Experiment = { id: string; pagePath: string; actionType: string; hypothesis
 type Evidence = { observation: Observation & { responseSnapshot: string }; mentions: Array<{ entityId: string; canonicalName: string; type: string;
   status: string; firstMentionOrder: number; recommended: boolean; sentiment: string }>; citations: Citation[]; fanoutQueries: Fanout[] };
 
-export type GeoAdminLoaderData = { view: GeoView; filters: Filters; overview?: Overview; observations?: Page<Observation>;
+export type GeoAdminLoaderData = { collectionQueue?: GeoCollectionQueue | null; view: GeoView; filters: Filters; overview?: Overview; observations?: Page<Observation>;
   prompts?: Page<Prompt>; entities?: Page<Entity>; citations?: Page<Citation>; fanout?: Page<Fanout>; evidence?: Evidence;
   referrals?: Page<Referral>; crawlerChecks?: Page<CrawlerCheck>; experiments?: Page<Experiment>; nextCursor?: string | null };
 
@@ -146,6 +147,7 @@ export function GeoAiVisibilityPage({ data, csrfToken }: { data: GeoAdminLoaderD
   const actionData = useActionData() as { ok?: boolean; error?: string } | undefined;
   return <main className="min-w-0 space-y-6 overflow-x-hidden">
     <GeoTabs active={data.view} />
+    {(data.view === "platforms" || data.view === "prompts") ? <GeoCollectionProgress queue={data.collectionQueue} /> : null}
     {data.view !== "evidence" ? <GeoFilters filters={data.filters} view={data.view} /> : null}
     {actionData?.ok ? <p className="rounded-lg bg-emerald-100 p-3 text-emerald-950">Изменение сохранено.</p> : null}
     {actionData?.error ? <p className="rounded-lg bg-red-100 p-3 text-red-950">{actionData.error}</p> : null}

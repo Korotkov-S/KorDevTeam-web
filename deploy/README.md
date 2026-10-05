@@ -1,5 +1,13 @@
 # Production release operations
 
+## Durable SEO/GEO continuation (0017/0018)
+
+Apply additive migrations before switching web. Install `kordevteam-seo-rank-recover.service` and `.timer` only during an explicitly requested rollout; the ten-minute recovery pass uses `--resume-yandex-rank` and never creates a new paid plan. Preserve the Monday 00:30 Europe/Moscow weekly creation timer. Do not add `Restart=on-failure` to rank services: CLI 2 means due retryable work; 1 means failed/blocked, including legacy or uncertain paid submissions. Query IDs and provider operation IDs are private. Never automatically repeat the old 255/960 run; its 705 lost operation IDs cannot be reconstructed.
+
+All worker commands validate the protected recorded image. New submissions are allowed only 00:30–06:00 Moscow; known-operation GET polling is allowed until the original 48-hour deadline. One bounded pass persists progress for the next timer.
+
+After compatible MCP deployment, update the existing seo heartbeat per [GEO collection protocol](../docs/operations/geo-collection-protocol.md). The repository does not install timers, change the automation, send AI prompts or bypass UI confirmation. Validate queue scopes and displayed progress before a controlled live batch. The daily budget is shared across platforms and regions, including retries/lost responses.
+
 These files are a deployment toolkit, not an installed production environment. No DNS, VPS, S3, timer, bucket policy, or Traefik changes are applied by the repository. CI publishes an atomic web/content release; production switching remains a protected manual dispatch. There is no staging domain.
 
 ## Image and local rehearsal

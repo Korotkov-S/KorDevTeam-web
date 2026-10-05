@@ -5,12 +5,12 @@ export const GEO_PROMPT_STATUSES = ["candidate", "active", "archived"] as const;
 export const GEO_ENTITY_STATUSES = ["candidate", "active", "archived"] as const;
 export const GEO_CITATION_CATEGORIES = ["owned", "competitor", "media", "blog", "forum", "directory", "other"] as const;
 
-export type GeoPlatform = typeof GEO_PLATFORMS[number];
-export type GeoRunMode = typeof GEO_RUN_MODES[number];
-export type GeoPromptCategory = typeof GEO_PROMPT_CATEGORIES[number];
-export type GeoPromptStatus = typeof GEO_PROMPT_STATUSES[number];
-export type GeoEntityStatus = typeof GEO_ENTITY_STATUSES[number];
-export type GeoCitationCategory = typeof GEO_CITATION_CATEGORIES[number];
+export type GeoPlatform = (typeof GEO_PLATFORMS)[number];
+export type GeoRunMode = (typeof GEO_RUN_MODES)[number];
+export type GeoPromptCategory = (typeof GEO_PROMPT_CATEGORIES)[number];
+export type GeoPromptStatus = (typeof GEO_PROMPT_STATUSES)[number];
+export type GeoEntityStatus = (typeof GEO_ENTITY_STATUSES)[number];
+export type GeoCitationCategory = (typeof GEO_CITATION_CATEGORIES)[number];
 
 export type GeoCitationInput = {
   url: string;
@@ -33,6 +33,8 @@ export type GeoFanoutQueryInput = {
 };
 
 export type GeoObservationInput = {
+  attemptId?: string;
+  leaseId?: string;
   promptId: string;
   repetition: 1 | 2 | 3;
   observedAt?: string;

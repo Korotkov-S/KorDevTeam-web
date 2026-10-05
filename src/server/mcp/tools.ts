@@ -92,10 +92,23 @@ function validateSeoRange(value: { dateFrom: string; dateTo: string }, context: 
 }
 const seoOverviewInput = z.strictObject(seoFilterFields).superRefine(validateSeoRange);
 const seoQueryListInput = z.strictObject({ ...seoFilterFields, ...pageFields }).superRefine(validateSeoRange);
-const seoChangeListInput = z.strictObject({ dateFrom: isoDate, dateTo: isoDate, pagePath: z.string().max(500).regex(/^\//).optional(), ...pageFields }).superRefine(validateSeoRange);
-const seoRecommendationListInput = z.strictObject({ dateFrom: isoDate, dateTo: isoDate,
-  status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]).optional(),
-  pagePath: z.string().max(500).regex(/^\//).optional(), ...pageFields }).superRefine(validateSeoRange);
+const seoChangeListInput = z
+  .strictObject({
+    dateFrom: isoDate,
+    dateTo: isoDate,
+    pagePath: z.string().max(500).regex(/^\//).optional(),
+    ...pageFields,
+  })
+  .superRefine(validateSeoRange);
+const seoRecommendationListInput = z
+  .strictObject({
+    dateFrom: isoDate,
+    dateTo: isoDate,
+    status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]).optional(),
+    pagePath: z.string().max(500).regex(/^\//).optional(),
+    ...pageFields,
+  })
+  .superRefine(validateSeoRange);
 const seoFrequencyBand = z.enum(["high", "medium", "low", "unclassified"]);
 const seoQueryKind = z.enum(["commercial", "informational", "other"]);
 const seoQueryStatus = z.enum(["candidate", "active", "archived"]);
@@ -184,6 +197,8 @@ const geoFanoutInput = z.strictObject({
 });
 const geoObservationInput = z.strictObject({
   runId: z.uuid(),
+  attemptId: z.uuid().optional(),
+  leaseId: z.uuid().optional(),
   promptId: z.uuid(),
   repetition: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   observedAt: z.iso.datetime().optional(),
@@ -264,17 +279,27 @@ const adForbiddenKeys = /^(?:name|phone|email|file|token|secret|authorization|co
 function adSafeEvidence(value: unknown): boolean {
   const visit = (item: unknown, depth: number): boolean => {
     if (depth > 8) return false;
-    if (typeof item === "string") return item.length <= 4_000 && (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(item)
+    if (typeof item === "string")
+      return (
+        item.length <= 4_000 && (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(item)
       || (!/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/u.test(item)
-        && !/(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u.test(item)));
+        && !/(?:^|\D)\+?\d[\d\s().-]{8,}\d(?:$|\D)/u.test(item)))
+      );
     if (typeof item === "number") return Number.isFinite(item);
     if (item === null || typeof item === "boolean") return true;
-    if (Array.isArray(item)) return item.length <= 100 && item.every(value => visit(value, depth + 1));
+    if (Array.isArray(item))
+      return (
+        item.length <= 100 && item.every(value => visit(value, depth + 1))
+      );
     if (!item || typeof item !== "object") return false;
     const entries = Object.entries(item as Record<string, unknown>);
-    return entries.length <= 100 && entries.every(([key, nested]) => (
-      !adForbiddenKeys.test(key.replace(/[_-]/gu, "")) && visit(nested, depth + 1)
-    ));
+    return (
+      entries.length <= 100 &&
+      entries.every(
+        ([key, nested]) =>
+          !adForbiddenKeys.test(key.replace(/[_-]/gu, "")) && visit(nested, depth + 1),
+      )
+    );
   };
   return visit(value, 0);
 }
@@ -728,6 +753,35 @@ export function createKordevMcpServer(
       inputSchema: z.strictObject({ status: geoStatus.optional(), type: z.enum(["owned", "competitor"]).optional(), ...pageFields }),
       outputSchema: withError(genericPage), annotations: annotations(true),
     }, input => run("list_geo_entities", () => services.geo.listEntities(input)));
+    server.registerTool(
+      "list_geo_collection_queue",
+      {
+        title: "Очередь GEO и охват",
+        description:
+          "Охват всех регионов, сохранённые повторения и причины остановки без приватных ответов.",
+        inputSchema: z.strictObject({
+          platform: geoPlatform.optional(),
+          region: z.string().min(2).max(120).optional(),
+          status: z
+            .enum([
+              "queued",
+              "running",
+              "retry_wait",
+              "blocked",
+              "complete",
+              "cancelled",
+            ])
+            .optional(),
+          ...pageFields,
+        }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(true),
+      },
+      (input) =>
+        run("list_geo_collection_queue", () =>
+          services.geo.listCollectionQueue(input),
+        ),
+    );
     server.registerTool("list_geo_prompts", {
       title: "Контрольные GEO-вопросы",
       description: "Возвращает каталог контрольных AI-вопросов без приватных снимков ответов.",
@@ -765,12 +819,21 @@ export function createKordevMcpServer(
       inputSchema: geoCrawlerListInput,
       outputSchema: withError(genericPage), annotations: annotations(true),
     }, input => run("list_geo_crawler_checks", () => services.geo.listCrawlerChecks(input)));
-    server.registerTool("list_geo_experiments", {
-      title: "GEO-эксперименты",
-      description: "Возвращает гипотезы продвижения, baseline и оценки 7/14/28 дней без изменения контента.",
-      inputSchema: z.strictObject({ status: geoExperimentStatus.optional(), pagePath: z.string().max(500).regex(/^\//).optional(), ...pageFields }),
-      outputSchema: withError(genericPage), annotations: annotations(true),
-    }, input => run("list_geo_experiments", () => services.geo.listExperiments(input)));
+    server.registerTool(
+      "list_geo_experiments",
+      {
+        title: "GEO-эксперименты",
+        description: "Возвращает гипотезы продвижения, baseline и оценки 7/14/28 дней без изменения контента.",
+        inputSchema: z.strictObject({
+          status: geoExperimentStatus.optional(),
+          pagePath: z.string().max(500).regex(/^\//).optional(),
+          ...pageFields,
+        }),
+        outputSchema: withError(genericPage),
+        annotations: annotations(true),
+      },
+      input => run("list_geo_experiments", () => services.geo.listExperiments(input)),
+    );
   }
 
   if (has("seo:read", "seo:write")) {
@@ -792,28 +855,46 @@ export function createKordevMcpServer(
       targetPath: input.targetPath ?? null,
       wordstatFrequency: input.wordstatFrequency ?? null,
     })));
-    server.registerTool("create_seo_recommendation", {
-      title: "Создать SEO-рекомендацию",
-      description: "Сохраняет аналитическую рекомендацию с серверной дедупликацией; не изменяет публичный контент.",
-      inputSchema: z.strictObject({
-        title: z.string().trim().min(1).max(300), rationale: z.string().trim().min(1).max(5_000),
-        pagePath: z.string().max(500).regex(/^\//).optional(), queryId: z.uuid().optional(),
-        issueType: z.string().trim().min(1).max(120), evidence: genericRecord,
-        confidence: z.enum(["low", "medium", "high"]),
-      }),
-      outputSchema: withError(genericRecord), annotations: annotations(false),
-    }, input => run("create_seo_recommendation", () => services.seo.createRecommendation(input)));
-    server.registerTool("record_seo_change", {
-      title: "Записать SEO-изменение",
-      description: "Регистрирует уже выполненное изменение для последующей оценки влияния.",
-      inputSchema: z.strictObject({ pagePath: z.string().max(500).regex(/^\//), summary: z.string().trim().min(1).max(2_000),
-        type: z.enum(["content", "metadata", "structure", "interlinking", "technical", "other"]),
-        appliedAt: z.iso.datetime().optional(), contentEntryId: z.uuid().optional(), contentVersion: z.number().int().positive().optional() }),
-      outputSchema: withError(genericRecord), annotations: annotations(false),
-    }, input => run("record_seo_change", () => {
+    server.registerTool(
+      "create_seo_recommendation",
+      {
+        title: "Создать SEO-рекомендацию",
+        description: "Сохраняет аналитическую рекомендацию с серверной дедупликацией; не изменяет публичный контент.",
+        inputSchema: z.strictObject({
+          title: z.string().trim().min(1).max(300),
+          rationale: z.string().trim().min(1).max(5_000),
+          pagePath: z.string().max(500).regex(/^\//).optional(),
+          queryId: z.uuid().optional(),
+          issueType: z.string().trim().min(1).max(120),
+          evidence: genericRecord,
+          confidence: z.enum(["low", "medium", "high"]),
+        }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(false),
+      },
+      input => run("create_seo_recommendation", () => services.seo.createRecommendation(input)),
+    );
+    server.registerTool(
+      "record_seo_change",
+      {
+        title: "Записать SEO-изменение",
+        description: "Регистрирует уже выполненное изменение для последующей оценки влияния.",
+        inputSchema: z.strictObject({
+          pagePath: z.string().max(500).regex(/^\//),
+          summary: z.string().trim().min(1).max(2_000),
+          type: z.enum(["content", "metadata", "structure", "interlinking", "technical", "other"]),
+          appliedAt: z.iso.datetime().optional(),
+          contentEntryId: z.uuid().optional(),
+          contentVersion: z.number().int().positive().optional(),
+        }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(false),
+      },
+      input => run("record_seo_change", () => {
       const { appliedAt, ...command } = input;
       return services.seo.recordChange({ ...command, ...(appliedAt ? { appliedAt: new Date(appliedAt) } : {}) });
-    }));
+    }),
+    );
     server.registerTool("update_seo_recommendation_status", {
       title: "Изменить состояние SEO-рекомендации",
       description: "Меняет состояние рекомендации с проверкой ожидаемого текущего состояния.",
@@ -833,6 +914,100 @@ export function createKordevMcpServer(
       seoQueryId: input.seoQueryId ?? null,
       expectedEntityDomain: input.expectedEntityDomain ?? null,
     })));
+    server.registerTool(
+      "claim_geo_collection_work",
+      {
+        title: "Получить GEO-задания",
+        description:
+          "Атомарно выдаёт до шести вопросов текущему токену с lease на 15 минут.",
+        inputSchema: z.strictObject({
+          limit: z.number().int().min(1).max(6).default(6),
+        }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(false),
+      },
+      (input) =>
+        run("claim_geo_collection_work", () =>
+          services.geo.claimCollectionWork(input),
+        ),
+    );
+    server.registerTool(
+      "reserve_geo_attempt",
+      {
+        title: "Зарезервировать отправку GEO",
+        description:
+          "Вызывать до отправки вопроса. Проверяет общий лимит 18 отправок и 6 вопросов за московский день.",
+        inputSchema: z.strictObject({
+          runId: z.uuid(),
+          promptId: z.uuid(),
+          repetition: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+          leaseId: z.uuid(),
+        }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(false),
+      },
+      (input) =>
+        run("reserve_geo_attempt", () =>
+          services.geo.reserveCollectionAttempt({
+            ...input,
+            repetition: input.repetition!,
+          }),
+        ),
+    );
+    server.registerTool(
+      "resume_geo_run",
+      {
+        title: "Продолжить GEO-запуск",
+        description:
+          "Возвращает только недостающие повторения. При несовместимой персонализации или возрасте 24 часа создаёт новую тройку без копирования ответов.",
+        inputSchema: z.strictObject({
+          runId: z.uuid(),
+          sessionPersonalized: z.boolean(),
+        }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(false),
+      },
+      (input) =>
+        run("resume_geo_run", () => services.geo.resumeCollectionRun(input)),
+    );
+    server.registerTool(
+      "renew_geo_collection_lease",
+      {
+        title: "Продлить право на GEO-задание",
+        description: "Продлевает только ещё действующую lease текущего токена.",
+        inputSchema: z.strictObject({ leaseId: z.uuid() }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(false),
+      },
+      (input) =>
+        run("renew_geo_collection_lease", () =>
+          services.geo.renewCollectionLease(input),
+        ),
+    );
+    server.registerTool(
+      "defer_geo_collection_work",
+      {
+        title: "Приостановить GEO-проверку",
+        description:
+          "Фиксирует фактическую неполноту и причину. Потерянные ответы не превращает в отрицательные наблюдения.",
+        inputSchema: z.strictObject({
+          leaseId: z.uuid(),
+          errorCode: z.enum([
+            "platform_auth_required",
+            "live_ui_confirmation_required",
+            "captcha_required",
+            "platform_unavailable",
+            "browser_unavailable",
+          ]),
+        }),
+        outputSchema: withError(genericRecord),
+        annotations: annotations(false),
+      },
+      (input) =>
+        run("defer_geo_collection_work", () =>
+          services.geo.deferCollectionWork(input),
+        ),
+    );
     server.registerTool("start_geo_run", {
       title: "Начать GEO-проверку",
       description: "Создаёт ограниченный запуск, принадлежащий текущему MCP-токену.",

@@ -1011,6 +1011,9 @@ export const geoRuns = pgTable(
     initiatedByMcpTokenId: uuid("initiated_by_mcp_token_id").references(() => mcpTokens.id, { onDelete: "set null" }),
     promptSetFingerprint: varchar("prompt_set_fingerprint", { length: 64 }).notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    collectionManaged: boolean("collection_managed").notNull().default(false),
+    sessionPersonalized: boolean("session_personalized"),
+    previousRunId: uuid("previous_run_id"),
   },
   (table) => [
     index("geo_runs_period_platform_mode_idx").on(table.startedAt, table.platform, table.mode),
@@ -1026,6 +1029,92 @@ export const geoRuns = pgTable(
     check("geo_runs_prompt_set_sha256", sql`${table.promptSetFingerprint} ~ '^[0-9a-f]{64}$'`),
     check("geo_runs_metadata_object", sql`jsonb_typeof(${table.metadata}) = 'object'`),
     check("geo_runs_metadata_bounded", sql`octet_length(${table.metadata}::text) <= 16384`),
+  ],
+);
+
+export const geoCoverageCycles = pgTable("geo_coverage_cycles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  promptIds: uuid("prompt_ids").array().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+export const geoCollectionLeases = pgTable(
+  "geo_collection_leases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").notNull().references(() => geoRuns.id, { onDelete: "restrict" }),
+    tokenId: uuid("token_id").references(() => mcpTokens.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+  },
+  (t) => [index("geo_collection_leases_run_idx").on(t.runId)],
+);
+export const geoCollectionJobs = pgTable(
+  "geo_collection_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .references(() => geoCoverageCycles.id, { onDelete: "restrict" }),
+    promptId: uuid("prompt_id").notNull().references(() => geoPrompts.id, { onDelete: "restrict" }),
+    promptText: text("prompt_text").notNull(),
+    platform: geoPlatform("platform").notNull(),
+    surface: varchar("surface", { length: 120 }).notNull(),
+    mode: geoRunMode("mode").notNull().default("live_ui"),
+    language: varchar("language", { length: 16 }).notNull(),
+    region: varchar("region", { length: 120 }).notNull(),
+    state: varchar("state", { length: 24 }).notNull().default("queued"),
+    runId: uuid("run_id").references(() => geoRuns.id, { onDelete: "restrict" }),
+    leaseId: uuid("lease_id").references(() => geoCollectionLeases.id, { onDelete: "restrict" }),
+    completedRepetitions: integer("completed_repetitions").notNull().default(0),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    errorCode: varchar("error_code", { length: 120 }),
+  },
+  (t) => [
+    uniqueIndex("geo_collection_jobs_key_uq").on(
+      t.cycleId,
+      t.platform,
+      t.surface,
+      t.mode,
+      t.language,
+      t.region,
+      t.promptId,
+    ),
+    index("geo_collection_jobs_due_idx").on(t.state, t.nextAttemptAt),
+    check(
+      "geo_collection_jobs_state_valid",
+      sql`${t.state} IN ('queued','running','retry_wait','blocked','complete','cancelled')`,
+    ),
+    check(
+      "geo_collection_jobs_counts_valid",
+      sql`${t.completedRepetitions} BETWEEN 0 AND 3 AND ${t.attempts} >= 0`,
+    ),
+  ],
+);
+export const geoCollectionAttempts = pgTable(
+  "geo_collection_attempts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").notNull().references(() => geoRuns.id, { onDelete: "restrict" }),
+    promptId: uuid("prompt_id").notNull().references(() => geoPrompts.id, { onDelete: "restrict" }),
+    repetition: integer("repetition").notNull(),
+    leaseId: uuid("lease_id")
+      .notNull()
+      .references(() => geoCollectionLeases.id, { onDelete: "restrict" }),
+    tokenId: uuid("token_id").references(() => mcpTokens.id, { onDelete: "set null" }),
+    budgetDate: date("budget_date", { mode: "string" }).notNull(),
+    reservedAt: timestamp("reserved_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    observationId: uuid("observation_id"),
+  },
+  (t) => [
+    index("geo_collection_attempts_budget_idx").on(t.budgetDate),
+    check(
+      "geo_collection_attempts_repetition_valid",
+      sql`${t.repetition} BETWEEN 1 AND 3`,
+    ),
   ],
 );
 
@@ -1830,6 +1919,10 @@ export const schema = {
   geoEntities,
   geoPrompts,
   geoRuns,
+  geoCoverageCycles,
+  geoCollectionJobs,
+  geoCollectionLeases,
+  geoCollectionAttempts,
   geoObservations,
   geoObservationMentions,
   geoCitations,

@@ -15,6 +15,9 @@ import {
   geoPrompts,
   geoReferralDailyMetrics,
   geoRuns,
+  geoCollectionJobs,
+  geoCollectionAttempts,
+  geoCollectionLeases,
   geoTopics,
   seoQueries,
   seoChanges,
@@ -35,6 +38,13 @@ import { GEO_PLATFORMS, type
 import { summarizeGeoObservations } from "./analytics";
 import type { NormalizedGeoReferral } from "./referrals";
 import { evaluateExperimentMetric, type ExperimentMilestone } from "./experiments";
+import {
+  createGeoQueueRepository,
+  geoQueueLock,
+  authorizeGeoObservation,
+  finishGeoQueue,
+  assertGeoLease,
+} from "./queueRepository";
 
 export type GeoDatabase = ReturnType<typeof createDb>;
 
@@ -166,7 +176,9 @@ function metricFromOverview(overview: ReturnType<typeof summarizeGeoObservations
 }
 
 function inclusiveDays(from: string, to: string) {
-  return Math.floor((Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000) + 1;
+  return (
+    Math.floor((Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000) + 1
+  );
 }
 
 async function readExperimentMetric(db: GeoDatabase, input: GeoReadFilters & {
@@ -220,7 +232,9 @@ async function readExperimentMetric(db: GeoDatabase, input: GeoReadFilters & {
 }
 
 function evidenceRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function evidencePeriod(value: unknown) {
@@ -329,8 +343,9 @@ function assertOwnedRun(run: typeof geoRuns.$inferSelect | undefined, tokenId: s
   return run;
 }
 
-export function createGeoRepository(db: GeoDatabase) {
+export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
   return {
+    collectionQueue: createGeoQueueRepository(db),
     async syncPromptCatalog(entries: readonly GeoPromptCatalogEntry[]) {
       return db.transaction(async (tx) => {
         const result = { inserted: 0, promoted: 0, preserved: 0 };
@@ -442,6 +457,12 @@ export function createGeoRepository(db: GeoDatabase) {
     },
 
     async startRun(input: GeoStartRunInput, tokenId: string) {
+      if (input.mode === "live_ui")
+        return createGeoQueueRepository(db).startManagedRun(
+          input,
+          tokenId,
+          clock(),
+        );
       return db.transaction(async (tx) => {
         const promptIds = [...input.promptIds].sort();
         const prompts = await tx.select({
@@ -468,10 +489,16 @@ export function createGeoRepository(db: GeoDatabase) {
       });
     },
 
-    async recordObservation(runId: string, tokenId: string, input: StoredGeoObservationInput) {
+    async recordObservation(
+      runId: string,
+      tokenId: string,
+      input: StoredGeoObservationInput,
+    ) {
       return db.transaction(async (tx) => {
+        await geoQueueLock(tx);
         const [run] = await tx.select().from(geoRuns).where(eq(geoRuns.id, runId)).for("update").limit(1);
         const ownedRun = assertOwnedRun(run, tokenId);
+        await authorizeGeoObservation(tx, ownedRun, tokenId, input, clock());
         if (!ownedRun.promptIds.includes(input.promptId)) throw new Error("geo_run_prompt_set_invalid");
         const [existing] = await tx.select().from(geoObservations).where(and(
           eq(geoObservations.runId, runId),
@@ -480,7 +507,14 @@ export function createGeoRepository(db: GeoDatabase) {
         )).limit(1);
         if (existing) return existing;
 
-        const { mentions, citations, fanoutQueries, ...observation } = input;
+        const {
+          mentions,
+          citations,
+          fanoutQueries,
+          attemptId,
+          leaseId: _leaseId,
+          ...observation
+        } = input;
         const mentionedEntities = mentions.length ? await tx.select({
           id: geoEntities.id,
           type: geoEntities.type,
@@ -491,6 +525,40 @@ export function createGeoRepository(db: GeoDatabase) {
         if (observation.mentioned !== ownedMentioned) throw new Error("geo_observation_mention_flag_incoherent");
         const [row] = await tx.insert(geoObservations).values({ ...observation, runId }).returning();
         if (!row) throw new Error("geo_observation_not_stored");
+        if (ownedRun.collectionManaged) {
+          const [count] = await tx
+            .select({ n: sql<number>`count(*)::int` })
+            .from(geoObservations)
+            .where(eq(geoObservations.runId, runId));
+          const [promptCount] = await tx
+            .select({ n: sql<number>`count(*)::int` })
+            .from(geoObservations)
+            .where(
+              and(
+                eq(geoObservations.runId, runId),
+                eq(geoObservations.promptId, input.promptId),
+              ),
+            );
+          await tx.update(geoRuns).set({
+              sessionPersonalized: input.sessionPersonalized,
+              storedCount: count.n,
+              completedCount: count.n,
+            })
+            .where(eq(geoRuns.id, runId));
+          await tx
+            .update(geoCollectionJobs)
+            .set({ completedRepetitions: promptCount.n })
+            .where(
+              and(
+                eq(geoCollectionJobs.runId, runId),
+                eq(geoCollectionJobs.promptId, input.promptId),
+              ),
+            );
+          await tx
+            .update(geoCollectionAttempts)
+            .set({ resolvedAt: clock(), observationId: row.id })
+            .where(eq(geoCollectionAttempts.id, attemptId!));
+        }
         if (mentions.length) {
           await tx.insert(geoObservationMentions).values(mentions.map((mention) => ({
             observationId: row.id,
@@ -515,11 +583,30 @@ export function createGeoRepository(db: GeoDatabase) {
 
     async finishRun(runId: string, tokenId: string, input: GeoFinishRunInput) {
       return db.transaction(async (tx) => {
+        await geoQueueLock(tx);
         const [run] = await tx.select().from(geoRuns).where(eq(geoRuns.id, runId)).for("update").limit(1);
         const ownedRun = assertOwnedRun(run, tokenId);
+        if (ownedRun.collectionManaged) {
+          const [lease] = await tx
+            .select()
+            .from(geoCollectionLeases)
+            .where(
+              and(
+                eq(geoCollectionLeases.runId, runId),
+                eq(geoCollectionLeases.tokenId, tokenId),
+                sql`${geoCollectionLeases.releasedAt} IS NULL`,
+              ),
+            )
+            .orderBy(desc(geoCollectionLeases.expiresAt))
+            .limit(1);
+          if (!lease) throw new Error("geo_lease_expired");
+          await assertGeoLease(tx, lease.id, tokenId, clock(), runId);
+        }
         const counted = await tx.select({ count: sql<number>`count(*)::int` }).from(geoObservations)
           .where(eq(geoObservations.runId, runId));
         const stored = counted[0]?.count ?? 0;
+        if (ownedRun.collectionManaged)
+          input = { ...input, completedCount: stored, storedCount: stored };
         if (input.storedCount !== stored || input.completedCount < stored || input.completedCount > ownedRun.plannedCount
           || (input.status === "success" && (stored !== ownedRun.plannedCount
             || input.completedCount !== ownedRun.plannedCount || input.storedCount !== ownedRun.plannedCount))) {
@@ -538,10 +625,14 @@ export function createGeoRepository(db: GeoDatabase) {
           }
         }
         const [row] = await tx.update(geoRuns).set({
-          ...input,
-          completedAt: new Date(),
-        }).where(eq(geoRuns.id, runId)).returning();
+            ...input,
+            completedAt: clock(),
+          })
+          .where(eq(geoRuns.id, runId))
+          .returning();
         if (!row) throw new Error("geo_run_not_found");
+        if (ownedRun.collectionManaged)
+          await finishGeoQueue(tx, runId, input.status, clock());
         if (input.status === "success") {
           await tx.execute(sql`
             INSERT INTO geo_entities (canonical_name, type, aliases, domains, status)
@@ -646,7 +737,10 @@ export function createGeoRepository(db: GeoDatabase) {
           .from(geoReferralDailyMetrics)
           .where(promptScopeRequested && !scopedPaths.length ? sql`false` : and(...referralConditions)),
       ]);
-      const latestByPlatform = new Map<GeoPlatform, typeof latestRuns[number]>();
+      const latestByPlatform = new Map<
+        GeoPlatform,
+        (typeof latestRuns)[number]
+      >();
       for (const run of latestRuns) if (!latestByPlatform.has(run.platform)) latestByPlatform.set(run.platform, run);
       return {
         dimensions: {
@@ -842,15 +936,20 @@ export function createGeoRepository(db: GeoDatabase) {
       return paged(items, input);
     },
 
-    async createExperimentCandidate(input: GeoExperimentCandidateInput, actor: GeoActor) {
+    async createExperimentCandidate(
+      input: GeoExperimentCandidateInput,
+      actor: GeoActor,
+    ) {
       return db.transaction(async (tx) => {
         const [recommendation] = await tx.select().from(seoRecommendations)
           .where(eq(seoRecommendations.id, input.recommendationId)).limit(1);
-        if (!recommendation || !recommendation.issueType.startsWith("geo_")
+        if (
+          !recommendation || !recommendation.issueType.startsWith("geo_")
           || recommendation.pagePath !== input.pagePath
           || ["rejected", "dismissed"].includes(recommendation.status)
-          || (actor.mcpTokenId && recommendation.createdByMcpTokenId !== actor.mcpTokenId)
-          || !await recommendationHasEvidence(tx as unknown as GeoDatabase, recommendation.evidence, input)) {
+          || (actor.mcpTokenId && recommendation.createdByMcpTokenId !== actor.mcpTokenId) ||
+          !(await recommendationHasEvidence(tx as unknown as GeoDatabase, recommendation.evidence, input))
+        ) {
           throw new Error("geo_experiment_recommendation_invalid");
         }
         const prompts = await tx.select({ id: geoPrompts.id, promptText: geoPrompts.promptText })
