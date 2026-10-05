@@ -1,0 +1,10 @@
+[Unit]
+Description=Continue due KorDevTeam rank jobs every ten minutes
+
+[Timer]
+OnCalendar=*:0/10
+Persistent=true
+Unit=kordevteam-seo-rank-recover.service
+
+[Install]
+WantedBy=timers.target

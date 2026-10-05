@@ -8,6 +8,7 @@ import {
   seoQueries,
   seoRankChecks,
   seoRankRuns,
+  seoRankJobs,
   seoRecommendations,
   seoRegions,
   seoSources,
@@ -15,6 +16,7 @@ import {
 } from "../db/schema";
 import type { NormalizedRankCheck, NormalizedSeoObservation, NormalizedTrafficObservation, SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "./contracts";
 import type { SemanticCoreEntry } from "./semanticCore";
+import { summarizeRankPlan } from "./rankQueue";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
@@ -166,6 +168,7 @@ export function buildRankControl(
   queries: RankControlQuery[],
   regions: RankControlRegion[],
   checks: RankControlCheck[],
+  compatiblePairs: Array<[string, string]> = [],
 ) {
   const referenceRegion = regions.find((region) => region.code === "ru") ?? regions[0] ?? null;
   const bySlice = new Map<string, RankControlCheck[]>();
@@ -183,13 +186,18 @@ export function buildRankControl(
       cells[region.code] = {};
       for (const device of RANK_CONTROL_DEVICES) {
         const entries = bySlice.get(`${query.id}:${region.id}:${device}`) ?? [];
-        const current = entries.find((entry) => entry.checkDate <= dateTo && entry.checkDate >= shiftDate(dateTo, -7));
+        const current = entries.find((entry) => entry.checkDate <= dateTo);
         if (!current) {
           cells[region.code][device] = null;
           continue;
         }
-        const previousDay = entries.find((entry) => entry.checkDate === shiftDate(current.checkDate, -1));
-        const previousWeek = entries.find((entry) => entry.checkDate === shiftDate(current.checkDate, -7));
+        const previousDay = undefined;
+        const previousDate = compatiblePairs.find(
+          ([date]) => date === current.checkDate,
+        )?.[1];
+        const previousWeek = previousDate
+          ? entries.find((entry) => entry.checkDate === previousDate)
+          : undefined;
         cells[region.code][device] = {
           ...current,
           deltaDay: numericDelta(current, previousDay),
@@ -202,7 +210,11 @@ export function buildRankControl(
     return { ...query, queryId: query.id, checks: cells };
   });
 
-  const referenceCells = rows.map((row) => referenceRegion ? row.checks[referenceRegion.code]?.desktop ?? null : null);
+  const referenceCells = rows.map((row) =>
+    referenceRegion
+      ? (row.checks[referenceRegion.code]?.desktop ?? null)
+      : null,
+  );
   const foundPositions = referenceCells.flatMap((cell) => cell?.status === "found" ? [cell.position!] : []);
   return {
     summary: {
@@ -630,13 +642,85 @@ export function createSeoRepository(db: SeoDatabase) {
         position: seoRankChecks.position,
         resultUrl: seoRankChecks.resultUrl,
         resultLimit: seoRankChecks.resultLimit,
-      }).from(seoRankChecks).where(and(
-        inArray(seoRankChecks.queryId, queries.map((query) => query.id)),
-        inArray(seoRankChecks.regionId, regions.map((region) => region.id)),
-        gte(seoRankChecks.checkDate, shiftDate(dateTo, -14)),
-        lte(seoRankChecks.checkDate, dateTo),
-      ));
-      return buildRankControl(dateTo, queries, regions, checks as RankControlCheck[]);
+      }).from(seoRankChecks).where(
+          and(
+            inArray(seoRankChecks.queryId, queries.map((query) => query.id)),
+            inArray(seoRankChecks.regionId, regions.map((region) => region.id)),
+            gte(seoRankChecks.checkDate, shiftDate(dateTo, -56)),
+            lte(seoRankChecks.checkDate, dateTo),
+          ),
+        );
+      const runs = await db
+        .select()
+        .from(seoRankRuns)
+        .where(
+          and(
+            eq(seoRankRuns.status, "success"),
+            lte(seoRankRuns.checkDate, dateTo),
+          ),
+        )
+        .orderBy(desc(seoRankRuns.checkDate));
+      const complete: Array<{ date: string; matrix: string }> = [];
+      for (const run of runs) {
+        const jobs = await db
+          .select()
+          .from(seoRankJobs)
+          .where(eq(seoRankJobs.runId, run.id));
+        if (
+          !jobs.length ||
+          jobs.length !== run.plannedCount ||
+          jobs.some(
+            (j) =>
+              j.state !== "stored" ||
+              !j.checkedAt ||
+              j.checkedAt.getTime() - run.startedAt.getTime() > 48 * 3600000,
+          )
+        )
+          continue;
+        complete.push({
+          date: run.checkDate,
+          matrix: jobs
+            .map((j) =>
+              JSON.stringify([
+                j.queryId,
+                j.queryText,
+                j.targetPath,
+                j.regionId,
+                j.device,
+              ]),
+            )
+            .sort()
+            .join("\n"),
+        });
+      }
+      const pairs: Array<[string, string]> = [];
+      for (let i = 0; i < complete.length - 1; i++)
+        if (
+          complete[i].matrix === complete[i + 1].matrix &&
+          complete[i + 1].date === shiftDate(complete[i].date, -7)
+        )
+          pairs.push([complete[i].date, complete[i + 1].date]);
+      return buildRankControl(
+        dateTo,
+        queries,
+        regions,
+        checks as RankControlCheck[],
+        pairs,
+      );
+    },
+    async getRankProgress({ dateTo }: { dateTo: string }) {
+      const [run] = await db
+        .select()
+        .from(seoRankRuns)
+        .where(lte(seoRankRuns.checkDate, dateTo))
+        .orderBy(desc(seoRankRuns.checkDate), desc(seoRankRuns.startedAt))
+        .limit(1);
+      if (!run) return null;
+      const jobs = await db
+        .select()
+        .from(seoRankJobs)
+        .where(eq(seoRankJobs.runId, run.id));
+      return summarizeRankPlan(run, jobs);
     },
 
     async listSemanticCore(filters: { status?: SeoQueryStatus; kind?: SeoQueryKind }, page: { limit: number; cursor: string | null }) {

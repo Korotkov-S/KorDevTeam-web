@@ -120,6 +120,13 @@
       "when": 1791012016606,
       "tag": "0016_yandex_ctr_over_100",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791196018427,
+      "tag": "0017_seo_rank_queue",
+      "breakpoints": true
     }
   ]
 }

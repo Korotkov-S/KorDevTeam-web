@@ -10,6 +10,33 @@ const config = {
   targetHost: "kordev.team",
 };
 
+test("ambiguous paid submissions cannot be retried; explicit rejection can", async () => {
+  for (const transport of [
+    async () => {
+      throw new Error("connection lost");
+    },
+    async () => new Response("", { status: 503 }),
+    async () => new Response("bad-json"),
+    async () => Response.json({}),
+  ]) {
+    const p = createYandexSearchProvider(config, transport);
+    await assert.rejects(() => p.startSearch("crm", 225, "desktop"), {
+      message: "seo_rank_submission_uncertain",
+      retryable: false,
+    });
+  }
+  const p = createYandexSearchProvider(
+    config,
+    async () =>
+      new Response("", { status: 429, headers: { "retry-after": "1000" } }),
+  );
+  await assert.rejects(() => p.startSearch("crm", 225, "desktop"), {
+    message: "seo_rank_submit_rejected",
+    retryable: true,
+    retryAfterSeconds: 1000,
+  });
+});
+
 function xml(urls: string[]): string {
   return `<?xml version="1.0" encoding="utf-8"?><yandexsearch><response><results><grouping>${urls
     .map((url) => `<group><doc><url>${url}</url></doc></group>`).join("")}</grouping></results></response></yandexsearch>`;
@@ -32,20 +59,34 @@ test("async Search API submits the fixed rank slice and polls its operation", as
     if (request.method === "POST") return Response.json({ done: false, id: "op-123" });
     pollCount++;
     if (pollCount === 1) return Response.json({ done: false, id: "op-123" });
-    return Response.json({ done: true, id: "op-123", response: {
-      "@type": "type.googleapis.com/yandex.cloud.searchapi.v2.WebSearchResponse",
-      rawData: Buffer.from(xml(["https://example.test/", "https://kordev.team/services/crm/"])).toString("base64"),
-    } });
+    return Response.json({
+      done: true,
+      id: "op-123",
+      response: {
+        "@type": "type.googleapis.com/yandex.cloud.searchapi.v2.WebSearchResponse",
+        rawData: Buffer.from(
+          xml(["https://example.test/", "https://kordev.team/services/crm/"]),
+        ).toString("base64"),
+      },
+    });
   });
 
   const operationId = await provider.startSearch("внедрение crm", 213, "desktop");
   const pending = await provider.pollSearch(operationId);
   const desktop = await provider.pollSearch(operationId);
 
-  assert.deepEqual(desktop, { status: "found", position: 2, resultUrl: "https://kordev.team/services/crm/", resultLimit: 100 });
+  assert.deepEqual(desktop, {
+    status: "found",
+    position: 2,
+    resultUrl: "https://kordev.team/services/crm/",
+    resultLimit: 100,
+  });
   assert.equal(pending, null);
   assert.equal(operationId, "op-123");
-  assert.equal(requests[0].url, "https://searchapi.api.cloud.yandex.net/v2/web/searchAsync");
+  assert.equal(
+    requests[0].url,
+    "https://searchapi.api.cloud.yandex.net/v2/web/searchAsync",
+  );
   assert.equal(requests[0].method, "POST");
   assert.equal(requests[0].headers.get("authorization"), "Api-Key search-secret");
   assert.deepEqual(requests[0].body, {
@@ -58,17 +99,32 @@ test("async Search API submits the fixed rank slice and polls its operation", as
     responseFormat: "FORMAT_XML",
     userAgent: "KorDevTeam SEO rank monitor/1.0 (desktop)",
   });
-  assert.equal(requests[1].url, "https://operation.api.cloud.yandex.net/operations/op-123");
+  assert.equal(
+    requests[1].url,
+    "https://operation.api.cloud.yandex.net/operations/op-123",
+  );
   assert.equal(requests[1].method, "GET");
   assert.equal(requests[1].headers.get("authorization"), "Api-Key search-secret");
 });
 
 test("only the exact target hostname counts and a miss is explicit", async () => {
-  const provider = createYandexSearchProvider(config, async (url) => String(url).includes("searchAsync")
-    ? Response.json({ done: false, id: "op-miss" })
-    : Response.json({ done: true, id: "op-miss", response: { rawData: Buffer.from(xml([
-      "https://notkordev.team/", "https://kordev.team.evil.test/", "https://blog.kordev.team/",
-    ])).toString("base64") } }));
+  const provider = createYandexSearchProvider(config, async (url) =>
+    String(url).includes("searchAsync")
+      ? Response.json({ done: false, id: "op-miss" })
+      : Response.json({
+          done: true,
+          id: "op-miss",
+          response: {
+            rawData: Buffer.from(
+              xml([
+                "https://notkordev.team/",
+                "https://kordev.team.evil.test/",
+                "https://blog.kordev.team/",
+              ]),
+            ).toString("base64"),
+          },
+        }),
+  );
 
   const operationId = await provider.startSearch("crm", 225, "desktop");
   assert.deepEqual(await provider.pollSearch(operationId), {

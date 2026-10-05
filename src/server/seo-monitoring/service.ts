@@ -33,7 +33,8 @@ function dateValue(value: string): number {
 function filters(input: SeoMetricFilters): SeoMetricFilters {
   const from = dateValue(input.dateFrom);
   const to = dateValue(input.dateTo);
-  if (to < from || ((to - from) / 86_400_000) + 1 > 366) throw new Error("seo_date_range_invalid");
+  if (to < from || (to - from) / 86_400_000 + 1 > 366)
+    throw new Error("seo_date_range_invalid");
   if (input.source && !sources.has(input.source)) throw new Error("seo_source_invalid");
   if (input.device && !devices.has(input.device)) throw new Error("seo_device_invalid");
   if (input.frequencyBand && !frequencyBands.has(input.frequencyBand)) throw new Error("seo_frequency_band_invalid");
@@ -63,8 +64,10 @@ function actorFields(actor: Actor) {
 }
 
 function plainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    && Buffer.byteLength(JSON.stringify(value), "utf8") <= 16_384;
+  return (
+    typeof value === "object" && value !== null && !Array.isArray(value)
+    && Buffer.byteLength(JSON.stringify(value), "utf8") <= 16_384
+  );
 }
 
 function boundedText(value: string, maximum: number, code: string): string {
@@ -175,6 +178,10 @@ export function createSeoService(repository: SeoRepository) {
     getRankControl(input: { dateTo: string }) {
       dateValue(input.dateTo);
       return repository.getRankControl(input.dateTo);
+    },
+    getRankProgress(input: { dateTo: string }) {
+      dateValue(input.dateTo);
+      return repository.getRankProgress(input);
     },
 
     listChanges(input: { pagePath?: string; dateFrom?: string; dateTo?: string; limit?: number; cursor?: string | null }) {

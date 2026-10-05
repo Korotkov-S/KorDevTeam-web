@@ -1,146 +1,202 @@
 import assert from "node:assert/strict";
-import test from "node:test";
-
-import type { NormalizedRankCheck } from "./contracts";
+import { test } from "node:test";
+import { createDb } from "../db/client";
+import { resetTestDatabase } from "../db/testDatabase";
+import { seoQueries, seoRankJobs } from "../db/schema";
+import { createRankQueueRepository } from "./rankQueueRepository";
 import { createSeoRankCollector } from "./rankCollector";
 import { SeoProviderError } from "./providers/provider-error";
-
-function fixture(options: { empty?: boolean; failAt?: number; queryCount?: number; regionCount?: number; alreadyRun?: boolean; pendingOnce?: boolean } = {}) {
-  const events: string[] = [];
-  const stored: NormalizedRankCheck[] = [];
-  const finished: Array<{ status: string; result: { completedCount: number; storedCount: number; errorCode?: string; metadata?: Record<string, unknown> } }> = [];
-  let calls = 0;
-  const repository = {
-    async withRankLock<T>(work: () => Promise<T>) { events.push("lock"); return work(); },
-    async hasRankRunInWindow(dateFrom: string, dateTo: string) {
-      events.push(`guard:${dateFrom}:${dateTo}`);
-      return options.alreadyRun ?? false;
-    },
-    async listTrackedQueries() {
-      return options.empty ? [] : Array.from({ length: options.queryCount ?? 2 }, (_, index) => ({ id: `q${index + 1}`, queryText: `запрос ${index + 1}` }));
-    },
-    async listRankRegions() {
-      return Array.from({ length: options.regionCount ?? 2 }, (_, index) => ({ id: `r${index + 1}`, externalId: String(200 + index), displayName: `Регион ${index + 1}` }));
-    },
-    async startRankRun(checkDate: string, plannedCount: number) {
-      events.push(`start:${checkDate}:${plannedCount}`);
-      return { id: "run-1" };
-    },
-    async finishRankRun(_id: string, status: string, result: { completedCount: number; storedCount: number; errorCode?: string; metadata?: Record<string, unknown> }) {
-      finished.push({ status, result });
-      events.push(`finish:${status}:${result.completedCount}:${result.storedCount}:${result.errorCode ?? "ok"}`);
-    },
-    async upsertRankChecks(rows: readonly NormalizedRankCheck[]) {
-      stored.push(...rows);
-      return rows.length;
-    },
-  };
+import { eq } from "drizzle-orm";
+const url = process.env.TEST_DATABASE_URL ?? "",
+  databaseTest = url ? test : test.skip;
+async function fixture() {
+  await resetTestDatabase(url);
+  const db = createDb(url);
+  await db
+    .insert(seoQueries)
+    .values({
+      queryText: "crm",
+      normalizedQuery: "crm",
+      status: "active",
+      tracked: true,
+    });
+  const repository = createRankQueueRepository(db);
+  let time = new Date("2026-10-04T22:00:00Z");
+  const calls = { post: 0, get: 0 };
   const provider = {
-    async startSearch(query: string, region: number, device: "desktop" | "mobile") {
-      calls++;
-      events.push(`start-search:${query}:${region}:${device}`);
-      if (calls === options.failAt) throw new SeoProviderError("seo_yandex_search_retryable", false);
-      return `op-${calls}`;
+    startSearch: async () => {
+      calls.post++;
+      return `op-${calls.post}`;
     },
-    async pollSearch(operationId: string) {
-      events.push(`poll-search:${operationId}`);
-      if (options.pendingOnce && events.filter((event) => event === `poll-search:${operationId}`).length === 1) return null;
-      const position = Number(operationId.slice(3));
-      return position % 2 === 0
-        ? { status: "not_found" as const, position: null, resultUrl: null, resultLimit: 100 }
-        : { status: "found" as const, position, resultUrl: "https://kordev.team/", resultLimit: 100 };
+    pollSearch: async (_id: string): Promise<any> => {
+      calls.get++;
+      return {
+        status: "not_found",
+        position: null,
+        resultUrl: null,
+        resultLimit: 100,
+      };
     },
   };
-  return { events, stored, finished, repository, provider };
+  return {
+    db,
+    repository,
+    calls,
+    provider,
+    clock: () => time,
+    setTime: (d: Date) => {
+      time = d;
+    },
+    collector: () =>
+      createSeoRankCollector({
+        repository,
+        provider,
+        dailyCheckLimit: 1000,
+        clock: () => time,
+        logger: { write() {} },
+      }),
+  };
 }
-
-test("rank collector checks the full query-region-device matrix and stores found plus not-found snapshots", async () => {
-  const f = fixture();
-  const collector = createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    dailyCheckLimit: 1000, clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 });
-
-  const report = await collector.run();
-
-  assert.deepEqual(report, { source: "yandex_search", status: "success", plannedCount: 8, completedCount: 8, storedCount: 8, checkDate: "2026-09-26" });
-  assert.equal(f.events.filter((event) => event.startsWith("start-search:")).length, 8);
-  assert.deepEqual(new Set(f.stored.map((row) => row.device)), new Set(["desktop", "mobile"]));
-  assert.deepEqual(new Set(f.stored.map((row) => row.regionId)), new Set(["r1", "r2"]));
-  assert.equal(f.stored.some((row) => row.status === "not_found" && row.position === null), true);
-  assert.ok(f.events.includes("finish:success:8:8:ok"));
+databaseTest(
+  "restart polls known operations only; stored results never issue another request",
+  async () => {
+    const f = await fixture(),
+      plan = (await f.repository.getOrCreatePlan({
+        now: f.clock(),
+        dailyLimit: 1000,
+        resumeOnly: false,
+      }))!;
+    for (const job of plan.jobs) {
+      await f.repository.reserveSubmission(job.id, f.clock(), 1000);
+      await f.repository.saveOperation(job.id, `op-${job.id}`, f.clock());
+    }
+    const report = await f.collector().run({ resumeOnly: true });
+    assert.equal(report.storedCount, 16);
+    assert.equal(report.status, "success");
+    assert.deepEqual(f.calls, { post: 0, get: 16 });
+    await f.collector().run({ resumeOnly: true });
+    assert.deepEqual(f.calls, { post: 0, get: 16 });
+  },
+);
+databaseTest(
+  "crash while submitting blocks uncertain work rather than charging twice",
+  async () => {
+    const f = await fixture(),
+      plan = (await f.repository.getOrCreatePlan({
+        now: f.clock(),
+        dailyLimit: 1000,
+        resumeOnly: false,
+      }))!;
+    for (const job of plan.jobs)
+      await f.repository.reserveSubmission(job.id, f.clock(), 1000);
+    const report = await f.collector().run({ resumeOnly: true });
+    assert.equal(report.blockedCount, 16);
+    assert.equal(report.retryable, false);
+    assert.equal(report.errorCode, "seo_rank_submission_uncertain");
+    assert.deepEqual(f.calls, { post: 0, get: 0 });
+  },
+);
+databaseTest(
+  "pending result is deferred durably and GET retry keeps the operation ID",
+  async () => {
+    const f = await fixture();
+    f.provider.pollSearch = async () => {
+      f.calls.get++;
+      return null;
+    };
+    const first = await f.collector().run();
+    assert.equal(first.status, "partial");
+    assert.equal(first.retryable, true);
+    assert.equal(first.storedCount, 0);
+    assert.equal(f.calls.post, 16);
+    assert.equal(
+      first.nextAttemptAt!.toISOString(),
+      "2026-10-04T22:02:00.000Z",
+    );
+    f.setTime(new Date("2026-10-04T22:02:00Z"));
+    f.provider.pollSearch = async () => {
+      f.calls.get++;
+      throw new SeoProviderError("seo_yandex_search_retryable", true, 1000);
+    };
+    const retry = await f.collector().run({ resumeOnly: true });
+    assert.equal(
+      retry.nextAttemptAt!.toISOString(),
+      "2026-10-04T22:18:40.000Z",
+    );
+    assert.equal(f.calls.post, 16);
+    assert.equal(
+      (await f.db.select().from(seoRankJobs)).every(
+        (j) => j.operationId !== null,
+      ),
+      true,
+    );
+  },
+);
+databaseTest(
+  "night window suppresses POST and expired plan cannot be restarted",
+  async () => {
+    const f = await fixture();
+    f.setTime(new Date("2026-10-05T06:00:00Z"));
+    const first = await f.collector().run();
+    assert.equal(f.calls.post, 0);
+    assert.equal(first.status, "partial");
+    f.setTime(new Date("2026-10-07T06:00:01Z"));
+    const expired = await f.collector().run();
+    assert.equal(expired.retryable, false);
+    assert.equal(expired.blockedCount, 16);
+    assert.equal(f.calls.post, 0);
+  },
+);
+databaseTest(
+  "429 costs a reservation and fourth rejected submission blocks",
+  async () => {
+    const f = await fixture();
+    f.provider.startSearch = async () => {
+      f.calls.post++;
+      throw new SeoProviderError("seo_rank_submit_rejected", true);
+    };
+    for (const next of [
+      "2026-10-04T22:10:00Z",
+      "2026-10-04T22:40:00Z",
+      "2026-10-05T00:40:00Z",
+    ]) {
+      const p = await f.collector().run();
+      assert.equal(
+        p.nextAttemptAt!.toISOString(),
+        new Date(next).toISOString(),
+      );
+      f.setTime(new Date(next));
+    }
+    const blocked = await f.collector().run();
+    assert.equal(blocked.blockedCount, 16);
+    assert.equal(f.calls.post, 64);
+  },
+);
+databaseTest("resume without an existing plan never submits", async () => {
+  const f = await fixture();
+  const p = await f.collector().run({ resumeOnly: true });
+  assert.equal(p.status, "skipped");
+  assert.equal(f.calls.post, 0);
 });
-
-test("empty tracked core is a successful zero-work run", async () => {
-  const f = fixture({ empty: true });
-  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    dailyCheckLimit: 1000, clock: () => new Date("2026-09-26T06:00:00.000Z") }).run();
-
-  assert.equal(report.status, "success");
-  assert.equal(report.plannedCount, 0);
-  assert.equal(f.events.some((event) => event.startsWith("start-search:")), false);
-  assert.ok(f.events.includes("finish:success:0:0:ok"));
-});
-
-test("a failed slice preserves successful checks and marks the run partial", async () => {
-  const f = fixture({ failAt: 2 });
-  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    dailyCheckLimit: 1000, clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 }).run();
-
-  assert.equal(report.status, "partial");
-  assert.equal(report.completedCount, 7);
-  assert.equal(report.storedCount, 7);
-  assert.equal(report.errorCode, "seo_yandex_search_retryable");
-  assert.ok(f.events.includes("finish:partial:7:7:seo_yandex_search_retryable"));
-});
-
-test("daily limit selects only whole query matrices and records safe quota metadata", async () => {
-  const f = fixture({ queryCount: 5, regionCount: 8 });
-  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    dailyCheckLimit: 32, clock: () => new Date("2026-09-26T06:00:00.000Z"), sleep: async () => {}, random: () => 0 }).run();
-
-  assert.equal(report.status, "success");
-  assert.equal(report.plannedCount, 32);
-  assert.equal(f.events.filter((event) => event.startsWith("start-search:")).length, 32);
-  assert.deepEqual(new Set(f.stored.map((row) => row.queryId)), new Set(["q1", "q2"]));
-  assert.deepEqual(f.finished[0].result.metadata, {
-    failedCount: 0,
-    availableQueryCount: 5,
-    selectedQueryCount: 2,
-    omittedQueryCount: 3,
-    dailyCheckLimit: 32,
-  });
-});
-
-test("limit below one complete matrix fails before any provider request", async () => {
-  const f = fixture({ queryCount: 2, regionCount: 9 });
-  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    dailyCheckLimit: 16, clock: () => new Date("2026-09-26T06:00:00.000Z") }).run();
-
-  assert.equal(report.status, "failed");
-  assert.equal(report.errorCode, "seo_yandex_search_daily_limit_too_low");
-  assert.equal(f.events.some((event) => event.startsWith("start-search:")), false);
-  assert.equal(f.finished[0].status, "failed");
-});
-
-test("all async searches are submitted before results are polled", async () => {
-  const f = fixture({ pendingOnce: true });
-  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    dailyCheckLimit: 1000, clock: () => new Date("2026-09-28T01:00:00.000Z"), sleep: async () => {}, random: () => 0 }).run();
-
-  assert.equal(report.status, "success");
-  assert.equal(f.events.filter((event) => event.startsWith("start-search:")).length, 8);
-  assert.equal(f.events.findIndex((event) => event.startsWith("poll-search:")) >
-    f.events.map((event, index) => event.startsWith("start-search:") ? index : -1).reduce((left, right) => Math.max(left, right)), true);
-  assert.equal(f.events.filter((event) => event.startsWith("poll-search:")).length, 16);
-});
-
-test("a previous charged run in the Moscow week skips the entire matrix", async () => {
-  const f = fixture({ alreadyRun: true });
-  const report = await createSeoRankCollector({ repository: f.repository, provider: f.provider,
-    dailyCheckLimit: 1000, clock: () => new Date("2026-10-01T01:00:00.000Z") }).run();
-
-  assert.deepEqual(report, { source: "yandex_search", status: "skipped", plannedCount: 0, completedCount: 0,
-    storedCount: 0, checkDate: "2026-10-01", reason: "weekly_run_already_started" });
-  assert.ok(f.events.includes("guard:2026-09-28:2026-10-04"));
-  assert.equal(f.events.some((event) => event.startsWith("start:")), false);
-  assert.equal(f.events.some((event) => event.startsWith("start-search:")), false);
-});
+databaseTest(
+  "recovery expires the original plan after 48 hours without losing its progress",
+  async () => {
+    const f = await fixture();
+    await f.collector().run();
+    const plan = (await f.repository.getOrCreatePlan({
+      now: f.clock(),
+      dailyLimit: 1000,
+      resumeOnly: true,
+    }))!;
+    await f.db
+      .update(seoRankJobs)
+      .set({ state: "polling", checkedAt: null })
+      .where(eq(seoRankJobs.id, plan.jobs[0].id));
+    f.setTime(new Date(+plan.startedAt + 48 * 3600000 + 1));
+    const report = await f.collector().run({ resumeOnly: true });
+    assert.equal(report.status, "partial");
+    assert.equal(report.blockedCount, 1);
+    assert.equal(report.retryable, false);
+    assert.deepEqual(f.calls, { post: 16, get: 16 });
+  },
+);

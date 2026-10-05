@@ -363,6 +363,7 @@ async function dropGeoSchema(db: ReturnType<typeof createDb>) {
 }
 
 async function dropAdvertisingSchema(db: ReturnType<typeof createDb>) {
+  await db.execute(sql`DROP TABLE IF EXISTS seo_rank_submissions, seo_rank_jobs`);
   await db.execute(sql`DROP TABLE IF EXISTS
     ad_vk_experiment_links,
     ad_vk_daily_metrics,

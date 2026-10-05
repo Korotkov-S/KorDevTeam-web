@@ -1,5 +1,5 @@
 [Unit]
-Description=Collect weekly KorDevTeam Yandex control ranks
+Description=Resume existing KorDevTeam rank operations without creating a plan
 After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target
@@ -9,6 +9,6 @@ Type=oneshot
 User=root
 WorkingDirectory=/opt/kordevteam/current
 EnvironmentFile=/etc/kordevteam/operations.env
-ExecStart=/bin/bash /opt/kordevteam/current/scripts/run-seo-rank-collect.sh
+ExecStart=/bin/bash /opt/kordevteam/current/scripts/run-seo-rank-recover.sh
 UMask=0077
 NoNewPrivileges=true

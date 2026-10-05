@@ -21,6 +21,34 @@ import { createSeoRepository } from "./repository";
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
 
+test("partial control snapshot never creates apparent weekly growth", () => {
+  const result = repositoryModule.buildRankControl(
+    "2026-10-05",
+    [
+      {
+        id: "q",
+        queryText: "crm",
+        targetPath: null,
+        wordstatFrequency: null,
+        frequencyBand: "low",
+      },
+    ],
+    [{ id: "r", code: "ru", displayName: "Россия", sortOrder: 0 }],
+    ["2026-10-05", "2026-09-28"].map((checkDate, i) => ({
+      queryId: "q",
+      regionId: "r",
+      device: "mobile" as const,
+      checkDate,
+      status: "found" as const,
+      position: i ? 10 : 3,
+      resultUrl: "https://kordev.team/",
+      resultLimit: 100,
+    })),
+  );
+  assert.equal(result.rows[0].checks.ru.mobile!.position, 3);
+  assert.equal(result.rows[0].checks.ru.mobile!.movementWeek, null);
+});
+
 test("rank control keeps every tracked query and compares exact day and week snapshots", () => {
   const buildRankControl = (repositoryModule as unknown as {
     buildRankControl?: (dateTo: string, queries: unknown[], regions: unknown[], checks: unknown[]) => {
@@ -43,8 +71,21 @@ test("rank control keeps every tracked query and compares exact day and week sna
     { id: "region-ru", code: "ru", displayName: "Россия", sortOrder: 0 },
     { id: "region-msk", code: "moscow", displayName: "Москва", sortOrder: 10 },
   ];
-  const found = (queryId: string, regionId: string, device: "desktop" | "mobile", checkDate: string, position: number) => ({
-    queryId, regionId, device, checkDate, status: "found", position, resultUrl: "https://kordev.team/services/crm/", resultLimit: 100,
+  const found = (
+    queryId: string,
+    regionId: string,
+    device: "desktop" | "mobile",
+    checkDate: string,
+    position: number,
+  ) => ({
+    queryId,
+    regionId,
+    device,
+    checkDate,
+    status: "found",
+    position,
+    resultUrl: "https://kordev.team/services/crm/",
+    resultLimit: 100,
   });
   const missing = (queryId: string, regionId: string, device: "desktop" | "mobile", checkDate: string) => ({
     queryId, regionId, device, checkDate, status: "not_found", position: null, resultUrl: null, resultLimit: 100,
@@ -62,23 +103,38 @@ test("rank control keeps every tracked query and compares exact day and week sna
 
   const result = buildRankControl!("2026-09-27", queries, regions, checks);
   assert.deepEqual(result.summary, {
-    tracked: 3, top3: 0, top10: 1, top30: 1, outsideTop100: 1, noData: 1,
-    improvedDay: 1, declinedDay: 1, improvedWeek: 1, declinedWeek: 1,
-    referenceRegionName: "Россия", referenceDevice: "desktop",
+    tracked: 3,
+    top3: 0,
+    top10: 1,
+    top30: 1,
+    outsideTop100: 1,
+    noData: 1,
+    improvedDay: 0,
+    declinedDay: 0,
+    improvedWeek: 0,
+    declinedWeek: 0,
+    referenceRegionName: "Россия",
+    referenceDevice: "desktop",
   });
   assert.equal(result.rows.length, 3);
   assert.equal(result.rows[1].queryId, "query-2");
   assert.equal(result.rows[1].checks.ru.desktop, null);
-  assert.deepEqual(result.rows[0].checks.ru.desktop && {
+  assert.deepEqual(
+    result.rows[0].checks.ru.desktop && {
     position: result.rows[0].checks.ru.desktop.position,
     movementDay: result.rows[0].checks.ru.desktop.movementDay,
     movementWeek: result.rows[0].checks.ru.desktop.movementWeek,
-  }, { position: 5, movementDay: "improved", movementWeek: "improved" });
-  assert.deepEqual(result.rows[0].checks.moscow.mobile && {
+  },
+    { position: 5, movementDay: null, movementWeek: null },
+  );
+  assert.deepEqual(
+    result.rows[0].checks.moscow.mobile && {
     position: result.rows[0].checks.moscow.mobile.position,
     movementDay: result.rows[0].checks.moscow.mobile.movementDay,
     movementWeek: result.rows[0].checks.moscow.mobile.movementWeek,
-  }, { position: null, movementDay: "declined", movementWeek: null });
+  },
+    { position: null, movementDay: null, movementWeek: null },
+  );
 });
 
 test("traffic aggregation keeps additive totals and weights behavior by visits", () => {

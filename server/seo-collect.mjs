@@ -3,6 +3,15 @@ import { pathToFileURL } from "node:url";
 const loadProductionBuild = () => import("../build/server/index.js");
 
 export function parseSeoCollectArgs(args) {
+  if (args.includes("--resume-yandex-rank")) {
+    if (args.length !== 1) throw new Error("seo_collect_arguments_invalid");
+    return {
+      check: false,
+      skipYandexRank: false,
+      source: "yandex_search",
+      resumeYandexRank: true,
+    };
+  }
   let check = false;
   let skipYandexRank = false;
   let source;
@@ -31,18 +40,43 @@ function compact(report) {
   }).join(" ");
 }
 
-export async function runSeoCollectCommand(args, loadBuild = loadProductionBuild, logger = console) {
+export async function runSeoCollectCommand(
+  args,
+  loadBuild = loadProductionBuild,
+  logger = console,
+) {
   const options = parseSeoCollectArgs(args);
   const build = await loadBuild();
   const report = options.check
     ? await build.entry.module.checkSeoCollectionReady(options.source ? { source: options.source } : {})
-    : await build.entry.module.runSeoCollection(options.source
-      ? { source: options.source }
-      : options.skipYandexRank ? { skipYandexRank: true } : {});
+    : await build.entry.module.runSeoCollection(
+        options.source
+          ? {
+              source: options.source,
+              ...(options.resumeYandexRank ? { resumeYandexRank: true } : {}),
+            }
+          : options.skipYandexRank ? { skipYandexRank: true } : {},
+      );
   const line = compact(report);
-  if (report.failed || report.sources.some((source) => source.status === "failed")) {
+  if (
+    report.failed ||
+    report.sources.some(
+      (source) =>
+        source.status === "failed" ||
+        (source.status === "partial" &&
+          (source.retryable === false || source.blockedCount > 0)),
+    )
+  ) {
     logger.error(`SEO collection failed: ${line}`);
     return 1;
+  }
+  if (
+    report.sources.some(
+      (source) => source.status === "partial" || source.status === "running",
+    )
+  ) {
+    logger.error(`SEO collection incomplete: ${line}`);
+    return 2;
   }
   logger.info(`SEO collection ready: ${line}`);
   return 0;

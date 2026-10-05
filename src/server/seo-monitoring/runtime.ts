@@ -10,6 +10,7 @@ import { createYandexMetrikaProvider } from "./providers/yandexMetrika";
 import { SeoProviderError } from "./providers/provider-error";
 import { createYandexSearchProvider } from "./providers/yandexSearch";
 import { createSeoRankCollector } from "./rankCollector";
+import { createRankQueueRepository } from "./rankQueueRepository";
 import { loadSemanticCore } from "./semanticCore";
 import { createGeoRepository } from "../geo-monitoring/repository";
 import { createGeoCollector } from "../geo-monitoring/collector";
@@ -35,7 +36,13 @@ export function syncSeoSemanticCore() {
   return createSeoRepository(getDb()).syncSemanticCore(loadSemanticCore());
 }
 
-export async function runSeoCollection(options: { source?: SeoCollectionTarget; skipYandexRank?: boolean } = {}) {
+export async function runSeoCollection(
+  options: {
+    source?: SeoCollectionTarget
+    skipYandexRank?: boolean
+    resumeYandexRank?: boolean;
+  } = {},
+) {
   const config = readSeoConfig(process.env);
   const repository = createSeoRepository(getDb());
   const geoRepository = createGeoRepository(getDb());
@@ -52,16 +59,18 @@ export async function runSeoCollection(options: { source?: SeoCollectionTarget; 
   if (options.source && options.source !== "yandex_search" && options.source !== "geo_crawler") return metricReport;
   const sources: Array<Record<string, unknown>> = [...metricReport.sources];
   let failed = metricReport.failed;
-  if ((!options.source && !options.skipYandexRank) || options.source === "yandex_search") {
+  if (
+    (!options.source && !options.skipYandexRank) || options.source === "yandex_search"
+  ) {
     if (!config.yandexSearch.enabled) {
       sources.push({ source: "yandex_search", status: "disabled", plannedCount: 0, completedCount: 0, storedCount: 0, checkDate: null });
     } else {
       try {
         const rank = await createSeoRankCollector({
-          repository,
+          repository: createRankQueueRepository(getDb()),
           provider: createYandexSearchProvider(config.yandexSearch),
           dailyCheckLimit: config.yandexSearch.dailyCheckLimit,
-        }).run();
+        }).run({ resumeOnly: options.resumeYandexRank });
         sources.push(rank);
         failed ||= rank.status === "failed";
       } catch (error) {

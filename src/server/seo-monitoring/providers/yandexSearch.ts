@@ -38,7 +38,13 @@ function operationId(payload: unknown): string {
   return payload.id;
 }
 
-async function requestJson(fetchImpl: typeof fetch, url: string, apiKey: string, init: RequestInit = {}): Promise<unknown> {
+async function requestJson(
+  fetchImpl: typeof fetch,
+  url: string,
+  apiKey: string,
+  init: RequestInit = {},
+): Promise<unknown> {
+  const submitting = init.method === "POST";
   let response: Response;
   try {
     response = await fetchImpl(url, {
@@ -51,11 +57,21 @@ async function requestJson(fetchImpl: typeof fetch, url: string, apiKey: string,
       },
     });
   } catch {
+    if (submitting)
+      throw new SeoProviderError("seo_rank_submission_uncertain", false);
     throw new SeoProviderError("seo_yandex_search_retryable", true);
   }
   if (response.status === 401 || response.status === 403) {
     throw new SeoProviderError("seo_yandex_search_auth_failed", false);
   }
+  if (submitting && response.status === 429)
+    throw new SeoProviderError(
+      "seo_rank_submit_rejected",
+      true,
+      boundedRetryAfter(response),
+    );
+  if (submitting && response.status >= 500)
+    throw new SeoProviderError("seo_rank_submission_uncertain", false);
   if (response.status === 429 || response.status >= 500) {
     throw new SeoProviderError("seo_yandex_search_retryable", true, boundedRetryAfter(response));
   }
@@ -63,6 +79,8 @@ async function requestJson(fetchImpl: typeof fetch, url: string, apiKey: string,
   try {
     return await response.json();
   } catch {
+    if (submitting)
+      throw new SeoProviderError("seo_rank_submission_uncertain", false);
     return invalidResponse();
   }
 }
@@ -103,7 +121,11 @@ export function createYandexSearchProvider(
   config: Extract<YandexSearchConfig, { enabled: true }>,
   fetchImpl: typeof fetch = fetch,
 ) {
-  async function startSearch(queryText: string, regionId: number, device: Extract<SeoDevice, "desktop" | "mobile">): Promise<string> {
+  async function startSearch(
+    queryText: string,
+    regionId: number,
+    device: Extract<SeoDevice, "desktop" | "mobile">,
+  ): Promise<string> {
     const query = queryText.trim();
     if (!query || query.length > 400) throw new SeoProviderError("seo_yandex_search_query_invalid", false);
     if (!Number.isSafeInteger(regionId) || regionId < 1) throw new SeoProviderError("seo_yandex_search_region_invalid", false);
@@ -127,7 +149,11 @@ export function createYandexSearchProvider(
         userAgent: device === "mobile" ? MOBILE_USER_AGENT : DESKTOP_USER_AGENT,
       }),
     });
-    return operationId(payload);
+    try {
+      return operationId(payload);
+    } catch {
+      throw new SeoProviderError("seo_rank_submission_uncertain", false);
+    }
   }
 
   async function pollSearch(id: string): Promise<YandexRankResult | null> {

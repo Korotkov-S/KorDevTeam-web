@@ -3,6 +3,87 @@ import test from "node:test";
 
 import { parseSeoCollectArgs, runSeoCollectCommand } from "./seo-collect.mjs";
 
+test("partial collections are not reported as ready, and blocked takes precedence", async () => {
+  for (const [sources, expected] of [
+    [
+      [
+        {
+          source: "yandex_search",
+          status: "partial",
+          retryable: true,
+          plannedCount: 960,
+          storedCount: 255,
+          completedCount: 255,
+        },
+      ],
+      2,
+    ],
+    [
+      [
+        {
+          source: "yandex_search",
+          status: "partial",
+          retryable: false,
+          errorCode: "legacy_resume_unavailable",
+        },
+      ],
+      1,
+    ],
+    [[{ source: "yandex_webmaster", status: "partial" }], 2],
+    [
+      [
+        { source: "yandex_search", status: "partial", retryable: true },
+        { source: "google_search_console", status: "failed" },
+      ],
+      1,
+    ],
+  ]) {
+    const lines = [];
+    assert.equal(
+      await runSeoCollectCommand(
+        [],
+        async () => ({
+          entry: { module: { runSeoCollection: async () => ({ sources }) } },
+        }),
+        { info: (l) => lines.push(l), error: (l) => lines.push(l) },
+      ),
+      expected,
+    );
+    assert.doesNotMatch(lines.join(" "), /collection ready/);
+  }
+});
+test("resume option cannot create a fresh rank plan or mix with collection options", async () => {
+  let options;
+  const build = {
+    entry: {
+      module: {
+        runSeoCollection: async (o) => {
+          options = o;
+          return { sources: [] };
+        },
+      },
+    },
+  };
+  assert.equal(
+    await runSeoCollectCommand(["--resume-yandex-rank"], async () => build, { info() {}, error() {} }),
+    0,
+  );
+  assert.deepEqual(options, {
+    source: "yandex_search",
+    resumeYandexRank: true,
+  });
+  for (const other of [
+    "--check",
+    "--skip-yandex-rank",
+    "--source=yandex-rank",
+    "--resume-yandex-rank",
+  ])
+    assert.throws(
+      () => parseSeoCollectArgs(["--resume-yandex-rank", other]),
+      /arguments_invalid/,
+    );
+});
+
 test("CLI accepts only --check and exact source selection", () => {
   assert.deepEqual(parseSeoCollectArgs([]), { check: false, skipYandexRank: false });
   assert.deepEqual(parseSeoCollectArgs(["--skip-yandex-rank"]), { check: false, skipYandexRank: true });

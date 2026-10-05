@@ -688,6 +688,71 @@ export const seoRankRuns = pgTable(
   ],
 );
 
+export const seoRankJobs = pgTable(
+  "seo_rank_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").notNull().references(() => seoRankRuns.id, { onDelete: "restrict" }),
+    queryId: uuid("query_id").notNull().references(() => seoQueries.id, { onDelete: "restrict" }),
+    queryText: text("query_text").notNull(),
+    targetPath: text("target_path"),
+    regionId: uuid("region_id").notNull()
+      .references(() => seoRegions.id, { onDelete: "restrict" }),
+    externalRegionId: integer("external_region_id").notNull(),
+    device: seoDevice("device").notNull(),
+    state: varchar("state", { length: 24 }).notNull().default("queued"),
+    operationId: varchar("operation_id", { length: 200 }),
+    submitAttempts: integer("submit_attempts").notNull().default(0),
+    pollErrorAttempts: integer("poll_error_attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    errorCode: varchar("error_code", { length: 120 }),
+  },
+  (t) => [
+    uniqueIndex("seo_rank_jobs_matrix_uq").on(
+      t.runId,
+      t.queryId,
+      t.regionId,
+      t.device,
+    ),
+    index("seo_rank_jobs_due_idx").on(t.runId, t.state, t.nextAttemptAt),
+    check(
+      "seo_rank_jobs_state_valid",
+      sql`${t.state} IN ('queued','submitting','polling','stored','retry_wait','blocked','expired')`,
+    ),
+    check(
+      "seo_rank_jobs_counts_valid",
+      sql`${t.submitAttempts} >= 0 AND ${t.pollErrorAttempts} >= 0`,
+    ),
+    check(
+      "seo_rank_jobs_device_valid",
+      sql`${t.device} IN ('desktop','mobile')`,
+    ),
+    check(
+      "seo_rank_jobs_polling_id",
+      sql`${t.state} <> 'polling' OR ${t.operationId} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const seoRankSubmissions = pgTable(
+  "seo_rank_submissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => seoRankJobs.id, { onDelete: "restrict" }),
+    attempt: integer("attempt").notNull(),
+    budgetDate: date("budget_date", { mode: "string" }).notNull(),
+    reservedAt: timestamp("reserved_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("seo_rank_submissions_attempt_uq").on(t.jobId, t.attempt),
+    index("seo_rank_submissions_budget_idx").on(t.budgetDate),
+    check("seo_rank_submissions_attempt_positive", sql`${t.attempt} > 0`),
+  ],
+);
+
 export const seoTrafficMetrics = pgTable(
   "seo_traffic_metrics",
   {
@@ -761,7 +826,10 @@ export const seoRankChecks = pgTable(
     check("seo_rank_checks_position_range", sql`${table.position} IS NULL OR (${table.position} >= 1 AND ${table.position} <= ${table.resultLimit})`),
     check("seo_rank_checks_limit_range", sql`${table.resultLimit} >= 1 AND ${table.resultLimit} <= 100`),
     check("seo_rank_checks_result_coherent", sql`(${table.status} = 'found' AND ${table.position} IS NOT NULL AND ${table.resultUrl} IS NOT NULL) OR (${table.status} = 'not_found' AND ${table.position} IS NULL AND ${table.resultUrl} IS NULL)`),
-    check("seo_rank_checks_result_url_http", sql`${table.resultUrl} IS NULL OR ${table.resultUrl} ~ '^https?://'`),
+    check(
+      "seo_rank_checks_result_url_http",
+      sql`${table.resultUrl} IS NULL OR ${table.resultUrl} ~ '^https?://'`,
+    ),
   ],
 );
 
@@ -1637,7 +1705,10 @@ export const adVkAds = pgTable(
     index("ad_vk_ads_source_updated_idx").on(table.sourceUpdatedAt),
     check("ad_vk_ads_external_nonempty", sql`length(btrim(${table.externalId})) > 0 AND length(btrim(${table.name})) > 0 AND length(btrim(${table.status})) > 0`),
     check("ad_vk_ads_fingerprint_sha256", sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
-    check("ad_vk_ads_landing_safe", sql`(${table.landingOrigin} IS NULL OR ${table.landingOrigin} ~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?$') AND (${table.landingPath} IS NULL OR (${table.landingPath} ~ '^/' AND ${table.landingPath} !~ '[?#]'))`),
+    check(
+      "ad_vk_ads_landing_safe",
+      sql`(${table.landingOrigin} IS NULL OR ${table.landingOrigin} ~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?$') AND (${table.landingPath} IS NULL OR (${table.landingPath} ~ '^/' AND ${table.landingPath} !~ '[?#]'))`,
+    ),
     check("ad_vk_ads_seen_period_valid", sql`${table.lastSeenAt} >= ${table.firstSeenAt} AND (${table.inactiveAt} IS NULL OR ${table.inactiveAt} >= ${table.firstSeenAt})`),
   ],
 );
@@ -1671,7 +1742,10 @@ export const adVkCreativeVersions = pgTable(
     check("ad_vk_creative_versions_content_bounded", sql`jsonb_typeof(${table.textBlocks}) = 'array' AND jsonb_array_length(${table.textBlocks}) <= 100 AND octet_length(${table.textBlocks}::text) <= 16384 AND jsonb_typeof(${table.contentIds}) = 'array' AND jsonb_array_length(${table.contentIds}) <= 100 AND octet_length(${table.contentIds}::text) <= 16384`),
     check("ad_vk_creative_versions_dimensions_valid", sql`(${table.width} IS NULL OR ${table.width} > 0) AND (${table.height} IS NULL OR ${table.height} > 0) AND (${table.durationSeconds} IS NULL OR ${table.durationSeconds} >= 0)`),
     check("ad_vk_creative_versions_image_paired", sql`(${table.imageSha256} IS NULL) = (${table.imageObjectKey} IS NULL)`),
-    check("ad_vk_creative_versions_media_coherent", sql`(${table.mediaKind} = 'image' AND ${table.videoSourceUrl} IS NULL) OR (${table.mediaKind} = 'video' AND ${table.imageSha256} IS NULL AND ${table.imageObjectKey} IS NULL AND (${table.videoSourceUrl} IS NULL OR (${table.videoSourceUrl} ~ '^https://' AND ${table.videoSourceUrl} !~ '[?#]')))`),
+    check(
+      "ad_vk_creative_versions_media_coherent",
+      sql`(${table.mediaKind} = 'image' AND ${table.videoSourceUrl} IS NULL) OR (${table.mediaKind} = 'video' AND ${table.imageSha256} IS NULL AND ${table.imageObjectKey} IS NULL AND (${table.videoSourceUrl} IS NULL OR (${table.videoSourceUrl} ~ '^https://' AND ${table.videoSourceUrl} !~ '[?#]')))`,
+    ),
     check("ad_vk_creative_versions_period_valid", sql`${table.activeTo} IS NULL OR ${table.activeTo} > ${table.activeFrom}`),
   ],
 );
@@ -1746,6 +1820,8 @@ export const schema = {
   seoDailyMetrics,
   seoRankChecks,
   seoRankRuns,
+  seoRankJobs,
+  seoRankSubmissions,
   seoTrafficMetrics,
   seoCollectionRuns,
   seoChanges,

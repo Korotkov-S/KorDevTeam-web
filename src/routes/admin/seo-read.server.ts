@@ -11,7 +11,8 @@ type Authenticator = Pick<AdminAuthService, "authenticate">;
 type SectionService = Pick<SeoService,
   "getDashboard" | "getOverview" | "getTrafficReport" | "getRankControl" | "listRankChecks" |
   "listQueries" | "listPagePerformance" | "listSemanticCore" | "listChanges" | "listRecommendations"
->;
+> &
+  Partial<Pick<SeoService, "getRankProgress">>;
 type Range = "7" | "28" | "90" | "custom";
 
 const DAY_MS = 86_400_000;
@@ -51,17 +52,29 @@ export function parseSeoSectionFilters(url: URL, now: Date) {
   const region = url.searchParams.get("region");
   if (region && !UUID.test(region)) throw new Error("seo_region_invalid");
   const deviceValue = url.searchParams.get("device");
-  const device = deviceValue && (["desktop", "mobile", "tablet", "all"] as string[]).includes(deviceValue)
-    ? deviceValue as SeoDevice : undefined;
+  const device =
+    deviceValue && (["desktop", "mobile", "tablet", "all"] as string[]).includes(deviceValue)
+      ? (deviceValue as SeoDevice)
+      : undefined;
   if (deviceValue && !device) throw new Error("seo_device_invalid");
   const frequencyValue = url.searchParams.get("frequency");
-  const frequencyBand = frequencyValue && (["high", "medium", "low", "unclassified"] as string[]).includes(frequencyValue)
-    ? frequencyValue as "high" | "medium" | "low" | "unclassified" : undefined;
+  const frequencyBand =
+    frequencyValue && (["high", "medium", "low", "unclassified"] as string[]).includes(frequencyValue)
+      ? (frequencyValue as "high" | "medium" | "low" | "unclassified")
+      : undefined;
   if (frequencyValue && !frequencyBand) throw new Error("seo_frequency_band_invalid");
   const pagePath = url.searchParams.get("page")?.trim() || undefined;
   return {
-    ui: { range, dateFrom, dateTo, source, regionId: source === "google_search_console" ? null : region ?? null,
-      device: device ?? null, frequencyBand: frequencyBand ?? null, pagePath: pagePath ?? "" },
+    ui: {
+      range,
+      dateFrom,
+      dateTo,
+      source,
+      regionId: source === "google_search_console" ? null : (region ?? null),
+      device: device ?? null,
+      frequencyBand: frequencyBand ?? null,
+      pagePath: pagePath ?? "",
+    },
     search: { dateFrom, dateTo, source, ...(source === "yandex_webmaster" && region ? { regionId: region } : {}),
       ...(device ? { device } : {}), ...(frequencyBand ? { frequencyBand } : {}), ...(pagePath ? { pagePath } : {}) },
     traffic: { dateFrom, dateTo },
@@ -103,11 +116,12 @@ export function createSeoSectionLoader(
         ]);
         payload = { filters: parsed.ui, dashboard, previousOverview, traffic, rankControl, recommendations };
       } else if (section === "positions") {
-        const [rankControl, rankChecks] = await Promise.all([
+        const [rankControl, rankChecks, rankProgress] = await Promise.all([
           service.getRankControl({ dateTo: parsed.ui.dateTo }),
           service.listRankChecks({ filters: { ...parsed.search, source: "yandex_webmaster" }, limit: 100, cursor }),
+          service.getRankProgress?.({ dateTo: parsed.ui.dateTo }) ?? null,
         ]);
-        payload = { filters: parsed.ui, rankControl, rankChecks };
+        payload = { filters: parsed.ui, rankControl, rankChecks, rankProgress };
       } else if (section === "traffic") {
         const [dashboard, traffic, queries] = await Promise.all([
           service.getDashboard(parsed.search),
