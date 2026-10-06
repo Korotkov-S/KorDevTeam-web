@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql, getTableColumns } from "drizzle-orm";
 import type { createDb } from "../db/client";
 import {
   seoRankJobs,
@@ -136,15 +136,18 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
         };
       });
     },
-    async listDueJobs(runId: string, now: Date) {
+    async listDueJobs(runId: string, now: Date, options: { allowBudgetResume?: boolean } = {}) {
       return db
-        .select()
+        .select({ ...getTableColumns(seoRankJobs), operationExpiresAt: sql<Date | null>`
+          (select max(s.reserved_at) + interval '12 hours' from seo_rank_submissions s where s.job_id = seo_rank_jobs.id)
+        `.mapWith((value: string | null) => value === null ? null : new Date(value)) })
         .from(seoRankJobs)
         .where(
           and(
             eq(seoRankJobs.runId, runId),
             sql`${seoRankJobs.state} IN ('queued','polling','retry_wait')`,
-            sql`(${seoRankJobs.nextAttemptAt} IS NULL OR ${seoRankJobs.nextAttemptAt} <= ${now})`,
+            sql`(${seoRankJobs.nextAttemptAt} IS NULL OR ${seoRankJobs.nextAttemptAt} <= ${now}
+              OR (${options.allowBudgetResume === true} AND ${seoRankJobs.errorCode} = 'seo_rank_daily_budget_exhausted' AND ${seoRankJobs.operationId} IS NULL))`,
           ),
         )
         .orderBy(asc(seoRankJobs.id));
@@ -303,6 +306,15 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
             eq(seoRankJobs.state, "submitting"),
           ),
         );
+    },
+    async recoverPollFailures(runId: string, now: Date) {
+      // Only known IDs stopped by the old GET retry cap. Never reopen an uncertain POST.
+      await db.update(seoRankJobs).set({ state: "polling", errorCode: null, nextAttemptAt: now }).where(and(
+        eq(seoRankJobs.runId, runId), eq(seoRankJobs.state, "blocked"),
+        eq(seoRankJobs.errorCode, "seo_yandex_search_retryable"),
+        sql`${seoRankJobs.operationId} IS NOT NULL`,
+        sql`${now} < (select max(s.reserved_at) + interval '12 hours' from seo_rank_submissions s where s.job_id = seo_rank_jobs.id)`,
+      ));
     },
     async summarizePlan(runId: string) {
       const [run] = await db

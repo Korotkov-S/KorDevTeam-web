@@ -11,6 +11,27 @@ const MAX_RAW_BYTES = 8 * 1024 * 1024;
 const MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 const DESKTOP_USER_AGENT = "KorDevTeam SEO rank monitor/1.0 (desktop)";
 
+type RequestTiming = { now: () => number; sleep: (ms: number) => Promise<void> };
+function createRequestGate(timing: RequestTiming) {
+  let tail = Promise.resolve(), nextAt = 0;
+  return {
+    async run<T>(request: () => Promise<T>): Promise<T> {
+      const previous = tail;
+      let release!: () => void;
+      tail = new Promise<void>(resolve => { release = resolve; });
+      await previous;
+      try {
+        while (timing.now() < nextAt) await timing.sleep(nextAt - timing.now());
+        nextAt = timing.now() + 200;
+        return await request();
+      } finally { release(); }
+    },
+    coolDown(seconds: number) { nextAt = Math.max(nextAt, timing.now() + seconds * 1000); },
+  };
+}
+// Shared by all provider instances in this process, not one limiter per worker.
+const sharedRequestGate = createRequestGate({ now: Date.now, sleep: ms => new Promise(resolve => setTimeout(resolve, ms)) });
+
 export type YandexRankResult = {
   status: "found";
   position: number;
@@ -43,20 +64,30 @@ async function requestJson(
   url: string,
   apiKey: string,
   init: RequestInit = {},
+  gate = sharedRequestGate,
+  beforeSend?: () => void,
 ): Promise<unknown> {
   const submitting = init.method === "POST";
   let response: Response;
+  let sent = false;
   try {
-    response = await fetchImpl(url, {
-      ...init,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: {
-        accept: "application/json",
-        authorization: `Api-Key ${apiKey}`,
-        ...init.headers,
-      },
+    response = await gate.run(async () => {
+      beforeSend?.();
+      sent = true;
+      const result = await fetchImpl(url, {
+        ...init,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        headers: {
+          accept: "application/json",
+          authorization: `Api-Key ${apiKey}`,
+          ...init.headers,
+        },
+      });
+      if (result.status === 429) gate.coolDown(boundedRetryAfter(result) ?? 30);
+      return result;
     });
-  } catch {
+  } catch (error) {
+    if (!sent && error instanceof SeoProviderError) throw error;
     if (submitting)
       throw new SeoProviderError("seo_rank_submission_uncertain", false);
     throw new SeoProviderError("seo_yandex_search_retryable", true);
@@ -64,6 +95,8 @@ async function requestJson(
   if (response.status === 401 || response.status === 403) {
     throw new SeoProviderError("seo_yandex_search_auth_failed", false);
   }
+  if (!submitting && response.status === 404)
+    throw new SeoProviderError("seo_rank_operation_unavailable", false);
   if (submitting && response.status === 429)
     throw new SeoProviderError(
       "seo_rank_submit_rejected",
@@ -120,11 +153,14 @@ function parseResult(xml: string, targetHost: string): YandexRankResult {
 export function createYandexSearchProvider(
   config: Extract<YandexSearchConfig, { enabled: true }>,
   fetchImpl: typeof fetch = fetch,
+  timing?: RequestTiming,
 ) {
+  const gate = timing ? createRequestGate(timing) : sharedRequestGate;
   async function startSearch(
     queryText: string,
     regionId: number,
     device: Extract<SeoDevice, "desktop" | "mobile">,
+    beforeSend?: () => void,
   ): Promise<string> {
     const query = queryText.trim();
     if (!query || query.length > 400) throw new SeoProviderError("seo_yandex_search_query_invalid", false);
@@ -148,7 +184,7 @@ export function createYandexSearchProvider(
         responseFormat: "FORMAT_XML",
         userAgent: device === "mobile" ? MOBILE_USER_AGENT : DESKTOP_USER_AGENT,
       }),
-    });
+    }, gate, beforeSend);
     try {
       return operationId(payload);
     } catch {
@@ -156,9 +192,9 @@ export function createYandexSearchProvider(
     }
   }
 
-  async function pollSearch(id: string): Promise<YandexRankResult | null> {
+  async function pollSearch(id: string, beforeSend?: () => void): Promise<YandexRankResult | null> {
     if (!/^[a-zA-Z0-9_-]{1,200}$/u.test(id)) throw new SeoProviderError("seo_yandex_search_operation_invalid", false);
-    const payload = await requestJson(fetchImpl, `${OPERATIONS_URL}/${encodeURIComponent(id)}`, config.apiKey);
+    const payload = await requestJson(fetchImpl, `${OPERATIONS_URL}/${encodeURIComponent(id)}`, config.apiKey, {}, gate, beforeSend);
     if (!plainObject(payload)) return invalidResponse();
     if (payload.error !== undefined) throw new SeoProviderError("seo_yandex_search_operation_failed", false);
     if (payload.done !== true) return null;

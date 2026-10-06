@@ -9,6 +9,7 @@ import {
   seoRankRuns,
   seoRankChecks,
   seoRankJobs,
+  seoRankSubmissions,
 } from "../db/schema";
 import * as queueModule from "./rankQueueRepository";
 
@@ -177,3 +178,15 @@ databaseTest(
     assert.equal(progress.retryable, false);
   },
 );
+
+databaseTest("one-off 1802 cap permits exactly 802 reservations beyond the already spent 1000", async () => {
+  await resetTestDatabase(url);
+  const db = createDb(url);
+  await db.insert(seoQueries).values({ queryText: "cap", normalizedQuery: "cap", status: "active", tracked: true });
+  const repo = queueModule.createRankQueueRepository(db);
+  const plan = (await repo.getOrCreatePlan({ now, dailyLimit: 1000, resumeOnly: false }))!;
+  await db.insert(seoRankSubmissions).values(Array.from({ length: 1801 }, (_, i) => ({ jobId: plan.jobs[0].id, attempt: i + 1, budgetDate: "2026-10-05", reservedAt: now })));
+  assert.equal(await repo.reserveSubmission(plan.jobs[1].id, now, 1000), false);
+  assert.equal(await repo.reserveSubmission(plan.jobs[1].id, now, 1802), true);
+  assert.equal(await repo.reserveSubmission(plan.jobs[2].id, now, 1802), false);
+});

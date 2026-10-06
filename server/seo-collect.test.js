@@ -3,6 +3,16 @@ import test from "node:test";
 
 import { parseSeoCollectArgs, runSeoCollectCommand } from "./seo-collect.mjs";
 
+test("daytime exception only resumes the existing plan and cannot leak into ordinary collection", async () => {
+  let options;
+  const build = { entry: { module: { runSeoCollection: async o => { options = o; return { sources: [] }; } } } };
+  await runSeoCollectCommand(["--resume-yandex-rank", "--allow-daytime-yandex-rank"], async () => build, { info() {}, error() {} });
+  assert.deepEqual(options, { source: "yandex_search", resumeYandexRank: true, allowDaytimeYandexRank: true });
+  for (const args of [["--allow-daytime-yandex-rank"], ["--source=yandex-rank", "--allow-daytime-yandex-rank"], ["--resume-yandex-rank", "--allow-daytime-yandex-rank", "--allow-daytime-yandex-rank"]]) {
+    assert.throws(() => parseSeoCollectArgs(args), /arguments_invalid/);
+  }
+});
+
 test("partial collections are not reported as ready, and blocked takes precedence", async () => {
   for (const [sources, expected] of [
     [

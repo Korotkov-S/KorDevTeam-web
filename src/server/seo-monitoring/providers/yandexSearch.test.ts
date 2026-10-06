@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createYandexSearchProvider } from "./yandexSearch";
+import { createYandexSearchProvider as createProvider } from "./yandexSearch";
+import { SeoProviderError } from "./provider-error";
+
+function createYandexSearchProvider(...args: Parameters<typeof createProvider>) {
+  let time = 0;
+  return createProvider(args[0], args[1], args[2] ?? {
+    now: () => time,
+    sleep: async (ms: number) => { time += ms; },
+  });
+}
 
 const config = {
   enabled: true as const,
@@ -9,6 +18,74 @@ const config = {
   folderId: "b1g1234567890abcdefg",
   targetHost: "kordev.team",
 };
+
+test("parallel rank requests share a five-per-second gate", async () => {
+  let time = 0;
+  const sent: number[] = [];
+  const provider = createYandexSearchProvider(config, async () => {
+    sent.push(time);
+    return Response.json({ done: false, id: "operation" });
+  }, { now: () => time, sleep: async (ms: number) => { time += ms; } });
+  await Promise.all(Array.from({ length: 8 }, () => provider.startSearch("crm", 225, "desktop")));
+  assert.deepEqual(sent, [0, 200, 400, 600, 800, 1000, 1200, 1400]);
+});
+
+test("a rejected request pauses all subsequent requests for Retry-After", async () => {
+  let time = 0;
+  const sent: number[] = [];
+  const provider = createYandexSearchProvider(config, async () => {
+    sent.push(time);
+    return sent.length === 1
+      ? new Response("", { status: 429, headers: { "retry-after": "31" } })
+      : Response.json({ done: false, id: "operation" });
+  }, { now: () => time, sleep: async (ms: number) => { time += ms; } });
+  await assert.rejects(() => provider.startSearch("crm", 225, "desktop"));
+  await provider.pollSearch("operation");
+  assert.deepEqual(sent, [0, 31000]);
+});
+
+test("a missing operation is explicit and never starts another paid search", async () => {
+  const provider = createYandexSearchProvider(config, async () => new Response("", { status: 404 }));
+  await assert.rejects(() => provider.pollSearch("operation"), {
+    message: "seo_rank_operation_unavailable", retryable: false,
+  });
+});
+
+test("default provider instances share a gate across POST and GET", async () => {
+  const sent: number[] = [];
+  const transport = async () => { sent.push(Date.now()); return Response.json({ done: false, id: "op" }); };
+  await Promise.all([
+    createProvider(config, transport).startSearch("crm", 225, "desktop"),
+    createProvider(config, transport).pollSearch("op"),
+  ]);
+  assert.ok(sent[1] - sent[0] >= 190);
+});
+
+test("paid request rechecks its submission guard after the global cooldown", async () => {
+  let time = 0, calls = 0;
+  const provider = createYandexSearchProvider(config, async () => {
+    calls++;
+    return new Response("", { status: 429, headers: { "retry-after": "31" } });
+  }, { now: () => time, sleep: async ms => { time += ms; } });
+  await assert.rejects(() => provider.pollSearch("op"));
+  await assert.rejects(() => provider.startSearch("crm", 225, "desktop", () => {
+    if (time >= 31000) throw new SeoProviderError("seo_rank_waiting_night_window", false);
+  }), { message: "seo_rank_waiting_night_window" });
+  assert.equal(calls, 1);
+});
+
+test("operation GET rechecks expiry after waiting in the same limiter", async () => {
+  let time = 0, calls = 0;
+  const provider = createYandexSearchProvider(config, async () => {
+    calls++;
+    return new Response("", { status: 429, headers: { "retry-after": "31" } });
+  }, { now: () => time, sleep: async ms => { time += ms; } });
+  await assert.rejects(() => provider.pollSearch("op"));
+  await assert.rejects(() => provider.pollSearch("op", () => {
+    if (time >= 31000) throw new SeoProviderError("seo_rank_operation_expired", false);
+  }), { message: "seo_rank_operation_expired" });
+  assert.equal(calls, 1);
+});
 
 test("ambiguous paid submissions cannot be retried; explicit rejection can", async () => {
   for (const transport of [

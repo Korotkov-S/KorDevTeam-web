@@ -4,12 +4,14 @@ const loadProductionBuild = () => import("../build/server/index.js");
 
 export function parseSeoCollectArgs(args) {
   if (args.includes("--resume-yandex-rank")) {
-    if (args.length !== 1) throw new Error("seo_collect_arguments_invalid");
+    const allowDaytime = args.length === 2 && args.includes("--allow-daytime-yandex-rank");
+    if (args.length !== 1 && !allowDaytime) throw new Error("seo_collect_arguments_invalid");
     return {
       check: false,
       skipYandexRank: false,
       source: "yandex_search",
       resumeYandexRank: true,
+      ...(allowDaytime ? { allowDaytimeYandexRank: true } : {}),
     };
   }
   let check = false;
@@ -54,6 +56,7 @@ export async function runSeoCollectCommand(
           ? {
               source: options.source,
               ...(options.resumeYandexRank ? { resumeYandexRank: true } : {}),
+              ...(options.allowDaytimeYandexRank ? { allowDaytimeYandexRank: true } : {}),
             }
           : options.skipYandexRank ? { skipYandexRank: true } : {},
       );

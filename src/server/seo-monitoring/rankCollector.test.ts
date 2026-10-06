@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 import { createDb } from "../db/client";
 import { resetTestDatabase } from "../db/testDatabase";
 import { seoQueries, seoRankJobs } from "../db/schema";
@@ -9,9 +9,14 @@ import { SeoProviderError } from "./providers/provider-error";
 import { eq } from "drizzle-orm";
 const url = process.env.TEST_DATABASE_URL ?? "",
   databaseTest = url ? test : test.skip;
+const clients: Array<{ end(): Promise<void> }> = [];
+afterEach(async () => {
+  await Promise.all(clients.splice(0).map(client => client.end()));
+});
 async function fixture() {
   await resetTestDatabase(url);
   const db = createDb(url);
+  clients.push((db as unknown as { $client: { end(): Promise<void> } }).$client);
   await db
     .insert(seoQueries)
     .values({
@@ -177,6 +182,70 @@ databaseTest("resume without an existing plan never submits", async () => {
   const p = await f.collector().run({ resumeOnly: true });
   assert.equal(p.status, "skipped");
   assert.equal(f.calls.post, 0);
+});
+databaseTest("four transient GET failures keep known operations recoverable without a new POST", async () => {
+  const f = await fixture();
+  f.provider.pollSearch = async () => { f.calls.get++; throw new SeoProviderError("seo_yandex_search_retryable", true); };
+  for (const date of ["2026-10-04T22:00:00Z", "2026-10-04T22:10:00Z", "2026-10-04T22:40:00Z", "2026-10-05T00:40:00Z"]) {
+    f.setTime(new Date(date));
+    await f.collector().run();
+  }
+  const jobs = await f.db.select().from(seoRankJobs);
+  assert.equal(jobs.filter(j => j.state === "blocked").length, 0);
+  assert.equal(jobs.filter(j => j.state === "retry_wait" && j.operationId !== null).length, 16);
+  assert.equal(f.calls.post, 16);
+});
+
+databaseTest("explicit daytime continuation wakes budget-deferred jobs but not early throttled retries", async () => {
+  const f = await fixture();
+  const plan = (await f.repository.getOrCreatePlan({ now: f.clock(), dailyLimit: 1000, resumeOnly: false }))!;
+  await f.repository.deferJob(plan.jobs[0].id, { stage: "submit", errorCode: "seo_rank_submit_rejected", nextAttemptAt: new Date("2026-10-05T12:00:00Z") });
+  for (const job of plan.jobs.slice(1)) await f.repository.deferJob(job.id, { stage: "submit", errorCode: "seo_rank_daily_budget_exhausted", nextAttemptAt: new Date("2026-10-05T21:30:00Z") });
+  f.setTime(new Date("2026-10-05T08:00:00Z"));
+  const report = await f.collector().run({ resumeOnly: true, allowDaytime: true });
+  assert.equal(report.storedCount, 15);
+  assert.equal(f.calls.post, 15);
+});
+databaseTest("daytime override cannot create a new paid plan", async () => {
+  const f = await fixture();
+  f.setTime(new Date("2026-10-05T08:00:00Z"));
+  await f.collector().run({ allowDaytime: true });
+  assert.equal(f.calls.post, 0);
+});
+databaseTest("expired operation is not polled or submitted again", async () => {
+  const f = await fixture();
+  f.provider.pollSearch = async () => { f.calls.get++; return null; };
+  await f.collector().run();
+  f.setTime(new Date("2026-10-05T10:00:00Z"));
+  const result = await f.collector().run({ resumeOnly: true });
+  assert.equal(result.blockedCount, 16);
+  assert.deepEqual(f.calls, { post: 16, get: 16 });
+  assert.ok((await f.db.select().from(seoRankJobs)).every(j => j.errorCode === "seo_rank_operation_expired"));
+});
+databaseTest("legacy transient GET failures resume only known unexpired operations", async () => {
+  const f = await fixture();
+  const plan = (await f.repository.getOrCreatePlan({ now: f.clock(), dailyLimit: 1000, resumeOnly: false }))!;
+  for (const job of plan.jobs) {
+    await f.repository.reserveSubmission(job.id, f.clock(), 1000);
+    await f.repository.saveOperation(job.id, `op-${job.id}`, f.clock());
+    await f.repository.blockJob(job.id, "seo_yandex_search_retryable");
+  }
+  await f.repository.blockJob(plan.jobs[0].id, "seo_yandex_search_auth_failed");
+  const result = await f.collector().run({ resumeOnly: true });
+  assert.equal(result.storedCount, 15);
+  assert.deepEqual(f.calls, { post: 0, get: 15 });
+});
+databaseTest("a fresh accepted operation does not inherit the expiry of a rejected attempt", async () => {
+  const f = await fixture();
+  const plan = (await f.repository.getOrCreatePlan({ now: f.clock(), dailyLimit: 1000, resumeOnly: false }))!;
+  for (const job of plan.jobs) {
+    await f.repository.reserveSubmission(job.id, f.clock(), 1000);
+    await f.repository.deferJob(job.id, { stage: "submit", errorCode: "seo_rank_submit_rejected", nextAttemptAt: new Date("2026-10-05T21:30:00Z"), expectedState: "submitting" });
+  }
+  f.setTime(new Date("2026-10-05T21:30:00Z"));
+  const result = await f.collector().run({ resumeOnly: true });
+  assert.equal(result.storedCount, 16);
+  assert.deepEqual(f.calls, { post: 16, get: 16 });
 });
 databaseTest(
   "recovery expires the original plan after 48 hours without losing its progress",

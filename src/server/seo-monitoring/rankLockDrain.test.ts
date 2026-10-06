@@ -39,6 +39,7 @@ test("fatal persistence failure drains sibling requests and stops new scheduling
         ? null
         : { runId: "run", expiresAt: new Date("2026-10-06T22:00:00Z") },
     recoverSubmitting: async () => {},
+    recoverPollFailures: async () => {},
     listDueJobs: async () =>
       Array.from({ length: 12 }, (_, i) => ({
         id: String(i),

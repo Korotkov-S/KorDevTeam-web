@@ -41,6 +41,7 @@ export async function runSeoCollection(
     source?: SeoCollectionTarget
     skipYandexRank?: boolean
     resumeYandexRank?: boolean;
+    allowDaytimeYandexRank?: boolean;
   } = {},
 ) {
   const config = readSeoConfig(process.env);
@@ -70,7 +71,7 @@ export async function runSeoCollection(
           repository: createRankQueueRepository(getDb()),
           provider: createYandexSearchProvider(config.yandexSearch),
           dailyCheckLimit: config.yandexSearch.dailyCheckLimit,
-        }).run({ resumeOnly: options.resumeYandexRank });
+        }).run({ resumeOnly: options.resumeYandexRank, allowDaytime: options.resumeYandexRank === true && options.allowDaytimeYandexRank === true });
         sources.push(rank);
         failed ||= rank.status === "failed";
       } catch (error) {
