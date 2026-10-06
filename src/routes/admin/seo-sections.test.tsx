@@ -75,6 +75,16 @@ test("positions page shows exact city/device ranks and dd.mm.yyyy dates", () => 
   assert.match(markup, /не средняя позиция по показам/u);
 });
 
+test("rotating positions show the actual 14-day comparison instead of a fictional weekly or daily change", () => {
+  const desktop = rankControl.rows[0].checks.ru.desktop;
+  const control = { ...rankControl, rows: [{ ...rankControl.rows[0], checks: {
+    ru: { desktop: { ...desktop, comparisonDays: 14, movementDay: null, deltaDay: null }, mobile: null },
+  } }] };
+  const markup = html(<SeoPositionsPage data={{ filters, rankControl: control, rankChecks: { items: [], nextCursor: null } }} />, "/admin/seo/positions/");
+  assert.match(markup, /14 дней: лучше на 5/u);
+  assert.doesNotMatch(markup, /7 дней:|1 день:/u);
+});
+
 test("traffic page separates search metrics from Metrica units and explains empty city data", () => {
   const noCities = { ...traffic, regions: [] };
   const markup = html(<SeoTrafficPage data={{ filters, dashboard, traffic: noCities, queries: { items: [], nextCursor: null } }} />, "/admin/seo/traffic/");

@@ -22,6 +22,13 @@ export type RankProgress = {
   periodTo: Date | null;
   errorCode: string | null;
   retryable: boolean;
+  rotation?: {
+    availableQueryCount: number;
+    selectedQueryCount: number;
+    deferredQueryCount: number;
+    groupCount: number;
+    cycleDays: number;
+  };
 };
 export function moscowDate(now: Date): string {
   return new Date(now.getTime() + 10800000).toISOString().slice(0, 10);
@@ -58,6 +65,15 @@ export function summarizeRankPlan(
     .filter((d): d is Date => d !== null)
     .sort((a, b) => b.getTime() - a.getTime());
   return {
+    ...(run.metadata?.selectionPolicy === "balanced_weekly_rotation" ? {
+      rotation: {
+        availableQueryCount: Number(run.metadata.availableQueryCount),
+        selectedQueryCount: Number(run.metadata.selectedQueryCount),
+        deferredQueryCount: Number(run.metadata.omittedQueryCount),
+        groupCount: Number(run.metadata.rotationGroupCount),
+        cycleDays: Number(run.metadata.rotationCycleDays),
+      },
+    } : {}),
     runId: run.id,
     checkDate: run.checkDate,
     status:

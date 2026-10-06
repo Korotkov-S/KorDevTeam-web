@@ -17,6 +17,39 @@ const url = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = url ? test : test.skip;
 const now = new Date("2026-10-04T22:00:00Z");
 
+databaseTest("weekly rotation covers 109 queries in two balanced whole-matrix plans without starving low priorities", async () => {
+  await resetTestDatabase(url);
+  const db = createDb(url);
+  await db.insert(seoQueries).values(Array.from({ length: 109 }, (_, i) => ({
+    queryText: `rotation-${i}`, normalizedQuery: `rotation-${i}`,
+    status: "active" as const, tracked: true, priority: i < 60 ? 100 : 10,
+  })));
+  const repo = queueModule.createRankQueueRepository(db);
+  const planAt = (weeks: number, resumeOnly = false) => repo.getOrCreatePlan({
+    now: new Date(now.getTime() + weeks * 7 * 86400000), dailyLimit: 1000, resumeOnly,
+  });
+  const first = (await planAt(0))!;
+  assert.equal(first.jobs.length, 880);
+  assert.equal((await planAt(0))!.runId, first.runId);
+  assert.equal((await planAt(0, true))!.runId, first.runId);
+  const second = (await planAt(1))!;
+  assert.equal(second.jobs.length, 864);
+  const ids = (plan: typeof first) => [...new Set(plan.jobs.map(job => job.queryId))].sort();
+  assert.equal(new Set([...ids(first), ...ids(second)]).size, 109);
+  assert.equal(ids(first).filter(id => ids(second).includes(id)).length, 0);
+  assert.deepEqual(ids((await planAt(2))!), ids(first));
+  for (const plan of [first, second]) {
+    assert.ok(plan.jobs.length <= 1000);
+    for (const id of ids(plan)) assert.equal(plan.jobs.filter(job => job.queryId === id).length, 16);
+    assert.equal(plan.quotaMetadata.rotationGroupCount, 2);
+    assert.equal(plan.quotaMetadata.rotationCycleDays, 14);
+    const progress = await repo.summarizePlan(plan.runId);
+    assert.equal(progress.rotation?.cycleDays, 14);
+    assert.equal(progress.rotation?.availableQueryCount, 109);
+    assert.equal(progress.rotation?.selectedQueryCount, plan.jobs.length / 16);
+  }
+});
+
 databaseTest(
   "failed submission reservation cannot reopen an in-flight paid POST",
   async () => {

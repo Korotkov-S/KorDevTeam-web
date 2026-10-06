@@ -76,10 +76,27 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
               ),
             )
             .orderBy(asc(seoRegions.sortOrder));
-          const size = regions.length * 2,
-            selected = size
-              ? queries.slice(0, Math.floor(dailyLimit / size))
-              : [];
+          const size = regions.length * 2;
+          const capacity = size ? Math.floor(dailyLimit / size) : 0;
+          const groupCount = capacity && queries.length
+            ? Math.ceil(queries.length / capacity) : 0;
+          const groupSize = groupCount ? Math.ceil(queries.length / groupCount) : 0;
+          // Stable, balanced groups preserve comparable matrices across rotations.
+          // Use durable plans (not successful checks): a failed platform must not
+          // starve the remaining catalog, and recovery keeps its original jobs.
+          const history = groupCount > 1 ? await tx
+            .select({ queryId: seoRankJobs.queryId, lastPlanned: sql<string>`max(${seoRankRuns.startedAt})` })
+            .from(seoRankJobs)
+            .innerJoin(seoRankRuns, eq(seoRankRuns.id, seoRankJobs.runId))
+            .where(lte(seoRankRuns.startedAt, now))
+            .groupBy(seoRankJobs.queryId) : [];
+          const lastPlanned = new Map(history.map(row => [row.queryId, new Date(row.lastPlanned).getTime()]));
+          const groups = Array.from({ length: groupCount }, (_, index) => {
+            const members = queries.slice(index * groupSize, (index + 1) * groupSize);
+            return { index, members, lastPlanned: Math.max(0, ...members.map(q => lastPlanned.get(q.id) ?? 0)) };
+          });
+          groups.sort((a, b) => a.lastPlanned - b.lastPlanned || a.index - b.index);
+          const selected = groups[0]?.members ?? [];
           const errorCode =
             queries.length && (!size || size > dailyLimit)
               ? "seo_yandex_search_daily_limit_too_low"
@@ -102,6 +119,10 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
                 selectedQueryCount: selected.length,
                 omittedQueryCount: queries.length - selected.length,
                 dailyCheckLimit: dailyLimit,
+                selectionPolicy: "balanced_weekly_rotation",
+                rotationGroupCount: groupCount,
+                rotationGroupIndex: groups[0]?.index ?? null,
+                rotationCycleDays: groupCount * 7,
               },
             })
             .returning();

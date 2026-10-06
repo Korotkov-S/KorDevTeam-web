@@ -88,6 +88,7 @@ type RankControlCheck = {
 export type RankMovement = "improved" | "declined" | "same";
 
 export type RankControlCell = RankControlCheck & {
+  comparisonDays: number | null;
   deltaDay: number | null;
   deltaWeek: number | null;
   movementDay: RankMovement | null;
@@ -200,6 +201,9 @@ export function buildRankControl(
           : undefined;
         cells[region.code][device] = {
           ...current,
+          comparisonDays: previousWeek
+            ? Math.round((Date.parse(current.checkDate) - Date.parse(previousWeek.checkDate)) / DAY_MS)
+            : null,
           deltaDay: numericDelta(current, previousDay),
           deltaWeek: numericDelta(current, previousWeek),
           movementDay: rankMovement(current, previousDay),
@@ -656,6 +660,7 @@ export function createSeoRepository(db: SeoDatabase) {
         .where(
           and(
             eq(seoRankRuns.status, "success"),
+            gte(seoRankRuns.checkDate, shiftDate(dateTo, -56)),
             lte(seoRankRuns.checkDate, dateTo),
           ),
         )
@@ -694,12 +699,14 @@ export function createSeoRepository(db: SeoDatabase) {
         });
       }
       const pairs: Array<[string, string]> = [];
-      for (let i = 0; i < complete.length - 1; i++)
-        if (
-          complete[i].matrix === complete[i + 1].matrix &&
-          complete[i + 1].date === shiftDate(complete[i].date, -7)
-        )
-          pairs.push([complete[i].date, complete[i + 1].date]);
+      for (let i = 0; i < complete.length - 1; i++) {
+        const current = complete[i];
+        const previous = complete.slice(i + 1).find(candidate => {
+          const days = Math.round((Date.parse(current.date) - Date.parse(candidate.date)) / DAY_MS);
+          return candidate.matrix === current.matrix && days > 0 && days <= 56 && days % 7 === 0;
+        });
+        if (previous) pairs.push([current.date, previous.date]);
+      }
       return buildRankControl(
         dateTo,
         queries,

@@ -41,11 +41,17 @@ export function RankProgressPanel({
       </p>
       <p>
         {progress.status === "success"
-          ? "Полный снимок"
+          ? progress.rotation && progress.rotation.groupCount > 1
+            ? "Полный снимок текущей группы" : "Полный снимок"
           : action
             ? "Требуется действие"
             : "Неполный снимок — продолжение запланировано"}
       </p>
+      {progress.rotation && progress.rotation.groupCount > 0 && <p>
+        Запросов в каталоге: {progress.rotation.availableQueryCount}; в текущем плане: {progress.rotation.selectedQueryCount};
+        {" "}ждут своей очереди: {progress.rotation.deferredQueryCount}.
+        {" "}Плановый обход каталога: {progress.rotation.cycleDays} дней при успешном сборе и неизменном составе.
+      </p>}
       <p>
         Период сбора: {collectionTime(progress.periodFrom)} —{" "}
         {collectionTime(progress.periodTo)} (Москва).

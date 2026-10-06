@@ -10,6 +10,7 @@ import {
   seoQueries,
   seoRankChecks,
   seoRankRuns,
+  seoRankJobs,
   seoRecommendations,
   seoRegions,
   seoTrafficMetrics,
@@ -17,9 +18,49 @@ import {
 import { resetTestDatabase } from "../db/testDatabase";
 import * as repositoryModule from "./repository";
 import { createSeoRepository } from "./repository";
+import { createRankQueueRepository } from "./rankQueueRepository";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
+
+databaseTest("rotation compares complete identical matrices 14 days apart, not intervening or partial plans", async () => {
+  await resetTestDatabase(TEST_DATABASE_URL);
+  const db = createDb(TEST_DATABASE_URL);
+  await db.insert(seoQueries).values(Array.from({ length: 4 }, (_, i) => ({
+    queryText: `compare-${i}`, normalizedQuery: `compare-${i}`, status: "active" as const, tracked: true,
+  })));
+  const queue = createRankQueueRepository(db);
+  const plans = [];
+  for (let week = 0; week < 3; week++) {
+    const startedAt = new Date(Date.parse("2026-10-04T22:00:00Z") + week * 7 * 86400000);
+    const plan = (await queue.getOrCreatePlan({ now: startedAt, dailyLimit: 32, resumeOnly: false }))!;
+    plans.push(plan);
+    const checkedAt = new Date(startedAt.getTime() + 60000);
+    await db.update(seoRankJobs).set({ state: "stored", checkedAt }).where(eq(seoRankJobs.runId, plan.runId));
+    await db.insert(seoRankChecks).values(plan.jobs.map(job => ({
+      queryId: job.queryId, regionId: job.regionId, device: job.device,
+      checkDate: plan.checkDate, checkedAt, status: "found" as const,
+      position: week === 2 ? 3 : 10, resultUrl: "https://kordev.team/", resultLimit: 100,
+    })));
+    await db.update(seoRankRuns).set({ status: "success", completedCount: plan.jobs.length, storedCount: plan.jobs.length })
+      .where(eq(seoRankRuns.id, plan.runId));
+  }
+  const repo = createSeoRepository(db);
+  const cellFor = async (id: string) => {
+    const control = await repo.getRankControl("2026-10-19");
+    return control.rows.find(row => row.queryId === id)!.checks.ru.desktop!;
+  };
+  const cell = await cellFor(plans[0].jobs[0].queryId);
+  assert.equal(cell.movementWeek, "improved");
+  assert.equal(cell.deltaWeek, -7);
+  assert.equal(cell.comparisonDays, 14);
+  assert.equal((await cellFor(plans[1].jobs[0].queryId)).movementWeek, null);
+  // Even an apparent position improvement cannot be compared after partial collection.
+  await db.update(seoRankJobs).set({ state: "blocked" }).where(eq(seoRankJobs.id, plans[2].jobs[0].id));
+  assert.equal((await cellFor(plans[0].jobs[0].queryId)).movementWeek, null);
+  await db.update(seoRankJobs).set({ state: "stored", queryText: "changed intent" }).where(eq(seoRankJobs.id, plans[2].jobs[0].id));
+  assert.equal((await cellFor(plans[0].jobs[0].queryId)).movementWeek, null);
+});
 
 test("partial control snapshot never creates apparent weekly growth", () => {
   const result = repositoryModule.buildRankControl(
