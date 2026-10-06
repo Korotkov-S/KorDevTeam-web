@@ -43,11 +43,17 @@ export function classifyContentReleaseItem(input: {
       ? "unchanged"
       : "unowned-conflict";
   }
+  if (current.entryId !== owned.entryId) return "conflict";
   if (
-    current.entryId !== owned.entryId
-    || current.version !== owned.databaseVersion
+    current.version !== owned.databaseVersion
     || current.databaseChecksum !== owned.databaseChecksum
-  ) return "conflict";
+  ) {
+    // Reviewed sources may adopt an exact CMS snapshot, never overwrite it.
+    return desired.sourceChecksum !== owned.sourceChecksum
+      && current.databaseChecksum === current.desiredDatabaseChecksum
+      ? "unchanged"
+      : "conflict";
+  }
   return desired.sourceChecksum === owned.sourceChecksum ? "unchanged" : "update";
 }
 

@@ -46,6 +46,8 @@ To proceed, copy `webImage` to `image_ref`, `contentImage` to `content_image_ref
 
 The deploy writes private mode-`0600` reports below `$DEPLOY_STATE_DIR/content-releases/<slot>/`. If `plan.json` has `blocked:true`, stop before apply and inspect every item with `conflict`, `unowned-conflict`, or `orphaned-owned`. A conflict commonly means that an administrator or MCP client changed production after the source snapshot was prepared. Resolve it deliberately: either move the accepted production text or metadata back into the repository source and build a new release, or explicitly restore the reviewed source in the admin/MCP workflow and rerun from a new plan. Never edit the report, waive its checksum, or force apply against a different plan.
 
+When a newly reviewed source differs from its previous release snapshot but exactly matches the same CMS entry's complete managed state, the planner accepts it as `unchanged` and the atomic release records the current ownership snapshot without rewriting the entry. The comparison includes publication status, payload, metadata and managed service relations. A different entry ID, unchanged old source, or any content/relation mismatch still conflicts. Version and checksum remain part of the approved plan: editing the page after planning invalidates that plan even when its text still matches. This is source reconciliation, not a force-apply mode.
+
 For an operator rehearsal, the exact sequence run over SSH is:
 
 ```bash

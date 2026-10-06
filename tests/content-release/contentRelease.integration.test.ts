@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { and, asc, eq } from "drizzle-orm";
 
-import { loadContentReleaseBundle } from "../../src/server/content-release/manifest";
+import { contentReleaseItemChecksum, loadContentReleaseBundle } from "../../src/server/content-release/manifest";
+import { checksum } from "../../src/server/content/migration";
 import {
   applyRelease,
   planRelease,
@@ -159,4 +160,50 @@ databaseTest("verification reports a service whose managed relation order drifte
   assert.equal(verification.ok, false);
   assert.ok(verification.issues.some(issue => issue.key === service.key));
   assert.ok(verification.issues.every(issue => !("bodyMd" in issue)));
+});
+
+databaseTest("reviewed case and service sources adopt CMS edits without changing content or relations", async () => {
+  await resetTestDatabase(databaseUrl);
+  const db = createDb(databaseUrl);
+  const bundle = await loadContentReleaseBundle();
+  const initialPlan = await planRelease(db, bundle.manifest);
+  await applyRelease(db, bundle, approval(bundle.manifest.checksum, initialPlan.planChecksum));
+
+  const caseSource = bundle.portfolioSources[0];
+  const serviceSource = bundle.serviceSources[0];
+  for (const source of [caseSource, serviceSource]) {
+    source.bodyMd += "\n\nПроверенное дополнение редактора с [внутренней ссылкой](/services/).";
+    const kind = source === caseSource ? "case" : "service";
+    await db.update(contentEntries).set({
+      bodyMd: source.bodyMd,
+      version: 2,
+      updatedAt: new Date("2026-10-06T10:00:00Z"),
+    }).where(and(eq(contentEntries.kind, kind), eq(contentEntries.slug, source.slug)));
+    const desired = bundle.manifest.items.find(item => item.kind === kind && item.slug === source.slug)!;
+    desired.command.bodyMd = source.bodyMd;
+    desired.sourceChecksum = contentReleaseItemChecksum(desired);
+  }
+  bundle.manifest.checksum = checksum({ schemaVersion: bundle.manifest.schemaVersion, counts: bundle.manifest.counts, items: bundle.manifest.items });
+  let beforeEntries = await db.select().from(contentEntries).orderBy(asc(contentEntries.id));
+  const beforeRelations = await db.select().from(contentRelations).orderBy(asc(contentRelations.id));
+  const beforeRevisions = await db.select().from(contentRevisions).orderBy(asc(contentRevisions.id));
+  let plan = await planRelease(db, bundle.manifest);
+
+  assert.equal(plan.blocked, false);
+  assert.equal(plan.counts.update, 0);
+  assert.equal(plan.counts.unchanged, bundle.manifest.items.length);
+  await db.update(contentEntries).set({ version: 3 }).where(and(eq(contentEntries.kind, "case"), eq(contentEntries.slug, caseSource.slug)));
+  await assert.rejects(applyRelease(db, bundle, { ...approval(bundle.manifest.checksum, plan.planChecksum), releaseSha: "b".repeat(40) }), /content_release_plan_changed/);
+  beforeEntries = await db.select().from(contentEntries).orderBy(asc(contentEntries.id));
+  plan = await planRelease(db, bundle.manifest);
+  await applyRelease(db, bundle, { ...approval(bundle.manifest.checksum, plan.planChecksum), releaseSha: "b".repeat(40) });
+
+  assert.deepEqual(await db.select().from(contentEntries).orderBy(asc(contentEntries.id)), beforeEntries);
+  assert.deepEqual(await db.select().from(contentRelations).orderBy(asc(contentRelations.id)), beforeRelations);
+  assert.deepEqual(await db.select().from(contentRevisions).orderBy(asc(contentRevisions.id)), beforeRevisions);
+  assert.equal((await verifyRelease(db, bundle.manifest)).ok, true);
+
+  const nextPlan = await planRelease(db, bundle.manifest);
+  await db.update(contentEntries).set({ version: 4 }).where(and(eq(contentEntries.kind, "case"), eq(contentEntries.slug, caseSource.slug)));
+  await assert.rejects(applyRelease(db, bundle, { ...approval(bundle.manifest.checksum, nextPlan.planChecksum), releaseSha: "c".repeat(40) }), /content_release_blocked/);
 });

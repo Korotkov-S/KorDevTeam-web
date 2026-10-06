@@ -84,6 +84,17 @@ test("classifier protects unmanaged and admin-edited content", () => {
   assert.equal(classifyContentReleaseItem({ desired, current: null, owned: ownedPrevious }), "conflict");
 });
 
+test("classifier adopts reviewed sources matching the same admin-edited entry exactly", () => {
+  const desired = item("case", "reviewed-case", { sourceChecksum: "b".repeat(64) });
+  const owned = { entryId: "entry", databaseVersion: 1, databaseChecksum: "a".repeat(64), sourceChecksum: "c".repeat(64) };
+  const current = { entryId: "entry", version: 2, databaseChecksum: "d".repeat(64), desiredDatabaseChecksum: "d".repeat(64) };
+
+  assert.equal(classifyContentReleaseItem({ desired, current, owned }), "unchanged");
+  assert.equal(classifyContentReleaseItem({ desired, current: { ...current, entryId: "replacement" }, owned }), "conflict");
+  assert.equal(classifyContentReleaseItem({ desired, current: { ...current, databaseChecksum: "e".repeat(64) }, owned }), "conflict");
+  assert.equal(classifyContentReleaseItem({ desired: { ...desired, sourceChecksum: owned.sourceChecksum }, current, owned }), "conflict");
+});
+
 databaseTest("planner blocks owned content removed from the manifest", async () => {
   await resetTestDatabase(databaseUrl);
   const db = createDb(databaseUrl);
