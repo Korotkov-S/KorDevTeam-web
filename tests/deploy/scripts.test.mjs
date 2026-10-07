@@ -65,7 +65,7 @@ elif [[ "$1" == inspect ]]; then
   elif [[ "$*" == *"{{.State.Health.Status}}"* ]]; then printf "healthy\\n"; fi
 fi
 `);
-  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nprintf "curl %s\\n" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *api/leads* ]]; then printf \'{"leadId":"22222222-2222-4222-8222-222222222222","status":"accepted"}\'; elif [[ "$*" == *--write-out* ]]; then if [[ "${BAD_CANONICAL:-0}" == 1 ]]; then printf "200 https://www.example.com/privacy?utm_source=deploy"; else printf "200 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; fi; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
+  stub('curl', 'printf "%s\\n" "$*" >> "$TEST_DIR/requests"\nprintf "curl %s\\n" "$*" >> "$TEST_DIR/events"\nif [[ "${FAIL_LOCAL:-0}" == 1 && "$*" == *127.0.0.1* ]]; then exit 22; fi\nif [[ "${FAIL_PUBLIC:-0}" == 1 && "$*" == *https://example.com* ]] && /usr/bin/grep -q "current-slot: green" "$TRAEFIK_DYNAMIC_FILE"; then exit 22; fi\nif [[ "$*" == *api/leads* ]]; then printf \'{"leadId":"22222222-2222-4222-8222-222222222222","status":"accepted"}\'; elif [[ "$*" == *--write-out* ]]; then if [[ "${BAD_CANONICAL:-0}" == 1 ]]; then printf "200 1 https://www.example.com/privacy?utm_source=deploy"; else printf "200 1 %s/privacy/?utm_source=deploy" "$PUBLIC_ORIGIN"; fi; elif [[ "$*" == *--dump-header* ]]; then if [[ "${STALE_PUBLIC:-0}" == 1 ]]; then printf "X-Kordev-Slot: blue\\r\\n"; else printf "X-Kordev-Slot: %s\\r\\n" "$(sed -n \'s/^# current-slot: //p\' "$TRAEFIK_DYNAMIC_FILE")"; fi; elif [[ "$*" == *health/ready* ]]; then printf \'{"status":"ready"}\'; elif [[ "$*" == *sitemap.xml* ]]; then printf \'<sitemapindex></sitemapindex>\'; else printf \'<!DOCTYPE html><html><head><title>Team</title></head><body><h1>Team</h1></body></html>\'; fi\n');
   const env = { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, TEST_DIR: dir,
     DEPLOY_STATE_DIR: `${dir}/state`, TRAEFIK_DYNAMIC_FILE: route, PUBLIC_ORIGIN: 'https://example.com',
     TARGET_IMAGE: image, OLD_IMAGE: oldImage, CONTENT_IMAGE: contentImage, RELEASE_SHA: releaseSha, READINESS_ATTEMPTS: '1', READINESS_DELAY: '0',
@@ -457,14 +457,14 @@ test('successful switch preserves existing security middleware configuration', t
   const result = f.run('switch-slot', ['green']); assert.equal(result.status, 0, result.stderr);
   assert.match(readFileSync(f.route, 'utf8'), /frameDeny: true/);
 });
-test('public smoke follows bounded HTTP and www redirect chains to the exact canonical URL', t => {
+test('public smoke requires exactly one HTTP or www redirect to the canonical URL', t => {
   const f = fixture(t);
   const result = f.run('switch-slot', ['green']); assert.equal(result.status, 0, result.stderr);
   const requests = readFileSync(`${f.dir}/requests`, 'utf8');
   for (const origin of ['http://example.com', 'http://www.example.com', 'https://www.example.com']) assert.ok(requests.includes(`${origin}/privacy?utm_source=deploy`));
   assert.match(requests, /--location/);
-  assert.match(requests, /--max-redirs 3/);
-  assert.match(requests, /%\{http_code\} %\{url_effective\}/);
+  assert.match(requests, /--max-redirs 1/);
+  assert.match(requests, /%\{http_code\} %\{num_redirects\} %\{url_effective\}/);
 });
 test('public smoke rejects a redirect chain that ends on a noncanonical URL', t => {
   const f = fixture(t);
@@ -472,4 +472,18 @@ test('public smoke rejects a redirect chain that ends on a noncanonical URL', t 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /rollback/i);
   assert.match(readFileSync(f.route, 'utf8'), /current-slot: blue/);
+});
+
+test('public smoke rejects an extra redirect even when the chain ends on the canonical URL', t => {
+  const f = fixture(t);
+  const curl = readFileSync(`${f.dir}/bin/curl`, 'utf8');
+  f.stub('curl', curl.split('\n').slice(2).join('\n').replace(
+    'if [[ "$*" == *api/leads* ]]',
+    'if [[ "$*" == *--write-out* && "$*" == *"--max-redirs 1"* ]]; then exit 47; fi\nif [[ "$*" == *api/leads* ]]',
+  ));
+  const before = readFileSync(f.route);
+  const result = f.run('switch-slot', ['green']);
+  assert.notEqual(result.status, 0, 'a canonical final URL must not hide an extra hop');
+  assert.deepEqual(readFileSync(f.route), before);
+  assert.match(result.stderr, /rollback/i);
 });

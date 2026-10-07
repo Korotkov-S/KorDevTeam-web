@@ -170,9 +170,9 @@ public_canonical_redirects() {
   local host="${PUBLIC_ORIGIN#https://}" origin result expected
   expected="$PUBLIC_ORIGIN/privacy/?utm_source=deploy"
   for origin in "http://$host" "http://www.$host" "https://www.$host"; do
-    result="$(curl --fail --silent --show-error --max-time 20 --location --max-redirs 3 \
-      -H 'Accept: text/html' --output /dev/null --write-out '%{http_code} %{url_effective}' \
+    result="$(curl --fail --silent --show-error --max-time 20 --location --max-redirs 1 \
+      -H 'Accept: text/html' --output /dev/null --write-out '%{http_code} %{num_redirects} %{url_effective}' \
       "$origin/privacy?utm_source=deploy")" || return 1
-    [[ "$result" == "200 $expected" ]] || return 1
+    [[ "$result" == "200 1 $expected" ]] || return 1
   done
 }

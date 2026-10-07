@@ -18,6 +18,7 @@ http:
     kordevteam-http:
       rule: "Host(`kordevteam.example`) || Host(`www.kordevteam.example`)"
       entryPoints: [http]
+      priority: 10001
       service: kordevteam-active
       middlewares: [kordevteam-slot]
   middlewares:

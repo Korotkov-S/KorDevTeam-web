@@ -80,14 +80,16 @@ After the workflow succeeds, record the Actions run URL, `release-manifest.json`
 ```bash
 curl --fail --silent --show-error --dump-header - --output /dev/null "$PUBLIC_ORIGIN/api/health/ready"
 curl --fail --silent --show-error --dump-header - --output /dev/null "$PUBLIC_ORIGIN/"
-curl --silent --show-error --dump-header - --output /dev/null "http://$PRODUCTION_HOST/blog"
-curl --silent --show-error --dump-header - --output /dev/null "https://www.$PRODUCTION_HOST/blog/"
-curl --silent --show-error --dump-header - --output /dev/null "$PUBLIC_ORIGIN/blog"
+curl --silent --show-error -H 'Accept: text/html' --dump-header - --output /dev/null "http://$PRODUCTION_HOST/blog"
+curl --silent --show-error -H 'Accept: text/html' --dump-header - --output /dev/null "https://www.$PRODUCTION_HOST/blog/"
+curl --silent --show-error -H 'Accept: text/html' --dump-header - --output /dev/null "$PUBLIC_ORIGIN/blog"
 curl --fail --silent --show-error "$PUBLIC_ORIGIN/blog/" | sed -n '/rel="canonical"/p'
 curl --fail --silent --show-error "$PUBLIC_ORIGIN/sitemap.xml"
 ```
 
 The final canonical URLs are HTTPS, non-`www`, and trailing-slash URLs; each redirect must point straight to that final form. Final pages and `sitemap.xml` must return 200 without a redirect. The canonical link must name the same final URL.
+
+HTML canonicalization checks must send `Accept: text/html`. A request negotiating a different representation must not be mistaken for a browser navigation. Automated public smoke follows at most one hop and checks the redirect count as well as the final URL: an intermediate HTTP-to-HTTPS redirect is a failure even if the chain eventually reaches the correct page. On shared Traefik installations, follow the inspected priority exception in `deploy/README.md`; do not disable other sites' redirect policy or recreate the shared proxy without operator approval.
 
 Also confirm that `X-Kordev-Slot` equals the new color on the public ready response and that the clearly marked form lead recorded by `release-gate.sh` is visible in the admin lead list/outbox with the recorded lead ID. This verifies sitemap, canonical URLs, form lead and route identity as separate pieces of post-switch evidence; never submit an unmarked real-looking test request.
 
