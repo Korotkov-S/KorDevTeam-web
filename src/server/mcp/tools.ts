@@ -72,6 +72,9 @@ const pageFields = {
   cursor: z.string().regex(/^(?:0|[1-9]\d*)$/).optional(),
 };
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const seoPageControlInput = z.strictObject({ ...pageFields, pagePath: z.string().max(500).regex(/^\//).optional() });
+const seoEffectListInput = z.strictObject({ ...pageFields, pagePath: z.string().max(500).regex(/^\//).optional(),
+  changeId: z.uuid().optional(), history: z.boolean().optional() }).refine(v => !v.history || !!v.changeId, "History requires changeId");
 const seoFilterFields = {
   dateFrom: isoDate,
   dateTo: isoDate,
@@ -698,6 +701,14 @@ export function createKordevMcpServer(
   }
 
   if (has("seo:read")) {
+    server.registerTool("get_seo_page_control", {
+      title: "Контроль всех опубликованных страниц", description: "Полный реестр с назначенными ключами и историческими source-specific фактами индексации; чтение без сбора/публикации.",
+      inputSchema: seoPageControlInput, outputSchema: withError(genericRecord), annotations: annotations(true),
+    }, input => run("get_seo_page_control", () => services.seo.getPageControl(input)));
+    server.registerTool("list_seo_change_effects", {
+      title: "Измерения эффекта SEO-изменений", description: "Сохранённые сопоставимые 7/14/28-дневные измерения и причины ожидания. history=true с changeId читает историю; новые измерения не запускаются.",
+      inputSchema: seoEffectListInput, outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_seo_change_effects", () => services.seo.listChangeEffects(input)));
     server.registerTool("get_seo_overview", {
       title: "Сводка SEO",
       description: "Возвращает агрегированные показы, клики, CTR и среднюю позицию за ограниченный период.",

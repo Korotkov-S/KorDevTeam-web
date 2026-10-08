@@ -12,6 +12,14 @@ import { SeoPagesPage } from "./seo-pages";
 import { SeoSemanticsPage } from "./seo-semantics";
 import { SeoChangesPage } from "./seo-changes";
 
+test("changes page includes saved checkpoint evidence without a mutation form for effects", () => {
+  const markup = html(<SeoChangesPage csrfToken="csrf" data={{ filters,
+    changes: { items: [], nextCursor: null }, recommendations: { items: [], nextCursor: null },
+    effects: { items: [], nextCursor: null }, effectsSearch: "?page=%2Fblog%2Ftest%2F" }} />);
+  assert.match(markup, /Эффект изменений: 7 \/ 14 \/ 28 дней/);
+  assert.match(markup, /Просмотр страницы не запускает сбор/);
+});
+
 const filters = { range: "28" as const, dateFrom: "2026-08-31", dateTo: "2026-09-27", source: "yandex_webmaster" as const,
   regionId: null, device: null, frequencyBand: null, pagePath: "" };
 const traffic = {

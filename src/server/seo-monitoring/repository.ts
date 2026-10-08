@@ -18,6 +18,7 @@ import type { NormalizedRankCheck, NormalizedSeoObservation, NormalizedTrafficOb
 import type { SemanticCoreEntry } from "./semanticCore";
 import { summarizeRankPlan } from "./rankQueue";
 import { createPageControlRepository } from "./pageControlRepository";
+import { createSeoEffectsRepository, type EffectListInput } from "./effectsRepository";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
@@ -857,6 +858,9 @@ export function createSeoRepository(db: SeoDatabase) {
 
     getPageControl(input: { pagePath?: string; limit: number; cursor: string | null }, now?: Date) {
       return createPageControlRepository(db).listPages(input, now);
+    },
+    listChangeEffects(input: EffectListInput) {
+      return createSeoEffectsRepository(db).list(input);
     },
 
     async listPagePerformance(filters: SeoMetricFilters, page: { limit: number; cursor: string | null }) {

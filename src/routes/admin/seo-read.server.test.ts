@@ -13,6 +13,19 @@ const principal = {
 };
 const auth = { authenticate: async () => principal };
 
+test("changes loader reads immutable effect history without evaluating or collecting", async () => {
+  const fixture = serviceFixture(); let captured;
+  const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,
+    listChangeEffects: async (input: unknown) => { captured = input; return { items: [{ id: "history" }], nextCursor: null }; },
+  } as never);
+  const response = await loader({ request: new Request("https://kordev.team/admin/seo/changes/?page=%2Fblog%2Ftest%2F&effectsCursor=50&effectChangeId=00000000-0000-4000-8000-000000000003", {
+    headers: { cookie: createAdminCookie("a".repeat(43)) },
+  }), params: {}, context: {} }) as Response;
+  assert.equal(response.status, 200);
+  assert.deepEqual(captured, { pagePath: "/blog/test/", limit: 50, cursor: "50", changeId: "00000000-0000-4000-8000-000000000003", history: true });
+  assert.equal((await response.json()).effects.items[0].id, "history");
+});
+
 function serviceFixture() {
   const calls: string[] = [];
   const method = (name: string, result: unknown) => async () => { calls.push(name); return result; };

@@ -8,7 +8,7 @@ type RecommendationStatus = "new" | "accepted" | "rejected" | "implemented" | "d
 type Filters = { dateFrom: string; dateTo: string; source?: SeoSourceId; regionId?: string; device?: SeoDevice; frequencyBand?: Frequency; pagePath?: string };
 type Page = { limit?: number; cursor?: string | null };
 type Backing = Pick<SeoService, "getOverview" | "listQueries" | "listSemanticCore" | "createCandidate" | "updateSemanticQuery"
-  | "listChanges" | "listRecommendations" | "createRecommendation" | "recordChange" | "updateRecommendationStatus">;
+  | "listChanges" | "listRecommendations" | "createRecommendation" | "recordChange" | "updateRecommendationStatus" | "getPageControl" | "listChangeEffects">;
 
 function stable(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
@@ -49,6 +49,8 @@ export function createMcpSeoService(service: Backing, tokenId: string) {
   const actor = { mcpTokenId: tokenId };
   return {
     async getOverview(filters: Filters) { return json(await service.getOverview(filters)); },
+    async getPageControl(input: Parameters<Backing["getPageControl"]>[0]) { return json(await service.getPageControl(input)); },
+    async listChangeEffects(input: Parameters<Backing["listChangeEffects"]>[0]) { return json(await service.listChangeEffects(input)); },
     async listQueries(input: Filters & Page) {
       const { limit, cursor, ...filters } = input;
       return json(await service.listQueries({ filters, limit, cursor }));

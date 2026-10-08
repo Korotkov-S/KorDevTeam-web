@@ -188,6 +188,10 @@ export function createSeoService(repository: SeoRepository) {
       return repository.getRankProgress(input);
     },
 
+    listChangeEffects(input: { pagePath?: string; changeId?: string; history?: boolean; limit?: number; cursor?: string | null }) {
+      return repository.listChangeEffects({ ...page(input), ...(input.pagePath ? { pagePath: normalizeSitePath(input.pagePath) } : {}),
+        ...(input.changeId ? { changeId: uuid(input.changeId, "seo_change_invalid") } : {}), history: input.history === true });
+    },
     listChanges(input: { pagePath?: string; dateFrom?: string; dateTo?: string; limit?: number; cursor?: string | null }) {
       if ((input.dateFrom ? 1 : 0) !== (input.dateTo ? 1 : 0)) throw new Error("seo_date_range_invalid");
       if (input.dateFrom && input.dateTo) filters({ dateFrom: input.dateFrom, dateTo: input.dateTo });

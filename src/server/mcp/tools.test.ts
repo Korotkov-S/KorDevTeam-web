@@ -10,6 +10,24 @@ import { createKordevMcpServer, type McpAuditRecord, type McpServices } from "./
 const ENTRY_ID = "00000000-0000-4000-8000-000000000010";
 const ACTOR_ID = "00000000-0000-4000-8000-000000000020";
 
+test("SEO read exposes paginated page control and effects, never the evaluation writer", async t => {
+  const captured: unknown[] = [];
+  const connection = await connected(["seo:read"], services({ seo: {
+    async getPageControl(input) { captured.push(input); return { items: [], total: 78, nextCursor: null, summary: {} } as never; },
+    async listChangeEffects(input) { captured.push(input); return { items: [], nextCursor: null }; },
+  } }));
+  t.after(async () => { await connection.client.close(); await connection.server.close(); });
+  const names = (await connection.client.listTools()).tools.map(t => t.name);
+  assert.ok(names.includes("get_seo_page_control"));
+  assert.ok(names.includes("list_seo_change_effects"));
+  assert.equal(names.includes("evaluate_seo_changes"), false);
+  assert.notEqual((await connection.client.callTool({ name: "get_seo_page_control", arguments: { limit: 10, cursor: "0" } })).isError, true);
+  assert.notEqual((await connection.client.callTool({ name: "list_seo_change_effects", arguments: { changeId: ENTRY_ID, history: true, limit: 10 } })).isError, true);
+  assert.equal((await connection.client.callTool({ name: "list_seo_change_effects", arguments: { limit: 101 } })).isError, true);
+  assert.equal((await connection.client.callTool({ name: "list_seo_change_effects", arguments: { history: true } })).isError, true);
+  assert.equal(captured.length, 2);
+});
+
 test("GEO continuation reserves through a strict principal-bound write tool", async (t) => {
   let captured;
   const write = await connected(
@@ -109,6 +127,8 @@ function services(
     ...overrides.media,
   };
   const seo = {
+    async getPageControl() { return { items: [], total: 0, nextCursor: null, summary: {} }; },
+    async listChangeEffects() { return { items: [], nextCursor: null }; },
     async getOverview() { return { impressions: 10, clicks: 1, ctr: 0.1, averagePosition: 5 }; },
     async listQueries() { return { items: [], nextCursor: null }; },
     async listSemanticCore() { return { items: [{ id: ENTRY_ID, queryText: "внедрение crm", status: "active", updatedAt: "2026-09-26T07:00:00.000Z" }], nextCursor: null }; },
@@ -217,6 +237,8 @@ test("scope combinations register only their exact tool surface", async (t) => {
         "list_geo_collection_queue",
         "get_geo_overview",
         "get_seo_overview",
+        "get_seo_page_control",
+        "list_seo_change_effects",
         "list_geo_citations",
         "list_geo_crawler_checks",
         "list_geo_entities",
@@ -249,6 +271,8 @@ test("scope combinations register only their exact tool surface", async (t) => {
         "finish_geo_run",
         "get_geo_overview",
         "get_seo_overview",
+        "get_seo_page_control",
+        "list_seo_change_effects",
         "list_geo_citations",
         "list_geo_crawler_checks",
         "list_geo_entities",

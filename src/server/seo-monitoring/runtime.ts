@@ -16,6 +16,11 @@ import { createGeoRepository } from "../geo-monitoring/repository";
 import { createGeoCollector } from "../geo-monitoring/collector";
 import { checkGeoCrawlerHealth } from "../geo-monitoring/crawlerHealth";
 import { createPageControlRepository } from "./pageControlRepository";
+import { createSeoEffectsRepository } from "./effectsRepository";
+
+export function evaluateSeoChanges() {
+  return createSeoEffectsRepository(getDb()).evaluateAll();
+}
 
 export function importSeoIndexingAudit(report: unknown) {
   return createPageControlRepository(getDb()).importAudit(report);
