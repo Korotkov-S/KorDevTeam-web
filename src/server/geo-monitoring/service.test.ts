@@ -62,6 +62,27 @@ function observationInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
+test("GEO read filters preserve explicit false personalization and reject unsafe cohort dimensions", async () => {
+  const service = createGeoMonitoringService(fakeRepository({ getOverview: async input => input as never }));
+  const filters = { from: "2026-10-01", to: "2026-10-08", surface: "alice_web", sessionPersonalized: false };
+  assert.deepEqual(await service.getOverview(filters), filters);
+  for (const invalid of [{ surface: "\n" }, { surface: "bad\u0000surface" }, { sessionPersonalized: "false" }])
+    await assert.rejects(service.getOverview({ ...filters, ...invalid } as never), /geo_(?:run_surface|observation_session)_invalid/u);
+});
+
+test("observational GEO candidates require both actual cohort dimensions; official metrics do not", async () => {
+  const service = createGeoMonitoringService(fakeRepository({ createExperimentCandidate: async input => input as never }));
+  const input = { recommendationId: runId, pagePath: "/services/crm/", actionType: "content_answer" as const,
+    hypothesis: "Ответ", platform: "chatgpt_search" as const, mode: "live_ui" as const, language: "ru", region: "RU",
+    promptIds: [promptId], primaryMetric: "citation_rate" as const, direction: "increase" as const,
+    minimumDelta: 0.05, expectedSignal: "Рост" };
+  await assert.rejects(service.createExperimentCandidate(input, { mcpTokenId: tokenId }), /geo_experiment_cohort_invalid/u);
+  await assert.rejects(service.createExperimentCandidate({ ...input, surface: "search" } as never, { mcpTokenId: tokenId }), /geo_experiment_cohort_invalid/u);
+  const accepted = await service.createExperimentCandidate({ ...input, surface: "search", sessionPersonalized: false }, { mcpTokenId: tokenId });
+  assert.equal((accepted as unknown as { sessionPersonalized: boolean }).sessionPersonalized, false);
+  await service.createExperimentCandidate({ ...input, primaryMetric: "ai_referrals" }, { mcpTokenId: tokenId });
+});
+
 test("startRun accepts only bounded plans, known modes, and bounded plain metadata", async () => {
   let calls = 0;
   const service = createGeoMonitoringService(fakeRepository({

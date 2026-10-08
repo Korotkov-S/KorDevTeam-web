@@ -129,11 +129,19 @@ function readFilters(input: GeoReadFilters): GeoReadFilters {
     from: input.from,
     to: input.to,
     ...(input.platform ? { platform: input.platform } : {}),
+    ...(input.surface !== undefined ? { surface: cohortSurface(input.surface) } : {}),
+    ...(input.sessionPersonalized !== undefined ? { sessionPersonalized: strictBoolean(input.sessionPersonalized, "geo_observation_session_invalid") } : {}),
     ...(input.mode ? { mode: input.mode } : {}),
     ...(input.language ? { language: boundedText(input.language, 16, "geo_run_language_invalid") } : {}),
     ...(input.region ? { region: boundedText(input.region, 120, "geo_run_region_invalid") } : {}),
     ...(input.topicId ? { topicId: uuid(input.topicId, "geo_topic_invalid") } : {}),
   };
+}
+
+function cohortSurface(value: unknown): string {
+  const surface = boundedText(value, 120, "geo_run_surface_invalid");
+  if (/[\u0000-\u001f\u007f]/u.test(surface)) throw new Error("geo_run_surface_invalid");
+  return surface;
 }
 
 function page(input: { limit?: number; cursor?: string | null }) {
@@ -451,6 +459,8 @@ export function createGeoMonitoringService(
     async createExperimentCandidate(input: Omit<GeoExperimentCandidateInput, "promptSetFingerprint" | "evaluationWindows">, value: GeoActor) {
       if (!experimentActions.has(input.actionType)) throw new Error("geo_experiment_action_invalid");
       if (!experimentMetrics.has(input.primaryMetric)) throw new Error("geo_experiment_metric_invalid");
+      const observational = input.primaryMetric !== "ai_referrals" && input.primaryMetric !== "crawler_health";
+      if (observational && (input.surface === undefined || typeof input.sessionPersonalized !== "boolean")) throw new Error("geo_experiment_cohort_invalid");
       if (input.direction !== "increase" && input.direction !== "decrease") throw new Error("geo_experiment_direction_invalid");
       if (!Number.isFinite(input.minimumDelta) || input.minimumDelta <= 0 || input.minimumDelta > 1_000_000) {
         throw new Error("geo_experiment_delta_invalid");
@@ -465,6 +475,8 @@ export function createGeoMonitoringService(
       const promptSetFingerprint = createHash("sha256").update(promptIds.join("\u0000"), "utf8").digest("hex");
       return repository.createExperimentCandidate({
         ...input,
+        ...(input.surface !== undefined ? { surface: cohortSurface(input.surface) } : {}),
+        ...(input.sessionPersonalized !== undefined ? { sessionPersonalized: strictBoolean(input.sessionPersonalized, "geo_observation_session_invalid") } : {}),
         recommendationId: uuid(input.recommendationId, "geo_recommendation_invalid"),
         pagePath: normalizeGeoTargetPath(input.pagePath),
         hypothesis: boundedText(input.hypothesis, 5_000, "geo_experiment_hypothesis_invalid"),

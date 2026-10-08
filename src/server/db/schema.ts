@@ -1317,6 +1317,8 @@ export const geoExperiments = pgTable(
     actionType: geoExperimentActionType("action_type").notNull(),
     hypothesis: text("hypothesis").notNull(),
     platform: geoPlatform("platform").notNull(),
+    surface: varchar("surface", { length: 120 }),
+    sessionPersonalized: boolean("session_personalized"),
     mode: geoRunMode("mode").notNull(),
     language: varchar("language", { length: 16 }).notNull(),
     region: varchar("region", { length: 120 }).notNull(),
@@ -1344,6 +1346,7 @@ export const geoExperiments = pgTable(
       .on(table.pagePath, table.promptSetFingerprint)
       .where(sql`${table.status} = 'active'`),
     check("geo_experiments_page_path_valid", sql`${table.pagePath} LIKE '/%'`),
+    check("geo_experiments_surface_valid", sql`${table.surface} IS NULL OR (length(btrim(${table.surface})) > 0 AND ${table.surface} !~ '[[:cntrl:]]')`),
     check("geo_experiments_hypothesis_nonempty", sql`length(btrim(${table.hypothesis})) > 0`),
     check("geo_experiments_prompt_set_sha256", sql`${table.promptSetFingerprint} ~ '^[0-9a-f]{64}$'`),
     check("geo_experiments_minimum_delta_positive", sql`${table.minimumDelta} > 0`),

@@ -71,6 +71,7 @@ function candidate() {
     actionType: "content_answer" as const,
     hypothesis: "Прямой ответ повысит долю цитирования.",
     platform: "chatgpt_search" as const,
+    surface: "search", sessionPersonalized: false,
     mode: "live_ui" as const,
     language: "ru",
     region: "RU",

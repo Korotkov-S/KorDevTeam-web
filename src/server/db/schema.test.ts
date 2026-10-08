@@ -97,6 +97,7 @@ test("SEO schema keeps Yandex Metrica traffic separate from search observations"
 databaseTest("0012 reconstructs legacy GEO prompt sets and distrusts incomplete runs", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await db.execute(sql`ALTER TABLE geo_experiments DROP CONSTRAINT geo_experiments_surface_valid, DROP COLUMN surface, DROP COLUMN session_personalized`);
   await db.execute(sql`DROP TABLE seo_recommendation_history`);
   await db.execute(sql`DROP TABLE seo_change_evaluations`);
   await db.execute(sql`DROP TABLE seo_index_observations`);

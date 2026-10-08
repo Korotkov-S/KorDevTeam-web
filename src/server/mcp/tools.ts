@@ -135,10 +135,13 @@ const geoPlatform = z.enum(["yandex_alice", "chatgpt_search", "google_ai", "bing
 const geoMode = z.enum(["official_report", "live_ui", "api_probe"]);
 const geoPromptCategory = z.enum(["commercial", "informational", "comparison", "local", "brand"]);
 const geoStatus = z.enum(["candidate", "active", "archived"]);
+const geoSurface = z.string().trim().min(1).max(120).regex(/^[^\u0000-\u001f\u007f]+$/u);
 const geoDateFilterFields = {
   from: isoDate,
   to: isoDate,
   platform: geoPlatform.optional(),
+  surface: geoSurface.optional(),
+  sessionPersonalized: z.boolean().optional(),
   mode: geoMode.optional(),
   language: z.string().trim().min(2).max(16).optional(),
   region: z.string().trim().min(2).max(120).optional(),
@@ -235,6 +238,8 @@ const geoExperimentCandidateInput = z.strictObject({
   actionType: z.enum(["content_answer", "first_party_evidence", "internal_linking", "technical_indexing", "structured_data", "authority_outreach"]),
   hypothesis: z.string().trim().min(1).max(5_000),
   platform: geoPlatform,
+  surface: geoSurface.optional(),
+  sessionPersonalized: z.boolean().optional(),
   mode: geoMode,
   language: z.string().trim().min(2).max(16),
   region: z.string().trim().min(2).max(120),
@@ -243,6 +248,11 @@ const geoExperimentCandidateInput = z.strictObject({
   direction: z.enum(["increase", "decrease"]),
   minimumDelta: z.number().positive().max(1_000_000),
   expectedSignal: z.string().trim().min(1).max(2_000),
+}).superRefine((value, context) => {
+  if (value.primaryMetric !== "ai_referrals" && value.primaryMetric !== "crawler_health"
+    && (!value.surface || typeof value.sessionPersonalized !== "boolean")) {
+    context.addIssue({ code: "custom", message: "geo_experiment_cohort_invalid" });
+  }
 });
 const adPageFields = {
   limit: z.number().int().min(1).max(100).optional(),

@@ -10,6 +10,23 @@ import { createKordevMcpServer, type McpAuditRecord, type McpServices } from "./
 const ENTRY_ID = "00000000-0000-4000-8000-000000000010";
 const ACTOR_ID = "00000000-0000-4000-8000-000000000020";
 
+test("GEO MCP retains false cohort filters and rejects observational candidates without a known cohort", async t => {
+  const captured: unknown[] = [];
+  const c = await connected(["seo:read", "seo:write"], services({ geo: {
+    async getOverview(input) { captured.push(input); return { control: { cohorts: [] } } as never; },
+    async createExperimentCandidate(input) { captured.push(input); return { status: "proposed" } as never; },
+  } }));
+  t.after(() => c.client.close());
+  const filters = { from: "2026-10-01", to: "2026-10-08", surface: "alice_web", sessionPersonalized: false };
+  assert.notEqual((await c.client.callTool({ name: "get_geo_overview", arguments: filters })).isError, true);
+  assert.deepEqual(captured[0], filters);
+  const candidate = { recommendationId: ENTRY_ID, pagePath: "/services/crm/", actionType: "content_answer", hypothesis: "Ответ",
+    platform: "chatgpt_search", mode: "live_ui", language: "ru", region: "RU", promptIds: [ENTRY_ID],
+    primaryMetric: "citation_rate", direction: "increase", minimumDelta: 0.05, expectedSignal: "Рост" };
+  assert.equal((await c.client.callTool({ name: "create_geo_experiment_candidate", arguments: candidate })).isError, true);
+  assert.notEqual((await c.client.callTool({ name: "create_geo_experiment_candidate", arguments: { ...candidate, surface: "search", sessionPersonalized: false } })).isError, true);
+});
+
 test("recommendation history is read-scoped; revision requires both scopes and rejects identity mutation", async t => {
   const reader = await connected(["seo:read"], services({ seo: { async listRecommendationHistory(input) { return { items: [{ recommendationId: input.recommendationId }], nextCursor: null }; } } }));
   t.after(() => reader.client.close());

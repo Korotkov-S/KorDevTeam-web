@@ -559,7 +559,7 @@ databaseTest(
     const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
     await fixture.pool.query("UPDATE geo_prompts SET updated_at = '2026-06-01T00:00:00Z' WHERE id = $1", [fixture.promptId]);
     await fixture.pool.query("DELETE FROM geo_runs");
-    for (const [runIndex, startedAt] of ["2026-07-01T10:00:00Z", "2026-07-08T10:00:00Z", "2026-07-15T10:00:00Z"].entries()) {
+    for (const [runIndex, startedAt] of ["2026-07-05T10:00:00Z", "2026-07-08T10:00:00Z", "2026-07-15T10:00:00Z"].entries()) {
     const runId = randomUUID();
     await fixture.pool.query(
       `INSERT INTO geo_runs
@@ -584,7 +584,7 @@ databaseTest(
      RETURNING id`,
     [JSON.stringify({
       source: "geo_observations", metric: "citation_rate", period: { from: "2026-07-01", to: "2026-07-31" },
-      dimensions: { platform: "chatgpt_search", mode: "live_ui", language: "ru", region: "RU", promptSetFingerprint: "b".repeat(64) },
+      dimensions: { platform: "chatgpt_search", surface: "search", sessionPersonalized: false, mode: "live_ui", language: "ru", region: "RU", promptSetFingerprint: "b".repeat(64) },
       promptIds: [fixture.promptId],
     }), "a".repeat(64), fixture.tokenId],
   );
@@ -599,6 +599,7 @@ databaseTest(
     pagePath: "/services/crm/",
     actionType: "content_answer" as const,
     hypothesis: "Прямой ответ повысит цитирование",
+    surface: "search", sessionPersonalized: false,
     platform: "chatgpt_search" as const,
     mode: "live_ui" as const,
     language: "ru",
@@ -627,14 +628,7 @@ databaseTest(
     await repository.linkExperimentChange({ id: first.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId });
     await assert.rejects(
       repository.linkExperimentChange({ id: second.id, seoChangeId: change.rows[0].id }, { adminUserId: fixture.adminId }),
-      (error: unknown) => {
-        if (typeof error !== "object" || error === null) return false;
-        if ("code" in error && error.code === "23505") return true;
-        return (
-          "cause" in error && typeof error.cause === "object" && error.cause !== null
-        && "code" in error.cause && error.cause.code === "23505"
-        );
-      },
+      /geo_experiment_page_cooldown/u,
     );
     await assert.rejects(repository.evaluateExperiment({ id: first.id, milestone: 14,
     evaluatedAt: new Date("2026-08-16T00:00:00Z") }, { mcpTokenId: fixture.tokenId }), /geo_experiment_milestone_order_invalid/u);
@@ -705,6 +699,8 @@ databaseTest("official AI referrals and complete crawler checks form measurable 
      RETURNING id`, [fixture.adminId],
   );
   for (const metric of ["ai_referrals", "crawler_health"] as const) {
+    // Independent metric fixtures; do not pretend two simultaneous changes to one page are allowed.
+    await fixture.pool.query("DELETE FROM geo_experiments");
     const source = metric === "ai_referrals" ? "geo_referrals" : "geo_crawler";
     const period = metric === "ai_referrals" ? { from: "2026-07-01", to: "2026-07-31" }
       : { from: "2026-07-04", to: "2026-07-31" };
@@ -731,4 +727,130 @@ databaseTest("official AI referrals and complete crawler checks form measurable 
     assert.equal(baseline.value, metric === "ai_referrals" ? 12 : 1);
     await fixture.pool.query("UPDATE geo_experiments SET status = 'completed' WHERE id = $1", [experiment.id]);
   }
+});
+
+async function experimentFixture() {
+  const fixture = await createFixture();
+  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+  await fixture.pool.query("DELETE FROM geo_runs");
+  await fixture.pool.query("UPDATE geo_prompts SET updated_at='2026-06-01T00:00:00Z'");
+  async function addRun(date: string, fields: { surface?: string; personalized?: boolean; incomplete?: boolean } = {}) {
+    const id = randomUUID();
+    await fixture.pool.query(`INSERT INTO geo_runs (id,platform,surface,mode,language,region,status,prompt_ids,
+      planned_count,completed_count,stored_count,started_at,completed_at,prompt_set_fingerprint)
+      VALUES ($1,'chatgpt_search',$2,'live_ui','ru','RU','success',ARRAY[$3]::uuid[],3,3,3,$4,$4,$5)`,
+    [id, fields.surface ?? "search", fixture.promptId, date, "b".repeat(64)]);
+    await fixture.pool.query(`INSERT INTO geo_observations (run_id,prompt_id,repetition,mentioned,linked,cited,
+      response_snapshot,response_hash,session_personalized) SELECT $1,$2,n,false,false,false,'Ответ',repeat('c',64),$3
+      FROM generate_series(1,$4::int) n`, [id, fixture.promptId, fields.personalized ?? false, fields.incomplete ? 2 : 3]);
+    return id;
+  }
+  async function evidence() {
+    const result = await fixture.pool.query<{ id: string }>(`INSERT INTO seo_recommendations
+      (title,rationale,page_path,issue_type,evidence,confidence,fingerprint,created_by_mcp_token_id)
+      VALUES ('GEO','Факты','/services/crm/','geo_visibility_gap',$1::jsonb,'high',$2,$3) RETURNING id`,
+    [JSON.stringify({ source: "geo_observations", metric: "mention_rate", period: { from: "2026-07-01", to: "2026-07-31" },
+      dimensions: { platform: "chatgpt_search", surface: "search", sessionPersonalized: false, mode: "live_ui", language: "ru", region: "RU", promptSetFingerprint: "b".repeat(64) }, promptIds: [fixture.promptId] }), randomUUID().replaceAll("-", "").repeat(2), fixture.tokenId]);
+    return result.rows[0]!.id;
+  }
+  const recommendationId = await evidence();
+  const command = { recommendationId, pagePath: "/services/crm/", actionType: "content_answer" as const,
+    hypothesis: "Ответ повысит упоминания", platform: "chatgpt_search" as const, surface: "search", sessionPersonalized: false,
+    mode: "live_ui" as const, language: "ru", region: "RU", promptIds: [fixture.promptId], promptSetFingerprint: "b".repeat(64),
+    primaryMetric: "mention_rate" as const, direction: "increase" as const, minimumDelta: 0.05,
+    evaluationWindows: [7, 14, 28], expectedSignal: "Рост упоминаний" };
+  async function change(date = "2026-08-01T10:00:00Z") {
+    const result = await fixture.pool.query<{ id: string }>(`INSERT INTO seo_changes (page_path,summary,type,applied_at,actor_admin_user_id)
+      VALUES ('/services/crm/','Ответ','content',$1,$2) RETURNING id`, [date, fixture.adminId]);
+    return result.rows[0]!.id;
+  }
+  return { ...fixture, repository, addRun, command, change };
+}
+
+databaseTest("GEO experiment uses three complete same-week snapshots and matches surface and personalization", async t => {
+  const f = await experimentFixture(); t.after(() => f.pool.end());
+  for (const day of [27, 28, 29]) await f.addRun(`2026-07-${day}T10:00:00Z`);
+  await assert.rejects(f.repository.createExperimentCandidate({ ...f.command, surface: "other" }, { mcpTokenId: f.tokenId }), /geo_experiment_recommendation_invalid/u);
+  await assert.rejects(f.repository.createExperimentCandidate({ ...f.command, sessionPersonalized: true }, { mcpTokenId: f.tokenId }), /geo_experiment_recommendation_invalid/u);
+  const proposed = await f.repository.createExperimentCandidate(f.command, { mcpTokenId: f.tokenId });
+  assert.equal(proposed.status, "proposed");
+  assert.equal((proposed as unknown as { sessionPersonalized: boolean }).sessionPersonalized, false);
+});
+
+databaseTest("three successful weeks with missing observations cannot authorize a GEO experiment", async t => {
+  const f = await experimentFixture(); t.after(() => f.pool.end());
+  await f.addRun("2026-07-05T10:00:00Z");
+  await f.addRun("2026-07-12T10:00:00Z", { incomplete: true });
+  await f.addRun("2026-07-19T10:00:00Z", { incomplete: true });
+  await assert.rejects(f.repository.createExperimentCandidate(f.command, { mcpTokenId: f.tokenId }), /geo_experiment_recommendation_invalid/u);
+});
+
+databaseTest("three real weeks never permit a mismatched surface or personalized GEO candidate", async t => {
+  const f = await experimentFixture(); t.after(() => f.pool.end());
+  for (const day of [5, 12, 19]) await f.addRun(`2026-07-${String(day).padStart(2, "0")}T10:00:00Z`);
+  await assert.rejects(f.repository.createExperimentCandidate({ ...f.command, surface: "other" }, { mcpTokenId: f.tokenId }), /geo_experiment_recommendation_invalid/u);
+  await assert.rejects(f.repository.createExperimentCandidate({ ...f.command, sessionPersonalized: true }, { mcpTokenId: f.tokenId }), /geo_experiment_recommendation_invalid/u);
+});
+
+databaseTest("GEO experiment fixes complete baseline provenance and rejects insufficient baseline without transition", async t => {
+  const f = await experimentFixture(); t.after(() => f.pool.end());
+  for (const day of [27, 28, 29]) await f.addRun(`2026-07-${day}T10:00:00Z`);
+  const proposed = await f.repository.createExperimentCandidate(f.command, { mcpTokenId: f.tokenId });
+  await f.repository.approveExperiment({ id: proposed.id }, { adminUserId: f.adminId });
+  const outside = await f.change("2026-09-15T10:00:00Z");
+  await assert.rejects(f.repository.linkExperimentChange({ id: proposed.id, seoChangeId: outside }, { adminUserId: f.adminId }), /geo_experiment_baseline_invalid/u);
+  assert.equal((await f.pool.query("SELECT status FROM geo_experiments WHERE id=$1", [proposed.id])).rows[0].status, "approved");
+  const active = await f.repository.linkExperimentChange({ id: proposed.id, seoChangeId: await f.change() }, { adminUserId: f.adminId });
+  const baseline = active.baseline as { completeSnapshots: number; runIds: string[]; numerator: number; denominator: number; dimensions: { surface: string; sessionPersonalized: boolean } };
+  assert.equal(baseline.completeSnapshots, 3); assert.equal(baseline.runIds.length, 3);
+  assert.equal(baseline.numerator, 0); assert.equal(baseline.denominator, 9);
+  assert.equal(baseline.dimensions.surface, "search"); assert.equal(baseline.dimensions.sessionPersonalized, false);
+  await f.addRun("2026-08-03T10:00:00Z", { personalized: true });
+  const evaluated = await f.repository.evaluateExperiment({ id: active.id, milestone: 7, evaluatedAt: new Date("2026-08-09T00:00:00Z") }, { adminUserId: f.adminId });
+  assert.equal(evaluated.evaluation.verdict, "inconclusive");
+  assert.equal(evaluated.evaluation.result.sample, 0);
+  assert.deepEqual(evaluated.experiment.baseline, active.baseline);
+});
+
+databaseTest("legacy GEO experiment with unknown cohort never reports observational success", async t => {
+  const f = await experimentFixture(); t.after(() => f.pool.end());
+  for (const day of [5, 12, 19]) await f.addRun(`2026-07-${String(day).padStart(2, "0")}T10:00:00Z`);
+  const proposed = await f.repository.createExperimentCandidate(f.command, { mcpTokenId: f.tokenId });
+  await f.repository.approveExperiment({ id: proposed.id }, { adminUserId: f.adminId });
+  const active = await f.repository.linkExperimentChange({ id: proposed.id, seoChangeId: await f.change() }, { adminUserId: f.adminId });
+  await f.pool.query("UPDATE geo_experiments SET surface=NULL, session_personalized=NULL WHERE id=$1", [active.id]);
+  await f.addRun("2026-08-03T10:00:00Z");
+  const evaluated = await f.repository.evaluateExperiment({ id: active.id, milestone: 7, evaluatedAt: new Date("2026-08-09T00:00:00Z") }, { adminUserId: f.adminId });
+  assert.equal(evaluated.evaluation.verdict, "inconclusive"); assert.equal(evaluated.evaluation.complete, false);
+});
+
+databaseTest("GEO experiment excludes responses completed outside its full result window", async t => {
+  const f = await experimentFixture(); t.after(() => f.pool.end());
+  for (const day of [27, 28, 29]) await f.addRun(`2026-07-${day}T10:00:00Z`);
+  const proposed = await f.repository.createExperimentCandidate(f.command, { mcpTokenId: f.tokenId });
+  await f.repository.approveExperiment({ id: proposed.id }, { adminUserId: f.adminId });
+  const active = await f.repository.linkExperimentChange({ id: proposed.id, seoChangeId: await f.change() }, { adminUserId: f.adminId });
+  const late = await f.addRun("2026-08-08T23:59:00Z");
+  await f.pool.query("UPDATE geo_runs SET completed_at='2026-08-10T00:00:00Z' WHERE id=$1", [late]);
+  const evaluated = await f.repository.evaluateExperiment({ id: active.id, milestone: 7, evaluatedAt: new Date("2026-08-09T00:00:00Z") }, { adminUserId: f.adminId });
+  assert.equal(evaluated.evaluation.verdict, "inconclusive"); assert.equal(evaluated.evaluation.result.sample, 0);
+});
+
+databaseTest("same-page concurrent GEO implementations with different prompt fingerprints cannot bypass fourteen days", async t => {
+  const f = await experimentFixture(); t.after(() => f.pool.end());
+  const change = await f.change();
+  const ids: string[] = [];
+  for (const hash of ["a", "b"]) {
+    const r = await f.pool.query<{ id: string }>(`INSERT INTO geo_experiments (recommendation_id,page_path,action_type,hypothesis,
+      platform,mode,language,region,prompt_set_fingerprint,primary_metric,direction,minimum_delta,expected_signal,status)
+      VALUES ($1,'/services/crm/','first_party_evidence','Сигнал','chatgpt_search','official_report','ru','RU',$2,'ai_referrals','increase',1,'Рост','approved') RETURNING id`, [f.command.recommendationId, hash.repeat(64)]);
+    ids.push(r.rows[0]!.id);
+  }
+  const results = await Promise.allSettled(ids.map(id => f.repository.linkExperimentChange({ id, seoChangeId: change }, { adminUserId: f.adminId })));
+  assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+  const failed = results.find(result => result.status === "rejected") as PromiseRejectedResult;
+  assert.match(String(failed.reason), /geo_experiment_page_cooldown/u);
+  const pending = ids.find(id => results[ids.indexOf(id)]!.status === "rejected")!;
+  const allowed = await f.repository.linkExperimentChange({ id: pending, seoChangeId: await f.change("2026-08-15T10:00:00Z") }, { adminUserId: f.adminId });
+  assert.equal(allowed.implementedAt?.toISOString(), "2026-08-15T10:00:00.000Z");
 });

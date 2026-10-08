@@ -35,7 +35,7 @@ import { GEO_PLATFORMS, type
   GeoPromptStatus,
   GeoRunMode,
 } from "./contracts";
-import { summarizeGeoObservations } from "./analytics";
+import { buildGeoSnapshots, geoCohortKey, projectGeoSnapshots, summarizeGeoSnapshots, summarizeGeoObservations } from "./analytics";
 import { summarizeGeoControl } from "./control";
 import type { NormalizedGeoReferral } from "./referrals";
 import { evaluateExperimentMetric, type ExperimentMilestone } from "./experiments";
@@ -145,6 +145,8 @@ export type GeoExperimentCandidateInput = {
   actionType: typeof geoExperiments.$inferInsert.actionType;
   hypothesis: string;
   platform: GeoPlatform;
+  surface?: string;
+  sessionPersonalized?: boolean;
   mode: GeoRunMode;
   language: string;
   region: string;
@@ -187,6 +189,7 @@ function inclusiveDays(from: string, to: string) {
 async function readExperimentMetric(db: GeoDatabase, input: GeoReadFilters & {
   metric: typeof geoExperiments.$inferSelect.primaryMetric;
   pagePath: string;
+  cohortKey?: string;
 }) {
   if (input.metric === "ai_referrals") {
     const [total] = await db.select({
@@ -231,7 +234,23 @@ async function readExperimentMetric(db: GeoDatabase, input: GeoReadFilters & {
       complete: (total?.days ?? 0) === inclusiveDays(input.from, input.to),
     };
   }
-  return metricFromOverview(await readOverview(db, input), input.metric);
+  const empty = { value: null, sample: 0, complete: false, completeSnapshots: 0, runIds: [] as string[],
+    numerator: 0, denominator: 0, cohortKey: null as string | null, evidenceTimes: [] as string[] };
+  if (!input.surface || typeof input.sessionPersonalized !== "boolean" || !input.promptIds?.length) return empty;
+  const snapshots = projectGeoSnapshots(buildGeoSnapshots(await readAnalyticsRows(db, input)), input)
+    .filter(snapshot => snapshot.date >= `${input.from}T00:00:00.000Z` && snapshot.date <= `${input.to}T23:59:59.999Z`
+      && JSON.stringify([...snapshot.fullPromptIds].sort()) === JSON.stringify([...input.promptIds!].sort()));
+  const keys = new Set(snapshots.map(geoCohortKey));
+  if (!snapshots.length || keys.size !== 1 || (input.cohortKey && !keys.has(input.cohortKey))) return empty;
+  const overview = summarizeGeoSnapshots(snapshots);
+  const metric = metricFromOverview(overview, input.metric);
+  const selected = {
+    mention_rate: overview.mentionRate, citation_rate: overview.citationRate, citation_share: overview.citationShare,
+    owned_source_coverage: overview.ownedSourceCoverage, share_of_voice: overview.shareOfVoice,
+  }[input.metric];
+  return { ...metric, completeSnapshots: snapshots.length, runIds: snapshots.map(snapshot => snapshot.runId),
+    numerator: selected.numerator, denominator: selected.denominator, cohortKey: geoCohortKey(snapshots[0]!),
+    evidenceTimes: snapshots.map(snapshot => snapshot.date) };
 }
 
 function evidenceRecord(value: unknown): Record<string, unknown> | null {
@@ -264,9 +283,12 @@ async function recommendationHasEvidence(db: GeoDatabase, recommendationEvidence
     || dimensions.language !== input.language || dimensions.region !== input.region
     || dimensions.promptSetFingerprint !== input.promptSetFingerprint
     || JSON.stringify(evidencePromptIds) !== JSON.stringify([...input.promptIds].sort())) return false;
+  if (expectedSource === "geo_observations" && (!input.surface || typeof input.sessionPersonalized !== "boolean"
+    || dimensions.surface !== input.surface || dimensions.sessionPersonalized !== input.sessionPersonalized)) return false;
 
   const metric = await readExperimentMetric(db, {
     from, to, platform: input.platform, mode: input.mode, language: input.language, region: input.region,
+    surface: input.surface, sessionPersonalized: input.sessionPersonalized,
     promptSetFingerprint: input.promptSetFingerprint, promptIds: input.promptIds,
     metric: input.primaryMetric, pagePath: input.pagePath,
   });
@@ -274,19 +296,7 @@ async function recommendationHasEvidence(db: GeoDatabase, recommendationEvidence
   if (input.primaryMetric === "ai_referrals") return (metric.value ?? 0) >= 10;
   if (input.primaryMetric === "crawler_health") return metric.sample >= 28;
 
-  const [weekly] = await db.select({
-    weeks: sql<number>`count(DISTINCT date_trunc('week', ${geoRuns.startedAt}))::int`,
-  }).from(geoRuns).where(and(
-    eq(geoRuns.status, "success"),
-    eq(geoRuns.platform, input.platform),
-    eq(geoRuns.mode, input.mode),
-    eq(geoRuns.language, input.language),
-    eq(geoRuns.region, input.region),
-    eq(geoRuns.promptSetFingerprint, input.promptSetFingerprint),
-    gte(geoRuns.startedAt, new Date(`${from}T00:00:00.000Z`)),
-    lte(geoRuns.startedAt, new Date(`${to}T23:59:59.999Z`)),
-  ));
-  return (weekly?.weeks ?? 0) >= 3;
+  return "completeSnapshots" in metric && metric.completeSnapshots >= 3;
 }
 
 async function readAnalyticsRows(db: GeoDatabase, filters: GeoReadFilters) {
@@ -1014,6 +1024,13 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
         if (!experiment || experiment.status !== "approved") throw new Error("geo_experiment_state_invalid");
         const [change] = await tx.select().from(seoChanges).where(eq(seoChanges.id, input.seoChangeId)).limit(1);
         if (!change || change.pagePath !== experiment.pagePath) throw new Error("geo_experiment_change_invalid");
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${experiment.pagePath}, 706024))`);
+        const [nearby] = await tx.select({ id: geoExperiments.id }).from(geoExperiments).where(and(
+          eq(geoExperiments.pagePath, experiment.pagePath), ne(geoExperiments.id, experiment.id),
+          sql`${geoExperiments.implementedAt} > ${new Date(+change.appliedAt - 14 * 86_400_000)}
+            AND ${geoExperiments.implementedAt} < ${new Date(+change.appliedAt + 14 * 86_400_000)}`,
+        )).limit(1);
+        if (nearby) throw new Error("geo_experiment_page_cooldown");
         const prompts = await tx.select({ id: geoExperimentPrompts.promptId }).from(geoExperimentPrompts)
           .where(eq(geoExperimentPrompts.experimentId, experiment.id));
         const baselineTo = shiftDate(change.appliedAt, -1);
@@ -1021,15 +1038,21 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
         const metric = await readExperimentMetric(tx as unknown as GeoDatabase, {
           from: utcDate(baselineFrom), to: utcDate(baselineTo), platform: experiment.platform,
           mode: experiment.mode, language: experiment.language, region: experiment.region,
+          surface: experiment.surface ?? undefined, sessionPersonalized: experiment.sessionPersonalized ?? undefined,
           promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
           metric: experiment.primaryMetric,
           pagePath: experiment.pagePath,
         });
+        if (experiment.primaryMetric !== "ai_referrals" && experiment.primaryMetric !== "crawler_health"
+          && (!metric.complete || !("completeSnapshots" in metric) || metric.completeSnapshots < 3)) {
+          throw new Error("geo_experiment_baseline_invalid");
+        }
         const baseline = {
           ...metric,
           unit: experiment.primaryMetric === "ai_referrals" ? "visits" : "ratio",
           period: { from: utcDate(baselineFrom), to: utcDate(baselineTo) },
           dimensions: { platform: experiment.platform, mode: experiment.mode, language: experiment.language,
+            surface: experiment.surface, sessionPersonalized: experiment.sessionPersonalized,
             region: experiment.region, promptSetFingerprint: experiment.promptSetFingerprint },
         };
         const [row] = await tx.update(geoExperiments).set({
@@ -1066,6 +1089,8 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
         const resultMetric = await readExperimentMetric(tx as unknown as GeoDatabase, {
           from: utcDate(from), to: utcDate(to), platform: experiment.platform, mode: experiment.mode,
           language: experiment.language, region: experiment.region,
+          surface: experiment.surface ?? undefined, sessionPersonalized: experiment.sessionPersonalized ?? undefined,
+          cohortKey: typeof experiment.baseline.cohortKey === "string" ? experiment.baseline.cohortKey : undefined,
           promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
           metric: experiment.primaryMetric,
           pagePath: experiment.pagePath,
@@ -1085,14 +1110,18 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
           minimumDelta: Number(experiment.minimumDelta),
           baselineSample: baseline.sample ?? 0,
           resultSample: resultMetric.sample,
-          complete: baseline.complete === true && resultMetric.complete,
+          complete: baseline.complete === true && resultMetric.complete
+            && (experiment.primaryMetric === "ai_referrals" || experiment.primaryMetric === "crawler_health"
+              || (typeof experiment.baseline.cohortKey === "string" && experiment.surface !== null && experiment.sessionPersonalized !== null)),
           confoundingChanges: changes.map((change) => change.id),
         });
         const evaluationResults = { ...previousResults, [key]: {
           ...evaluation,
+          evidence: resultMetric,
           evaluatedAt: input.evaluatedAt.toISOString(),
           period: { from: utcDate(from), to: utcDate(to) },
           dimensions: { platform: experiment.platform, mode: experiment.mode, language: experiment.language,
+            surface: experiment.surface, sessionPersonalized: experiment.sessionPersonalized,
             region: experiment.region, promptSetFingerprint: experiment.promptSetFingerprint },
         } };
         const [row] = await tx.update(geoExperiments).set({
