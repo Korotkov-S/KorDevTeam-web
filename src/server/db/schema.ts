@@ -944,6 +944,22 @@ export const seoRecommendations = pgTable(
   ],
 );
 
+export const seoRecommendationHistory = pgTable("seo_recommendation_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  recommendationId: uuid("recommendation_id").notNull().references(() => seoRecommendations.id, { onDelete: "restrict" }),
+  eventType: varchar("event_type", { length: 20 }).notNull(),
+  beforeSnapshot: jsonb("before_snapshot").$type<Record<string, unknown> | null>(),
+  afterSnapshot: jsonb("after_snapshot").$type<Record<string, unknown>>().notNull(),
+  reason: text("reason").notNull(),
+  actor: jsonb("actor").$type<Record<string, string>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index("seo_recommendation_history_lookup_idx").on(table.recommendationId, table.createdAt),
+  check("seo_recommendation_history_type_valid", sql`${table.eventType} IN ('created','refreshed','revised','status')`),
+  check("seo_recommendation_history_reason_valid", sql`length(btrim(${table.reason})) > 0`),
+  check("seo_recommendation_history_snapshots_valid", sql`(${table.beforeSnapshot} IS NULL OR jsonb_typeof(${table.beforeSnapshot})='object') AND jsonb_typeof(${table.afterSnapshot})='object' AND jsonb_typeof(${table.actor})='object'`),
+]);
+
 export const geoTopics = pgTable(
   "geo_topics",
   {
@@ -1950,6 +1966,7 @@ export const schema = {
   seoChanges,
   seoChangeEvaluations,
   seoRecommendations,
+  seoRecommendationHistory,
   geoTopics,
   geoEntities,
   geoPrompts,

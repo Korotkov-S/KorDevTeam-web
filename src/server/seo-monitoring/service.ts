@@ -5,6 +5,7 @@ import type {
 } from "../db/schema";
 import { SEO_QUERY_KINDS, SEO_QUERY_STATUSES, type SeoDevice, type SeoQueryKind, type SeoQueryStatus, type SeoSourceId } from "./contracts";
 import { normalizeSeoQuery, normalizeSitePath } from "./normalization";
+import type { RecommendationRevision } from "./recommendationHistory";
 import type { SeoMetricFilters, SeoRepository } from "./repository";
 
 type FrequencyBand = typeof seoQueries.$inferSelect.frequencyBand;
@@ -276,9 +277,16 @@ export function createSeoService(repository: SeoRepository) {
         ...(command.pagePath ? { pagePath: normalizeSitePath(command.pagePath) } : {}),
         ...(command.queryId ? { queryId: uuid(command.queryId, "seo_query_invalid") } : {}),
         ...(actorIds.actorMcpTokenId ? { createdByMcpTokenId: actorIds.actorMcpTokenId } : {}),
-      });
+      }, actor.adminUserId || actor.mcpTokenId ? actor : { operation: "legacy-service" });
     },
 
+    reviseRecommendation(command: RecommendationRevision, actor: Actor) {
+      actorFields(actor);
+      return repository.reviseRecommendation(command, actor);
+    },
+    listRecommendationHistory(input: { recommendationId: string; limit?: number; cursor?: string | null }) {
+      return repository.listRecommendationHistory({ recommendationId: uuid(input.recommendationId, "seo_recommendation_invalid"), ...page(input) });
+    },
     updateRecommendationStatus(command: { id: string; expectedStatus: RecommendationStatus; status: RecommendationStatus }, actor: Actor) {
       actorFields(actor);
       if (!recommendationStatuses.has(command.expectedStatus) || !recommendationStatuses.has(command.status)) {
@@ -288,6 +296,7 @@ export function createSeoService(repository: SeoRepository) {
         uuid(command.id, "seo_recommendation_invalid"),
         command.expectedStatus,
         command.status,
+        actor.adminUserId || actor.mcpTokenId ? actor : { operation: "legacy-service" },
       );
     },
   };

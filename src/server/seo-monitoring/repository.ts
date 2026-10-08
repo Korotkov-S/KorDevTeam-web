@@ -19,6 +19,7 @@ import type { SemanticCoreEntry } from "./semanticCore";
 import { summarizeRankPlan } from "./rankQueue";
 import { createPageControlRepository } from "./pageControlRepository";
 import { createSeoEffectsRepository, type EffectListInput } from "./effectsRepository";
+import { createRecommendationHistoryRepository, type RecommendationActor, type RecommendationRevision } from "./recommendationHistory";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
@@ -241,15 +242,6 @@ export function buildRankControl(
     rows,
   };
 }
-
-const activeRecommendationStatuses: RecommendationStatus[] = ["new", "accepted"];
-const recommendationTransitions: Record<RecommendationStatus, RecommendationStatus[]> = {
-  new: ["accepted", "rejected", "dismissed"],
-  accepted: ["implemented", "dismissed"],
-  rejected: [],
-  implemented: [],
-  dismissed: [],
-};
 
 function cursorOffset(cursor: string | null): number {
   if (cursor === null) return 0;
@@ -1035,40 +1027,17 @@ export function createSeoRepository(db: SeoDatabase) {
       return { items: rows.slice(0, page.limit), nextCursor: rows.length > page.limit ? String(offset + page.limit) : null };
     },
 
-    async createRecommendation(command: RecommendationCommand) {
-      return db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${command.fingerprint}))`);
-        const [active] = await tx.select().from(seoRecommendations).where(and(
-          eq(seoRecommendations.fingerprint, command.fingerprint),
-          inArray(seoRecommendations.status, activeRecommendationStatuses),
-        )).orderBy(desc(seoRecommendations.createdAt)).limit(1).for("update");
-        if (active) {
-          const [updated] = await tx.update(seoRecommendations).set({
-            rationale: command.rationale,
-            evidence: command.evidence,
-            confidence: command.confidence,
-            updatedAt: new Date(),
-          }).where(eq(seoRecommendations.id, active.id)).returning();
-          return updated;
-        }
-        const [created] = await tx.insert(seoRecommendations).values(command).returning();
-        return created;
-      });
+    createRecommendation(command: RecommendationCommand, actor?: RecommendationActor) {
+      return createRecommendationHistoryRepository(db).create(command, actor);
     },
-
-    async updateRecommendationStatus(id: string, expectedStatus: RecommendationStatus, status: RecommendationStatus) {
-      return db.transaction(async (tx) => {
-        const [current] = await tx.select().from(seoRecommendations).where(eq(seoRecommendations.id, id)).for("update");
-        if (!current) throw new Error("seo_recommendation_not_found");
-        if (current.status !== expectedStatus) throw new Error("seo_recommendation_status_conflict");
-        if (!recommendationTransitions[current.status].includes(status)) {
-          throw new Error("seo_recommendation_transition_invalid");
-        }
-        const [updated] = await tx.update(seoRecommendations).set({ status, updatedAt: new Date() })
-          .where(and(eq(seoRecommendations.id, id), eq(seoRecommendations.status, expectedStatus))).returning();
-        if (!updated) throw new Error("seo_recommendation_status_conflict");
-        return updated;
-      });
+    updateRecommendationStatus(id: string, expectedStatus: RecommendationStatus, status: RecommendationStatus, actor?: RecommendationActor) {
+      return createRecommendationHistoryRepository(db).status(id, expectedStatus, status, actor);
+    },
+    reviseRecommendation(command: RecommendationRevision, actor: RecommendationActor) {
+      return createRecommendationHistoryRepository(db).revise(command, actor);
+    },
+    listRecommendationHistory(input: { recommendationId: string; limit: number; cursor: string | null }) {
+      return createRecommendationHistoryRepository(db).list(input);
     },
 
     async listRecommendations(filters: { status?: RecommendationStatus; pagePath?: string; dateFrom?: string; dateTo?: string }, page: { limit: number; cursor: string | null }) {

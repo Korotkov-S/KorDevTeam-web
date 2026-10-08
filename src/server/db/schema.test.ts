@@ -97,6 +97,7 @@ test("SEO schema keeps Yandex Metrica traffic separate from search observations"
 databaseTest("0012 reconstructs legacy GEO prompt sets and distrusts incomplete runs", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await db.execute(sql`DROP TABLE seo_recommendation_history`);
   await db.execute(sql`DROP TABLE seo_change_evaluations`);
   await db.execute(sql`DROP TABLE seo_index_observations`);
   await dropAdvertisingSchema(db);
@@ -668,6 +669,7 @@ databaseTest("SEO query lifecycle defaults to a candidate and rejects incoherent
 databaseTest("0008 promotes non-API tracked queries but turns legacy API noise into candidates", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await db.execute(sql`DROP TABLE seo_recommendation_history`);
   await db.execute(sql`DROP TABLE seo_change_evaluations`);
   await db.execute(sql`DROP TABLE seo_index_observations`);
   await dropAdvertisingSchema(db);
@@ -906,6 +908,7 @@ databaseTest("lead delivery and rate-limit counters reject negative values", asy
 databaseTest("0002 additively upgrades existing delivery jobs with a zero provider counter", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await db.execute(sql`DROP TABLE seo_recommendation_history`);
   await db.execute(sql`DROP TABLE seo_change_evaluations`);
   await db.execute(sql`DROP TABLE seo_index_observations`);
   await dropAdvertisingSchema(db);
