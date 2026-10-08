@@ -46,7 +46,7 @@
 - [x] Add failing action tests for source conflict, immutable provenance and occupied slug: status 409, distinct actionable safe message, unchanged fields, no current-version read. Keep real version conflict behavior; unknown internal errors stay sanitized.
 - [x] Run `node --import tsx --test src/routes/admin/content-routes.test.tsx` and observe RED.
 - [x] Implement narrow classification and run the same command to GREEN, then typecheck and build.
-- [ ] Fresh review, commit/merge/push; require successful complete CI and protected deployment, then independently verify production.
+- [x] Fresh review, commit/merge/push; require successful complete CI and protected deployment, then independently verify production.
 
 ### Task 3: Bounded saved-evidence evaluation
 
@@ -57,7 +57,7 @@
 - [x] Add integration regressions: unrelated historical metrics/evaluations are not returned in bulk; multiple change batches all processed; newest failed run outside window still blocks; frozen cohort/baseline and idempotence remain unchanged. Observe RED on bounded-read regression.
 - [x] Page changes by `(appliedAt,id)` in the existing fenced transaction; read only matching publication, assigned keys, first cohort, first complete checkpoint baselines, relevant page/window metrics, overlapping runs plus global newest eligible run, latest index and later same-page changes.
 - [x] Run local effects tests with the isolated CI-configured test database, then full CI-equivalent tests, typecheck and build. Review numerical/evidence equivalence and source-calendar edges.
-- [ ] Commit/merge/push, protected deploy and independent production checks; compare immutable state hashes and run only the idempotent saved-DB evaluator, without external collection.
+- [x] Commit/merge/push, protected deploy and independent production checks; compare immutable state hashes and run only the idempotent saved-DB evaluator, without external collection.
 
 ## Execution record
 
@@ -70,3 +70,6 @@
 - Required evidence remains proportional to overlapping collection runs and later same-page changes; this removes eager whole-database histories from application memory, not every possible SQL scan or per-page historical array. Existing floating-point iteration order and read-committed snapshots are unchanged policy limitations.
 - Task 1 production: revision `6c91ff5d71b636c04917f4231033aa9e220e9e8e`, CI `37792782041`, protected deployment `37795561439`; independent active green/image/revision/health/public canonical/release-boundary checks passed. Content plan/apply 145 unchanged, 0 insert/update/mismatch. Content/core/GEO/journal/evaluation/recommendation hashes unchanged. Before optimization the saved-DB evaluator returned inserted=0, unchanged=108, without provider calls.
 - Task 3 final acceptance: JS 224 passed / 2 skipped / 0 failed; TypeScript/application 1166 passed / 0 skipped / 0 failed. Typecheck/build and diff check passed. Authoritative log `/tmp/kordev-seo-polish-stage3-final-acceptance.log`. Reviewer blockers addressed with observed failing/passing regressions; no additional concrete issue remained in its scoped review.
+- Task 2 production: revision `bf71fc8c6c4ce56ef405b9f06c7e8e557eeafe09`, CI `37796097497`, protected deployment `37798957379`; independently verified at 2026-10-08T15:17:04.963Z. Active blue identity, health, canonical/release gates passed. Managed content 145 unchanged; complete monitored state hashes unchanged.
+- Task 3 production: revision `7429f90b89e8f8958af8596e3987339cd7015376`, CI `37799493487`, protected deployment `37802561647`; independently verified at 2026-10-08T15:42:24.763Z. Active green identity, health, canonical/release gates passed. Managed content 145 unchanged; complete monitored state hashes unchanged. New evaluator returned inserted=0/unchanged=108, identical to the old-code baseline; pipeline exited 0 at 2026-10-08T15:42:54.262Z.
+- Final proof: `docs/runbooks/seo-polish-release-2026-10-08.md`. All functional commits are merged into main and deployed. The final documentary proof is retained on the feature branch; it does not imply a fourth deployment.
