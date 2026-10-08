@@ -10,6 +10,17 @@ import { createKordevMcpServer, type McpAuditRecord, type McpServices } from "./
 const ENTRY_ID = "00000000-0000-4000-8000-000000000010";
 const ACTOR_ID = "00000000-0000-4000-8000-000000000020";
 
+test("MCP exposes safe Telegram conflict codes without database details", async t => {
+  for (const code of ["content_source_conflict", "content_provenance_immutable"]) {
+    const c = await connected(["content:write"], services({ content: { async createDraft() { throw new Error(code); } } }));
+    t.after(() => c.client.close());
+    const result = await c.client.callTool({ name: "create_content_draft", arguments: { snapshot: snapshot() } });
+    assert.equal(result.isError, true);
+    assert.match(JSON.stringify(result), new RegExp(code));
+    assert.doesNotMatch(JSON.stringify(result), /INSERT INTO|23505|constraint/);
+  }
+});
+
 test("GEO MCP retains false cohort filters and rejects observational candidates without a known cohort", async t => {
   const captured: unknown[] = [];
   const c = await connected(["seo:read", "seo:write"], services({ geo: {

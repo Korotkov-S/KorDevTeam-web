@@ -72,7 +72,7 @@ export function verifyContentMutation(
 
 export function contentErrorStatus(error: unknown): number {
   const code = error instanceof Error ? error.message : "";
-  if (code === "content_version_conflict" || code === "content_slug_conflict" || code === "setting_version_conflict") return 409;
+  if (["content_version_conflict", "content_slug_conflict", "content_source_conflict", "content_provenance_immutable", "setting_version_conflict"].includes(code)) return 409;
   if (code === "content_not_found") return 404;
   if (code === "admin_origin_invalid" || code === "admin_csrf_invalid") return 403;
   if (code === "content_validation_error" || code === "setting_validation_error" || code === "content_delete_confirmation_invalid") return 422;

@@ -5,6 +5,7 @@ import { parseContentCommand, validatePublication } from "./types";
 import { matchesImportedEntry, migrationKey, type MigrationRecord } from "./migration";
 import { listPublishedRelations } from "./relations";
 import type { ContentEntry, ContentKind, RelationType, ValidatedContentCommand } from "./types";
+import { assertTelegramTransition, safeContentWriteError } from "./provenance";
 
 export type ContentDatabase = ReturnType<typeof createDb>;
 export type ContentTransaction = Parameters<Parameters<ContentDatabase["transaction"]>[0]>[0];
@@ -109,9 +110,10 @@ export function createContentRepository(db: ContentDatabase) {
     async insert(command: ValidatedContentCommand): Promise<WriteResult> {
       return db.transaction(async tx => {
         const { id: _id, expectedVersion: _version, ...fields } = command;
+        assertTelegramTransition(undefined, { ...fields, status: "draft" });
         const [after] = await tx.insert(contentEntries).values({ ...fields, status: "draft" }).returning();
         return { after, relatedSourceIds: [], relatedKinds: [] };
-      });
+      }).catch(error => { throw safeContentWriteError(error); });
     },
     async update(
       id: string, expectedVersion: number, actorId: string,
@@ -140,6 +142,7 @@ export function createContentRepository(db: ContentDatabase) {
           };
         }
         const fields = change(before, revision);
+        assertTelegramTransition(before, { ...before, ...fields });
         const snapshot = await revisionState(tx, before);
         await tx.insert(contentRevisions).values({
           entryId: id, version: before.version,
@@ -159,7 +162,7 @@ export function createContentRepository(db: ContentDatabase) {
           );
         }
         return { before, after, ...await references(tx, id) };
-      });
+      }).catch(error => { throw safeContentWriteError(error); });
     },
     async delete(id: string, expectedVersion: number): Promise<WriteResult | null> {
       return db.transaction(async tx => {

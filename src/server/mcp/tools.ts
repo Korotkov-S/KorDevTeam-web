@@ -446,6 +446,8 @@ const errorMessages: Record<string, string> = {
   content_version_conflict: "Материал уже изменён. Сначала прочитайте актуальную версию.",
   content_validation_error: "Материал не прошёл проверку.",
   content_slug_conflict: "Материал с таким адресом уже существует.",
+  content_source_conflict: "Этот Telegram-пост уже связан с материалом. Прочитайте существующий черновик или статью.",
+  content_provenance_immutable: "Происхождение материала нельзя удалить или заменить при редактировании или восстановлении.",
   media_content_invalid: "Данные изображения повреждены или имеют неподдерживаемый формат.",
   media_filename_invalid: "Некорректное имя файла.",
   media_metadata_invalid: "Укажите alt-текст или отметьте изображение декоративным.",

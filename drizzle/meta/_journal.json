@@ -162,6 +162,13 @@
       "when": 1791455400000,
       "tag": "0022_geo_experiment_cohorts",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791459000000,
+      "tag": "0023_content_telegram_identity",
+      "breakpoints": true
     }
   ]
 }

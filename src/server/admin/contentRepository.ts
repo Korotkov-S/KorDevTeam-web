@@ -10,6 +10,7 @@ import {
 } from "../db/schema";
 import { parseContentCommand, validatePublication, type ContentEntry, type ContentKind } from "../content/types";
 import type { AdminContentCommand, AdminMediaRef, AdminRelation } from "./contentSchemas";
+import { assertTelegramTransition, safeContentWriteError } from "../content/provenance";
 
 export type AdminContentDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<AdminContentDatabase["transaction"]>[0]>[0];
@@ -85,6 +86,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
           const fields = publicFields(command);
           if (!command.id) {
             const candidate = { ...fields, status: command.intent === "publish" ? "published" : "draft" } as ContentEntry;
+            assertTelegramTransition(undefined, candidate);
             if (command.intent === "publish") validatePublication(candidate);
             const [entry] = await tx.insert(contentEntries).values({
               ...fields,
@@ -106,6 +108,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
             status: command.intent === "publish" ? "published" : "draft",
             publishedAt: command.intent === "publish" ? before.publishedAt ?? new Date() : before.publishedAt,
           } as ContentEntry;
+          assertTelegramTransition(before, next);
           if (command.intent === "publish") validatePublication(next);
           await tx.insert(contentRevisions).values({
             entryId: before.id,
@@ -125,8 +128,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
           return entry;
         });
       } catch (error) {
-        if (isUniqueViolation(error)) throw new Error("content_slug_conflict");
-        throw error;
+        throw safeContentWriteError(error);
       }
     },
     async unpublish(id: string, expectedVersion: number, actorId: string) {
@@ -170,6 +172,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
           payload: restored.entry.payload,
         });
         if (parsed.kind !== before.kind) throw new Error("content_validation_error");
+        assertTelegramTransition(before, { ...restored.entry, ...parsed });
         if (restored.entry.status === "published") validatePublication(restored.entry);
         await tx.insert(contentRevisions).values({
           entryId: id, version: before.version,
@@ -185,7 +188,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
         if (!entry) throw new Error("content_version_conflict");
         await writeRelations(tx, id, restored.relations, restored.mediaRefs);
         return entry;
-      });
+      }).catch(error => { throw safeContentWriteError(error); });
     },
     async hardDelete(id: string, expectedVersion: number) {
       return db.transaction(async tx => {

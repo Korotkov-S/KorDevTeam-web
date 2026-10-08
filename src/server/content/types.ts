@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { contentEntries } from "../db/schema";
 import type { MediaPresentationMap, ResolvedMediaAsset } from "../media/presentation";
 import { BLOG_CATEGORY_SLUGS } from "../../lib/blogCategories";
+import { validTelegramProvenance } from "./provenance";
 
 export type ContentKind = "service" | "case" | "article" | "page" | "faq";
 export type RelationType = "related_case" | "related_article" | "related_faq" | "related_service";
@@ -143,7 +144,7 @@ export const saveContentSchema = z.discriminatedUnion("kind", [
     primarySeoQuery: z.string().trim().min(1).optional(),
     wordstatFrequency: z.number().int().nonnegative().nullable().optional(),
     wordstatFrequencyStatus: z.enum(["confirmed", "unconfirmed"]).optional(),
-  }).default({}) }),
+  }).refine(validTelegramProvenance, { message: "Telegram provenance must be complete and match its public source" }).default({}) }),
   z.strictObject({ ...base, kind: z.literal("page"), payload: z.strictObject({
     h1: z.string().optional(), sections: z.array(block).optional(), cta: cta.optional(),
   }).default({}) }),

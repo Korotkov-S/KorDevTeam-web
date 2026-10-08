@@ -47,6 +47,11 @@ import { resetTestDatabase } from "./testDatabase";
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
 
+async function dropTelegramIdentity(db: ReturnType<typeof createDb>) {
+  await db.execute(sql`ALTER TABLE content_entries DROP CONSTRAINT content_entries_telegram_valid`);
+  await db.execute(sql`DROP INDEX content_entries_telegram_post_uq, content_entries_telegram_url_uq`);
+}
+
 test("advertising schema exposes the ten bounded knowledge tables", () => {
   for (const table of [
     adResearchSources,
@@ -97,6 +102,7 @@ test("SEO schema keeps Yandex Metrica traffic separate from search observations"
 databaseTest("0012 reconstructs legacy GEO prompt sets and distrusts incomplete runs", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropTelegramIdentity(db);
   await db.execute(sql`ALTER TABLE geo_experiments DROP CONSTRAINT geo_experiments_surface_valid, DROP COLUMN surface, DROP COLUMN session_personalized`);
   await db.execute(sql`DROP TABLE seo_recommendation_history`);
   await db.execute(sql`DROP TABLE seo_change_evaluations`);
@@ -693,6 +699,7 @@ databaseTest("0008 promotes non-API tracked queries but turns legacy API noise i
     DROP CONSTRAINT seo_daily_metrics_ctr_valid,
     ADD CONSTRAINT seo_daily_metrics_clicks_valid CHECK (clicks >= 0 AND clicks <= impressions),
     ADD CONSTRAINT seo_daily_metrics_ctr_valid CHECK (ctr >= 0 AND ctr <= 1)`);
+  await dropTelegramIdentity(db);
   await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1790453494948`);
 
   await migrate(db, { migrationsFolder: "drizzle" });
@@ -938,6 +945,7 @@ databaseTest("0002 additively upgrades existing delivery jobs with a zero provid
     DROP COLUMN version`);
   await db.execute(sql`ALTER TABLE lead_delivery_jobs DROP CONSTRAINT lead_delivery_jobs_provider_attempt_count_non_negative`);
   await db.execute(sql`ALTER TABLE lead_delivery_jobs DROP COLUMN provider_attempt_count`);
+  await dropTelegramIdentity(db);
   await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1789387439441`);
 
   await migrate(db, { migrationsFolder: "drizzle" });

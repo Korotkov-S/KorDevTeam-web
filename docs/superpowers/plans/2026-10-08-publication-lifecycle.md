@@ -25,7 +25,7 @@ Architecture: one transaction helper shared by existing admin/MCP and generic co
 - Republish a no-op increments version today; event must describe version publication rather than pretend semantic improvement and restart first-publication date.
 - Concurrent manual candidate creation/assigned query must preserve its existing target/status/Wordstat, including another-page cannibalization risk.
 
-## Task1: source identity boundary
+### Task 1: Source identity boundary
 
 Files: src/server/content/types.ts validation; new src/server/content/provenance.ts helper; src/server/db/schema.ts + migration0023/journal/schema/backup fixtures; src/server/admin/contentRepository.ts and src/server/content/repository.ts guards/errors; src/server/mcp/tools.ts safe map, src/routes/admin/content-http.server.ts409 map; targeted validation/DB/MCP tests.
 
@@ -35,7 +35,7 @@ Interfaces: assertTelegramTransition(before:ContentEntry|undefined,after:Content
 - [ ] Implement minimum validation, shared transition guard and schema constraints/indexes. Preserve generic drafts, published Telegram records and source-none records. Own unchanged provenance update allowed.
 - [ ] Run `env TEST_DATABASE_URL=postgresql://kordev_ci:kordev_ci@127.0.0.1:54329/kordev_test node --import tsx --test --test-concurrency=1 src/server/content/provenance.test.ts src/server/admin/contentRepository.test.ts src/server/content/service.test.ts src/server/mcp/tools.test.ts src/server/db/schema.test.ts tests/deploy/backup.test.mjs`; expected0 failures, no skipped DB tests. Run `npm run typecheck` and `npm run db:check`; expected exit0. Commit. Full suite remains final release gate.
 
-## Task2: atomic publication events/candidates
+### Task 2: Atomic publication events and candidates
 
 Files: new content/publicationLifecycle.ts + DB tests; admin/contentRepository.ts; content/repository.ts; content/service.test.ts and admin repository tests; source-aware helper from Task1; no independent API endpoint.
 
@@ -46,7 +46,7 @@ Interfaces: recordPublicationTransition(tx:ContentWriteTransaction,input:{before
 - [ ] Implement smallest shared transactional helper; exactly one event per affected public path/new version, old URL technical withdrawal and new URL event on slug move. Actor existing admin identity or null, never invent MCP identity. Candidate only current published/indexable explicit article phrase under shared existing advisory key. Preserve static/import path exceptions, no backfill.
 - [ ] Run `env TEST_DATABASE_URL=postgresql://kordev_ci:kordev_ci@127.0.0.1:54329/kordev_test node --import tsx --test --test-concurrency=1 src/server/content/publicationLifecycle.test.ts src/server/admin/contentRepository.test.ts src/server/content/service.test.ts src/server/content/cache.test.ts src/server/mcp/tools.test.ts src/server/seo-monitoring/effectsRepository.test.ts src/server/seo-monitoring/pageControlRepository.test.ts`; expected0 failures, no skipped DB tests. Run `npm run typecheck`, `npm run build`, `npm run db:check`; expected exit0. Commit.
 
-## Task3: documentation, full acceptance and release
+### Task 3: Documentation full acceptance and release
 
 Files: runbook, operations protocol/Telegram instructions, release proof, existing heartbeat after physical acceptance.
 

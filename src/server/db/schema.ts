@@ -281,6 +281,12 @@ export const contentEntries = pgTable(
   },
   (table) => [
     uniqueIndex("content_entries_kind_slug_uq").on(table.kind, table.slug),
+    uniqueIndex("content_entries_telegram_post_uq").on(sql`(${table.payload}->>'telegramPostId')`).where(sql`${table.kind} = 'article' AND ${table.payload} ? 'telegramPostId'`),
+    uniqueIndex("content_entries_telegram_url_uq").on(sql`(${table.payload}->>'telegramSourceUrl')`).where(sql`${table.kind} = 'article' AND ${table.payload} ? 'telegramSourceUrl'`),
+    check("content_entries_telegram_valid", sql`${table.kind} <> 'article' OR NOT (${table.payload} ?| ARRAY['telegramPostId','telegramSourceUrl','contentOrigin']) OR COALESCE(
+      jsonb_typeof(${table.payload}->'telegramPostId') = 'string' AND ${table.payload}->>'telegramPostId' ~ '^[1-9][0-9]*$'
+      AND ${table.payload}->>'telegramSourceUrl' = 'https://t.me/korotkovsStudio/' || (${table.payload}->>'telegramPostId')
+      AND ${table.payload}->>'contentOrigin' = 'telegram:korotkovsStudio', false)`),
     check("content_entries_version_positive", sql`${table.version} > 0`),
     check("content_entries_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'`),
   ],
