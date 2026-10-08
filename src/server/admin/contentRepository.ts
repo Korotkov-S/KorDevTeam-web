@@ -11,6 +11,7 @@ import {
 import { parseContentCommand, validatePublication, type ContentEntry, type ContentKind } from "../content/types";
 import type { AdminContentCommand, AdminMediaRef, AdminRelation } from "./contentSchemas";
 import { assertTelegramTransition, safeContentWriteError } from "../content/provenance";
+import { recordPublicationTransition, referencesDiffer } from "../content/publicationLifecycle";
 
 export type AdminContentDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<AdminContentDatabase["transaction"]>[0]>[0];
@@ -94,6 +95,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
               publishedAt: command.intent === "publish" ? new Date() : null,
             }).returning();
             await writeRelations(tx, entry.id, command.relations, command.mediaRefs);
+            await recordPublicationTransition(tx, { after: entry, actorId });
             return entry;
           }
           const [before] = await tx.select().from(contentEntries).where(eq(contentEntries.id, command.id)).for("update");
@@ -125,6 +127,8 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
           }).where(and(eq(contentEntries.id, before.id), eq(contentEntries.version, before.version))).returning();
           if (!entry) throw new Error("content_version_conflict");
           await writeRelations(tx, entry.id, command.relations, command.mediaRefs);
+          await recordPublicationTransition(tx, { before, after: entry, actorId,
+            linksChanged: referencesDiffer(state.relations, command.relations), mediaChanged: referencesDiffer(state.mediaRefs, command.mediaRefs) });
           return entry;
         });
       } catch (error) {
@@ -145,6 +149,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
           status: "draft", version: before.version + 1, updatedAt: new Date(),
         }).where(and(eq(contentEntries.id, id), eq(contentEntries.version, expectedVersion))).returning();
         if (!entry) throw new Error("content_version_conflict");
+        await recordPublicationTransition(tx, { before, after: entry, actorId });
         return entry;
       });
     },
@@ -187,6 +192,8 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
         }).where(and(eq(contentEntries.id, id), eq(contentEntries.version, expectedVersion))).returning();
         if (!entry) throw new Error("content_version_conflict");
         await writeRelations(tx, id, restored.relations, restored.mediaRefs);
+        await recordPublicationTransition(tx, { before, after: entry, actorId,
+          linksChanged: referencesDiffer(currentState.relations, restored.relations), mediaChanged: referencesDiffer(currentState.mediaRefs, restored.mediaRefs) });
         return entry;
       }).catch(error => { throw safeContentWriteError(error); });
     },
@@ -195,6 +202,7 @@ export function createAdminContentRepository(db: AdminContentDatabase) {
         const [before] = await tx.select().from(contentEntries).where(eq(contentEntries.id, id)).for("update");
         if (!before) return false;
         if (before.version !== expectedVersion) throw new Error("content_version_conflict");
+        await recordPublicationTransition(tx, { before });
         const rows = await tx.delete(contentEntries).where(and(
           eq(contentEntries.id, id), eq(contentEntries.version, expectedVersion),
         )).returning({ id: contentEntries.id });

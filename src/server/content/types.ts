@@ -141,7 +141,7 @@ export const saveContentSchema = z.discriminatedUnion("kind", [
     telegramSourceUrl: z.url().regex(/^https:\/\/t\.me\/korotkovsStudio\/[1-9]\d*$/).optional(),
     contentOrigin: z.literal("telegram:korotkovsStudio").optional(),
     sourcePublishedAt: z.iso.datetime({ offset: true }).optional(),
-    primarySeoQuery: z.string().trim().min(1).optional(),
+    primarySeoQuery: z.string().trim().min(1).refine(value => new TextEncoder().encode(value).length <= 500).optional(),
     wordstatFrequency: z.number().int().nonnegative().nullable().optional(),
     wordstatFrequencyStatus: z.enum(["confirmed", "unconfirmed"]).optional(),
   }).refine(validTelegramProvenance, { message: "Telegram provenance must be complete and match its public source" }).default({}) }),

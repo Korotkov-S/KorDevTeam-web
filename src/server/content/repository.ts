@@ -6,6 +6,7 @@ import { matchesImportedEntry, migrationKey, type MigrationRecord } from "./migr
 import { listPublishedRelations } from "./relations";
 import type { ContentEntry, ContentKind, RelationType, ValidatedContentCommand } from "./types";
 import { assertTelegramTransition, safeContentWriteError } from "./provenance";
+import { recordPublicationTransition, referencesDiffer } from "./publicationLifecycle";
 
 export type ContentDatabase = ReturnType<typeof createDb>;
 export type ContentTransaction = Parameters<Parameters<ContentDatabase["transaction"]>[0]>[0];
@@ -161,6 +162,9 @@ export function createContentRepository(db: ContentDatabase) {
             restoredState.mediaRefs.map(ref => ({ entryId: id, ...ref })),
           );
         }
+        await recordPublicationTransition(tx, { before, after, actorId,
+          linksChanged: restoredState ? referencesDiffer(snapshot.relations, restoredState.relations) : false,
+          mediaChanged: restoredState ? referencesDiffer(snapshot.mediaRefs, restoredState.mediaRefs) : false });
         return { before, after, ...await references(tx, id) };
       }).catch(error => { throw safeContentWriteError(error); });
     },
@@ -170,6 +174,7 @@ export function createContentRepository(db: ContentDatabase) {
         if (!before) return null;
         if (before.version !== expectedVersion) throw new Error("content_version_conflict");
         const related = await references(tx, id);
+        await recordPublicationTransition(tx, { before });
         const deleted = await tx.delete(contentEntries).where(and(
           eq(contentEntries.id, id), eq(contentEntries.version, expectedVersion),
         )).returning({ id: contentEntries.id });
