@@ -1,5 +1,5 @@
 export type EffectSource = "yandex_webmaster" | "google_search_console";
-export type EffectStatus = "not_applicable" | "pending_period" | "pending_source" | "pending_coverage" | "pending_refresh"
+export type EffectStatus = "not_applicable" | "pending_period" | "pending_source" | "pending_coverage" | "pending_refresh" | "pending_provenance"
   | "confounded" | "incompatible" | "insufficient_data" | "improved" | "declined" | "no_material_change";
 type Window = { from: string; to: string };
 export type EffectMetric = { queryId: string; date: string; regionCode: string; device: string; impressions: number; clicks: number; averagePosition: number };
@@ -13,7 +13,8 @@ export type EffectInput = {
   publication: { pagePath: string; version: number; indexable: boolean } | null;
   cohort: string[]; currentCohort: string[]; baseline?: EffectBaseline;
   subsequentChanges: string[]; runs: EffectRun[]; metrics: EffectMetric[];
-  index: { status: string; checkedAt: string; lastCrawlAt: string | null; publishedVersion: number; pagePath: string } | null;
+  index: { status: string; checkedAt: string; lastCrawlAt: string | null; publishedVersion: number; pagePath: string;
+    technical?: { httpStatus: number | null; canonical: string | null; noindex: boolean | null; robotsAllowed: boolean | null; errorCode: string | null } } | null;
 };
 export const EFFECT_POLICY = { version: 1, minImpressionsPerQuery: 100, minPositionEffect: 1, maxEvidenceAgeHours: 36,
   metric: "equal_query_mean_impression_weighted_position", scope: "Russia / actual devices / frozen assigned queries", causal: false } as const;
@@ -66,10 +67,14 @@ export function evaluateSeoEffect(input: EffectInput) {
   else if (windows.after.to >= today) status = "pending_period";
   else if (!sourceReady) status = "pending_source";
   else if (!baseline.complete || !after.complete) status = "pending_coverage";
+  else if (input.change.contentVersion === null) status = "pending_provenance";
   else if (!publication || !publication.indexable || input.cohort.some(id => !input.currentCohort.includes(id))) status = "incompatible";
   else if (input.subsequentChanges.some(at => +new Date(at) > applied && calendarDay(at, input.source) <= windows.after.to)
     || (input.change.contentVersion !== null && publication.version !== input.change.contentVersion)) status = "confounded";
   else if (!index || index.status !== "indexed" || index.publishedVersion !== publication.version || index.pagePath !== publication.pagePath
+    || (index.technical?.httpStatus != null && index.technical.httpStatus !== 200) || index.technical?.noindex === true
+    || index.technical?.robotsAllowed === false || !!index.technical?.errorCode
+    || (!!index.technical?.canonical && index.technical.canonical !== `https://kordev.team${publication.pagePath}`)
     || now - +new Date(index.checkedAt) > EFFECT_POLICY.maxEvidenceAgeHours * 3600000 || +new Date(index.checkedAt) > now
     || !index.lastCrawlAt || +new Date(index.lastCrawlAt) < applied || +new Date(index.lastCrawlAt) > now) status = "pending_refresh";
   else if (!input.cohort.length || [...baseline.queries, ...after.queries].some(q => q.impressions < EFFECT_POLICY.minImpressionsPerQuery)

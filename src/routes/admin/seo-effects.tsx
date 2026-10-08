@@ -4,6 +4,7 @@ import type { EffectStatus } from "../../server/seo-monitoring/effects";
 
 const labels: Record<EffectStatus, string> = { not_applicable: "Операционное событие — не контентная гипотеза", pending_period: "Ожидание полного периода",
   pending_source: "Ожидание свежего успешного сбора", pending_coverage: "Периоды покрыты не полностью", pending_refresh: "Ожидание подтверждённого переобхода/индексации",
+  pending_provenance: "Версия страницы на момент изменения не подтверждена",
   confounded: "Есть последующие изменения страницы", incompatible: "Несовместимая страница или группа ключей", insufficient_data: "Недостаточно показов",
   improved: "Средняя позиция улучшилась", declined: "Средняя позиция ухудшилась", no_material_change: "Изменение меньше рабочего порога" };
 const n = (value: number | null) => value === null ? "нет данных" : value.toFixed(2);

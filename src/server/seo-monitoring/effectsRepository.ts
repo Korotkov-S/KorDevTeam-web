@@ -37,7 +37,7 @@ export function createSeoEffectsRepository(db: SeoDatabase) {
             const previous = history.filter(h => h.changeId === change.id && h.source === source);
             const currentCohort = queries.filter(q => q.targetPath === change.pagePath).map(q => q.id);
             const cohort = previous[0]?.result.cohort ?? currentCohort;
-            const entry = publications.find(e => entryPath(e) === change.pagePath);
+            const entry = publications.find(e => e.id === change.contentEntryId && entryPath(e) === change.pagePath);
             const index = entry && indices.find(i => i.contentEntryId === entry.id && i.source === (source === "yandex_webmaster" ? "yandex" : "google"));
             for (const checkpoint of [7, 14, 28] as const) {
               const baseline = previous.find(h => h.checkpoint === checkpoint && h.result.baseline.complete)?.result.baseline;
@@ -46,10 +46,12 @@ export function createSeoEffectsRepository(db: SeoDatabase) {
                 publication: entry ? { pagePath: entryPath(entry)!, version: entry.version, indexable: entry.indexable } : null,
                 cohort, currentCohort, baseline, runs,
                 index: index ? { status: index.status, checkedAt: index.checkedAt.toISOString(), publishedVersion: index.publishedVersion, pagePath: index.pagePath,
+                  technical: { httpStatus: index.evidence.httpStatus ?? null, canonical: index.evidence.canonical ?? null,
+                    noindex: index.evidence.noindex ?? null, robotsAllowed: index.evidence.robotsAllowed ?? null, errorCode: index.evidence.technicalErrorCode ?? null },
                   lastCrawlAt: typeof index.evidence.lastCrawlAt === "string" ? index.evidence.lastCrawlAt : null } : null,
                 metrics: metrics.filter(r => r.metric.pagePath === change.pagePath).map(({ metric: r, region }) => ({ queryId: r.queryId, date: r.observationDate,
                   regionCode: region, device: r.device, impressions: r.impressions, clicks: r.clicks, averagePosition: Number(r.averagePosition) })),
-                subsequentChanges: changes.filter(c => c.pagePath === change.pagePath && +c.appliedAt > +change.appliedAt).map(c => c.appliedAt.toISOString()),
+                subsequentChanges: changes.filter(c => c.type !== "other" && c.pagePath === change.pagePath && +c.appliedAt > +change.appliedAt).map(c => c.appliedAt.toISOString()),
               });
               // Capture times document the first persisted attempt, not a reason to duplicate identical evidence.
               const digestInput = { ...result, baseline: { ...result.baseline, capturedAt: null } };

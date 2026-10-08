@@ -112,3 +112,10 @@ test("frozen complete baseline survives later metric corrections; incomplete bas
   input.change.type = "other";
   assert.equal(evaluateSeoEffect(input).status, "not_applicable");
 });
+
+test("unknown change version cannot measure the current publication", () => {
+  const input = effectFixture(); input.change.contentVersion = null;
+  input.publication!.version = 99; input.index!.publishedVersion = 99;
+  assert.equal(evaluateSeoEffect(input).status, "pending_provenance");
+  assert.equal(evaluateSeoEffect(input).positionDelta, null);
+});
