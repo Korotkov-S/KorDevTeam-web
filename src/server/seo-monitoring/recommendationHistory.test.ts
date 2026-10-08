@@ -5,11 +5,15 @@ import { createDb } from "../db/client";
 import { resetTestDatabase } from "../db/testDatabase";
 import { seoRecommendations } from "../db/schema";
 import { createSeoRepository } from "./repository";
-import { createRecommendationHistoryRepository, type RecommendationRevision } from "./recommendationHistory";
+import { createRecommendationHistoryRepository, validateRecommendationRevisions, type RecommendationRevision } from "./recommendationHistory";
 
 const url = process.env.TEST_DATABASE_URL ?? "";
 const actor = { operation: "test-reconcile" };
 const command = { title: "Old title", rationale: "Old evidence", issueType: "coverage", evidence: { covered: 29 }, confidence: "high" as const, fingerprint: "a".repeat(64) };
+test("finite revision evidence cannot silently serialize Infinity into null", () => {
+  const input = { id: "00000000-0000-4000-8000-000000000001", expectedUpdatedAt: "2026-10-08T12:00:00Z", title: "Current", rationale: "Audit", confidence: "high", reason: "Facts", evidence: JSON.parse('{"impressions":1e400}') };
+  assert.throws(() => validateRecommendationRevisions([input]), /seo_recommendation_batch_invalid/);
+});
 async function fixture() {
   await resetTestDatabase(url); const db = createDb(url); const repo = createSeoRepository(db);
   const row = await repo.createRecommendation(command);
@@ -70,4 +74,11 @@ async function fixture() {
   const rejected = results.find(r => r.status === "rejected") as PromiseRejectedResult;
   assert.match(rejected.reason.message, /seo_recommendation_revision_conflict/);
   assert.equal((await f.history.list({ recommendationId: f.row.id, limit: 100, cursor: null })).items.length, 2);
+});
+
+(url ? test : test.skip)("history cannot appear under a different current page filter", async () => {
+  const f = await fixture();
+  await f.db.update(seoRecommendations).set({ pagePath: "/services/a/" }).where(eq(seoRecommendations.id, f.row.id));
+  assert.equal((await f.history.list({ recommendationId: f.row.id, pagePath: "/services/b/", limit: 100, cursor: null })).items.length, 0);
+  assert.equal((await f.history.list({ recommendationId: f.row.id, pagePath: "/services/a/", limit: 100, cursor: null })).items.length, 1);
 });

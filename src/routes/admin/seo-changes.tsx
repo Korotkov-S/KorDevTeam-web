@@ -7,7 +7,7 @@ import { adminRouteHeaders } from "./headers";
 import { createSeoSectionLoader } from "./seo-read.server";
 import { action } from "./seo.server";
 import { SeoEffectsPanel } from "./seo-effects";
-import { SeoRecommendationHistory, recommendationHistoryLink } from "./seo-recommendation-history";
+import { SeoRecommendationHistory, SeoRecommendationIndex } from "./seo-recommendation-history";
 import type { RecommendationHistoryRow } from "../../server/seo-monitoring/recommendationHistory";
 import type { ChangeEffectRow } from "../../server/seo-monitoring/effectsRepository";
 import { formatDate, PageHeader, Panel, SearchFilters, useAdminCsrfToken, type SeoFilters } from "./seo-shared";
@@ -27,7 +27,7 @@ function SeoChangesJournal({ data, csrfToken }: { data: Data; csrfToken: string 
 }
 
 export function SeoChangesPage({ data, csrfToken }: { data: Data; csrfToken: string }) {
-  return <><SeoChangesJournal data={data} csrfToken={csrfToken} /><ul className="my-3 space-y-1">{data.recommendations.items.map(item => <li key={item.id} className="text-sm"><a className="underline" href={recommendationHistoryLink(data.recommendationsSearch, item.id)}>История: {item.title}</a>{item.updatedAt ? ` · обновлено ${formatDate(item.updatedAt)}` : ""}</li>)}</ul>{data.recommendationId ? <SeoRecommendationHistory data={data.recommendationHistory ?? { items: [], nextCursor: null }} recommendationId={data.recommendationId} search={data.recommendationsSearch} /> : null}<div className="mt-6"><SeoEffectsPanel data={data.effects ?? { items: [], nextCursor: null }} search={data.effectsSearch} /></div></>;
+  return <><SeoChangesJournal data={data} csrfToken={csrfToken} /><SeoRecommendationIndex data={data.recommendations} search={data.recommendationsSearch} />{data.recommendationId ? <SeoRecommendationHistory data={data.recommendationHistory ?? { items: [], nextCursor: null }} recommendationId={data.recommendationId} search={data.recommendationsSearch} /> : null}<div className="mt-6"><SeoEffectsPanel data={data.effects ?? { items: [], nextCursor: null }} search={data.effectsSearch} /></div></>;
 }
 
 export default function SeoChangesRoute() {

@@ -156,10 +156,10 @@ export function createSeoSectionLoader(
         const recommendationId = effectsUrl.searchParams.get("recommendationId");
         const [changes, recommendations, effects, recommendationHistory] = await Promise.all([
           service.listChanges({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor }),
-          service.listRecommendations({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor: null }),
+          service.listRecommendations({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor: effectsUrl.searchParams.get("recommendationsCursor") }),
           service.listChangeEffects?.({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50,
             cursor: effectsUrl.searchParams.get("effectsCursor"), ...(changeId ? { changeId, history: true } : {}) }) ?? { items: [], nextCursor: null },
-          recommendationId && service.listRecommendationHistory ? service.listRecommendationHistory({ recommendationId, limit: 50, cursor: effectsUrl.searchParams.get("recommendationHistoryCursor") }) : { items: [], nextCursor: null },
+          recommendationId && service.listRecommendationHistory ? service.listRecommendationHistory({ recommendationId, ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor: effectsUrl.searchParams.get("recommendationHistoryCursor") }) : { items: [], nextCursor: null },
         ]);
         payload = { filters: parsed.ui, changes, recommendations, effects, effectsSearch: effectsUrl.search, recommendationId, recommendationHistory, recommendationsSearch: effectsUrl.search };
       }

@@ -2,6 +2,11 @@ import React from "react";
 import type { RecommendationHistoryRow } from "../../server/seo-monitoring/recommendationHistory";
 import { Panel, formatDate } from "./seo-shared";
 type Event = Omit<RecommendationHistoryRow, "createdAt"> & { createdAt: Date | string };
+export function SeoRecommendationIndex({ data, search }: { data: { items: Array<{ id: string; title: string; status: string; updatedAt?: string | Date }>; nextCursor: string | null }; search?: string }) {
+  const next = new URLSearchParams(search); next.delete("recommendationId"); next.delete("recommendationHistoryCursor");
+  if (data.nextCursor) next.set("recommendationsCursor", data.nextCursor);
+  return <nav aria-label="История рекомендаций"><ul className="my-3 space-y-1">{data.items.map(item => <li key={item.id} className="text-sm"><a className="underline" href={recommendationHistoryLink(search, item.id)}>История: {item.title}</a> · {item.status}{item.updatedAt ? ` · обновлено ${formatDate(item.updatedAt)}` : ""}</li>)}</ul>{data.nextCursor ? <a className="underline" href={`?${next}`}>Следующие рекомендации</a> : null}</nav>;
+}
 export function recommendationHistoryLink(search: string | undefined, id: string, cursor?: string) {
   const params = new URLSearchParams(search); params.set("recommendationId", id);
   params.delete("recommendationHistoryCursor"); if (cursor) params.set("recommendationHistoryCursor", cursor);

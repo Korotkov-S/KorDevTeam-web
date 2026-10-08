@@ -284,8 +284,8 @@ export function createSeoService(repository: SeoRepository) {
       actorFields(actor);
       return repository.reviseRecommendation(command, actor);
     },
-    listRecommendationHistory(input: { recommendationId: string; limit?: number; cursor?: string | null }) {
-      return repository.listRecommendationHistory({ recommendationId: uuid(input.recommendationId, "seo_recommendation_invalid"), ...page(input) });
+    listRecommendationHistory(input: { recommendationId: string; pagePath?: string; limit?: number; cursor?: string | null }) {
+      return repository.listRecommendationHistory({ recommendationId: uuid(input.recommendationId, "seo_recommendation_invalid"), ...(input.pagePath ? { pagePath: normalizeSitePath(input.pagePath) } : {}), ...page(input) });
     },
     updateRecommendationStatus(command: { id: string; expectedStatus: RecommendationStatus; status: RecommendationStatus }, actor: Actor) {
       actorFields(actor);

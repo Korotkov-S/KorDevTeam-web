@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray, and, sql } from "drizzle-orm";
+import { asc, desc, eq, inArray, and, sql, getTableColumns } from "drizzle-orm";
 import { z } from "zod";
 import { seoRecommendations, seoRecommendationHistory } from "../db/schema";
 import type { SeoDatabase } from "./repository";
@@ -9,10 +9,17 @@ type Status = Row["status"];
 type Create = Omit<typeof seoRecommendations.$inferInsert, "id" | "status" | "createdAt" | "updatedAt">;
 export type RecommendationActor = { adminUserId?: string; mcpTokenId?: string; operation?: string };
 const statuses = z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]);
+function jsonValue(value: unknown, depth = 0): boolean {
+  if (depth > 20) return false;
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(v => jsonValue(v, depth + 1));
+  return !!value && typeof value === "object" && [Object.prototype, null].includes(Object.getPrototypeOf(value)) && Object.values(value).every(v => jsonValue(v, depth + 1));
+}
 const revisionSchema = z.object({
   id: z.string().uuid(), expectedUpdatedAt: z.string().datetime({ offset: true }),
   title: z.string().trim().min(1).max(300), rationale: z.string().trim().min(1).max(5000),
-  evidence: z.record(z.string(), z.unknown()).refine(v => Buffer.byteLength(JSON.stringify(v), "utf8") <= 16384),
+  evidence: z.record(z.string(), z.unknown()).refine(v => jsonValue(v) && Buffer.byteLength(JSON.stringify(v), "utf8") <= 16384),
   confidence: z.enum(["low", "medium", "high"]), status: statuses.optional(), reason: z.string().trim().min(1).max(2000),
 }).strict();
 export type RecommendationRevision = z.infer<typeof revisionSchema>;
@@ -93,12 +100,15 @@ export function createRecommendationHistoryRepository(db: SeoDatabase) {
         return { revised, unchanged };
       });
     },
-    async list(input: { recommendationId: string; limit: number; cursor: string | null }) {
+    async list(input: { recommendationId: string; pagePath?: string; limit: number; cursor: string | null }) {
       if (!z.string().uuid().safeParse(input.recommendationId).success) throw Error("seo_recommendation_invalid");
       if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 100) throw Error("seo_limit_invalid");
       if (input.cursor !== null && (!/^(0|[1-9][0-9]*)$/.test(input.cursor) || !Number.isSafeInteger(Number(input.cursor)))) throw Error("seo_cursor_invalid");
       const offset = Number(input.cursor ?? 0);
-      const rows = await db.select().from(seoRecommendationHistory).where(eq(seoRecommendationHistory.recommendationId, input.recommendationId)).orderBy(desc(seoRecommendationHistory.createdAt), desc(seoRecommendationHistory.id)).limit(input.limit + 1).offset(offset);
+      const rows = await db.select(getTableColumns(seoRecommendationHistory)).from(seoRecommendationHistory)
+        .innerJoin(seoRecommendations, eq(seoRecommendations.id, seoRecommendationHistory.recommendationId))
+        .where(and(eq(seoRecommendationHistory.recommendationId, input.recommendationId), input.pagePath ? eq(seoRecommendations.pagePath, input.pagePath) : undefined))
+        .orderBy(desc(seoRecommendationHistory.createdAt), desc(seoRecommendationHistory.id)).limit(input.limit + 1).offset(offset);
       return { items: rows.slice(0, input.limit), nextCursor: rows.length > input.limit ? String(offset + input.limit) : null };
     },
   };

@@ -1036,7 +1036,7 @@ export function createSeoRepository(db: SeoDatabase) {
     reviseRecommendation(command: RecommendationRevision, actor: RecommendationActor) {
       return createRecommendationHistoryRepository(db).revise(command, actor);
     },
-    listRecommendationHistory(input: { recommendationId: string; limit: number; cursor: string | null }) {
+    listRecommendationHistory(input: { recommendationId: string; pagePath?: string; limit: number; cursor: string | null }) {
       return createRecommendationHistoryRepository(db).list(input);
     },
 

@@ -26,6 +26,19 @@ test("authenticated changes history stays scoped and preserves current filters",
   assert.match(data.recommendationsSearch, /source=google/);
 });
 
+test("closed recommendations beyond first50 are discoverable with independent cursor and scoped history", async () => {
+  const fixture = serviceFixture(); let cardsInput, historyInput;
+  const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,
+    listRecommendations: async (input: unknown) => { cardsInput = input; return { items: [{ id: "old-card", status: "dismissed" }], nextCursor: null }; },
+    listRecommendationHistory: async (input: unknown) => { historyInput = input; return { items: [], nextCursor: null }; },
+  } as never);
+  const response = await loader({ request: new Request("https://kordev.team/admin/seo/changes/?page=%2Fservices%2Fa%2F&recommendationsCursor=50&recommendationId=00000000-0000-4000-8000-000000000003", { headers: { cookie: createAdminCookie("a".repeat(43)) } }), params: {}, context: {} }) as Response;
+  assert.equal(response.status, 200);
+  assert.deepEqual(cardsInput, { pagePath: "/services/a/", limit: 50, cursor: "50" });
+  assert.deepEqual(historyInput, { pagePath: "/services/a/", recommendationId: "00000000-0000-4000-8000-000000000003", limit: 50, cursor: null });
+  assert.equal((await response.json()).recommendations.items[0].status, "dismissed");
+});
+
 test("changes loader reads immutable effect history without evaluating or collecting", async () => {
   const fixture = serviceFixture(); let captured;
   const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,
