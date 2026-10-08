@@ -897,6 +897,24 @@ export const seoChanges = pgTable(
   ],
 );
 
+export const seoChangeEvaluations = pgTable("seo_change_evaluations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  changeId: uuid("change_id").notNull().references(() => seoChanges.id, { onDelete: "restrict" }),
+  source: varchar("source", { length: 40 }).notNull(),
+  checkpoint: integer("checkpoint").notNull(),
+  evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull(),
+  evidenceHash: varchar("evidence_hash", { length: 64 }).notNull(),
+  result: jsonb("result").$type<import("../seo-monitoring/effects").EffectResult>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  uniqueIndex("seo_change_evaluations_evidence_uq").on(t.changeId, t.source, t.checkpoint, t.evidenceHash),
+  index("seo_change_evaluations_lookup_idx").on(t.changeId, t.source, t.checkpoint, t.evaluatedAt),
+  check("seo_change_evaluations_source_valid", sql`${t.source} IN ('yandex_webmaster','google_search_console')`),
+  check("seo_change_evaluations_checkpoint_valid", sql`${t.checkpoint} IN (7,14,28)`),
+  check("seo_change_evaluations_hash_valid", sql`${t.evidenceHash} ~ '^[0-9a-f]{64}$'`),
+  check("seo_change_evaluations_result_object", sql`jsonb_typeof(${t.result})='object'`),
+]);
+
 export const seoRecommendations = pgTable(
   "seo_recommendations",
   {
@@ -1930,6 +1948,7 @@ export const schema = {
   seoTrafficMetrics,
   seoCollectionRuns,
   seoChanges,
+  seoChangeEvaluations,
   seoRecommendations,
   geoTopics,
   geoEntities,

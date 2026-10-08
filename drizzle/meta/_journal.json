@@ -141,6 +141,13 @@
       "when": 1791444600000,
       "tag": "0019_seo_index_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791448200000,
+      "tag": "0020_seo_change_evaluations",
+      "breakpoints": true
     }
   ]
 }
