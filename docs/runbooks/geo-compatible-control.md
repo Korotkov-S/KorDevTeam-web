@@ -1,0 +1,9 @@
+# GEO compatible saved control
+
+Read `/admin/seo/ai-visibility/?view=overview` or MCP `get_geo_overview` with a bounded date interval. Surface and tri-state personalization remain in report navigation. Queue progress is current-cycle operational coverage, not eligible analytical samples; its global summary remains global when its visible list is region/platform-filtered.
+
+Use `control.coverage` to distinguish checked0/N from unchecked/null0 and branded from generic demand. These category totals may span conditions and are descriptive only. Use exact `control.cohorts` for snapshot readiness and comparison. Raw evidence/freshness is not proof of a complete compatible snapshot. Current prompt edits conservatively invalidate earlier definitions; inspect raw saved evidence rather than guessing old questions.
+
+New observational candidates need known surface/personalization and recommendation evidence matching those dimensions, exact original full prompt plan and three re-derived complete snapshots. Same-week complete snapshots count, duplicate IDs do not. Unknown legacy experiments cannot produce observational verdicts. A baseline is frozen at the human-authorized link step; insufficient baseline leaves approved unchanged. Results retain contributing run IDs and numerator/denominator. Fourteen-day page cooldown serializes different-set implementations too; official referral/crawler thresholds remain independent.
+
+Release proof requires complete tests/typecheck/build/dbcheck, one fresh review, exact-tree CI, protected immutable deploy with backup and marked test-lead gate, independent active digest/revision/health/content verification and read-only saved control. Do not issue new provider/AI/indexing/paid rank sends or auto-publish to test this feature. Update only existing heartbeat after deployed interface compatibility is confirmed, preserving recurrence/thread/limits.

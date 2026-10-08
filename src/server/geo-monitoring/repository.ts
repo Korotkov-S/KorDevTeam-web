@@ -357,6 +357,7 @@ function runDimensionConditions(filters: GeoReadFilters) {
 
 function runConditions(filters: GeoReadFilters) {
   const conditions = runDimensionConditions(filters);
+  if (filters.sessionPersonalized !== undefined) conditions.push(eq(geoObservations.sessionPersonalized, filters.sessionPersonalized));
   if (filters.topicId) conditions.push(eq(geoPrompts.topicId, filters.topicId));
   if (filters.promptIds?.length) conditions.push(inArray(geoObservations.promptId, filters.promptIds));
   return and(...conditions);
@@ -740,6 +741,11 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
       const scopedPromptIds = scopedPrompts.map((prompt) => prompt.id);
       const scopedPaths = [...new Set(scopedPrompts.map((prompt) => prompt.targetPath).filter((path): path is string => Boolean(path)))];
       const latestConditions = runDimensionConditions(filters);
+      if (filters.sessionPersonalized !== undefined) latestConditions.push(sql`(
+        ${geoRuns.sessionPersonalized} = ${filters.sessionPersonalized}
+        OR EXISTS (SELECT 1 FROM geo_observations AS profile_observation
+          WHERE profile_observation.run_id = ${geoRuns.id}
+            AND profile_observation.session_personalized = ${filters.sessionPersonalized}))`);
       if (promptScopeRequested && scopedPromptIds.length) latestConditions.push(arrayOverlaps(geoRuns.promptIds, scopedPromptIds));
       const latestRuns = promptScopeRequested && !scopedPromptIds.length ? [] : await db.select(latestRunFields)
         .from(geoRuns).where(and(...latestConditions)).orderBy(desc(geoRuns.startedAt));

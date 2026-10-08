@@ -45,9 +45,14 @@ export function parseGeoFilters(url: URL, now: Date) {
   if (cursor && !/^(?:0|[1-9]\d*)$/u.test(cursor)) throw new Error("geo_cursor_invalid");
   const language = url.searchParams.get("language")?.trim() || null;
   const region = url.searchParams.get("region")?.trim() || null;
+  const surface = url.searchParams.get("surface")?.trim() || null;
+  if (surface && (Buffer.byteLength(surface, "utf8") > 120 || /[\u0000-\u001f\u007f]/u.test(surface))) throw new Error("geo_run_surface_invalid");
+  const personalized = url.searchParams.get("sessionPersonalized");
+  if (personalized && personalized !== "true" && personalized !== "false") throw new Error("geo_observation_session_invalid");
+  const sessionPersonalized = personalized === "true" ? true : personalized === "false" ? false : null;
   return { view, cursor, observationId: url.searchParams.get("observation"), filters: {
     from, to, platform: platformValue as GeoPlatform | null, mode: modeValue as GeoRunMode | null,
-    language, region, topicId: topicId ?? null,
+    language, region, surface, sessionPersonalized, topicId: topicId ?? null,
   } };
 }
 
@@ -71,6 +76,8 @@ export function createGeoSectionLoader(
       const parsed = parseGeoFilters(new URL(request.url), clock());
       const filters = { from: parsed.filters.from, to: parsed.filters.to,
         ...(parsed.filters.platform ? { platform: parsed.filters.platform } : {}),
+        ...(parsed.filters.surface ? { surface: parsed.filters.surface } : {}),
+        ...(parsed.filters.sessionPersonalized !== null ? { sessionPersonalized: parsed.filters.sessionPersonalized } : {}),
         ...(parsed.filters.mode ? { mode: parsed.filters.mode } : {}),
         ...(parsed.filters.language ? { language: parsed.filters.language } : {}),
         ...(parsed.filters.region ? { region: parsed.filters.region } : {}),
@@ -98,13 +105,24 @@ export function createGeoSectionLoader(
         from: filters.from, to: filters.to, ...(filters.platform ? { platform: filters.platform } : {}), limit: 100, cursor: parsed.cursor,
       }) };
       else payload = { experiments: await service.listExperiments({ limit: 100, cursor: parsed.cursor }) };
-      if (parsed.view === "platforms" || parsed.view === "prompts")
-        payload.collectionQueue =
-          (await service.listCollectionQueue?.({
-            platform: parsed.filters.platform ?? undefined,
-            region: parsed.filters.region ?? undefined,
-            limit: 200,
-          })) ?? null;
+      if (["overview", "platforms", "prompts"].includes(parsed.view)) {
+        payload.collectionQueue = null;
+        if (service.listCollectionQueue) {
+          let cursor: string | null = null;
+          const seen = new Set<string>();
+          let queue: Awaited<ReturnType<NonNullable<Service["listCollectionQueue"]>>> | null = null;
+          do {
+            const page = await service.listCollectionQueue({ platform: parsed.filters.platform ?? undefined,
+              region: parsed.filters.region ?? undefined, limit: 200, cursor });
+            if (queue && +new Date(queue.coverage.startedAt ?? 0) !== +new Date(page.coverage.startedAt ?? 0)) throw new Error("geo_queue_changed");
+            queue = queue ? { ...queue, items: [...queue.items, ...page.items], nextCursor: page.nextCursor } : page;
+            cursor = page.nextCursor;
+            if (cursor && seen.has(cursor)) throw new Error("geo_cursor_invalid");
+            if (cursor) seen.add(cursor);
+          } while (cursor);
+          payload.collectionQueue = queue;
+        }
+      }
       return Response.json({ view: parsed.view, filters: parsed.filters, ...payload }, {
         headers: adminHeaders(requestCspNonce(request)),
       });

@@ -80,6 +80,37 @@ function render(data: GeoAdminLoaderData) {
 const base = { filters: { from: "2026-09-01", to: "2026-09-27", platform: null, mode: null, language: null, region: null, topicId: null },
   nextCursor: null };
 
+test("overview loads the entire paginated queue and preserves false personalization and surface in its report and navigation", async () => {
+  const pages: Array<string | null | undefined> = [];
+  let savedFilters: unknown;
+  const queueItem = { id: "first", promptText: "CRM", platform: "chatgpt_search", region: "RU", state: "queued",
+    completedRepetitions: 0, attempts: 0, errorCode: null, nextAttemptAt: null, lastAttemptAt: null, periodFrom: null, periodTo: null };
+  const loader = createGeoSectionLoader(auth, { ...serviceFixture().service,
+    async getOverview(input: unknown) { savedFilters = input; return overview; },
+    async listCollectionQueue(input: { cursor?: string | null }) {
+      pages.push(input.cursor);
+      return { items: [{ ...queueItem, id: input.cursor ? "last" : "first" }], nextCursor: input.cursor ? null : "200",
+        coverage: { plannedCount: 201, completeCount: 0, remainingCount: 201, blockedCount: 0, cancelledCount: 0, storedCount: 0, plannedAnswers: 603, minimumDays: 34, goalDays: 28 } };
+    },
+  } as never);
+  const response = await loader({ request: new Request("https://kordev.team/admin/seo/ai-visibility/?view=overview&from=2026-10-01&to=2026-10-08&surface=search&sessionPersonalized=false", { headers: { cookie: createAdminCookie("a".repeat(43)) } }), params: {}, context: {} });
+  assert.ok(response instanceof Response); assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.deepEqual(pages, [null, "200"]); assert.equal(data.collectionQueue.items.length, 2);
+  assert.equal((savedFilters as { sessionPersonalized: boolean }).sessionPersonalized, false);
+  assert.equal((savedFilters as { surface: string }).surface, "search");
+  const markup = render(data);
+  assert.match(markup, /Очередь GEO и охват/u);
+  assert.match(markup, /sessionPersonalized=false/u); assert.match(markup, /surface=search/u);
+});
+
+test("GEO matrix is descriptive and never prescribes changes from one full run", () => {
+  const markup = render({ ...base, view: "overview", overview });
+  assert.match(markup, /три полных сопоставимых снимка/u);
+  assert.match(markup, /только подтверждённые отслеживаемые сущности/u);
+  assert.doesNotMatch(markup, /Усилить источник|Вернуть бренд|Сохранять качество ответа и подтверждать эффект/u);
+});
+
 test("GEO report has eight focused views with Russian explanations and no print controls", () => {
   const fixtures: Array<[GeoView, GeoAdminLoaderData, string]> = [
     ["overview", { ...base, view: "overview", overview }, "AI-видимость — сводка"],
@@ -99,7 +130,7 @@ test("GEO report has eight focused views with Russian explanations and no print 
   }
   const overviewMarkup = render(fixtures[0]![1]);
   for (const label of ["Упоминания", "Цитирование", "Доля собственных источников", "Покрытие целевой страницы", "Share of Voice",
-    "2 из 3", "числитель ÷ знаменатель", "Упомянут и процитирован", "Усилить источник", "Вернуть бренд", "Требует внимания"])
+    "2 из 3", "числитель ÷ знаменатель", "Упомянут и процитирован", "Упоминание без цитаты", "Цитата без упоминания", "Только подтверждённый конкурент"])
     assert.match(overviewMarkup, new RegExp(label, "u"));
   assert.match(overviewMarkup, /01\.09\.2026/u);
   assert.match(overviewMarkup, /27\.09\.2026/u);

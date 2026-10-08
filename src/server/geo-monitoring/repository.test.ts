@@ -89,6 +89,7 @@ databaseTest("GEO overview false personalization filters only validated full sna
   const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
   const filters = { from: "2026-10-08", to: "2026-10-08", sessionPersonalized: false };
   assert.equal((await repository.getOverview(filters)).sample.observations, 0);
+  assert.equal((await repository.listObservations({ ...filters, limit: 10, cursor: null })).items.length, 0);
   await fixture.pool.query("UPDATE geo_observations SET session_personalized=false");
   assert.equal((await repository.getOverview(filters)).sample.observations, 3);
   await fixture.pool.query("UPDATE geo_observations SET session_personalized=true WHERE repetition=3");

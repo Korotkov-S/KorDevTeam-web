@@ -1,5 +1,6 @@
 import React from "react";
 import { GeoCollectionProgress, type GeoCollectionQueue } from "./geo-collection-progress";
+import { GeoControl, type GeoControlData } from "./geo-control";
 import { Form, Link, useActionData, useLoaderData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 
@@ -12,10 +13,10 @@ import { Empty, GeoFilters, GeoPanel, GeoRateCard, GeoTable, GeoTabs, HelpHeader
 import { adminRouteHeaders } from "./headers";
 import { PageHeader, integer, useAdminCsrfToken } from "./seo-shared";
 
-type Filters = { from: string; to: string; platform: string | null; mode: string | null; language: string | null; region: string | null; topicId: string | null };
+type Filters = { from: string; to: string; platform: string | null; mode: string | null; language: string | null; region: string | null; topicId: string | null; surface?: string | null; sessionPersonalized?: boolean | null };
 type Page<T> = { items: T[]; nextCursor: string | null };
 type Rate = { numerator: number; denominator: number; value: number | null };
-type Overview = { period: { from: string; to: string }; mentionRate: Rate; citationRate: Rate; citationShare: Rate;
+type Overview = { control?: GeoControlData; period: { from: string; to: string }; mentionRate: Rate; citationRate: Rate; citationShare: Rate;
   ownedSourceCoverage: Rate; shareOfVoice: Rate; sample: { runs: number; prompts: number; observations: number; requiredRepetitions: number };
   actionMatrix: Record<"strong" | "strengthenSource" | "restoreBrand" | "attention", { prompts: number; promptIds: string[] }>;
   freshness: { platforms: Array<{ platform: string; run: null | { status: string; startedAt: string | Date; completedAt: string | Date | null; errorCode: string | null } }>;
@@ -56,10 +57,10 @@ export const meta: MetaFunction = () => [{ title: "AI-видимость и GEO 
 function OverviewView({ overview }: { overview?: Overview }) {
   if (!overview) return <Empty>Данных ещё нет. Первый сопоставимый отчёт появится после успешного полного запуска по трём повторениям каждого вопроса.</Empty>;
   const matrix = [
-    ["Упомянут и процитирован", overview.actionMatrix.strong, "Сохранять качество ответа и подтверждать эффект."],
-    ["Усилить источник", overview.actionMatrix.strengthenSource, "Бренд упомянут, но AI не ссылается на наш материал."],
-    ["Вернуть бренд", overview.actionMatrix.restoreBrand, "Страница цитируется, но бренд не назван в ответе."],
-    ["Требует внимания", overview.actionMatrix.attention, "Бренда и собственной цитаты нет, конкурент присутствует."],
+    ["Упомянут и процитирован", overview.actionMatrix.strong, "В сохранённых полных ответах есть упоминание и цитирование."],
+    ["Упоминание без цитаты", overview.actionMatrix.strengthenSource, "Бренд упомянут, но AI не ссылается на наш материал."],
+    ["Цитата без упоминания", overview.actionMatrix.restoreBrand, "Страница цитируется, но бренд не назван в ответе."],
+    ["Только подтверждённый конкурент", overview.actionMatrix.attention, "Бренда и собственной цитаты нет, конкурент присутствует."],
   ] as const;
   return <div className="space-y-6">
     <PageHeader title="AI-видимость — сводка" description={`Проверяем, упоминают ли AI-системы KorDevTeam, цитируют ли сайт и какие страницы служат источниками. Период: ${formatDate(overview.period.from)} — ${formatDate(overview.period.to)}.`} />
@@ -70,6 +71,8 @@ function OverviewView({ overview }: { overview?: Overview }) {
       <GeoRateCard title="Покрытие целевой страницы" rate={overview.ownedSourceCoverage} formula="цитаты целевой страницы ÷ собственные цитаты" />
       <GeoRateCard title="Share of Voice" rate={overview.shareOfVoice} formula="упоминания бренда ÷ упоминания бренда и подтверждённых конкурентов" />
     </div>
+    <p className="text-sm text-muted-foreground">Общие метрики описательные: разные условия не доказывают рост. Share of Voice учитывает только подтверждённые отслеживаемые сущности, а не весь рынок.</p>
+    <GeoControl control={overview.control} />
     <GeoPanel title="Достаточность выборки" help="В расчёт входят только успешные запуски, где каждый контрольный вопрос проверен ровно три раза.">
       <p>{integer.format(overview.sample.observations)} наблюдений · {integer.format(overview.sample.prompts)} вопросов · {integer.format(overview.sample.runs)} запусков · требуется {overview.sample.requiredRepetitions} повторения.</p>
     </GeoPanel>
@@ -77,7 +80,8 @@ function OverviewView({ overview }: { overview?: Overview }) {
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{overview.freshness.platforms.map(({ platform, run }) => <article key={platform} className="rounded-lg border border-border p-3"><h3 className="font-semibold">{platformLabels[platform] ?? platform}</h3><p className="mt-1 text-sm">{run ? `${statusLabels[run.status] ?? run.status} · ${formatDate(run.completedAt ?? run.startedAt)}` : "Нет данных"}</p></article>)}</div>
       <p className="mt-3 text-sm">Crawler health: {overview.freshness.crawler.checks ? `${overview.freshness.crawler.passed} успешно, ${overview.freshness.crawler.failed} с ошибкой; обновлено ${formatDate(overview.freshness.crawler.lastCheckedAt)}` : "нет данных"}. AI-referral: {overview.freshness.referrals.lastImportedAt ? `обновлено ${formatDate(overview.freshness.referrals.lastImportedAt)}` : "нет данных"}.</p>
     </GeoPanel>
-    <GeoPanel title="Матрица действий" help="Подсказывает следующий тип работы, но не меняет страницы автоматически.">
+    <GeoPanel title="Наблюдаемые сигналы" help="Описывает сохранённые ответы, а не назначает изменения страниц.">
+      <p className="mb-3 text-sm">Для рекомендаций нужны три полных сопоставимых снимка. Сигнал одного запуска не является основанием менять страницу.</p>
       <div className="grid gap-3 md:grid-cols-2">{matrix.map(([title, bucket, explanation]) => <article key={title} className="rounded-lg border border-border p-4"><h3 className="font-semibold">{title}</h3><p className="mt-1 text-2xl font-semibold">{integer.format(bucket.prompts)}</p><p className="mt-1 text-sm text-muted-foreground">{explanation}</p></article>)}</div>
     </GeoPanel>
   </div>;
@@ -146,8 +150,8 @@ function PromotionView({ experiments, csrfToken }: { experiments?: Page<Experime
 export function GeoAiVisibilityPage({ data, csrfToken }: { data: GeoAdminLoaderData; csrfToken: string }) {
   const actionData = useActionData() as { ok?: boolean; error?: string } | undefined;
   return <main className="min-w-0 space-y-6 overflow-x-hidden">
-    <GeoTabs active={data.view} />
-    {(data.view === "platforms" || data.view === "prompts") ? <GeoCollectionProgress queue={data.collectionQueue} /> : null}
+    <GeoTabs active={data.view} filters={data.filters} />
+    {(["overview", "platforms", "prompts"].includes(data.view)) ? <GeoCollectionProgress queue={data.collectionQueue} /> : null}
     {data.view !== "evidence" ? <GeoFilters filters={data.filters} view={data.view} /> : null}
     {actionData?.ok ? <p className="rounded-lg bg-emerald-100 p-3 text-emerald-950">Изменение сохранено.</p> : null}
     {actionData?.error ? <p className="rounded-lg bg-red-100 p-3 text-red-950">{actionData.error}</p> : null}
