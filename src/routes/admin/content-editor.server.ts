@@ -67,10 +67,10 @@ export function createContentEditorAction(auth: Authenticator, service: EditorSe
     } catch (error) {
       const status = contentErrorStatus(error);
       let currentVersion: number | undefined;
-      if (status === 409 && params.id) {
+      if (error instanceof Error && error.message === "content_version_conflict" && params.id) {
         try { currentVersion = (await service.getEditorData(params.id)).entry.version; } catch { /* safe fallback */ }
       }
-      return adminJson(request, { error: contentErrorMessage(status), fields, currentVersion }, status);
+      return adminJson(request, { error: contentErrorMessage(status, error), fields, currentVersion }, status);
     }
   };
 }

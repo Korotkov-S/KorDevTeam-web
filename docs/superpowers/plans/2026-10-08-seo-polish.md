@@ -43,9 +43,9 @@
 
 **Interfaces:** Extend `contentErrorMessage(status: number, error?: unknown): string`; only `content_version_conflict` loads `currentVersion` in editor action. Existing callers remain compatible.
 
-- [ ] Add failing action tests for source conflict, immutable provenance and occupied slug: status 409, distinct actionable safe message, unchanged fields, no current-version read. Keep real version conflict behavior; unknown internal errors stay sanitized.
-- [ ] Run `node --import tsx --test src/routes/admin/content-routes.test.tsx` and observe RED.
-- [ ] Implement narrow classification and run the same command to GREEN, then typecheck and build.
+- [x] Add failing action tests for source conflict, immutable provenance and occupied slug: status 409, distinct actionable safe message, unchanged fields, no current-version read. Keep real version conflict behavior; unknown internal errors stay sanitized.
+- [x] Run `node --import tsx --test src/routes/admin/content-routes.test.tsx` and observe RED.
+- [x] Implement narrow classification and run the same command to GREEN, then typecheck and build.
 - [ ] Fresh review, commit/merge/push; require successful complete CI and protected deployment, then independently verify production.
 
 ### Task 3: Bounded saved-evidence evaluation
@@ -65,3 +65,4 @@
 - Initial full-test invocations without the full CI environment were invalid acceptance evidence; one was interrupted. Authoritative acceptance uses `release-artifacts/2026-10-08-seo-polish/run-tests.mjs` with CI fixture environment and the existing disposable localhost test database only.
 - Browser verification currently reaches the existing admin login, not an authenticated dashboard; do not represent this as a visual dashboard check.
 - Task 1 acceptance: JS 224 passed / 2 skipped / 0 failed; TypeScript/application 1157 passed / 0 skipped / 0 failed. Typecheck/build passed. Authoritative log: `/tmp/kordev-seo-polish-stage1-acceptance.log`.
+- Task 2: three misleading messages reproduced RED; route tests GREEN 9/9, typecheck/build passed. Fresh scoped review had no findings and independently passed 9/9 tests. Implementation prepared in the feature branch while Task 1 CI runs; shared-branch release remains sequenced after Task 1 production verification.

@@ -82,6 +82,41 @@ test("409 keeps submitted text and reports the current server version", async ()
   assert.equal(body.currentVersion, 1);
 });
 
+for (const [code, message] of [
+  ["content_source_conflict", "Публикация Telegram уже связана с другим материалом. Проверьте существующую статью."],
+  ["content_provenance_immutable", "Источник Telegram нельзя изменить у существующего материала. Верните исходные данные публикации."],
+  ["content_slug_conflict", "Этот URL уже занят другим материалом. Укажите другой slug."],
+] as const) {
+  test(`${code} preserves input without claiming a stale version`, async () => {
+    let versionReads = 0;
+    const action = createContentEditorAction(auth, service({
+      async save() { throw new Error(code); },
+      async getEditorData() { versionReads++; throw new Error("must_not_read_version"); },
+    }) as never, config);
+    const form = editorForm("save-draft");
+    const payload = JSON.stringify({ telegramPostId: "130", telegramSourceUrl: "https://t.me/korotkovsStudio/130", contentOrigin: "telegram:korotkovsStudio" });
+    form.set("payload", payload);
+    const response = await action({ request: request("/admin/content/article/id/", form), params: { kind: "article", id: "id" }, context: {} });
+    const body = await response.json();
+    assert.equal(response.status, 409);
+    assert.equal(body.error, message);
+    assert.equal(body.fields.bodyMd, "мой несохранённый текст");
+    assert.equal(body.fields.payload, payload);
+    assert.equal(body.currentVersion, undefined);
+    assert.equal(versionReads, 0);
+  });
+}
+
+test("unknown content failures never expose internal error details", async () => {
+  const action = createContentEditorAction(auth, service({ async save() { throw new Error("private_database_detail"); } }) as never, config);
+  const response = await action({ request: request("/admin/content/article/new/", editorForm("save-draft")), params: { kind: "article" }, context: {} });
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.error, "Редактор временно недоступен.");
+  assert.equal(JSON.stringify(body).includes("private_database_detail"), false);
+  assert.equal(body.fields.bodyMd, "мой несохранённый текст");
+});
+
 test("editor dispatches publish, unpublish, restore and typed delete intents", async () => {
   const calls: string[] = [];
   const fake = service({

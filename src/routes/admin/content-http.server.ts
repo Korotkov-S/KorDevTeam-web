@@ -79,7 +79,11 @@ export function contentErrorStatus(error: unknown): number {
   return 503;
 }
 
-export function contentErrorMessage(status: number): string {
+export function contentErrorMessage(status: number, error?: unknown): string {
+  const code = error instanceof Error ? error.message : "";
+  if (status === 409 && code === "content_source_conflict") return "Публикация Telegram уже связана с другим материалом. Проверьте существующую статью.";
+  if (status === 409 && code === "content_provenance_immutable") return "Источник Telegram нельзя изменить у существующего материала. Верните исходные данные публикации.";
+  if (status === 409 && code === "content_slug_conflict") return "Этот URL уже занят другим материалом. Укажите другой slug.";
   if (status === 409) return "Запись уже изменена. Обновите страницу и сравните версии.";
   if (status === 404) return "Запись не найдена.";
   if (status === 403) return "Не удалось проверить запрос. Обновите страницу.";
