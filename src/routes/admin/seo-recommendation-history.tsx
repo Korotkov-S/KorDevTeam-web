@@ -1,0 +1,12 @@
+import React from "react";
+import type { RecommendationHistoryRow } from "../../server/seo-monitoring/recommendationHistory";
+import { Panel, formatDate } from "./seo-shared";
+type Event = Omit<RecommendationHistoryRow, "createdAt"> & { createdAt: Date | string };
+export function recommendationHistoryLink(search: string | undefined, id: string, cursor?: string) {
+  const params = new URLSearchParams(search); params.set("recommendationId", id);
+  params.delete("recommendationHistoryCursor"); if (cursor) params.set("recommendationHistoryCursor", cursor);
+  return `?${params}`;
+}
+export function SeoRecommendationHistory({ data, recommendationId, search }: { data: { items: Event[]; nextCursor: string | null }; recommendationId: string; search?: string }) {
+  return <Panel title="История рекомендации"><p className="text-sm text-muted-foreground">Прежние доказательства сохранены. Закрытие карточки не доказывает рост позиции.</p>{data.items.length ? <ul className="mt-3 space-y-3">{data.items.map(item => <li key={item.id} className="rounded border p-3"><p>{formatDate(item.createdAt)} · {item.eventType}</p><p>{item.reason}</p><p className="text-xs">Автор: {JSON.stringify(item.actor)}</p><details><summary>До и после</summary><div className="grid gap-3 lg:grid-cols-2"><pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(item.beforeSnapshot, null, 2)}</pre><pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(item.afterSnapshot, null, 2)}</pre></div></details></li>)}</ul> : <p>Истории пока нет; прежние изменения до включения журнала не реконструируются.</p>}{data.nextCursor ? <a className="mt-3 inline-block underline" href={recommendationHistoryLink(search, recommendationId, data.nextCursor)}>Следующие события</a> : null}</Panel>;
+}

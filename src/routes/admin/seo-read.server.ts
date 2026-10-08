@@ -12,7 +12,7 @@ type SectionService = Pick<SeoService,
   "getDashboard" | "getOverview" | "getTrafficReport" | "getRankControl" | "listRankChecks" |
   "listQueries" | "listPagePerformance" | "listSemanticCore" | "listChanges" | "listRecommendations"
 > &
-  Partial<Pick<SeoService, "getRankProgress" | "getPageControl" | "listChangeEffects">>;
+  Partial<Pick<SeoService, "getRankProgress" | "getPageControl" | "listChangeEffects" | "listRecommendationHistory">>;
 type Range = "7" | "28" | "90" | "custom";
 
 const DAY_MS = 86_400_000;
@@ -85,7 +85,7 @@ export function parseSeoSectionFilters(url: URL, now: Date) {
 function safeResponse(request: Request, error: unknown): Response {
   const code = error instanceof Error ? error.message : "seo_dashboard_unavailable";
   const validation = new Set(["seo_date_invalid", "seo_date_range_invalid", "seo_source_invalid", "seo_region_invalid",
-    "seo_device_invalid", "seo_frequency_band_invalid", "seo_page_path_invalid", "seo_page_origin_invalid", "seo_cursor_invalid", "seo_change_invalid"]);
+    "seo_device_invalid", "seo_frequency_band_invalid", "seo_page_path_invalid", "seo_page_origin_invalid", "seo_cursor_invalid", "seo_change_invalid", "seo_recommendation_invalid"]);
   return Response.json({ error: validation.has(code) ? "Проверьте параметры SEO-отчёта." : "SEO-аналитика временно недоступна." }, {
     status: validation.has(code) ? 422 : 503,
     headers: adminHeaders(requestCspNonce(request)),
@@ -153,13 +153,15 @@ export function createSeoSectionLoader(
       } else {
         const effectsUrl = new URL(request.url);
         const changeId = effectsUrl.searchParams.get("effectChangeId");
-        const [changes, recommendations, effects] = await Promise.all([
+        const recommendationId = effectsUrl.searchParams.get("recommendationId");
+        const [changes, recommendations, effects, recommendationHistory] = await Promise.all([
           service.listChanges({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor }),
           service.listRecommendations({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor: null }),
           service.listChangeEffects?.({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50,
             cursor: effectsUrl.searchParams.get("effectsCursor"), ...(changeId ? { changeId, history: true } : {}) }) ?? { items: [], nextCursor: null },
+          recommendationId && service.listRecommendationHistory ? service.listRecommendationHistory({ recommendationId, limit: 50, cursor: effectsUrl.searchParams.get("recommendationHistoryCursor") }) : { items: [], nextCursor: null },
         ]);
-        payload = { filters: parsed.ui, changes, recommendations, effects, effectsSearch: effectsUrl.search };
+        payload = { filters: parsed.ui, changes, recommendations, effects, effectsSearch: effectsUrl.search, recommendationId, recommendationHistory, recommendationsSearch: effectsUrl.search };
       }
       return Response.json(payload, { headers: adminHeaders(requestCspNonce(request)) });
     } catch (error) {

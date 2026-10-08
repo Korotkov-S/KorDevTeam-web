@@ -10,6 +10,22 @@ import { createKordevMcpServer, type McpAuditRecord, type McpServices } from "./
 const ENTRY_ID = "00000000-0000-4000-8000-000000000010";
 const ACTOR_ID = "00000000-0000-4000-8000-000000000020";
 
+test("recommendation history is read-scoped; revision requires both scopes and rejects identity mutation", async t => {
+  const reader = await connected(["seo:read"], services({ seo: { async listRecommendationHistory(input) { return { items: [{ recommendationId: input.recommendationId }], nextCursor: null }; } } }));
+  t.after(() => reader.client.close());
+  const names = (await reader.client.listTools()).tools.map(x => x.name);
+  assert.ok(names.includes("list_seo_recommendation_history")); assert.equal(names.includes("revise_seo_recommendation"), false);
+  assert.notEqual((await reader.client.callTool({ name: "list_seo_recommendation_history", arguments: { recommendationId: ENTRY_ID, limit: 10 } })).isError, true);
+  assert.equal((await reader.client.callTool({ name: "list_seo_recommendation_history", arguments: { recommendationId: ENTRY_ID, limit: 101 } })).isError, true);
+  let writes = 0;
+  const writer = await connected(["seo:read", "seo:write"], services({ seo: { async reviseRecommendation() { writes++; return { unchanged: false, item: {} }; } } }));
+  t.after(() => writer.client.close());
+  const args = { id: ENTRY_ID, expectedUpdatedAt: "2026-10-08T12:00:00Z", title: "Current", rationale: "Audit", evidence: {}, confidence: "high", reason: "New facts" };
+  assert.notEqual((await writer.client.callTool({ name: "revise_seo_recommendation", arguments: args })).isError, true);
+  for (const extra of [{ fingerprint: "a".repeat(64) }, { pagePath: "/wrong/" }, { actor: ACTOR_ID }]) assert.equal((await writer.client.callTool({ name: "revise_seo_recommendation", arguments: { ...args, ...extra } })).isError, true);
+  assert.equal(writes, 1);
+});
+
 test("SEO read exposes paginated page control and effects, never the evaluation writer", async t => {
   const captured: unknown[] = [];
   const connection = await connected(["seo:read"], services({ seo: {
@@ -251,6 +267,7 @@ test("scope combinations register only their exact tool surface", async (t) => {
         "list_seo_changes",
         "list_seo_queries",
         "list_seo_recommendations",
+        "list_seo_recommendation_history",
         "list_seo_semantic_core",
       ],
     ],
@@ -285,10 +302,12 @@ test("scope combinations register only their exact tool surface", async (t) => {
         "list_seo_changes",
         "list_seo_queries",
         "list_seo_recommendations",
+        "list_seo_recommendation_history",
         "list_seo_semantic_core",
         "record_geo_experiment_evaluation",
         "record_geo_observation",
         "record_seo_change",
+        "revise_seo_recommendation",
         "start_geo_run",
         "update_seo_query",
         "update_seo_recommendation_status",

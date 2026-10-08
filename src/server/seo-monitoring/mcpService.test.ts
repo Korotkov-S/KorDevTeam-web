@@ -6,6 +6,21 @@ import { createMcpSeoService } from "./mcpService";
 const tokenId = "00000000-0000-4000-8000-000000000001";
 const queryId = "00000000-0000-4000-8000-000000000002";
 
+test("recommendation revision preserves actor and history reads do not mutate", async () => {
+  let written, read;
+  const service = createMcpSeoService({ ...backing().service,
+    async reviseRecommendation(c: unknown, actor: unknown) { written = { c, actor }; return { unchanged: false, item: { updatedAt: new Date("2026-10-08T12:00:00Z") } }; },
+    async listRecommendationHistory(c: unknown) { read = c; return { items: [], nextCursor: null }; },
+  } as never, tokenId);
+  const command = { id: queryId, expectedUpdatedAt: "2026-10-08T11:00:00Z", title: "Updated", rationale: "Saved audit", confidence: "high" as const, evidence: { auditDate: "2026-10-08" }, reason: "New official evidence" };
+  const result = await service.reviseRecommendation(command);
+  assert.deepEqual(written, { c: command, actor: { mcpTokenId: tokenId } });
+  assert.equal(result.item.updatedAt, "2026-10-08T12:00:00.000Z");
+  await service.listRecommendationHistory({ recommendationId: queryId, limit: 10, cursor: "0" });
+  assert.deepEqual(read, { recommendationId: queryId, limit: 10, cursor: "0" });
+  await assert.rejects(service.reviseRecommendation({ ...command, evidence: { impressions: NaN } }), /seo_evidence_invalid/);
+});
+
 function backing() {
   const calls: Array<[string, unknown]> = [];
   return { calls, service: {

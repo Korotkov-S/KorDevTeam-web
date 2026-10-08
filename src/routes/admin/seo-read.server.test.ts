@@ -13,6 +13,19 @@ const principal = {
 };
 const auth = { authenticate: async () => principal };
 
+test("authenticated changes history stays scoped and preserves current filters", async () => {
+  const fixture = serviceFixture(); let captured;
+  const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,
+    listRecommendationHistory: async (input: unknown) => { captured = input; return { items: [{ reason: "Resolved by saved audit" }], nextCursor: "50" }; },
+  } as never);
+  const response = await loader({ request: new Request("https://kordev.team/admin/seo/changes/?source=google&range=7&recommendationId=00000000-0000-4000-8000-000000000003&recommendationHistoryCursor=50", { headers: { cookie: createAdminCookie("a".repeat(43)) } }), params: {}, context: {} }) as Response;
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.deepEqual(captured, { recommendationId: "00000000-0000-4000-8000-000000000003", limit: 50, cursor: "50" });
+  assert.equal(data.recommendationHistory.items[0].reason, "Resolved by saved audit");
+  assert.match(data.recommendationsSearch, /source=google/);
+});
+
 test("changes loader reads immutable effect history without evaluating or collecting", async () => {
   const fixture = serviceFixture(); let captured;
   const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,

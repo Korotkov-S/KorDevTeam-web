@@ -450,6 +450,8 @@ const errorMessages: Record<string, string> = {
   seo_date_range_invalid: "Диапазон SEO-данных должен содержать от 1 до 366 дней.",
   seo_cursor_invalid: "Некорректный курсор списка SEO-данных.",
   seo_recommendation_status_conflict: "Рекомендация уже изменилась. Сначала прочитайте актуальное состояние.",
+  seo_recommendation_revision_conflict: "Рекомендация уже обновлена. Прочитайте актуальную версию и историю.",
+  seo_recommendation_revision_invalid: "Проверьте поля рекомендации и причину обновления.",
   seo_recommendation_transition_invalid: "Недопустимый переход состояния рекомендации.",
   seo_query_conflict: "Ключевой запрос уже изменён. Сначала прочитайте актуальное состояние.",
   seo_query_exists: "Такой ключевой запрос уже существует.",
@@ -701,6 +703,11 @@ export function createKordevMcpServer(
   }
 
   if (has("seo:read")) {
+    server.registerTool("list_seo_recommendation_history", {
+      title: "История SEO-рекомендации", description: "Неизменяемые прежние и новые доказательства, причина и автор обновления одной рекомендации. Чтение не меняет карточку.",
+      inputSchema: z.strictObject({ recommendationId: z.uuid(), limit: z.number().int().min(1).max(100).optional(), cursor: z.string().regex(/^(0|[1-9][0-9]*)$/).optional() }),
+      outputSchema: withError(genericPage), annotations: annotations(true),
+    }, input => run("list_seo_recommendation_history", () => services.seo.listRecommendationHistory(input)));
     server.registerTool("get_seo_page_control", {
       title: "Контроль всех опубликованных страниц", description: "Полный реестр с назначенными ключами и историческими source-specific фактами индексации; чтение без сбора/публикации.",
       inputSchema: seoPageControlInput, outputSchema: withError(genericRecord), annotations: annotations(true),
@@ -848,6 +855,11 @@ export function createKordevMcpServer(
   }
 
   if (has("seo:read", "seo:write")) {
+    server.registerTool("revise_seo_recommendation", {
+      title: "Обновить доказательства SEO-рекомендации", description: "Обновляет существующую карточку с expectedUpdatedAt и причиной, сохраняя прежнюю версию. Не меняет страницу/ядро, не утверждает и не внедряет решение автоматически.",
+      inputSchema: z.strictObject({ id: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }), title: z.string().trim().min(1).max(300), rationale: z.string().trim().min(1).max(5000), evidence: genericRecord, confidence: z.enum(["low", "medium", "high"]), status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]).optional(), reason: z.string().trim().min(1).max(2000) }),
+      outputSchema: withError(genericRecord), annotations: annotations(false),
+    }, input => run("revise_seo_recommendation", () => services.seo.reviseRecommendation(input)));
     server.registerTool("create_seo_candidate", {
       title: "Добавить SEO-кандидата",
       description: "Добавляет новый ключевой запрос только как кандидата; он не включается в ежедневный контроль автоматически.",

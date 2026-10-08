@@ -17,6 +17,11 @@ import { createGeoCollector } from "../geo-monitoring/collector";
 import { checkGeoCrawlerHealth } from "../geo-monitoring/crawlerHealth";
 import { createPageControlRepository } from "./pageControlRepository";
 import { createSeoEffectsRepository } from "./effectsRepository";
+import { createRecommendationHistoryRepository } from "./recommendationHistory";
+
+export function reconcileSeoRecommendations(commands: unknown) {
+  return createRecommendationHistoryRepository(getDb()).reconcile(commands, { operation: "saved-audit-reconcile" });
+}
 
 export function evaluateSeoChanges() {
   return createSeoEffectsRepository(getDb()).evaluateAll();

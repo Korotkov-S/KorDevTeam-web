@@ -7,13 +7,15 @@ import { adminRouteHeaders } from "./headers";
 import { createSeoSectionLoader } from "./seo-read.server";
 import { action } from "./seo.server";
 import { SeoEffectsPanel } from "./seo-effects";
+import { SeoRecommendationHistory, recommendationHistoryLink } from "./seo-recommendation-history";
+import type { RecommendationHistoryRow } from "../../server/seo-monitoring/recommendationHistory";
 import type { ChangeEffectRow } from "../../server/seo-monitoring/effectsRepository";
 import { formatDate, PageHeader, Panel, SearchFilters, useAdminCsrfToken, type SeoFilters } from "./seo-shared";
 
 type ChangeRow = { id: string; pagePath: string; summary: string; type: string; appliedAt: string | Date };
-type RecommendationRow = { id: string; title: string; rationale: string; pagePath: string | null; confidence: string; status: string; createdAt?: string | Date };
+type RecommendationRow = { id: string; title: string; rationale: string; pagePath: string | null; confidence: string; status: string; createdAt?: string | Date; updatedAt?: string | Date };
 type Data = { filters: SeoFilters; effects?: { items: ChangeEffectRow[]; nextCursor: string | null }; effectsSearch?: string; changes: { items: ChangeRow[]; nextCursor: string | null };
-  recommendations: { items: RecommendationRow[]; nextCursor: string | null } };
+  recommendations: { items: RecommendationRow[]; nextCursor: string | null }; recommendationsSearch?: string; recommendationId?: string | null; recommendationHistory?: { items: Array<Omit<RecommendationHistoryRow, "createdAt"> & { createdAt: string | Date }>; nextCursor: string | null } };
 
 export const loader = (args: Parameters<ReturnType<typeof createSeoSectionLoader>>[0]) => createSeoSectionLoader("changes", getAdminAuthService(), getSeoMonitoringService())(args);
 export { action };
@@ -25,7 +27,7 @@ function SeoChangesJournal({ data, csrfToken }: { data: Data; csrfToken: string 
 }
 
 export function SeoChangesPage({ data, csrfToken }: { data: Data; csrfToken: string }) {
-  return <><SeoChangesJournal data={data} csrfToken={csrfToken} /><div className="mt-6"><SeoEffectsPanel data={data.effects ?? { items: [], nextCursor: null }} search={data.effectsSearch} /></div></>;
+  return <><SeoChangesJournal data={data} csrfToken={csrfToken} /><ul className="my-3 space-y-1">{data.recommendations.items.map(item => <li key={item.id} className="text-sm"><a className="underline" href={recommendationHistoryLink(data.recommendationsSearch, item.id)}>История: {item.title}</a>{item.updatedAt ? ` · обновлено ${formatDate(item.updatedAt)}` : ""}</li>)}</ul>{data.recommendationId ? <SeoRecommendationHistory data={data.recommendationHistory ?? { items: [], nextCursor: null }} recommendationId={data.recommendationId} search={data.recommendationsSearch} /> : null}<div className="mt-6"><SeoEffectsPanel data={data.effects ?? { items: [], nextCursor: null }} search={data.effectsSearch} /></div></>;
 }
 
 export default function SeoChangesRoute() {
