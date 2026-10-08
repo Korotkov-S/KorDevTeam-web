@@ -116,12 +116,34 @@ export function createSeoSectionLoader(
         ]);
         payload = { filters: parsed.ui, dashboard, previousOverview, traffic, rankControl, recommendations };
       } else if (section === "positions") {
-        const [rankControl, rankChecks, rankProgress] = await Promise.all([
+        const average = async (source: "yandex_webmaster" | "google_search_console") => {
+          try {
+            const dashboard = await service.getDashboard({ dateFrom: parsed.ui.dateFrom, dateTo: parsed.ui.dateTo, source, device: "desktop" });
+            const region = dashboard.availableRegions.find(r => r.source === source && r.code === "ru");
+            if (!region) return { items: [], latestDataDate: null, errorCode: "seo_average_region_unavailable" };
+            const items: Awaited<ReturnType<SectionService["listQueries"]>>["items"] = [];
+            let next: string | null = null;
+            const seen = new Set<string>();
+            do {
+              const page = await service.listQueries({ filters: { dateFrom: parsed.ui.dateFrom, dateTo: parsed.ui.dateTo,
+                source, regionId: region.id, device: "desktop" }, limit: 100, cursor: next });
+              items.push(...page.items); next = page.nextCursor;
+              if (next && seen.has(next)) throw Error("seo_cursor_invalid");
+              if (next) seen.add(next);
+            } while (next);
+            const state = dashboard.sources.find(s => s.id === source);
+            const errorCode = !state?.enabled ? "seo_average_not_configured" : state.lastErrorCode ? "seo_average_collection_failed"
+              : !state.lastSuccessAt ? "seo_average_not_collected" : null;
+            return { items, latestDataDate: state?.latestDataDate ?? null, errorCode };
+          } catch { return { items: [], latestDataDate: null, errorCode: "seo_average_unavailable" }; }
+        };
+        const [rankControl, rankChecks, rankProgress, yandex, google] = await Promise.all([
           service.getRankControl({ dateTo: parsed.ui.dateTo }),
           service.listRankChecks({ filters: { ...parsed.search, source: "yandex_webmaster" }, limit: 100, cursor }),
           service.getRankProgress?.({ dateTo: parsed.ui.dateTo }) ?? null,
+          average("yandex_webmaster"), average("google_search_console"),
         ]);
-        payload = { filters: parsed.ui, rankControl, rankChecks, rankProgress };
+        payload = { filters: parsed.ui, rankControl, rankChecks, rankProgress, averages: { yandex, google } };
       } else if (section === "traffic") {
         const [dashboard, traffic, queries] = await Promise.all([
           service.getDashboard(parsed.search),

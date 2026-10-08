@@ -83,6 +83,48 @@ test("positions page shows exact city/device ranks and dd.mm.yyyy dates", () => 
   assert.match(markup, /не средняя позиция по показам/u);
 });
 
+test("positions put two impression averages beside dated paid control without inventing missing positions", () => {
+  const control = { ...rankControl, rows: [...rankControl.rows, { ...rankControl.rows[0], id: "query-2", queryId: "query-2", queryText: "без показов", checks: {} }] };
+  const markup = html(<SeoPositionsPage data={{ filters, rankControl: control, rankChecks: { items: [], nextCursor: null },
+    averages: {
+      yandex: { items: [{ id: "query-1", impressions: 120, averagePosition: 24.6 }], latestDataDate: "2026-09-25", errorCode: null },
+      google: { items: [{ id: "query-1", impressions: 50, averagePosition: 18.2 }], latestDataDate: "2026-09-24", errorCode: null },
+    } }} />, "/admin/seo/positions/");
+  assert.match(markup, /Средние и контрольные позиции по ключам/);
+  assert.match(markup, /Яндекс Вебмастер — средняя/);
+  assert.match(markup, /Google Search Console — средняя/);
+  assert.match(markup, /Яндекс Search API — контрольная/);
+  assert.match(markup, /Россия, компьютер/);
+  assert.match(markup, /31\.08\.2026.*27\.09\.2026/s);
+  assert.match(markup, /24,6/); assert.match(markup, /18,2/);
+  assert.match(markup, /120 показов/); assert.match(markup, /25\.09\.2026/);
+  assert.match(markup, /Нет сохранённых показов за период/); assert.match(markup, /Не проверено/);
+  assert.doesNotMatch(markup, /name="source"|name="region"|name="device"/);
+});
+
+test("failed collection preserves a saved average with a warning instead of claiming fresh data", () => {
+  const markup = html(<SeoPositionsPage data={{ filters, rankControl, rankChecks: { items: [], nextCursor: null },
+    averages: { yandex: { items: [{ id: "query-1", averagePosition: 24.6, impressions: 120 }], latestDataDate: "2026-09-25", errorCode: "seo_average_collection_failed" },
+      google: { items: [], latestDataDate: null, errorCode: "seo_average_not_collected" } } }} />);
+  assert.match(markup, /24,6/); assert.match(markup, /Последний сбор завершился ошибкой/);
+  assert.match(markup, /Успешный сбор ещё не подтверждён/);
+});
+
+test("unavailable average source stays unknown while paid checks remain visible", () => {
+  const markup = html(<SeoPositionsPage data={{ filters, rankControl, rankChecks: { items: [], nextCursor: null },
+    averages: { yandex: { items: [], latestDataDate: null, errorCode: "seo_average_unavailable" },
+      google: { items: [], latestDataDate: null, errorCode: null } } }} />);
+  assert.match(markup, /Источник временно недоступен/); assert.match(markup, /позиция 3/);
+});
+
+test("overview and semantics describe weekly rotation instead of fictional daily paid checks", () => {
+  const overview = html(<SeoOverviewPage data={{ filters, dashboard, previousOverview: dashboard.overview, traffic, rankControl,
+    recommendations: { items: [], nextCursor: null } }} />);
+  const semantics = html(<SeoSemanticsPage csrfToken="csrf" data={{ filters, semanticCore: { items: [], nextCursor: null }, candidates: { items: [], nextCursor: null } }} />);
+  assert.doesNotMatch(overview + semantics, /Точный ежедневный|ежедневной проверке позиций|ежедневный контроль|Выросло за день|Упало за день|ежедневного контроля/);
+  assert.match(overview, /сопоставимыми замерами/); assert.match(semantics, /недельн/);
+});
+
 test("rotating positions show the actual 14-day comparison instead of a fictional weekly or daily change", () => {
   const desktop = rankControl.rows[0].checks.ru.desktop;
   const control = { ...rankControl, rows: [{ ...rankControl.rows[0], checks: {

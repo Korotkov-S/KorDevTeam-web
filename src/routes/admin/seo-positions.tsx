@@ -7,12 +7,14 @@ import { getAdminAuthService } from "../../server/auth/runtime";
 import { getSeoMonitoringService } from "../../server/seo-monitoring/runtime";
 import { adminRouteHeaders } from "./headers";
 import { createSeoSectionLoader } from "./seo-read.server";
-import { formatDate, PageHeader, Panel, RankControlPanel, SearchFilters, type RankControl, type SeoFilters } from "./seo-shared";
+import { formatDate, PageHeader, Panel, RankControlPanel, type RankControl, type SeoFilters } from "./seo-shared";
+import { PositionPeriodFilters, SeoPositionComparison, type PositionAverages } from "./seo-position-comparison";
 
 type Data = {
   rankProgress?: RankProgress | null;
   filters: SeoFilters;
   rankControl: RankControl;
+  averages?: PositionAverages;
   rankChecks: {
     items: Array<{
       id: string;
@@ -38,7 +40,8 @@ export function SeoPositionsPage({ data }: { data: Data }) {
     <section className="space-y-6">
       <PageHeader title="Точные позиции" description="Место kordev.team в органической выдаче Яндекса по утверждённым ключам, городам и устройствам. Это не средняя позиция по показам." />
       <RankProgressPanel progress={data.rankProgress ?? null} />
-      <SearchFilters filters={{ ...data.filters, source: "yandex_webmaster" }} compact />
+      <PositionPeriodFilters filters={data.filters} />
+      <SeoPositionComparison control={data.rankControl} averages={data.averages} filters={data.filters} />
       <Panel title="Ключевые слова по регионам">
         <RankControlPanel control={data.rankControl} />
       </Panel>

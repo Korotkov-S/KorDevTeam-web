@@ -66,6 +66,9 @@ test("GEO progress shows partial repetitions, regions, dates and required action
     assert.ok(html.includes(text), text);
   }
   assert.equal(html.includes("0%"), false);
+  assert.match(html, /текущий операционный цикл/);
+  assert.match(html, /Общие счётчики.*весь каталог/s);
+  assert.match(html, /Даты.*персонализац.*не фильтруют очередь/s);
 });
 test("GEO overdue coverage is explicit rather than silently promising twenty-eight days", () => {
  const queue:any={items:[],nextCursor:null,coverage:{startedAt:"2026-09-01T06:00:00Z",plannedCount:152,completeCount:10,remainingCount:142,blockedCount:1,cancelledCount:0,storedCount:30,plannedAnswers:456,minimumDays:26,goalDays:28}};
