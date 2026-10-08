@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { and, arrayOverlaps, asc, desc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, arrayOverlaps, asc, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
 import {
@@ -982,6 +982,10 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
       actor: GeoActor,
     ) {
       return db.transaction(async (tx) => {
+        // Pin the definitions while re-deriving evidence and saving their text.
+        const prompts = await tx.select({ id: geoPrompts.id, promptText: geoPrompts.promptText })
+          .from(geoPrompts).where(and(inArray(geoPrompts.id, input.promptIds), eq(geoPrompts.status, "active")))
+          .orderBy(asc(geoPrompts.id)).for("share");
         const [recommendation] = await tx.select().from(seoRecommendations)
           .where(eq(seoRecommendations.id, input.recommendationId)).limit(1);
         if (
@@ -993,8 +997,6 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
         ) {
           throw new Error("geo_experiment_recommendation_invalid");
         }
-        const prompts = await tx.select({ id: geoPrompts.id, promptText: geoPrompts.promptText })
-          .from(geoPrompts).where(and(inArray(geoPrompts.id, input.promptIds), eq(geoPrompts.status, "active")));
         if (prompts.length !== input.promptIds.length) throw new Error("geo_experiment_prompt_set_invalid");
         const { promptIds, minimumDelta, ...values } = input;
         const [experiment] = await tx.insert(geoExperiments).values({
@@ -1037,8 +1039,16 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
             AND ${geoExperiments.implementedAt} < ${new Date(+change.appliedAt + 14 * 86_400_000)}`,
         )).limit(1);
         if (nearby) throw new Error("geo_experiment_page_cooldown");
-        const prompts = await tx.select({ id: geoExperimentPrompts.promptId }).from(geoExperimentPrompts)
-          .where(eq(geoExperimentPrompts.experimentId, experiment.id));
+        const prompts = await tx.select({ id: geoExperimentPrompts.promptId,
+          snapshot: geoExperimentPrompts.promptTextSnapshot, text: geoPrompts.promptText,
+          updatedAt: geoPrompts.updatedAt, status: geoPrompts.status }).from(geoExperimentPrompts)
+          .innerJoin(geoPrompts, eq(geoPrompts.id, geoExperimentPrompts.promptId))
+          .where(eq(geoExperimentPrompts.experimentId, experiment.id)).orderBy(asc(geoPrompts.id)).for("share");
+        if (experiment.primaryMetric !== "ai_referrals" && experiment.primaryMetric !== "crawler_health"
+          && (!prompts.length || prompts.some(prompt => prompt.status !== "active"
+            || prompt.text !== prompt.snapshot || +prompt.updatedAt > +experiment.createdAt))) {
+          throw new Error("geo_experiment_baseline_invalid");
+        }
         const baselineTo = shiftDate(change.appliedAt, -1);
         const baselineFrom = shiftDate(change.appliedAt, -28);
         const metric = await readExperimentMetric(tx as unknown as GeoDatabase, {
@@ -1105,7 +1115,7 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
         const changes = await tx.select({ id: seoChanges.id }).from(seoChanges).where(and(
           eq(seoChanges.pagePath, experiment.pagePath),
           gte(seoChanges.appliedAt, experiment.implementedAt),
-          lte(seoChanges.appliedAt, to),
+          lt(seoChanges.appliedAt, availableAt),
           experiment.seoChangeId ? ne(seoChanges.id, experiment.seoChangeId) : undefined,
         ));
         const evaluation = evaluateExperimentMetric({

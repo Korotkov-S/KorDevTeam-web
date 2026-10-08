@@ -855,3 +855,41 @@ databaseTest("same-page concurrent GEO implementations with different prompt fin
   const allowed = await f.repository.linkExperimentChange({ id: pending, seoChangeId: await f.change("2026-08-15T10:00:00Z") }, { adminUserId: f.adminId });
   assert.equal(allowed.implementedAt?.toISOString(), "2026-08-15T10:00:00.000Z");
 });
+
+databaseTest("approved GEO candidate cannot replace its question definition with new complete evidence", async t => {
+  for (const edit of ["text", "category"] as const) await t.test(edit, async t => {
+    const f = await experimentFixture(); t.after(() => f.pool.end());
+    for (const day of [5, 6, 7]) await f.addRun(`2026-07-${String(day).padStart(2, "0")}T10:00:00Z`);
+    const proposed = await f.repository.createExperimentCandidate(f.command, { mcpTokenId: f.tokenId });
+    await f.repository.approveExperiment({ id: proposed.id }, { adminUserId: f.adminId });
+    await f.pool.query("UPDATE geo_experiments SET created_at='2026-07-08T00:00:00Z' WHERE id=$1", [proposed.id]);
+    if (edit === "text") await f.pool.query("UPDATE geo_prompts SET prompt_text='Другая CRM?', normalized_text='другая crm?', updated_at='2026-07-09T00:00:00Z' WHERE id=$1", [f.promptId]);
+    else await f.pool.query("UPDATE geo_prompts SET category='brand', updated_at='2026-07-09T00:00:00Z' WHERE id=$1", [f.promptId]);
+    for (const day of [27, 28, 29]) await f.addRun(`2026-07-${day}T10:00:00Z`);
+    await assert.rejects(f.repository.linkExperimentChange({ id: proposed.id, seoChangeId: await f.change() }, { adminUserId: f.adminId }), /geo_experiment_baseline_invalid/u);
+    const unchanged = (await f.pool.query("SELECT status,seo_change_id,baseline FROM geo_experiments WHERE id=$1", [proposed.id])).rows[0];
+    assert.equal(unchanged.status, "approved"); assert.equal(unchanged.seo_change_id, null); assert.deepEqual(unchanged.baseline, {});
+  });
+});
+
+databaseTest("GEO final-day page change confounds the full result window but next midnight does not", async t => {
+  for (const [date, verdict, confounded] of [
+    ["2026-08-29T12:00:00Z", "inconclusive", true],
+    ["2026-08-30T00:00:00Z", "won", false],
+  ] as const) await t.test(date, async t => {
+    const f = await experimentFixture(); t.after(() => f.pool.end());
+    for (const day of [27, 28, 29]) await f.addRun(`2026-07-${day}T10:00:00Z`);
+    const proposed = await f.repository.createExperimentCandidate(f.command, { mcpTokenId: f.tokenId });
+    await f.repository.approveExperiment({ id: proposed.id }, { adminUserId: f.adminId });
+    const active = await f.repository.linkExperimentChange({ id: proposed.id, seoChangeId: await f.change() }, { adminUserId: f.adminId });
+    const resultRun = await f.addRun("2026-08-29T15:00:00Z");
+    await f.pool.query("UPDATE geo_observations SET mentioned=true WHERE run_id=$1", [resultRun]);
+    const interfering = await f.change(date);
+    await f.repository.evaluateExperiment({ id: active.id, milestone: 7, evaluatedAt: new Date("2026-08-09T00:00:00Z") }, { adminUserId: f.adminId });
+    await f.repository.evaluateExperiment({ id: active.id, milestone: 14, evaluatedAt: new Date("2026-08-16T00:00:00Z") }, { adminUserId: f.adminId });
+    const evaluated = await f.repository.evaluateExperiment({ id: active.id, milestone: 28, evaluatedAt: new Date("2026-08-30T00:00:00Z") }, { adminUserId: f.adminId });
+    assert.equal(evaluated.evaluation.complete, true); assert.equal(evaluated.evaluation.delta, 1);
+    assert.equal(evaluated.evaluation.verdict, verdict); assert.equal(evaluated.evaluation.confounded, confounded);
+    assert.deepEqual(evaluated.evaluation.confoundingChanges, confounded ? [interfering] : []);
+  });
+});
