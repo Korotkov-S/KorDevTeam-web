@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compareGeoSnapshots, summarizeGeoObservations, type GeoAnalyticsRow } from "./analytics";
+import { buildGeoSnapshots, compareGeoSnapshots, summarizeGeoObservations, type GeoAnalyticsRow } from "./analytics";
 
 function row(overrides: Partial<GeoAnalyticsRow> = {}): GeoAnalyticsRow {
   return {
     runId: "run-1",
     runStatus: "success",
     platform: "chatgpt_search",
+    surface: "chatgpt_search_web",
+    runPromptIds: ["prompt-1"], plannedCount: 3, completedCount: 3, storedCount: 3,
+    runStartedAt: "2026-09-01T00:00:00Z", runCompletedAt: "2026-09-01T00:01:00Z",
+    runSessionPersonalized: false, runComparisonEligible: true, sessionPersonalized: false,
+    category: "commercial", promptText: "Какая CRM подходит", promptUpdatedAt: "2026-08-01T00:00:00Z",
     mode: "live_ui",
     language: "ru",
     region: "RU",
@@ -36,8 +41,8 @@ test("GEO rates expose transparent numerators and denominators and ignore incomp
       confirmedCompetitorMentionCount: 0 }),
     row({ runId: "partial", runStatus: "partial", promptId: "ignored", repetition: 1 }),
     row({ runId: "failed", runStatus: "failed", promptId: "ignored", repetition: 2 }),
-    row({ promptId: "only-two", repetition: 1 }),
-    row({ promptId: "only-two", repetition: 2 }),
+    row({ runId: "incomplete", runPromptIds: ["only-two"], promptId: "only-two", repetition: 1 }),
+    row({ runId: "incomplete", runPromptIds: ["only-two"], promptId: "only-two", repetition: 2 }),
   ];
   const result = summarizeGeoObservations(rows);
   assert.deepEqual(result.mentionRate, { numerator: 2, denominator: 3, value: 2 / 3 });
@@ -57,6 +62,7 @@ test("GEO action matrix keeps the four approved evidence buckets separate", () =
   ];
   const rows = configurations.flatMap((configuration) => [1, 2, 3].map((repetition) => row({
     ...configuration,
+    runPromptIds: configurations.map(value => value.promptId), plannedCount: 12, completedCount: 12, storedCount: 12,
     repetition,
     ownedEntityMentionCount: configuration.mentioned ? 1 : 0,
     ownedCitationCount: configuration.cited ? 1 : 0,
@@ -71,36 +77,18 @@ test("GEO action matrix keeps the four approved evidence buckets separate", () =
   });
 });
 
-test("GEO comparisons require equal prompt sets and three weekly snapshots", () => {
-  const base = {
-    platform: "chatgpt_search" as const, mode: "live_ui" as const, language: "ru", region: "RU", topicId: "topic-1",
-    promptSetFingerprint: "a".repeat(64), promptIds: ["a", "b"], mentionRate: 0.5, citationRate: 0.25,
-  };
-  assert.deepEqual(compareGeoSnapshots([
-    { ...base, date: "2026-09-13" },
-    { ...base, date: "2026-09-20", mentionRate: 0.6 },
-  ]), { status: "insufficient_baseline", requiredSnapshots: 3, availableSnapshots: 2 });
-
-  const incomparable = compareGeoSnapshots([
-    { ...base, date: "2026-09-13" },
-    { ...base, date: "2026-09-20", promptIds: ["a", "c"] },
-    { ...base, date: "2026-09-27" },
-  ]);
+test("GEO comparisons require equal full plans and three distinct complete snapshots", () => {
+  const snapshots = buildGeoSnapshots([13, 20, 27].flatMap(day => [1, 2, 3].map(repetition => row({
+    runId: `run-${day}`, runCompletedAt: `2026-09-${day}T00:01:00.000Z`, repetition,
+    mentioned: day === 27 || repetition === 1, cited: day === 27 || repetition === 1,
+  }))));
+  assert.deepEqual(compareGeoSnapshots(snapshots.slice(0, 2)), { status: "insufficient_baseline", requiredSnapshots: 3, availableSnapshots: 2 });
+  const incomparable = compareGeoSnapshots([snapshots[0]!, { ...snapshots[1]!, fullPromptIds: ["different"] }, snapshots[2]!]);
   assert.deepEqual(incomparable, { status: "incomparable_prompt_sets" });
-
-  const compared = compareGeoSnapshots([
-    { ...base, date: "2026-09-13" },
-    { ...base, date: "2026-09-20", mentionRate: 0.6, citationRate: 0.3 },
-    { ...base, date: "2026-09-27", mentionRate: 0.75, citationRate: 0.5 },
-  ]);
-  assert.deepEqual(compared, {
-    status: "comparable",
-    dimensions: {
-      platform: "chatgpt_search", mode: "live_ui", language: "ru", region: "RU", topicId: "topic-1",
-      promptSetFingerprint: "a".repeat(64), promptIds: ["a", "b"],
-    },
-    period: { from: "2026-09-13", to: "2026-09-27", snapshots: 3 },
-    mentionRate: { first: 0.5, last: 0.75, delta: 0.25 },
-    citationRate: { first: 0.25, last: 0.5, delta: 0.25 },
-  });
+  const compared = compareGeoSnapshots(snapshots);
+  assert.equal(compared.status, "comparable");
+  if (compared.status !== "comparable") throw new Error("comparison missing");
+  assert.deepEqual(compared.period, { from: "2026-09-13T00:01:00.000Z", to: "2026-09-27T00:01:00.000Z", snapshots: 3 });
+  assert.deepEqual(compared.mentionRate, { first: 1 / 3, last: 1, delta: 1 - 1 / 3 });
+  assert.deepEqual(compared.citationRate, { first: 1 / 3, last: 1, delta: 1 - 1 / 3 });
 });

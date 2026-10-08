@@ -61,6 +61,40 @@ async function expectConstraint(
   });
 }
 
+databaseTest("GEO overview validates every planned sibling before projecting a selected prompt", async (t) => {
+  const fixture = await createFixture(); t.after(() => fixture.pool.end());
+  const sibling = randomUUID();
+  await fixture.pool.query(`INSERT INTO geo_prompts (id, prompt_text, normalized_text, topic_id, category, status, language, region, source)
+    VALUES ($1, 'Второй вопрос', 'второй вопрос', $2, 'informational', 'active', 'ru', 'RU', 'manual')`, [sibling, fixture.topicId]);
+  await fixture.pool.query("UPDATE geo_prompts SET updated_at = '2026-09-01T00:00:00Z'");
+  await fixture.pool.query(`UPDATE geo_runs SET status = 'success', prompt_ids = ARRAY[$2,$3]::uuid[], planned_count = 6,
+    completed_count = 6, stored_count = 6, started_at = '2026-10-08T06:00:00Z', completed_at = '2026-10-08T06:01:00Z' WHERE id=$1`, [fixture.runId, fixture.promptId, sibling]);
+  await fixture.pool.query(`INSERT INTO geo_observations (run_id,prompt_id,repetition,response_snapshot,response_hash,mentioned,linked,cited)
+    SELECT $1,$2,n,'Ответ',repeat('a',64),false,false,false FROM generate_series(1,3) n`, [fixture.runId, fixture.promptId]);
+  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+  const filters = { from: "2026-10-08", to: "2026-10-08", promptIds: [fixture.promptId] };
+  assert.equal((await repository.getOverview(filters)).sample.observations, 0);
+  await fixture.pool.query(`INSERT INTO geo_observations (run_id,prompt_id,repetition,response_snapshot,response_hash,mentioned,linked,cited)
+    SELECT $1,$2,n,'Ответ',repeat('b',64),false,false,false FROM generate_series(1,3) n`, [fixture.runId, sibling]);
+  assert.equal((await repository.getOverview(filters)).sample.observations, 3);
+});
+
+databaseTest("GEO overview false personalization filters only validated full snapshots", async (t) => {
+  const fixture = await createFixture(); t.after(() => fixture.pool.end());
+  await fixture.pool.query("UPDATE geo_prompts SET updated_at = '2026-09-01T00:00:00Z'");
+  await fixture.pool.query(`UPDATE geo_runs SET status='success', completed_count=3, stored_count=3,
+    started_at='2026-10-08T06:00:00Z', completed_at='2026-10-08T06:01:00Z' WHERE id=$1`, [fixture.runId]);
+  await fixture.pool.query(`INSERT INTO geo_observations (run_id,prompt_id,repetition,response_snapshot,response_hash,session_personalized,mentioned,linked,cited)
+    SELECT $1,$2,n,'Ответ',repeat('a',64),true,false,false,false FROM generate_series(1,3) n`, [fixture.runId, fixture.promptId]);
+  const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+  const filters = { from: "2026-10-08", to: "2026-10-08", sessionPersonalized: false };
+  assert.equal((await repository.getOverview(filters)).sample.observations, 0);
+  await fixture.pool.query("UPDATE geo_observations SET session_personalized=false");
+  assert.equal((await repository.getOverview(filters)).sample.observations, 3);
+  await fixture.pool.query("UPDATE geo_observations SET session_personalized=true WHERE repetition=3");
+  assert.equal((await repository.getOverview(filters)).sample.observations, 0);
+});
+
 databaseTest("GEO prompts and observations reject duplicate comparison keys", async (t) => {
   const fixture = await createFixture();
   t.after(() => fixture.pool.end());
@@ -444,6 +478,7 @@ databaseTest(
     const fixture = await createFixture();
     t.after(() => fixture.pool.end());
     const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+    await fixture.pool.query("UPDATE geo_prompts SET updated_at = date_trunc('day', now()) WHERE id = $1", [fixture.promptId]);
     for (const repetition of [1, 2, 3]) {
       await fixture.pool.query(
       `INSERT INTO geo_observations
@@ -522,6 +557,7 @@ databaseTest(
     const fixture = await createFixture();
     t.after(() => fixture.pool.end());
     const repository = createGeoRepository(createDb(TEST_DATABASE_URL));
+    await fixture.pool.query("UPDATE geo_prompts SET updated_at = '2026-06-01T00:00:00Z' WHERE id = $1", [fixture.promptId]);
     await fixture.pool.query("DELETE FROM geo_runs");
     for (const [runIndex, startedAt] of ["2026-07-01T10:00:00Z", "2026-07-08T10:00:00Z", "2026-07-15T10:00:00Z"].entries()) {
     const runId = randomUUID();

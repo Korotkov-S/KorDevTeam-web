@@ -36,6 +36,7 @@ import { GEO_PLATFORMS, type
   GeoRunMode,
 } from "./contracts";
 import { summarizeGeoObservations } from "./analytics";
+import { summarizeGeoControl } from "./control";
 import type { NormalizedGeoReferral } from "./referrals";
 import { evaluateExperimentMetric, type ExperimentMilestone } from "./experiments";
 import {
@@ -125,6 +126,8 @@ export type GeoReadFilters = {
   from: string;
   to: string;
   platform?: GeoPlatform;
+  surface?: string;
+  sessionPersonalized?: boolean;
   mode?: GeoRunMode;
   language?: string;
   region?: string;
@@ -286,17 +289,30 @@ async function recommendationHasEvidence(db: GeoDatabase, recommendationEvidence
   return (weekly?.weeks ?? 0) >= 3;
 }
 
-async function readOverview(db: GeoDatabase, filters: GeoReadFilters) {
-  const rows = await db.select({
+async function readAnalyticsRows(db: GeoDatabase, filters: GeoReadFilters) {
+  return db.select({
     runId: geoRuns.id,
     runStatus: geoRuns.status,
     platform: geoRuns.platform,
+    surface: geoRuns.surface,
     mode: geoRuns.mode,
     language: geoRuns.language,
     region: geoRuns.region,
     promptSetFingerprint: geoRuns.promptSetFingerprint,
+    runPromptIds: geoRuns.promptIds,
+    plannedCount: geoRuns.plannedCount,
+    completedCount: geoRuns.completedCount,
+    storedCount: geoRuns.storedCount,
+    runStartedAt: geoRuns.startedAt,
+    runCompletedAt: geoRuns.completedAt,
+    runSessionPersonalized: geoRuns.sessionPersonalized,
+    runComparisonEligible: sql<boolean>`NOT (${geoRuns.metadata} @> '{"comparisonEligible":false}'::jsonb)`,
     promptId: geoObservations.promptId,
     topicId: geoPrompts.topicId,
+    category: geoPrompts.category,
+    promptText: geoPrompts.promptText,
+    promptUpdatedAt: geoPrompts.updatedAt,
+    sessionPersonalized: geoObservations.sessionPersonalized,
     repetition: geoObservations.repetition,
     mentioned: geoObservations.mentioned,
     cited: geoObservations.cited,
@@ -308,8 +324,11 @@ async function readOverview(db: GeoDatabase, filters: GeoReadFilters) {
   }).from(geoObservations)
     .innerJoin(geoRuns, eq(geoRuns.id, geoObservations.runId))
     .innerJoin(geoPrompts, eq(geoPrompts.id, geoObservations.promptId))
-    .where(runConditions(filters));
-  return summarizeGeoObservations(rows);
+    .where(and(...runDimensionConditions(filters)));
+}
+
+async function readOverview(db: GeoDatabase, filters: GeoReadFilters) {
+  return summarizeGeoObservations(await readAnalyticsRows(db, filters), filters);
 }
 
 function runDimensionConditions(filters: GeoReadFilters) {
@@ -318,6 +337,7 @@ function runDimensionConditions(filters: GeoReadFilters) {
     lte(geoRuns.startedAt, new Date(`${filters.to}T23:59:59.999Z`)),
   ];
   if (filters.platform) conditions.push(eq(geoRuns.platform, filters.platform));
+  if (filters.surface) conditions.push(eq(geoRuns.surface, filters.surface));
   if (filters.mode) conditions.push(eq(geoRuns.mode, filters.mode));
   if (filters.language) conditions.push(eq(geoRuns.language, filters.language));
   if (filters.region) conditions.push(eq(geoRuns.region, filters.region));
@@ -725,8 +745,10 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
         referralConditions.push(inArray(geoReferralDailyMetrics.landingPath, scopedPaths));
       }
       if (filters.platform) referralConditions.push(eq(geoReferralDailyMetrics.platform, filters.platform));
-      const [metrics, crawler, referrals] = await Promise.all([
-        readOverview(db, filters),
+      const [analyticsRows, catalog, crawler, referrals] = await Promise.all([
+        readAnalyticsRows(db, filters),
+        db.select({ id: geoPrompts.id, category: geoPrompts.category, language: geoPrompts.language,
+          region: geoPrompts.region, topicId: geoPrompts.topicId }).from(geoPrompts).where(eq(geoPrompts.status, "active")),
         db.select({
           lastCheckedAt: sql<Date | null>`max(${geoCrawlerChecks.checkedAt})`,
           checks: sql<number>`count(*)::int`,
@@ -745,13 +767,16 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
       return {
         dimensions: {
           platform: filters.platform ?? null,
+          surface: filters.surface ?? null,
+          sessionPersonalized: filters.sessionPersonalized ?? null,
           mode: filters.mode ?? null,
           language: filters.language ?? null,
           region: filters.region ?? null,
           topicId: filters.topicId ?? null,
         },
         period: { from: filters.from, to: filters.to },
-        ...metrics,
+        ...summarizeGeoObservations(analyticsRows, filters),
+        control: summarizeGeoControl({ rows: analyticsRows, prompts: catalog, platforms: GEO_PLATFORMS, filters }),
         freshness: {
           platforms: (filters.platform ? [filters.platform] : GEO_PLATFORMS)
             .map((platform) => ({ platform, run: latestByPlatform.get(platform) ?? null })),
