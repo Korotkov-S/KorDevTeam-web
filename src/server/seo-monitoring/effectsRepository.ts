@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { contentEntries, seoChanges, seoChangeEvaluations, seoCollectionRuns, seoDailyMetrics, seoIndexObservations, seoQueries, seoRegions } from "../db/schema";
 import { entryPath } from "../seo/sitemaps";
-import { evaluateSeoEffect, type EffectSource, type EffectResult } from "./effects";
+import { evaluateSeoEffect, seoEffectWindows, type EffectSource, type EffectResult } from "./effects";
 import type { SeoDatabase } from "./repository";
 
 function stable(value: unknown): string {
@@ -20,47 +20,81 @@ export function createSeoEffectsRepository(db: SeoDatabase) {
           const lock = await tx.execute(sql`select pg_try_advisory_xact_lock(hashtext(${'seo-collector:' + source})) as acquired`);
           if (lock.rows[0]?.acquired !== true) throw Error("seo_source_locked");
         }
-        const changes = await tx.select().from(seoChanges).orderBy(asc(seoChanges.appliedAt), asc(seoChanges.id));
-        const publications = await tx.select().from(contentEntries).where(eq(contentEntries.status, "published"));
-        const queries = await tx.select().from(seoQueries).where(and(eq(seoQueries.status, "active"), eq(seoQueries.tracked, true))).orderBy(asc(seoQueries.id));
-        const history = await tx.select().from(seoChangeEvaluations).orderBy(asc(seoChangeEvaluations.evaluatedAt), asc(seoChangeEvaluations.createdAt), asc(seoChangeEvaluations.id));
-        const allRuns = await tx.select().from(seoCollectionRuns);
-        const indices = await tx.selectDistinctOn([seoIndexObservations.contentEntryId, seoIndexObservations.source]).from(seoIndexObservations)
-          .orderBy(asc(seoIndexObservations.contentEntryId), asc(seoIndexObservations.source), desc(seoIndexObservations.checkedAt));
+        const historyOrder = [asc(seoChangeEvaluations.evaluatedAt), asc(seoChangeEvaluations.createdAt), asc(seoChangeEvaluations.id)];
+        const runFields = { id: seoCollectionRuns.id, status: seoCollectionRuns.status, requestedFrom: seoCollectionRuns.requestedFrom,
+          requestedTo: seoCollectionRuns.requestedTo, startedAt: seoCollectionRuns.startedAt, completedAt: seoCollectionRuns.completedAt };
+        // The evaluator historically compares Date/ISO millisecond values, not native microseconds.
+        const eligibleRun = or(isNull(seoCollectionRuns.completedAt), lt(seoCollectionRuns.completedAt, new Date(+now + 1)));
+        // Freshness is global to the source, even when its newest attempt requests another period.
+        async function latestRun(source: EffectSource) {
+          return (await tx.select(runFields).from(seoCollectionRuns).where(and(eq(seoCollectionRuns.source, source), eligibleRun))
+            .orderBy(desc(sql`date_trunc('milliseconds', ${seoCollectionRuns.startedAt})`), desc(seoCollectionRuns.id)).limit(1))[0];
+        }
+        const latestRuns = new Map<EffectSource, Awaited<ReturnType<typeof latestRun>>>();
+        for (const source of ["yandex_webmaster", "google_search_console"] as const) latestRuns.set(source, await latestRun(source));
         let inserted = 0, unchanged = 0;
-        for (const source of ["yandex_webmaster", "google_search_console"] as EffectSource[]) {
-          const metrics = await tx.select({ metric: seoDailyMetrics, region: seoRegions.code }).from(seoDailyMetrics)
-            .innerJoin(seoRegions, eq(seoDailyMetrics.regionId, seoRegions.id)).where(and(eq(seoDailyMetrics.source, source), eq(seoRegions.code, "ru")));
-          const runs = allRuns.filter(r => r.source === source).map(r => ({ id: r.id, status: r.status, requestedFrom: r.requestedFrom, requestedTo: r.requestedTo,
-            startedAt: r.startedAt.toISOString(), completedAt: r.completedAt?.toISOString() ?? null }));
+        let cursor: string | undefined;
+        while (true) {
+          // Resolve the last key in PostgreSQL: mapping timestamptz through Date loses microseconds.
+          const changes = await tx.select().from(seoChanges).where(cursor ? sql`(${seoChanges.appliedAt}, ${seoChanges.id}) >
+            (select cursor_change.applied_at, cursor_change.id from seo_changes as cursor_change where cursor_change.id = ${cursor})` : undefined)
+            .orderBy(asc(seoChanges.appliedAt), asc(seoChanges.id)).limit(25);
+          if (!changes.length) break;
           for (const change of changes) {
-            const previous = history.filter(h => h.changeId === change.id && h.source === source);
-            const currentCohort = queries.filter(q => q.targetPath === change.pagePath).map(q => q.id);
-            const cohort = previous[0]?.result.cohort ?? currentCohort;
-            const entry = publications.find(e => e.id === change.contentEntryId && entryPath(e) === change.pagePath);
-            const index = entry && indices.find(i => i.contentEntryId === entry.id && i.source === (source === "yandex_webmaster" ? "yandex" : "google"));
-            for (const checkpoint of [7, 14, 28] as const) {
-              const baseline = previous.find(h => h.checkpoint === checkpoint && h.result.baseline.complete)?.result.baseline;
-              const result = evaluateSeoEffect({ source, checkpoint, now: now.toISOString(),
-                change: { id: change.id, pagePath: change.pagePath, type: change.type, appliedAt: change.appliedAt.toISOString(), contentVersion: change.contentVersion },
-                publication: entry ? { pagePath: entryPath(entry)!, version: entry.version, indexable: entry.indexable } : null,
-                cohort, currentCohort, baseline, runs,
-                index: index ? { status: index.status, checkedAt: index.checkedAt.toISOString(), publishedVersion: index.publishedVersion, pagePath: index.pagePath,
-                  technical: { httpStatus: index.evidence.httpStatus ?? null, canonical: index.evidence.canonical ?? null,
-                    noindex: index.evidence.noindex ?? null, robotsAllowed: index.evidence.robotsAllowed ?? null, errorCode: index.evidence.technicalErrorCode ?? null },
-                  lastCrawlAt: typeof index.evidence.lastCrawlAt === "string" ? index.evidence.lastCrawlAt : null } : null,
-                metrics: metrics.filter(r => r.metric.pagePath === change.pagePath).map(({ metric: r, region }) => ({ queryId: r.queryId, date: r.observationDate,
-                  regionCode: region, device: r.device, impressions: r.impressions, clicks: r.clicks, averagePosition: Number(r.averagePosition) })),
-                subsequentChanges: changes.filter(c => c.type !== "other" && c.pagePath === change.pagePath && +c.appliedAt > +change.appliedAt).map(c => c.appliedAt.toISOString()),
-              });
-              // Capture times document the first persisted attempt, not a reason to duplicate identical evidence.
-              const digestInput = { ...result, baseline: { ...result.baseline, capturedAt: null } };
-              const evidenceHash = createHash("sha256").update(stable(digestInput)).digest("hex");
-              const saved = await tx.insert(seoChangeEvaluations).values({ changeId: change.id, source, checkpoint, evaluatedAt: now, evidenceHash, result })
-                .onConflictDoNothing().returning({ id: seoChangeEvaluations.id });
-              if (saved.length) inserted++; else unchanged++;
+            const [published] = change.contentEntryId ? await tx.select().from(contentEntries)
+              .where(and(eq(contentEntries.id, change.contentEntryId), eq(contentEntries.status, "published"))).limit(1) : [];
+            const entry = published && entryPath(published) === change.pagePath ? published : undefined;
+            const queries = await tx.select({ id: seoQueries.id }).from(seoQueries).where(and(eq(seoQueries.status, "active"),
+              eq(seoQueries.tracked, true), eq(seoQueries.targetPath, change.pagePath))).orderBy(asc(seoQueries.id));
+            const currentCohort = queries.map(q => q.id);
+            const subsequentChanges = (await tx.select({ appliedAt: seoChanges.appliedAt }).from(seoChanges).where(and(
+              eq(seoChanges.pagePath, change.pagePath), ne(seoChanges.type, "other"), gte(seoChanges.appliedAt, new Date(+change.appliedAt + 1))))
+              .orderBy(asc(seoChanges.appliedAt), asc(seoChanges.id))).map(c => c.appliedAt.toISOString());
+            for (const source of ["yandex_webmaster", "google_search_console"] as EffectSource[]) {
+              const historyScope = and(eq(seoChangeEvaluations.changeId, change.id), eq(seoChangeEvaluations.source, source));
+              const [first] = await tx.select({ result: seoChangeEvaluations.result }).from(seoChangeEvaluations)
+                .where(historyScope).orderBy(...historyOrder).limit(1);
+              const cohort = first?.result.cohort ?? currentCohort;
+              const window = seoEffectWindows(change.appliedAt.toISOString(), source, 28);
+              const metrics = cohort.length ? await tx.select({ metric: seoDailyMetrics, region: seoRegions.code }).from(seoDailyMetrics)
+                .innerJoin(seoRegions, eq(seoDailyMetrics.regionId, seoRegions.id)).where(and(eq(seoDailyMetrics.source, source),
+                  eq(seoRegions.code, "ru"), eq(seoDailyMetrics.pagePath, change.pagePath), inArray(seoDailyMetrics.queryId, cohort),
+                  gte(seoDailyMetrics.observationDate, window.before.from), lte(seoDailyMetrics.observationDate, window.after.to))) : [];
+              const relevantRuns = await tx.select(runFields).from(seoCollectionRuns).where(and(eq(seoCollectionRuns.source, source), eligibleRun,
+                lte(seoCollectionRuns.requestedFrom, window.after.to), gte(seoCollectionRuns.requestedTo, window.before.from)));
+              const latest = latestRuns.get(source);
+              if (latest && !relevantRuns.some(r => r.id === latest.id)) relevantRuns.push(latest);
+              const runs = relevantRuns.map(r => ({ ...r, startedAt: r.startedAt.toISOString(), completedAt: r.completedAt?.toISOString() ?? null }));
+              const [index] = entry ? await tx.select().from(seoIndexObservations).where(and(eq(seoIndexObservations.contentEntryId, entry.id),
+                eq(seoIndexObservations.source, source === "yandex_webmaster" ? "yandex" : "google")))
+                .orderBy(desc(seoIndexObservations.checkedAt)).limit(1) : [];
+              for (const checkpoint of [7, 14, 28] as const) {
+                const [previous] = await tx.select({ result: seoChangeEvaluations.result }).from(seoChangeEvaluations).where(and(historyScope,
+                  eq(seoChangeEvaluations.checkpoint, checkpoint), sql`${seoChangeEvaluations.result}->'baseline'->>'complete' = 'true'`))
+                  .orderBy(...historyOrder).limit(1);
+                const baseline = previous?.result.baseline;
+                const result = evaluateSeoEffect({ source, checkpoint, now: now.toISOString(),
+                  change: { id: change.id, pagePath: change.pagePath, type: change.type, appliedAt: change.appliedAt.toISOString(), contentVersion: change.contentVersion },
+                  publication: entry ? { pagePath: entryPath(entry)!, version: entry.version, indexable: entry.indexable } : null,
+                  cohort, currentCohort, baseline, runs,
+                  index: index ? { status: index.status, checkedAt: index.checkedAt.toISOString(), publishedVersion: index.publishedVersion, pagePath: index.pagePath,
+                    technical: { httpStatus: index.evidence.httpStatus ?? null, canonical: index.evidence.canonical ?? null,
+                      noindex: index.evidence.noindex ?? null, robotsAllowed: index.evidence.robotsAllowed ?? null, errorCode: index.evidence.technicalErrorCode ?? null },
+                    lastCrawlAt: typeof index.evidence.lastCrawlAt === "string" ? index.evidence.lastCrawlAt : null } : null,
+                  metrics: metrics.map(({ metric: r, region }) => ({ queryId: r.queryId, date: r.observationDate,
+                    regionCode: region, device: r.device, impressions: r.impressions, clicks: r.clicks, averagePosition: Number(r.averagePosition) })),
+                  subsequentChanges,
+                });
+                // Capture times document the first persisted attempt, not a reason to duplicate identical evidence.
+                const digestInput = { ...result, baseline: { ...result.baseline, capturedAt: null } };
+                const evidenceHash = createHash("sha256").update(stable(digestInput)).digest("hex");
+                const saved = await tx.insert(seoChangeEvaluations).values({ changeId: change.id, source, checkpoint, evaluatedAt: now, evidenceHash, result })
+                  .onConflictDoNothing().returning({ id: seoChangeEvaluations.id });
+                if (saved.length) inserted++; else unchanged++;
+              }
             }
           }
+          cursor = changes[changes.length - 1].id;
         }
         return { inserted, unchanged };
       });

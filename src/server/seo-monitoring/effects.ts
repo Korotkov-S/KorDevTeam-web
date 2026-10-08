@@ -26,6 +26,10 @@ function calendarDay(iso: string, source: EffectSource) {
   const field = (name: string) => parts.find(p => p.type === name)!.value;
   return `${field("year")}-${field("month")}-${field("day")}`;
 }
+export function seoEffectWindows(appliedAt: string, source: EffectSource, checkpoint: 7 | 14 | 28) {
+  const day = calendarDay(appliedAt, source);
+  return { before: { from: shift(day, -checkpoint), to: shift(day, -1) }, after: { from: shift(day, 1), to: shift(day, checkpoint) } };
+}
 function covered(window: Window, runs: EffectRun[]) {
   for (let day = window.from; day <= window.to; day = shift(day, 1)) {
     if (!runs.some(r => r.status === "success" && r.completedAt && r.requestedFrom <= day && r.requestedTo >= day)) return false;
@@ -51,8 +55,8 @@ export function evaluateSeoEffect(input: EffectInput) {
   const now = +new Date(input.now), applied = +new Date(input.change.appliedAt);
   if (!Number.isFinite(now) || !Number.isFinite(applied) || ![7, 14, 28].includes(input.checkpoint)
     || new Set(input.cohort).size !== input.cohort.length) throw Error("seo_effect_input_invalid");
-  const day = calendarDay(input.change.appliedAt, input.source), today = calendarDay(input.now, input.source);
-  const windows = { before: { from: shift(day, -input.checkpoint), to: shift(day, -1) }, after: { from: shift(day, 1), to: shift(day, input.checkpoint) } };
+  const today = calendarDay(input.now, input.source);
+  const windows = seoEffectWindows(input.change.appliedAt, input.source, input.checkpoint);
   const runs = input.runs.filter(r => r.completedAt === null || +new Date(r.completedAt) <= now);
   const latest = [...runs].sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))[0];
   const sourceReady = !!latest && latest.status === "success" && latest.completedAt !== null

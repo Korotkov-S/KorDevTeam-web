@@ -35,7 +35,7 @@
 - [x] Write and observe failing tests for same-row means/control/date, weekly copy, queue scope, complete pagination and source failures.
 - [x] Implement the comparison and copy; retain cached means with warnings.
 - [x] Run focused tests, full CI-equivalent tests, typecheck/build and fresh review.
-- [ ] Commit, merge, push, deploy immutable CI artifacts and verify production before Task 2.
+- [x] Commit, merge, push, deploy immutable CI artifacts and verify production before Task 2 release.
 
 ### Task 2: Accurate content editor conflicts
 
@@ -54,9 +54,9 @@
 
 **Interfaces:** Preserve `evaluateAll(now): Promise<{inserted, unchanged}>` and result shape. Share `seoEffectWindows(appliedAt, source, checkpoint)` between evaluator and repository if needed for source-calendar bounds.
 
-- [ ] Add integration regressions: unrelated historical metrics/evaluations are not returned in bulk; multiple change batches all processed; newest failed run outside window still blocks; frozen cohort/baseline and idempotence remain unchanged. Observe RED on bounded-read regression.
-- [ ] Page changes by `(appliedAt,id)` in the existing fenced transaction; read only matching publication, assigned keys, first cohort, first complete checkpoint baselines, relevant page/window metrics, overlapping runs plus global newest eligible run, latest index and later same-page changes.
-- [ ] Run local effects tests with the isolated CI-configured test database, then full CI-equivalent tests, typecheck and build. Review numerical/evidence equivalence and source-calendar edges.
+- [x] Add integration regressions: unrelated historical metrics/evaluations are not returned in bulk; multiple change batches all processed; newest failed run outside window still blocks; frozen cohort/baseline and idempotence remain unchanged. Observe RED on bounded-read regression.
+- [x] Page changes by `(appliedAt,id)` in the existing fenced transaction; read only matching publication, assigned keys, first cohort, first complete checkpoint baselines, relevant page/window metrics, overlapping runs plus global newest eligible run, latest index and later same-page changes.
+- [x] Run local effects tests with the isolated CI-configured test database, then full CI-equivalent tests, typecheck and build. Review numerical/evidence equivalence and source-calendar edges.
 - [ ] Commit/merge/push, protected deploy and independent production checks; compare immutable state hashes and run only the idempotent saved-DB evaluator, without external collection.
 
 ## Execution record
@@ -66,3 +66,7 @@
 - Browser verification currently reaches the existing admin login, not an authenticated dashboard; do not represent this as a visual dashboard check.
 - Task 1 acceptance: JS 224 passed / 2 skipped / 0 failed; TypeScript/application 1157 passed / 0 skipped / 0 failed. Typecheck/build passed. Authoritative log: `/tmp/kordev-seo-polish-stage1-acceptance.log`.
 - Task 2: three misleading messages reproduced RED; route tests GREEN 9/9, typecheck/build passed. Fresh scoped review had no findings and independently passed 9/9 tests. Implementation prepared in the feature branch while Task 1 CI runs; shared-branch release remains sequenced after Task 1 production verification.
+- Task 3: bounded-read tests RED (112 unrelated metrics and an unpaged 56-change journal), then GREEN. Review identified a microsecond-to-Date keyset loop and a latest-source test whose requested dates were still inside the 28-day envelope. Added native timestamp regressions, observed both RED, retained the exact database cursor and original millisecond source/evidence semantics; 17/17 effects tests GREEN. Latest failed source now explicitly tested outside the full envelope. Typecheck/build passed. Interrupted pre-fix full run is not acceptance; final full run restarted after fixes.
+- Required evidence remains proportional to overlapping collection runs and later same-page changes; this removes eager whole-database histories from application memory, not every possible SQL scan or per-page historical array. Existing floating-point iteration order and read-committed snapshots are unchanged policy limitations.
+- Task 1 production: revision `6c91ff5d71b636c04917f4231033aa9e220e9e8e`, CI `37792782041`, protected deployment `37795561439`; independent active green/image/revision/health/public canonical/release-boundary checks passed. Content plan/apply 145 unchanged, 0 insert/update/mismatch. Content/core/GEO/journal/evaluation/recommendation hashes unchanged. Before optimization the saved-DB evaluator returned inserted=0, unchanged=108, without provider calls.
+- Task 3 final acceptance: JS 224 passed / 2 skipped / 0 failed; TypeScript/application 1166 passed / 0 skipped / 0 failed. Typecheck/build and diff check passed. Authoritative log `/tmp/kordev-seo-polish-stage3-final-acceptance.log`. Reviewer blockers addressed with observed failing/passing regressions; no additional concrete issue remained in its scoped review.
