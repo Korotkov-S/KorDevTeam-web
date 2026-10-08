@@ -51,4 +51,4 @@
 - [ ] Run focused tests, `npm test`, `npm run typecheck`, `npm run build`; expect all exit 0.
 - [ ] Review diff; fix important findings through RED→GREEN. Commit, merge into main and push.
 - [ ] Verify immutable CI manifest, deploy using existing protected workflow, verify deployed SHA/health and preserved content.
-- [ ] Import the existing Oct6–8 audits using bounded CLI; verify source counts, all current published registry and card data. Record evidence, then proceed to stage 2.
+- [ ] Import the existing Oct7–8 schemaVersion 2 audits using bounded CLI; preserve Oct6 schemaVersion 1 locally because its source timestamps/published versions are absent. Verify source counts and the complete current published registry. Record evidence, then proceed to stage 2.

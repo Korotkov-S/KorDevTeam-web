@@ -15,6 +15,11 @@ import { loadSemanticCore } from "./semanticCore";
 import { createGeoRepository } from "../geo-monitoring/repository";
 import { createGeoCollector } from "../geo-monitoring/collector";
 import { checkGeoCrawlerHealth } from "../geo-monitoring/crawlerHealth";
+import { createPageControlRepository } from "./pageControlRepository";
+
+export function importSeoIndexingAudit(report: unknown) {
+  return createPageControlRepository(getDb()).importAudit(report);
+}
 
 export function readGeoSiteOrigin(env: NodeJS.ProcessEnv = process.env) {
   let origin: URL;

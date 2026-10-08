@@ -23,6 +23,22 @@ import {
 
 import type { AcceptedResponse } from "../leads/contracts";
 import type { VkAdsCheckpoint } from "../advertising/vk/contracts";
+import type { IndexObservation, IndexStatus } from "../seo-monitoring/pageControl";
+
+export const seoIndexObservations = pgTable("seo_index_observations", {
+  id: uuid("id").defaultRandom().primaryKey(), contentEntryId: uuid("content_entry_id").notNull(),
+  kind: text("kind").$type<IndexObservation["kind"]>().notNull(), pagePath: text("page_path").notNull(), url: text("url").notNull(),
+  publishedVersion: integer("published_version").notNull(), source: text("source").$type<"yandex" | "google">().notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull(), status: text("status").$type<IndexStatus>().notNull(),
+  errorCode: text("error_code"), evidence: jsonb("evidence").$type<IndexObservation["evidence"]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  uniqueIndex("seo_index_observation_identity").on(table.contentEntryId, table.source, table.checkedAt),
+  index("seo_index_observation_lookup").on(table.contentEntryId, table.source, table.checkedAt.desc()),
+  check("seo_index_source_check", sql`${table.source} IN ('yandex', 'google')`),
+  check("seo_index_status_check", sql`${table.status} IN ('indexed','unconfirmed','not_indexed','canonical_conflict','excluded','failed')`),
+  check("seo_index_version_check", sql`${table.publishedVersion} > 0`),
+]);
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() { return "bytea"; },

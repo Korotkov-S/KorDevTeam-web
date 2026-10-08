@@ -112,3 +112,25 @@ test("pages, semantics, and changes screens contain only their working entities"
   assert.match(changesMarkup, /Рекомендации агента/u);
   assert.doesNotMatch(changesMarkup, /Точные позиции/u);
 });
+
+test("page control renders unchecked pages, separate successful and failed indexing state, and preserves filters", () => {
+  const markup = html(<SeoPagesPage data={{ filters: { ...filters, range: "7", source: "google_search_console", pagePath: "/blog/test/" },
+    pages: { items: [], nextCursor: null }, control: { total: 2, nextCursor: "50",
+      summary: { yandex: { planned: 2, completed: 0, confirmedIndexed: 0, excluded: 0, canonicalConflicts: 0, unconfirmed: 0, failed: 0, uncheckedOrStale: 2 },
+        google: { planned: 2, completed: 0, confirmedIndexed: 0, excluded: 0, canonicalConflicts: 0, unconfirmed: 0, failed: 1, uncheckedOrStale: 1 }, intentionallyExcluded: 0, withoutKeywords: 2 },
+      items: [{ id: "page", title: "Untracked publication", kind: "article", pagePath: "/blog/test/", version: 3, updatedAt: new Date(), indexable: true, keywords: [],
+        yandex: { lastSuccess: null, lastAttempt: null, stale: true },
+        google: { lastSuccess: { status: "indexed", checkedAt: new Date("2026-10-07T00:00:00Z"), evidence: { httpStatus: 200, inSitemap: true, canonical: "https://kordev.team/blog/test/" } },
+          lastAttempt: { status: "failed", checkedAt: new Date("2026-10-08T00:00:00Z"), errorCode: "google_http_429" }, stale: true } }],
+    } as never }} />, "/admin/seo/pages/");
+  assert.match(markup, /Untracked publication/);
+  assert.match(markup, /Яндекс Search API/);
+  assert.match(markup, /Ключи не назначены/);
+  assert.match(markup, /Последний достоверный результат/);
+  assert.match(markup, /google_http_429/);
+  assert.match(markup, /Требуется новая проверка/);
+  assert.match(markup, /cursor=50/);
+  assert.match(markup, /source=google/);
+  assert.match(markup, /range=7/);
+  assert.match(markup, /page=%2Fblog%2Ftest%2F/);
+});

@@ -80,3 +80,18 @@ test("focused SEO loaders preserve authentication redirects and reject unsafe ra
   assert.equal(response.status, 422);
   assert.equal(fixture.calls.length, 0);
 });
+
+test("pages loader joins the full published registry, rank history and selected search metrics", async () => {
+  const fixture = serviceFixture();
+  const loader = createSeoSectionLoader("pages", auth, { ...fixture.service,
+    getPageControl: async (input: unknown) => { assert.deepEqual(input, { limit: 50, cursor: "50", pagePath: "/blog/test/" }); return { items: [{ title: "No impressions" }], total: 78 }; },
+  } as never, () => new Date("2026-10-08T06:00:00Z"));
+  const response = await loader({ request: new Request("https://kordev.team/admin/seo/pages/?cursor=50&page=%2Fblog%2Ftest%2F&range=7&source=google", {
+    headers: { cookie: createAdminCookie("a".repeat(43)) },
+  }), params: {}, context: {} }) as Response;
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.control.total, 78);
+  assert.equal(data.control.items[0].title, "No impressions");
+  assert.deepEqual(fixture.calls.sort(), ["getRankControl", "listPagePerformance"]);
+});

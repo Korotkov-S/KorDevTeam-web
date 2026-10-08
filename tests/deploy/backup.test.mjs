@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.mcp_tokens': '0', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
 const postMigrationTableCounts = {
   ...preMigrationTableCounts,
-  'drizzle.__drizzle_migrations': '19',
+  'drizzle.__drizzle_migrations': '20',
   'public.leads': '0',
   'public.lead_attachments': '0',
   'public.lead_delivery_jobs': '0',
@@ -22,6 +22,7 @@ const postMigrationTableCounts = {
   'public.seo_changes': '0',
   'public.seo_collection_runs': '0',
   'public.seo_daily_metrics': '0',
+  'public.seo_index_observations': '0',
   'public.seo_queries': '0',
   'public.seo_rank_checks': '0',
   'public.seo_rank_runs': '0',
@@ -90,6 +91,7 @@ const migrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0016_yandex_ctr_over_100.sql')).digest('hex'), created_at: '1791012016606' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0017_seo_rank_queue.sql')).digest('hex'), created_at: '1791196018427' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0018_geo_coverage_queue.sql')).digest('hex'), created_at: '1791196847588' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0019_seo_index_observations.sql')).digest('hex'), created_at: '1791444600000' },
 ];
 const tableCounts = postMigrationTableCounts;
 function inventoryQuery(sql, tables = tableCounts) {
@@ -322,7 +324,7 @@ test('restore rejects unsafe evidence paths and object keys before external comm
 test('restore verification rejects lost drafts, revisions, media, missing tables and wrong last migration after migration', async t => {
   const { verifyRestoreState } = await import('../../scripts/postgres-backup.mjs');
   const manifest = { inventory: { tables: tableCounts, contentStatuses: { draft: '3', published: '2' } }, publishedCounts: { article: 2 }, migrations: migrationHistory };
-  for (const stage of [false, true]) for (const damage of ['drafts', 'revisions', 'media', 'missing-table', 'history']) await t.test(`${stage ? 'after' : 'before'}:${damage}`, async () => {
+  for (const stage of [false, true]) for (const damage of ['drafts', 'revisions', 'media', 'missing-table', 'missing-index-evidence', 'history']) await t.test(`${stage ? 'after' : 'before'}:${damage}`, async () => {
     const client = { async query(sql) {
       if (sql.includes('SELECT hash, created_at')) return { rows: damage === 'history' ? [{ ...migrationHistory[0], hash: 'wrong-last-hash' }] : migrationHistory };
       if (sql.includes('GROUP BY kind')) return { rows: [{ kind: 'article', count: '2' }] };
@@ -331,6 +333,7 @@ test('restore verification rejects lost drafts, revisions, media, missing tables
       if (damage === 'revisions' && sql.includes('FROM "public"."content_revisions"')) result.rows[0].count = '7';
       if (damage === 'media' && sql.includes('FROM "public"."media_assets"')) result.rows[0].count = '0';
       if (damage === 'missing-table' && sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== 'redirects');
+      if (damage === 'missing-index-evidence' && sql.includes('pg_catalog.pg_class')) result.rows = result.rows.filter(row => row.name !== 'seo_index_observations');
       return result;
     }};
     await assert.rejects(verifyRestoreState(client, manifest, stage), /inventory|verification/i);

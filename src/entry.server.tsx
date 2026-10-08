@@ -18,7 +18,7 @@ export { createLeadRouter } from "./server/leads/http";
 export { createVkLeadRouter } from "./server/vk-leads/http";
 export { checkLeadWorkerReady, createLeadWorker } from "./server/leads/worker";
 export { createMcpRouter } from "./server/mcp/http";
-export { runSeoCollection, checkSeoCollectionReady, syncSeoSemanticCore } from "./server/seo-monitoring/runtime";
+export { runSeoCollection, checkSeoCollectionReady, syncSeoSemanticCore, importSeoIndexingAudit } from "./server/seo-monitoring/runtime";
 export { syncGeoPromptCatalog } from "./server/geo-monitoring/runtime";
 export { runVkAdsCollection, checkVkAdsCollectionReady } from "./server/advertising/vk/runtime";
 

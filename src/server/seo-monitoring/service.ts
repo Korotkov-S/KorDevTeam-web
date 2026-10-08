@@ -107,6 +107,10 @@ export function createSeoService(repository: SeoRepository) {
       return repository.listPagePerformance(filters(input.filters), page(input));
     },
 
+    getPageControl(input: { pagePath?: string; limit?: number; cursor?: string | null }) {
+      return repository.getPageControl({ ...page(input), ...(input.pagePath ? { pagePath: normalizeSitePath(input.pagePath) } : {}) });
+    },
+
     listQueries(input: { filters: SeoMetricFilters; limit?: number; cursor?: string | null }) {
       return repository.listQueries(filters(input.filters), page(input));
     },

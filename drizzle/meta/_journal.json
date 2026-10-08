@@ -134,6 +134,13 @@
       "when": 1791196847588,
       "tag": "0018_geo_coverage_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791444600000,
+      "tag": "0019_seo_index_observations",
+      "breakpoints": true
     }
   ]
 }

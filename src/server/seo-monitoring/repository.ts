@@ -17,6 +17,7 @@ import {
 import type { NormalizedRankCheck, NormalizedSeoObservation, NormalizedTrafficObservation, SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "./contracts";
 import type { SemanticCoreEntry } from "./semanticCore";
 import { summarizeRankPlan } from "./rankQueue";
+import { createPageControlRepository } from "./pageControlRepository";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
@@ -852,6 +853,10 @@ export function createSeoRepository(db: SeoDatabase) {
         lte(seoTrafficMetrics.observationDate, filters.dateTo),
       )).orderBy(asc(seoTrafficMetrics.observationDate), asc(seoTrafficMetrics.slice), asc(seoTrafficMetrics.dimensionKey));
       return aggregateTrafficRows(rows);
+    },
+
+    getPageControl(input: { pagePath?: string; limit: number; cursor: string | null }, now?: Date) {
+      return createPageControlRepository(db).listPages(input, now);
     },
 
     async listPagePerformance(filters: SeoMetricFilters, page: { limit: number; cursor: string | null }) {

@@ -12,7 +12,7 @@ type SectionService = Pick<SeoService,
   "getDashboard" | "getOverview" | "getTrafficReport" | "getRankControl" | "listRankChecks" |
   "listQueries" | "listPagePerformance" | "listSemanticCore" | "listChanges" | "listRecommendations"
 > &
-  Partial<Pick<SeoService, "getRankProgress">>;
+  Partial<Pick<SeoService, "getRankProgress" | "getPageControl">>;
 type Range = "7" | "28" | "90" | "custom";
 
 const DAY_MS = 86_400_000;
@@ -130,7 +130,19 @@ export function createSeoSectionLoader(
         ]);
         payload = { filters: parsed.ui, dashboard, traffic, queries };
       } else if (section === "pages") {
-        payload = { filters: parsed.ui, pages: await service.listPagePerformance({ filters: parsed.search, limit: 50, cursor }) };
+        if (service.getPageControl) {
+          const [control, rankControl, first] = await Promise.all([
+            service.getPageControl({ limit: 50, cursor, ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}) }),
+            service.getRankControl({ dateTo: parsed.ui.dateTo }),
+            service.listPagePerformance({ filters: parsed.search, limit: 100, cursor: null }),
+          ]);
+          const items = [...first.items]; let next = first.nextCursor;
+          while (next) {
+            const page = await service.listPagePerformance({ filters: parsed.search, limit: 100, cursor: next });
+            items.push(...page.items); next = page.nextCursor;
+          }
+          payload = { filters: parsed.ui, control, rankControl, pages: { items, nextCursor: null } };
+        } else payload = { filters: parsed.ui, pages: await service.listPagePerformance({ filters: parsed.search, limit: 50, cursor }) };
       } else if (section === "semantics") {
         const [active, archived, candidates] = await Promise.all([
           service.listSemanticCore({ status: "active", limit: 100, cursor: null }),
