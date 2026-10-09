@@ -60,7 +60,7 @@
 
 `WorkPageInput = {limit?:number;cursor?:string|null}` и `WorkPage = {items:WorkSummary[];nextCursor:string|null}`. `WorkSummary = {recommendationId:string;title:string;updatedAt:string;pagePath:string|null;executionId:string|null;state:RecommendationWork["state"];errorCode:string|null}` не содержит больших before/after тел; get возвращает полный снимок. Точные recommendation/execution-типы выводятся из schema, currentPage — PublishedSnapshot|null.
 
-### Task1: Typed execution plan and exact patch
+### Task 1: Typed execution plan and exact patch
 
 **Files:** Create `recommendationExecutionPlan.ts`, `recommendationExecutionPlan.test.ts`; существующие `src/server/content/types.ts`/`src/server/admin/contentSchemas.ts` использовать без расширения публичной модели.
 
@@ -72,7 +72,7 @@
 - [ ] Реализовать strict allowlist, 1..20 критериев с уникальными id/описанием, finite plain JSON без undefined/function/Date/prototype-ключей, установленную нормализацию снимков и существующую CMS-валидацию итогового command. Хеш не включает поля времени попыток/verification; frozen approval хранит конкретный принятый снимок карточки.
 - [ ] Повторить команду до PASS, затем `git diff --check` и commit `feat(seo): validate exact recommendation execution plans`.
 
-### Task2: Human approval, immutable execution ledger and history guards
+### Task 2: Human approval, immutable execution ledger and history guards
 
 **Files:** Modify `src/server/db/schema.ts`, `src/server/seo-monitoring/recommendationHistory.ts`, его `.test.ts`, `src/server/seo-monitoring/repository.ts`, `service.ts`; Create `recommendationExecutionRepository.ts`, `.test.ts`; Generate следующую свободную миграцию `drizzle/0024_seo_recommendation_executions.sql` и соответствующие meta. Если номер уже занят, не перезаписывать, выбрать следующий.
 
@@ -84,7 +84,7 @@
 - [ ] Реализовать согласование/повторное согласование одним transaction; guards updatedAt/pageVersion/baseHash. Revision/dedup-refresh сохраняют plan и делают старое согласование непригодным при изменении карточки; accepted не сбрасывается автоматически. Закрыть implemented во всех общих mutators, разрешив неизменный implemented при уточнении исторических доказательств. Расширить history eventType check значениями `approval`, `execution_applied`, `execution_verified`, `execution_failed`: их время — фактическое время операции. Применение и неудачная проверка пишут ledger/history, но не меняют семантическую версию принятой карточки/её updatedAt и не инвалидируют собственное согласование. Completion меняет статус/updatedAt и сохраняет старый approval snapshot.
 - [ ] Выполнить DB-команду до PASS и `yarn db:check`, `git diff --check`; commit `feat(seo): bind execution to immutable human approvals`.
 
-### Task3: Atomic CMS application and recovery
+### Task 3: Atomic CMS application and recovery
 
 **Files:** Create `src/server/admin/contentWrite.ts`, `.test.ts`; Modify `src/server/admin/contentRepository.ts`, `src/server/content/publicationLifecycle.ts`/`.test.ts`, `recommendationExecutionRepository.ts`/`.test.ts`.
 
@@ -96,7 +96,7 @@
 - [ ] Выделить общий writer без копирования CMS-validation/provenance/revisions/relations. Publication lifecycle возвращает свои фактически вставленные события; MCP-исполнение записывает actorMcpTokenId, не выдаёт владельца токена за клик человека. Установить порядок locks: recommendation → execution → все участвующие content rows по UUID; перечитать актуальные related targets под locks. Применить только plan из ledger и сохранить applied result в той же transaction. Replay сверяет актуальность и возвращает сохранённый результат, не вызывает writer второй раз.
 - [ ] Выполнить указанную suite и существующие `src/server/admin/contentRepository.test.ts`, `src/server/admin/contentService.test.ts` до PASS; `git diff --check`; commit `feat(seo): apply approved patches atomically through CMS`.
 
-### Task4: Public verification and protected implemented
+### Task 4: Public verification and protected implemented
 
 **Files:** Create `recommendationExecutionVerification.ts`, `.test.ts`, `recommendationExecutionService.ts`, `.test.ts`, `src/components/PublishedContentIdentity.tsx`; Modify `src/routes/blog-post.tsx`, `case.tsx`, `content-page.tsx`, execution repository; Test `tests/ssr/seoParity.test.ts` и новый `tests/ssr/publicationIdentity.test.tsx`.
 
@@ -109,7 +109,7 @@
 - [ ] Завершать только связанную applied execution: proof получает серверные checkedAt/responseSHA/фактические результаты. После сетевого чтения повторно проверить card/page/ledger и атомарно записать completion+implemented+history. Идентичность replay — хеш command/evidence; противоречащий повтор не перезаписывает proof. Сохранять безопасную последнюю неудачную попытку отдельно от достоверного applied/completed результата.
 - [ ] Повторить suite плюс `tests/ssr/seoParity.test.ts` до PASS; `git diff --check`; commit `feat(seo): verify published executions before completion`.
 
-### Task5: MCP reads, execution tools and authorization
+### Task 5: MCP reads, execution tools and authorization
 
 **Files:** Modify `src/server/seo-monitoring/mcpService.ts`/`.test.ts`, `runtime.ts`, `src/server/mcp/tools.ts`/`.test.ts`, `runtime.ts`, `http.test.ts`; execution repository/service tests.
 
@@ -121,7 +121,7 @@
 - [ ] Подключить execution service через runtime без provider dependencies. Reads: seo:read+content:read; apply: также seo:write+content:write+content:publish; complete: seo:read+seo:write+content:read. Actor только из authenticated principal. Добавить безопасные русские сообщения conflict/approval_required/unsupported/verification_failed, не raw stack/HTML/секреты. Existing tools и scopes сохраняются, implemented bypass остаётся закрытым.
 - [ ] Повторить suite до PASS; `yarn typecheck`, `git diff --check`; commit `feat(mcp): expose protected SEO recommendation work`.
 
-### Task6: Owner-facing diff, approval and recovery UI
+### Task 6: Owner-facing diff, approval and recovery UI
 
 **Files:** Create `src/routes/admin/seo-recommendation-card.tsx`, `.test.tsx`; Modify `src/routes/admin/seo.tsx`, `seo-changes.tsx`, `seo.server.ts`, их route/UI tests, `seo-recommendation-history.tsx`/`.test.tsx`.
 
@@ -132,7 +132,7 @@
 - [ ] Реализовать общий компонент с collapsed/expanded diff без скрытой подмены/усечения согласуемого значения, page/version, blocked reason, applied/completed facts и journal link. Сохранить таблицу изменений, её фильтры/пагинацию и историю. Устаревший submitted form не очищать и не принимать заново автоматически; показать понятный конфликт и свежую карточку.
 - [ ] Повторить UI/route suite до PASS, локально проверить русский длинный diff, мобильную ширину и историю браузера; `git diff --check`; commit `feat(admin): review and approve exact SEO changes`.
 
-### Task7: Acceptance, immutable release and existing heartbeat
+### Task 7: Acceptance, immutable release and existing heartbeat
 
 **Files:** Create `docs/runbooks/approved-seo-recommendation-execution.md`, `docs/runbooks/approved-seo-recommendation-execution-release-2026-10-09.md`; Modify `docs/runbooks/seo-recommendation-history.md`, `docs/operations/seo-geo-automation-prompt.md`; существующую automation `seo` обновлять только штатным automation_update после релиза, не прямой правкой TOML.
 
