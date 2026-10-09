@@ -12,3 +12,7 @@ test("recommendation index offers next page and closed-card history without drop
   const html = renderToStaticMarkup(<SeoRecommendationIndex data={{ items: [{ id: "old", title: "Closed card", status: "dismissed", updatedAt: "2026-10-08T12:00:00Z" }], nextCursor: "50" }} search="?page=%2Fservices%2Fa%2F&source=google&recommendationId=current&recommendationHistoryCursor=50" />);
   assert.match(html, /recommendationsCursor=50/); assert.match(html, /recommendationId=old/); assert.match(html, /source=google/); assert.match(html, /Closed card/);
 });
+test("execution history labels human approval, application and public verification separately", () => {
+  const html = renderToStaticMarkup(<SeoRecommendationHistory recommendationId="card" data={{ items: (["approval", "execution_applied", "execution_verified", "execution_failed"] as const).map((eventType, i) => ({ id: String(i), recommendationId: "card", eventType, beforeSnapshot: {}, afterSnapshot: {}, actor: { operation: "fixture" }, reason: "Факт", createdAt: new Date() })), nextCursor: null }} />);
+  for (const label of ["Одобрение владельца", "Применено в CMS", "Подтверждено публичной проверкой", "Проверка не завершена"]) assert.ok(html.includes(label), label);
+});

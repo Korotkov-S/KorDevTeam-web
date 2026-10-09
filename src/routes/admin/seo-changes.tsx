@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Form, Link, useActionData, useLoaderData, useLocation } from "react-router";
 import { getAdminAuthService } from "../../server/auth/runtime";
-import { getSeoMonitoringService } from "../../server/seo-monitoring/runtime";
+import { getSeoMonitoringService, getSeoRecommendationExecutionService } from "../../server/seo-monitoring/runtime";
+import { SeoRecommendationCard, type RecommendationPreview } from "./seo-recommendation-card";
 import { adminRouteHeaders } from "./headers";
 import { createSeoSectionLoader } from "./seo-read.server";
 import { action } from "./seo.server";
@@ -17,8 +18,9 @@ type RecommendationRow = { id: string; title: string; rationale: string; pagePat
 type Data = { filters: SeoFilters; search?: string; effects?: { items: ChangeEffectRow[]; nextCursor: string | null }; legacyEffects?: { items: ChangeEffectRow[]; nextCursor: string | null }; effectsSearch?: string;
   changes: { items: JournalChange[]; nextCursor: string | null }; recommendations: { items: RecommendationRow[]; nextCursor: string | null };
   recommendationsSearch?: string; recommendationId?: string | null;
+  recommendationWork?: Record<string, RecommendationPreview>;
   recommendationHistory?: { items: Array<Omit<RecommendationHistoryRow, "createdAt"> & { createdAt: string | Date }>; nextCursor: string | null } };
-export const loader = (args: Parameters<ReturnType<typeof createSeoSectionLoader>>[0]) => createSeoSectionLoader("changes", getAdminAuthService(), getSeoMonitoringService())(args);
+export const loader = (args: Parameters<ReturnType<typeof createSeoSectionLoader>>[0]) => createSeoSectionLoader("changes", getAdminAuthService(), getSeoMonitoringService(), undefined, getSeoRecommendationExecutionService())(args);
 export { action };
 export const headers = adminRouteHeaders;
 export function meta() { return [{ title: "SEO-изменения и рекомендации | KorDevTeam" }]; }
@@ -53,13 +55,13 @@ export function SeoChangesPage({ data, csrfToken }: { data: Data | ChangeDetailD
   if ("change" in data) return <SeoChangeDetail data={data} />;
   const search = data.search ?? location.search;
   const params = new URLSearchParams(search); const proposals = params.get("view") === "proposals" || !!params.get("recommendationId");
-  return <section className="space-y-6"><PageHeader title="Изменения и решения" description="Выполненные работы и их сохранённые измерения. Предложения — отдельно; контент автоматически не публикуется." />
+  return <section className="space-y-6"><PageHeader title="Изменения и решения" description="Выполненные работы и их сохранённые измерения. Предложения — отдельно; публикация точного варианта требует явного одобрения владельца." />
     <nav className="flex gap-2" aria-label="Журнал и предложения">
       <Link aria-current={!proposals ? "page" : undefined} className={`rounded-lg border px-4 py-2 ${!proposals ? "bg-primary text-primary-foreground" : "bg-card"}`} to={journalLink(search, { view: "journal", recommendationId: null, recommendationHistoryCursor: null })}>Журнал изменений</Link>
       <Link aria-current={proposals ? "page" : undefined} className={`rounded-lg border px-4 py-2 ${proposals ? "bg-primary text-primary-foreground" : "bg-card"}`} to={journalLink(search, { view: "proposals" })}>Предложения</Link>
     </nav>
     <JournalFilters key={`${search}:${proposals}`} search={search} source={data.filters.source} proposals={proposals} />
-    {proposals ? <><Panel title="Рекомендации агента"><p className="mb-4 text-sm text-muted-foreground">Предложение не является выполненным изменением. Принятие не публикует страницу.</p>{data.recommendations.items.length ? <ul className="space-y-4">{data.recommendations.items.map(item => <li key={item.id} className="rounded-lg border p-4"><h2 className="font-medium">{item.title}</h2><p className="mt-2 text-sm">{item.rationale}</p><p className="mt-2 break-all text-xs text-muted-foreground">{item.pagePath ?? "Весь сайт"} · уверенность: {item.confidence} · статус: {item.status}</p>{item.status === "new" ? <Form method="post" className="mt-3 flex gap-4"><input type="hidden" name="_csrf" value={csrfToken} /><input type="hidden" name="intent" value="recommendation-status" /><input type="hidden" name="id" value={item.id} /><input type="hidden" name="expectedStatus" value="new" /><button name="status" value="accepted" className="underline">Принять</button><button name="status" value="rejected" className="text-destructive underline">Отклонить</button></Form> : null}</li>)}</ul> : <p>Доказательных рекомендаций пока нет.</p>}</Panel>
+    {proposals ? <><Panel title="Рекомендации агента"><p className="mb-4 text-sm text-muted-foreground">Предложение не является выполненным изменением. Перед одобрением проверьте полный diff и условия публикации.</p>{data.recommendations.items.length ? <ul className="space-y-4">{data.recommendations.items.map(item => <li key={item.id}><SeoRecommendationCard recommendation={item} work={data.recommendationWork?.[item.id]} csrfToken={csrfToken} /></li>)}</ul> : <p>Доказательных рекомендаций пока нет.</p>}</Panel>
       <SeoRecommendationIndex data={data.recommendations} search={search} />{data.recommendationId ? <SeoRecommendationHistory data={data.recommendationHistory ?? { items: [], nextCursor: null }} recommendationId={data.recommendationId} search={search} /> : null}</> : <>
       <div><h2 className="text-lg font-semibold">Эффект изменений: 7 / 14 / 28 дней</h2><p className="mt-2 text-sm text-muted-foreground">Средние позиции по показам: {data.filters.source === "yandex_webmaster" ? "Яндекс Вебмастер" : "Google Search Console"}. Россия, фактические устройства, фиксированная группа ключей. Окна отсчитываются от события, не от фильтра дат журнала.</p><p className="mt-1 text-xs text-muted-foreground">Наблюдение не доказывает причинность. Платные контрольные позиции Яндекса — отдельно в подробностях. Просмотр страницы не запускает сбор.</p></div>
       <SeoChangeTable changes={data.changes} effects={data.effects?.items ?? []} source={data.filters.source} search={search} /><RecordChange csrfToken={csrfToken} />

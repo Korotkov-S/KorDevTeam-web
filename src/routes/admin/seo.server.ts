@@ -5,7 +5,9 @@ import { verifyAdminMutationRequest } from "../../server/auth/request";
 import { getAdminAuthService } from "../../server/auth/runtime";
 import type { AdminAuthService } from "../../server/auth/service";
 import type { SeoService } from "../../server/seo-monitoring/service";
-import { getSeoMonitoringService } from "../../server/seo-monitoring/runtime";
+import { getSeoMonitoringService, getSeoRecommendationExecutionService } from "../../server/seo-monitoring/runtime";
+import type { RecommendationExecutionService } from "../../server/seo-monitoring/recommendationExecutionService";
+import { readRecommendationPreviews } from "./seo-recommendation-preview.server";
 import type { SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "../../server/seo-monitoring/contracts";
 import { requireAdminPage } from "./auth.server";
 import { adminHeaders, adminRouteHeaders, requestCspNonce } from "./headers";
@@ -69,9 +71,11 @@ function safeResponse(request: Request, error: unknown): Response {
   const code = error instanceof Error ? error.message : "seo_dashboard_unavailable";
   const validation = new Set(["seo_date_invalid", "seo_date_range_invalid", "seo_source_invalid", "seo_region_invalid", "seo_device_invalid", "seo_frequency_band_invalid", "seo_page_path_invalid", "seo_page_origin_invalid", "seo_cursor_invalid", "seo_query_text_invalid", "seo_query_invalid", "seo_query_status_invalid", "seo_query_kind_invalid", "seo_wordstat_frequency_invalid", "seo_query_priority_invalid", "seo_query_updated_at_invalid", "seo_action_invalid"]);
   const security = code === "admin_origin_invalid" || code === "admin_csrf_invalid";
-  const conflict = code === "seo_query_conflict" || code === "seo_query_exists";
+  const executionConflict = ["seo_execution_card_conflict", "seo_execution_page_conflict", "seo_execution_status_conflict", "seo_execution_already_applied"].includes(code);
+  const conflict = code === "seo_query_conflict" || code === "seo_query_exists" || executionConflict;
   const known = validation.has(code) || security;
   const message = security ? "Сессия формы устарела. Обновите страницу."
+    : executionConflict ? "Карточка или опубликованная версия изменилась. Обновите страницу, проверьте свежий diff и согласуйте его отдельным кликом. Изменения не применены."
     : code === "seo_query_conflict" ? "Запрос уже изменён. Обновите страницу и повторите действие."
     : code === "seo_query_exists" ? "Такой запрос уже есть в семантическом ядре."
     : known ? "Проверьте параметры SEO-отчёта." : "SEO-аналитика временно недоступна.";
@@ -81,7 +85,7 @@ function safeResponse(request: Request, error: unknown): Response {
   });
 }
 
-export function createSeoAdminLoader(auth: Authenticator, service: Service, clock = () => new Date()): LoaderFunction {
+export function createSeoAdminLoader(auth: Authenticator, service: Service, clock = () => new Date(), execution?: Pick<RecommendationExecutionService, "get">): LoaderFunction {
   return async ({ request }: LoaderFunctionArgs) => {
     await requireAdminPage(request, auth);
     try {
@@ -112,7 +116,7 @@ export function createSeoAdminLoader(auth: Authenticator, service: Service, cloc
       const semanticItems = [...new Map([...activeCore.items, ...archivedCore.items].map((item) => [item.id, item])).values()];
       return Response.json({ filters: parsed.ui, dashboard, previousOverview, queries, movers, rankControl,
         semanticCore: { items: semanticItems, nextCursor: activeCore.nextCursor ?? archivedCore.nextCursor },
-        candidates, rankChecks, changes, recommendations },
+        candidates, rankChecks, changes, recommendations, recommendationWork: await readRecommendationPreviews(execution, recommendations.items) },
         { headers: adminHeaders(requestCspNonce(request)) });
     } catch (error) { return safeResponse(request, error); }
   };
@@ -126,7 +130,7 @@ function integerValue(form: FormData, key: string, nullable = false): number | n
   return Number(raw);
 }
 
-export function createSeoAdminAction(auth: Authenticator, service: Service, config: AdminAuthConfig): ActionFunction {
+export function createSeoAdminAction(auth: Authenticator, service: Service, config: AdminAuthConfig, execution?: Pick<RecommendationExecutionService, "approve">): ActionFunction {
   return async ({ request }: ActionFunctionArgs) => {
     const { principal } = await requireAdminPage(request, auth);
     try {
@@ -153,6 +157,11 @@ export function createSeoAdminAction(auth: Authenticator, service: Service, conf
       } else if (intent === "record-change") {
         await service.recordChange({ pagePath: value(form, "pagePath"), summary: value(form, "summary"),
           type: value(form, "type") as "content" | "metadata" | "structure" | "interlinking" | "technical" | "other" }, { adminUserId: principal.userId });
+      } else if (intent === "approve-recommendation") {
+        if (!execution) throw Error("seo_execution_unavailable");
+        const baseVersion = value(form, "expectedBaseVersion");
+        await execution.approve({ recommendationId: value(form, "id"), expectedUpdatedAt: value(form, "expectedUpdatedAt"),
+          ...(baseVersion ? { expectedBaseVersion: Number(baseVersion), expectedBaseHash: value(form, "expectedBaseHash") } : {}) }, { adminUserId: principal.userId });
       } else if (intent === "recommendation-status") {
         await service.updateRecommendationStatus({ id: value(form, "id"), expectedStatus: value(form, "expectedStatus") as "new" | "accepted" | "rejected" | "implemented" | "dismissed",
           status: value(form, "status") as "new" | "accepted" | "rejected" | "implemented" | "dismissed" }, { adminUserId: principal.userId });
@@ -162,6 +171,6 @@ export function createSeoAdminAction(auth: Authenticator, service: Service, conf
   };
 }
 
-export const loader = (args: LoaderFunctionArgs) => createSeoAdminLoader(getAdminAuthService(), getSeoMonitoringService())(args);
-export const action = (args: ActionFunctionArgs) => createSeoAdminAction(getAdminAuthService(), getSeoMonitoringService(), readAdminAuthConfig(process.env))(args);
+export const loader = (args: LoaderFunctionArgs) => createSeoAdminLoader(getAdminAuthService(), getSeoMonitoringService(), undefined, getSeoRecommendationExecutionService())(args);
+export const action = (args: ActionFunctionArgs) => createSeoAdminAction(getAdminAuthService(), getSeoMonitoringService(), readAdminAuthConfig(process.env), getSeoRecommendationExecutionService())(args);
 export const headers = adminRouteHeaders;

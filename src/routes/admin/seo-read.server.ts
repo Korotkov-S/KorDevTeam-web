@@ -3,6 +3,8 @@ import type { LoaderFunction, LoaderFunctionArgs } from "react-router";
 import type { AdminAuthService } from "../../server/auth/service";
 import type { SeoDevice, SeoSourceId } from "../../server/seo-monitoring/contracts";
 import type { SeoService } from "../../server/seo-monitoring/service";
+import type { RecommendationExecutionService } from "../../server/seo-monitoring/recommendationExecutionService";
+import { readRecommendationPreviews } from "./seo-recommendation-preview.server";
 import { requireAdminPage } from "./auth.server";
 import { adminHeaders, requestCspNonce } from "./headers";
 
@@ -98,6 +100,7 @@ export function createSeoSectionLoader(
   auth: Authenticator,
   service: SectionService,
   clock = () => new Date(),
+  execution?: Pick<RecommendationExecutionService, "get">,
 ): LoaderFunction {
   return async ({ request, params }: LoaderFunctionArgs) => {
     await requireAdminPage(request, auth);
@@ -210,7 +213,7 @@ export function createSeoSectionLoader(
           recommendationId && service.listRecommendationHistory ? service.listRecommendationHistory({ recommendationId, ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor: effectsUrl.searchParams.get("recommendationHistoryCursor") }) : { items: [], nextCursor: null },
         ]);
         const effects = await service.listChangeEffects?.({ changeIds: changes.items.map(c => c.id), source: parsed.ui.source, limit: 100, cursor: null }) ?? { items: [], nextCursor: null };
-        payload = { filters: parsed.ui, journal, search: effectsUrl.search, changes, recommendations, effects, legacyEffects, effectsSearch: effectsUrl.search, recommendationId, recommendationHistory, recommendationsSearch: effectsUrl.search };
+        payload = { filters: parsed.ui, journal, search: effectsUrl.search, changes, recommendations, recommendationWork: await readRecommendationPreviews(execution, recommendations.items), effects, legacyEffects, effectsSearch: effectsUrl.search, recommendationId, recommendationHistory, recommendationsSearch: effectsUrl.search };
       }
       return Response.json(payload, { headers: adminHeaders(requestCspNonce(request)) });
     } catch (error) {

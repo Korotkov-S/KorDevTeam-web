@@ -8,6 +8,7 @@ import type { AdminAuthConfig } from "../../server/auth/config";
 import { createAdminCookie } from "../../server/auth/cookie";
 import { AdminSeoDashboard, meta as seoMeta, type SeoAdminLoaderData } from "./seo";
 import { createSeoAdminAction, createSeoAdminLoader } from "./seo.server";
+import { SeoChangesPage } from "./seo-changes";
 
 const adminId = "00000000-0000-4000-8000-000000000001";
 const queryId = "00000000-0000-4000-8000-000000000002";
@@ -111,6 +112,32 @@ function renderDashboard(value: SeoAdminLoaderData) {
   const router = createMemoryRouter([{ path: "*", element: <AdminSeoDashboard data={value} csrfToken={csrf} /> }], { initialEntries: ["/admin/seo/"] });
   return renderToStaticMarkup(<RouterProvider router={router} />);
 }
+test("both_surfaces_show_full_reviewable_diff_and_publication_consent", () => {
+  const item = { ...data.recommendations.items[0], updatedAt: "2026-10-09T10:00:00Z" };
+  const work = { state: "blocked", supported: true, canApprove: true, errorCode: "seo_execution_approval_required", baseVersion: 1, baseHash: "a".repeat(64), execution: null,
+    diff: [{ fieldPath: "bodyMd", before: "Прежний текст", after: "Полный новый текст" }], criteria: [{ id: "text", description: "Проверить новый текст" }] };
+  const value = { ...data, recommendations: { items: [item], nextCursor: null }, recommendationWork: { [item.id]: work } };
+  const router = createMemoryRouter([{ path: "*", element: <SeoChangesPage data={value as never} csrfToken={csrf} /> }], { initialEntries: ["/admin/seo/changes/?view=proposals"] });
+  for (const html of [renderDashboard(value), renderToStaticMarkup(<RouterProvider router={router} />)]) {
+    assert.match(html, /Принять — разрешить агенту применить эти изменения и опубликовать их при следующем запуске/);
+    assert.match(html, /Прежний текст/); assert.match(html, /Полный новый текст/);
+  }
+});
+test("stale_form_cannot_approve_new_text", async () => {
+  let captured: unknown;
+  const execution = { async approve(input: unknown, actor: unknown) { captured = { input, actor }; throw Error("seo_execution_card_conflict"); } };
+  const form = new FormData();
+  for (const [key, value] of Object.entries({ _csrf: csrf, intent: "approve-recommendation", id: recommendationId, expectedUpdatedAt: "2026-10-09T09:00:00Z", expectedBaseVersion: "2", expectedBaseHash: "a".repeat(64), actor: "forged" })) form.set(key, value);
+  const response = await createSeoAdminAction(auth, service() as never, config, execution as never)({ request: request("/admin/seo/", form), params: {}, context: {} });
+  assert.equal(response.status, 409);
+  assert.deepEqual(captured, { input: { recommendationId, expectedUpdatedAt: "2026-10-09T09:00:00Z", expectedBaseVersion: 2, expectedBaseHash: "a".repeat(64) }, actor: { adminUserId: adminId } });
+});
+test("rejection_does_not_execute", async () => {
+  let rejected = 0, approved = 0;
+  const form = new FormData(); for (const [key, value] of Object.entries({ _csrf: csrf, intent: "recommendation-status", id: recommendationId, expectedStatus: "new", status: "rejected" })) form.set(key, value);
+  const response = await createSeoAdminAction(auth, { ...service(), async updateRecommendationStatus() { rejected++; return {}; } } as never, config, { async approve() { approved++; } } as never)({ request: request("/admin/seo/", form), params: {}, context: {} });
+  assert.equal(response.status, 200); assert.equal(rejected, 1); assert.equal(approved, 0);
+});
 
 test("SEO dashboard has an explicit non-error browser title", () => {
   assert.deepEqual(seoMeta(), [{ title: "SEO-мониторинг | KorDevTeam" }]);
