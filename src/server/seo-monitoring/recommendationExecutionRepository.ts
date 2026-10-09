@@ -1,9 +1,11 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import { adminUsers, contentEntries, contentMediaRefs, contentRelations, seoRecommendations, seoRecommendationExecutions } from "../db/schema";
+import { adminUsers, contentEntries, contentMediaRefs, contentRelations, geoExperiments, seoChanges, seoRecommendations, seoRecommendationExecutions } from "../db/schema";
 import type { SeoDatabase } from "./repository";
-import { hashExecutionJson, parseExecutionPlan, prepareExecutionPatch, publishedSnapshot, type PublishedSnapshot } from "./recommendationExecutionPlan";
+import { hashExecutionJson, parseExecutionPlan, prepareExecutionPatch, publishedSnapshot, type ExecutionCommand, type PublishedSnapshot } from "./recommendationExecutionPlan";
 import { appendRecommendationEvent, nextRecommendationTime, recommendationSnapshot } from "./recommendationHistory";
+import { saveContentInTransaction } from "../admin/contentWrite";
+import { linkApprovedGeoExperimentInTransaction } from "../geo-monitoring/repository";
 
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
 type Reader = SeoDatabase | Transaction;
@@ -14,6 +16,19 @@ export type RecommendationWork = { recommendation: Recommendation; execution: Ex
 export type WorkSummary = Pick<RecommendationWork, "state" | "errorCode"> & { recommendationId: string; title: string; updatedAt: string; pagePath: string | null; executionId: string | null };
 export type WorkPageInput = { limit?: number; cursor?: string | null };
 export type WorkPage = { items: WorkSummary[]; nextCursor: string | null };
+export const executionCommandSchema = z.strictObject({ recommendationId: z.uuid(), executionId: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }) });
+export function checkedExecutionCommand(input: ExecutionCommand, actor: { mcpTokenId: string }) {
+  if (!executionCommandSchema.safeParse(input).success) throw Error("seo_execution_command_invalid");
+  if (!z.strictObject({ mcpTokenId: z.uuid() }).safeParse(actor).success) throw Error("seo_actor_invalid");
+}
+async function lockedExecution(tx: Transaction, command: ExecutionCommand) {
+  const [recommendation] = await tx.select().from(seoRecommendations).where(eq(seoRecommendations.id, command.recommendationId)).for("update");
+  if (!recommendation) throw Error("seo_recommendation_not_found");
+  const [execution] = await tx.select().from(seoRecommendationExecutions).where(and(eq(seoRecommendationExecutions.id, command.executionId), eq(seoRecommendationExecutions.recommendationId, recommendation.id))).for("update");
+  if (!execution || execution.supersededAt) throw Error("seo_execution_approval_required");
+  if (execution.approvedRecommendation.updatedAt !== new Date(command.expectedUpdatedAt).toISOString()) throw Error("seo_execution_card_conflict");
+  return { recommendation, execution };
+}
 
 export async function readPublishedSnapshot(db: Reader, id: string, lock = false): Promise<PublishedSnapshot> {
   let query = db.select().from(contentEntries).where(eq(contentEntries.id, id));
@@ -78,6 +93,48 @@ export function createRecommendationExecutionRepository(db: SeoDatabase) {
           approvedByAdminUserId: actor.adminUserId, approvedAt: now, approvedRecommendation: recommendationSnapshot(recommendation), recommendationHash: hashExecutionJson(recommendationSnapshot(recommendation)),
           approvedPlan: plan, contentEntryId: page.entry.id, baseSnapshot: page, baseHash: hashExecutionJson(page) }).returning();
         return executionWork(recommendation, execution, page);
+      });
+    },
+    async apply(command: ExecutionCommand, actor: { mcpTokenId: string }) {
+      checkedExecutionCommand(command, actor);
+      return db.transaction(async tx => {
+        const { recommendation, execution } = await lockedExecution(tx, command);
+        const prepared = prepareExecutionPatch(execution.baseSnapshot, execution.approvedPlan);
+        const relatedSlugs = prepared.command.kind === "article" ? prepared.command.payload.relatedArticleSlugs ?? [] : [];
+        const relatedArticles = relatedSlugs.length ? await tx.select({ id: contentEntries.id }).from(contentEntries).where(and(eq(contentEntries.kind, "article"), inArray(contentEntries.slug, relatedSlugs))) : [];
+        const ids = [...new Set([execution.contentEntryId, ...prepared.command.relations.map(r => r.targetId), ...relatedArticles.map(r => r.id)])].sort();
+        const entries = await tx.select().from(contentEntries).where(inArray(contentEntries.id, ids)).orderBy(asc(contentEntries.id)).for("update");
+        const page = await currentPage(tx, recommendation, execution);
+        const work = executionWork(recommendation, execution, page);
+        if (work.state === "blocked") throw Error(work.errorCode!);
+        if (execution.appliedAt) return { work, unchanged: true };
+        const kindForType = { related_article: "article", related_case: "case", related_service: "service", related_faq: "faq" };
+        for (const relation of prepared.command.relations) {
+          const target = entries.find(e => e.id === relation.targetId);
+          if (!target || target.id === execution.contentEntryId || target.status !== "published" || target.kind !== kindForType[relation.type]) throw Error("seo_execution_relation_invalid");
+        }
+        for (const slug of relatedSlugs) if (!entries.some(e => e.kind === "article" && e.slug === slug && e.status === "published" && e.id !== execution.contentEntryId)) throw Error("seo_execution_relation_invalid");
+        // Match the existing GEO lock order: linked experiment rows, then the shared page lock.
+        const linked = await tx.select().from(geoExperiments).where(eq(geoExperiments.recommendationId, recommendation.id)).orderBy(asc(geoExperiments.id)).for("update");
+        if (linked.length > 1 || linked.some(e => e.status !== "approved" || !e.approvedByAdminUserId || e.pagePath !== recommendation.pagePath)) throw Error("geo_experiment_state_invalid");
+        if (recommendation.issueType.startsWith("geo_") && !linked.length) throw Error("geo_experiment_state_invalid");
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${execution.approvedPlan.pagePath}, 706024))`);
+        const cutoff = new Date(Date.now() - 14 * 86_400_000);
+        const [nearby] = await tx.select({ id: geoExperiments.id }).from(geoExperiments).where(and(eq(geoExperiments.pagePath, execution.approvedPlan.pagePath), gte(geoExperiments.implementedAt, cutoff))).limit(1);
+        if (nearby) throw Error("geo_experiment_page_cooldown");
+        if (linked.length) {
+          const [recent] = await tx.select({ id: seoChanges.id }).from(seoChanges).where(and(eq(seoChanges.pagePath, execution.approvedPlan.pagePath), gte(seoChanges.appliedAt, cutoff))).limit(1);
+          if (recent) throw Error("geo_experiment_page_cooldown");
+        }
+        const result = await saveContentInTransaction(tx, prepared.command, actor);
+        const change = result.publicationChanges.find(c => c.contentEntryId === execution.contentEntryId && c.contentVersion === result.entry.version && c.pagePath === execution.approvedPlan.pagePath);
+        if (!change) throw Error("seo_execution_change_missing");
+        for (const experiment of linked) await linkApprovedGeoExperimentInTransaction(tx, { id: experiment.id, seoChangeId: change.id });
+        const applied = await readPublishedSnapshot(tx, execution.contentEntryId);
+        const now = new Date();
+        const [updated] = await tx.update(seoRecommendationExecutions).set({ appliedSnapshot: applied, appliedVersion: applied.entry.version, appliedHash: hashExecutionJson(applied), appliedChangeId: change.id, appliedByMcpTokenId: actor.mcpTokenId, appliedAt: now }).where(eq(seoRecommendationExecutions.id, execution.id)).returning();
+        await appendRecommendationEvent(tx, recommendation, recommendation, "execution_applied", `Applied approved execution ${execution.id}; CMS change ${change.id}; version ${applied.entry.version}`, actor, now);
+        return { work: executionWork(recommendation, updated, applied), unchanged: false };
       });
     },
   };

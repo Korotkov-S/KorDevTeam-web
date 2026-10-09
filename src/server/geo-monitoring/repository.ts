@@ -374,6 +374,62 @@ function assertOwnedRun(run: typeof geoRuns.$inferSelect | undefined, tokenId: s
   return run;
 }
 
+export async function linkApprovedGeoExperimentInTransaction(tx: Parameters<Parameters<GeoDatabase["transaction"]>[0]>[0], input: { id: string; seoChangeId: string }) {
+  const [experiment] = await tx.select().from(geoExperiments)
+    .where(eq(geoExperiments.id, input.id)).for("update").limit(1);
+  if (!experiment || experiment.status !== "approved") throw new Error("geo_experiment_state_invalid");
+  const [change] = await tx.select().from(seoChanges).where(eq(seoChanges.id, input.seoChangeId)).limit(1);
+  if (!change || change.pagePath !== experiment.pagePath) throw new Error("geo_experiment_change_invalid");
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${experiment.pagePath}, 706024))`);
+  const [nearby] = await tx.select({ id: geoExperiments.id }).from(geoExperiments).where(and(
+    eq(geoExperiments.pagePath, experiment.pagePath), ne(geoExperiments.id, experiment.id),
+    sql`${geoExperiments.implementedAt} > ${new Date(+change.appliedAt - 14 * 86_400_000)}
+      AND ${geoExperiments.implementedAt} < ${new Date(+change.appliedAt + 14 * 86_400_000)}`,
+  )).limit(1);
+  if (nearby) throw new Error("geo_experiment_page_cooldown");
+  const prompts = await tx.select({ id: geoExperimentPrompts.promptId,
+    snapshot: geoExperimentPrompts.promptTextSnapshot, text: geoPrompts.promptText,
+    updatedAt: geoPrompts.updatedAt, status: geoPrompts.status }).from(geoExperimentPrompts)
+    .innerJoin(geoPrompts, eq(geoPrompts.id, geoExperimentPrompts.promptId))
+    .where(eq(geoExperimentPrompts.experimentId, experiment.id)).orderBy(asc(geoPrompts.id)).for("share");
+  if (experiment.primaryMetric !== "ai_referrals" && experiment.primaryMetric !== "crawler_health"
+    && (!prompts.length || prompts.some(prompt => prompt.status !== "active"
+      || prompt.text !== prompt.snapshot || +prompt.updatedAt > +experiment.createdAt))) {
+    throw new Error("geo_experiment_baseline_invalid");
+  }
+  const baselineTo = shiftDate(change.appliedAt, -1);
+  const baselineFrom = shiftDate(change.appliedAt, -28);
+  const metric = await readExperimentMetric(tx as unknown as GeoDatabase, {
+    from: utcDate(baselineFrom), to: utcDate(baselineTo), platform: experiment.platform,
+    mode: experiment.mode, language: experiment.language, region: experiment.region,
+    surface: experiment.surface ?? undefined, sessionPersonalized: experiment.sessionPersonalized ?? undefined,
+    promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
+    metric: experiment.primaryMetric,
+    pagePath: experiment.pagePath,
+  });
+  if (experiment.primaryMetric !== "ai_referrals" && experiment.primaryMetric !== "crawler_health"
+    && (!metric.complete || !("completeSnapshots" in metric) || metric.completeSnapshots < 3)) {
+    throw new Error("geo_experiment_baseline_invalid");
+  }
+  const baseline = {
+    ...metric,
+    unit: experiment.primaryMetric === "ai_referrals" ? "visits" : "ratio",
+    period: { from: utcDate(baselineFrom), to: utcDate(baselineTo) },
+    dimensions: { platform: experiment.platform, mode: experiment.mode, language: experiment.language,
+      surface: experiment.surface, sessionPersonalized: experiment.sessionPersonalized,
+      region: experiment.region, promptSetFingerprint: experiment.promptSetFingerprint },
+  };
+  const [row] = await tx.update(geoExperiments).set({
+    status: "active",
+    seoChangeId: change.id,
+    implementedAt: change.appliedAt,
+    baseline,
+    updatedAt: new Date(),
+  }).where(eq(geoExperiments.id, experiment.id)).returning();
+  if (!row) throw new Error("geo_experiment_not_found");
+  return row;
+}
+
 export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
   return {
     collectionQueue: createGeoQueueRepository(db),
@@ -1026,61 +1082,7 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
     },
 
     async linkExperimentChange(input: { id: string; seoChangeId: string }, _actor: GeoActor) {
-      return db.transaction(async (tx) => {
-        const [experiment] = await tx.select().from(geoExperiments)
-          .where(eq(geoExperiments.id, input.id)).for("update").limit(1);
-        if (!experiment || experiment.status !== "approved") throw new Error("geo_experiment_state_invalid");
-        const [change] = await tx.select().from(seoChanges).where(eq(seoChanges.id, input.seoChangeId)).limit(1);
-        if (!change || change.pagePath !== experiment.pagePath) throw new Error("geo_experiment_change_invalid");
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${experiment.pagePath}, 706024))`);
-        const [nearby] = await tx.select({ id: geoExperiments.id }).from(geoExperiments).where(and(
-          eq(geoExperiments.pagePath, experiment.pagePath), ne(geoExperiments.id, experiment.id),
-          sql`${geoExperiments.implementedAt} > ${new Date(+change.appliedAt - 14 * 86_400_000)}
-            AND ${geoExperiments.implementedAt} < ${new Date(+change.appliedAt + 14 * 86_400_000)}`,
-        )).limit(1);
-        if (nearby) throw new Error("geo_experiment_page_cooldown");
-        const prompts = await tx.select({ id: geoExperimentPrompts.promptId,
-          snapshot: geoExperimentPrompts.promptTextSnapshot, text: geoPrompts.promptText,
-          updatedAt: geoPrompts.updatedAt, status: geoPrompts.status }).from(geoExperimentPrompts)
-          .innerJoin(geoPrompts, eq(geoPrompts.id, geoExperimentPrompts.promptId))
-          .where(eq(geoExperimentPrompts.experimentId, experiment.id)).orderBy(asc(geoPrompts.id)).for("share");
-        if (experiment.primaryMetric !== "ai_referrals" && experiment.primaryMetric !== "crawler_health"
-          && (!prompts.length || prompts.some(prompt => prompt.status !== "active"
-            || prompt.text !== prompt.snapshot || +prompt.updatedAt > +experiment.createdAt))) {
-          throw new Error("geo_experiment_baseline_invalid");
-        }
-        const baselineTo = shiftDate(change.appliedAt, -1);
-        const baselineFrom = shiftDate(change.appliedAt, -28);
-        const metric = await readExperimentMetric(tx as unknown as GeoDatabase, {
-          from: utcDate(baselineFrom), to: utcDate(baselineTo), platform: experiment.platform,
-          mode: experiment.mode, language: experiment.language, region: experiment.region,
-          surface: experiment.surface ?? undefined, sessionPersonalized: experiment.sessionPersonalized ?? undefined,
-          promptSetFingerprint: experiment.promptSetFingerprint, promptIds: prompts.map((prompt) => prompt.id),
-          metric: experiment.primaryMetric,
-          pagePath: experiment.pagePath,
-        });
-        if (experiment.primaryMetric !== "ai_referrals" && experiment.primaryMetric !== "crawler_health"
-          && (!metric.complete || !("completeSnapshots" in metric) || metric.completeSnapshots < 3)) {
-          throw new Error("geo_experiment_baseline_invalid");
-        }
-        const baseline = {
-          ...metric,
-          unit: experiment.primaryMetric === "ai_referrals" ? "visits" : "ratio",
-          period: { from: utcDate(baselineFrom), to: utcDate(baselineTo) },
-          dimensions: { platform: experiment.platform, mode: experiment.mode, language: experiment.language,
-            surface: experiment.surface, sessionPersonalized: experiment.sessionPersonalized,
-            region: experiment.region, promptSetFingerprint: experiment.promptSetFingerprint },
-        };
-        const [row] = await tx.update(geoExperiments).set({
-          status: "active",
-          seoChangeId: change.id,
-          implementedAt: change.appliedAt,
-          baseline,
-          updatedAt: new Date(),
-        }).where(eq(geoExperiments.id, experiment.id)).returning();
-        if (!row) throw new Error("geo_experiment_not_found");
-        return row;
-      });
+      return db.transaction(tx => linkApprovedGeoExperimentInTransaction(tx, input));
     },
 
     async evaluateExperiment(input: { id: string; milestone: ExperimentMilestone; evaluatedAt: Date }, _actor: GeoActor) {
