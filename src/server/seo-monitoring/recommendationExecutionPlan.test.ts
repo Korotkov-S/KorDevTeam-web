@@ -31,6 +31,9 @@ test("hash_is_stable_for_cyrillic_and_key_order", () => {
   for (const value of [NaN, new Date(), { x: undefined }, { x: () => 1 }, JSON.parse('{"__proto__":{}}')]) {
     assert.throws(() => hashExecutionJson(value), /seo_execution_plan_invalid/);
   }
+  const sparse = new Array(1); Object.assign(sparse, { extra: () => 1 });
+  assert.throws(() => hashExecutionJson(sparse), /seo_execution_plan_invalid/);
+  assert.throws(() => hashExecutionJson(Object.defineProperty({}, "value", { enumerable: true, get: () => 1 })), /seo_execution_plan_invalid/);
 });
 test("patch_rejects_forbidden_and_prototype_fields", () => {
   for (const patch of [{ slug: "new" }, { indexable: false }, { payload: { coverUrl: "x" } }, JSON.parse('{"payload":{"constructor":{}}}')]) {

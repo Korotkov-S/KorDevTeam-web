@@ -2,10 +2,11 @@ import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { adminUsers, contentEntries, contentMediaRefs, contentRelations, geoExperiments, seoChanges, seoRecommendations, seoRecommendationExecutions } from "../db/schema";
 import type { SeoDatabase } from "./repository";
-import { hashExecutionJson, parseExecutionPlan, prepareExecutionPatch, publishedSnapshot, type ExecutionCommand, type PublishedSnapshot } from "./recommendationExecutionPlan";
+import { hashExecutionJson, parseExecutionPlan, prepareExecutionPatch, publishedSnapshot, type ExecutionCommand, type CompleteExecutionCommand, type PublicExecutionProof, type PublishedSnapshot } from "./recommendationExecutionPlan";
 import { appendRecommendationEvent, nextRecommendationTime, recommendationSnapshot } from "./recommendationHistory";
 import { saveContentInTransaction } from "../admin/contentWrite";
 import { linkApprovedGeoExperimentInTransaction } from "../geo-monitoring/repository";
+import { criterionEvidenceSchema, completionEvidence } from "./recommendationExecutionVerification";
 
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
 type Reader = SeoDatabase | Transaction;
@@ -17,6 +18,15 @@ export type WorkSummary = Pick<RecommendationWork, "state" | "errorCode"> & { re
 export type WorkPageInput = { limit?: number; cursor?: string | null };
 export type WorkPage = { items: WorkSummary[]; nextCursor: string | null };
 export const executionCommandSchema = z.strictObject({ recommendationId: z.uuid(), executionId: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }) });
+export const completeExecutionCommandSchema = executionCommandSchema.extend({ criteriaEvidence: criterionEvidenceSchema });
+export function checkedCompleteExecutionCommand(input: CompleteExecutionCommand, actor: { mcpTokenId: string }) {
+  const parsed = completeExecutionCommandSchema.safeParse(input);
+  if (!parsed.success) throw Error("seo_execution_command_invalid");
+  const { criteriaEvidence: _evidence, ...base } = parsed.data;
+  checkedExecutionCommand(base, actor);
+  return { ...base, expectedUpdatedAt: new Date(base.expectedUpdatedAt).toISOString(), criteriaEvidence: completionEvidence(parsed.data.criteriaEvidence) };
+}
+export const completeExecutionHash = (command: CompleteExecutionCommand) => hashExecutionJson({ ...command, expectedUpdatedAt: new Date(command.expectedUpdatedAt).toISOString(), criteriaEvidence: completionEvidence(command.criteriaEvidence) });
 export function checkedExecutionCommand(input: ExecutionCommand, actor: { mcpTokenId: string }) {
   if (!executionCommandSchema.safeParse(input).success) throw Error("seo_execution_command_invalid");
   if (!z.strictObject({ mcpTokenId: z.uuid() }).safeParse(actor).success) throw Error("seo_actor_invalid");
@@ -135,6 +145,42 @@ export function createRecommendationExecutionRepository(db: SeoDatabase) {
         const [updated] = await tx.update(seoRecommendationExecutions).set({ appliedSnapshot: applied, appliedVersion: applied.entry.version, appliedHash: hashExecutionJson(applied), appliedChangeId: change.id, appliedByMcpTokenId: actor.mcpTokenId, appliedAt: now }).where(eq(seoRecommendationExecutions.id, execution.id)).returning();
         await appendRecommendationEvent(tx, recommendation, recommendation, "execution_applied", `Applied approved execution ${execution.id}; CMS change ${change.id}; version ${applied.entry.version}`, actor, now);
         return { work: executionWork(recommendation, updated, applied), unchanged: false };
+      });
+    },
+    async completeVerified(input: CompleteExecutionCommand, proof: PublicExecutionProof, actor: { mcpTokenId: string }) {
+      const command = checkedCompleteExecutionCommand(input, actor), completionHash = completeExecutionHash(command);
+      return db.transaction(async tx => {
+        const { recommendation, execution } = await lockedExecution(tx, command);
+        const page = await currentPage(tx, recommendation, execution, true);
+        const work = executionWork(recommendation, execution, page);
+        if (work.state === "blocked") throw Error(work.errorCode!);
+        if (execution.completedAt) {
+          if (execution.completionHash !== completionHash) throw Error("seo_execution_completion_conflict");
+          return { work, unchanged: true };
+        }
+        if (work.state !== "applied" || !page || !execution.appliedChangeId) throw Error("seo_execution_not_applied");
+        const [change] = await tx.select().from(seoChanges).where(eq(seoChanges.id, execution.appliedChangeId)).for("share");
+        if (!change || change.contentEntryId !== execution.contentEntryId || change.contentVersion !== execution.appliedVersion || change.pagePath !== execution.approvedPlan.pagePath || change.actorMcpTokenId !== execution.appliedByMcpTokenId || change.actorAdminUserId !== null) throw Error("seo_execution_change_invalid");
+        const parsed = z.strictObject({ checkedAt: z.iso.datetime({ offset: true }), url: z.string(), httpStatus: z.literal(200), responseSha256: z.string().regex(/^[a-f0-9]{64}$/),
+          contentEntryId: z.uuid(), contentVersion: z.number().int().positive(), contentHash: z.string().regex(/^[a-f0-9]{64}$/), criteriaEvidence: criterionEvidenceSchema,
+          checks: z.strictObject({ identity: z.literal(true), metadata: z.literal(true), canonical: z.literal(true), robots: z.literal(true), criteria: z.literal(true) }) }).safeParse(proof);
+        if (!parsed.success || proof.url !== page.publicContract.url || proof.contentEntryId !== page.entry.id || proof.contentVersion !== page.entry.version || proof.contentHash !== execution.appliedHash || hashExecutionJson(completionEvidence(proof.criteriaEvidence)) !== hashExecutionJson(command.criteriaEvidence)) throw Error("seo_execution_verification_failed");
+        const now = new Date();
+        const [completedRecommendation] = await tx.update(seoRecommendations).set({ status: "implemented", updatedAt: nextRecommendationTime(recommendation) }).where(eq(seoRecommendations.id, recommendation.id)).returning();
+        const [completedExecution] = await tx.update(seoRecommendationExecutions).set({ completion: proof, completionHash, completedRecommendationHash: hashExecutionJson(recommendationSnapshot(completedRecommendation)), completedAt: now }).where(eq(seoRecommendationExecutions.id, execution.id)).returning();
+        await appendRecommendationEvent(tx, recommendation, completedRecommendation, "execution_verified", `Verified execution ${execution.id}; CMS change ${change.id}; version ${page.entry.version}`, actor, now);
+        return { work: executionWork(completedRecommendation, completedExecution, page), unchanged: false };
+      });
+    },
+    async recordVerificationFailure(input: CompleteExecutionCommand, errorCode: string, actor: { mcpTokenId: string }) {
+      const command = checkedCompleteExecutionCommand(input, actor);
+      const code = /^seo_execution_[a-z_]{1,80}$/.test(errorCode) ? errorCode : "seo_execution_verification_failed";
+      await db.transaction(async tx => {
+        const { recommendation, execution } = await lockedExecution(tx, command);
+        if (execution.completedAt) return;
+        const now = new Date();
+        await tx.update(seoRecommendationExecutions).set({ lastVerificationAttempt: { checkedAt: now.toISOString(), errorCode: code } }).where(eq(seoRecommendationExecutions.id, execution.id));
+        await appendRecommendationEvent(tx, recommendation, recommendation, "execution_failed", `Execution ${execution.id}: ${code}`, actor, now);
       });
     },
   };

@@ -1,5 +1,6 @@
 import { data, useLoaderData, type LoaderFunctionArgs } from "react-router";
 import { ServicePage } from "../pages/ServicePage";
+import { PublishedContentIdentity } from "../components/PublishedContentIdentity";
 import { getPublishedEntry, listPublishedRelations } from "../server/content/service";
 import { servicePage } from "../server/content/commercialPresentation";
 import { entrySeo } from "../server/content/presentation";
@@ -31,13 +32,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       ],
       faq: service.faq,
     };
-    return data({ type: "service" as const, seo, pathname, service }, { headers: documentHeaders });
+    return data({ type: "service" as const, seo, pathname, service, identity: { id: entry.id, version: entry.version } }, { headers: documentHeaders });
   }
   const media = await getEntryMediaMap(entry.id);
   return data({ type: "page" as const, seo: entrySeo(entry, pathname, media), title: String(entry.payload.h1 || entry.title), bodyMd: entry.bodyMd, excerpt: entry.excerpt, media }, { headers: documentHeaders });
 }
 export default function ContentPage() {
   const entry = useLoaderData<typeof loader>();
-  if (entry.type === "service") return <ServicePage pathname={entry.pathname} service={entry.service} />;
+  if (entry.type === "service") return <PublishedContentIdentity {...entry.identity}><ServicePage pathname={entry.pathname} service={entry.service} /></PublishedContentIdentity>;
   return <article className="container mx-auto max-w-4xl px-4 pt-28 pb-16"><h1 className="text-4xl mb-6">{entry.title}</h1><p className="mb-8">{entry.excerpt}</p><MarkdownContent markdown={entry.bodyMd} media={entry.media} /></article>;
 }

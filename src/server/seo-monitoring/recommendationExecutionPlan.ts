@@ -45,10 +45,11 @@ function canonicalJson(value: unknown, ancestors = new Set<unknown>(), depth = 0
   if (value === null || typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) return JSON.stringify(value);
   if (!value || typeof value !== "object" || ancestors.has(value) || (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value)))) throw Error("seo_execution_plan_invalid");
   ancestors.add(value);
+  if (Reflect.ownKeys(value).some(k => typeof k !== "string") || Object.values(Object.getOwnPropertyDescriptors(value)).some(d => !("value" in d))) throw Error("seo_execution_plan_invalid");
   const serialize = (v: unknown) => canonicalJson(v, ancestors, depth + 1);
   let result: string;
   if (Array.isArray(value)) {
-    if (Object.keys(value).length !== value.length) throw Error("seo_execution_plan_invalid");
+    if (Object.getPrototypeOf(value) !== Array.prototype || Object.keys(value).length !== value.length || Object.keys(value).some((k,i) => k !== String(i))) throw Error("seo_execution_plan_invalid");
     result = `[${value.map(serialize).join(",")}]`;
   } else {
     if (Reflect.ownKeys(value).some(k => typeof k !== "string" || ["__proto__", "constructor", "prototype"].includes(k))) throw Error("seo_execution_plan_invalid");
