@@ -169,6 +169,13 @@
       "when": 1791459000000,
       "tag": "0023_content_telegram_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791538444216,
+      "tag": "0024_seo_recommendation_executions",
+      "breakpoints": true
     }
   ]
 }

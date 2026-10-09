@@ -2,6 +2,7 @@ import { asc, desc, eq, inArray, and, sql, getTableColumns } from "drizzle-orm";
 import { z } from "zod";
 import { seoRecommendations, seoRecommendationHistory } from "../db/schema";
 import type { SeoDatabase } from "./repository";
+import { parseExecutionPlan, type ExecutionPlan } from "./recommendationExecutionPlan";
 
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
 type Row = typeof seoRecommendations.$inferSelect;
@@ -21,9 +22,10 @@ const revisionSchema = z.object({
   title: z.string().trim().min(1).max(300), rationale: z.string().trim().min(1).max(5000),
   evidence: z.record(z.string(), z.unknown()).refine(v => jsonValue(v) && Buffer.byteLength(JSON.stringify(v), "utf8") <= 16384),
   confidence: z.enum(["low", "medium", "high"]), status: statuses.optional(), reason: z.string().trim().min(1).max(2000),
+  executionPlan: z.unknown().transform((v, ctx): ExecutionPlan | null => { try { return v === null ? null : parseExecutionPlan(v); } catch { ctx.addIssue({ code: "custom", message: "seo_execution_plan_invalid" }); return z.NEVER; } }).optional(),
 }).strict();
 export type RecommendationRevision = z.infer<typeof revisionSchema>;
-const transitions: Record<Status, Status[]> = { new: ["accepted", "rejected", "dismissed"], accepted: ["implemented", "dismissed"], rejected: [], implemented: [], dismissed: [] };
+const transitions: Record<Status, Status[]> = { new: ["accepted", "rejected", "dismissed"], accepted: ["dismissed"], rejected: [], implemented: [], dismissed: [] };
 const legacyActor = { operation: "legacy-repository" };
 function stable(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
@@ -43,16 +45,18 @@ export function validateRecommendationRevisions(value: unknown): RecommendationR
     return rows;
   } catch { throw Error("seo_recommendation_batch_invalid"); }
 }
-const snapshot = (row: Row) => JSON.parse(JSON.stringify(row)) as Record<string, unknown>;
-const nextTime = (current: Row) => new Date(Math.max(Date.now(), +current.updatedAt + 1));
-async function event(tx: Transaction, before: Row | null, after: Row, eventType: string, reason: string, actor: Record<string, string>) {
-  await tx.insert(seoRecommendationHistory).values({ recommendationId: after.id, beforeSnapshot: before ? snapshot(before) : null, afterSnapshot: snapshot(after), eventType, reason, actor, createdAt: after.updatedAt });
+export const recommendationSnapshot = (row: Row) => JSON.parse(JSON.stringify(row)) as Record<string, unknown>;
+export const nextRecommendationTime = (current: Row) => new Date(Math.max(Date.now(), +current.updatedAt + 1));
+export async function appendRecommendationEvent(tx: Transaction, before: Row | null, after: Row, eventType: string, reason: string, actor: Record<string, string>, createdAt = after.updatedAt) {
+  const [event] = await tx.insert(seoRecommendationHistory).values({ recommendationId: after.id, beforeSnapshot: before ? recommendationSnapshot(before) : null, afterSnapshot: recommendationSnapshot(after), eventType, reason, actor, createdAt }).returning();
+  return event;
 }
+const event = appendRecommendationEvent, nextTime = nextRecommendationTime;
 async function revise(tx: Transaction, c: RecommendationRevision, actor: Record<string, string>) {
   const [current] = await tx.select().from(seoRecommendations).where(eq(seoRecommendations.id, c.id)).for("update");
   if (!current) throw Error("seo_recommendation_not_found");
-  const fields = { title: c.title, rationale: c.rationale, evidence: c.evidence, confidence: c.confidence, status: c.status ?? current.status };
-  if (stable(fields) === stable({ title: current.title, rationale: current.rationale, evidence: current.evidence, confidence: current.confidence, status: current.status })) return { item: current, unchanged: true };
+  const fields = { title: c.title, rationale: c.rationale, evidence: c.evidence, confidence: c.confidence, status: c.status ?? current.status, executionPlan: c.executionPlan === undefined ? current.executionPlan : c.executionPlan };
+  if (stable(fields) === stable({ title: current.title, rationale: current.rationale, evidence: current.evidence, confidence: current.confidence, status: current.status, executionPlan: current.executionPlan })) return { item: current, unchanged: true };
   if (+current.updatedAt !== +new Date(c.expectedUpdatedAt)) throw Error("seo_recommendation_revision_conflict");
   if (fields.status !== current.status && !transitions[current.status].includes(fields.status)) throw Error("seo_recommendation_transition_invalid");
   const [updated] = await tx.update(seoRecommendations).set({ ...fields, updatedAt: nextTime(current) }).where(eq(seoRecommendations.id, c.id)).returning();
@@ -67,12 +71,12 @@ export function createRecommendationHistoryRepository(db: SeoDatabase) {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${command.fingerprint}))`);
         const [current] = await tx.select().from(seoRecommendations).where(and(eq(seoRecommendations.fingerprint, command.fingerprint), inArray(seoRecommendations.status, ["new", "accepted"]))).orderBy(desc(seoRecommendations.createdAt)).limit(1).for("update");
         if (current) {
-          const fields = { title: command.title, rationale: command.rationale, evidence: command.evidence ?? {}, confidence: command.confidence };
-          if (stable(fields) === stable({ title: current.title, rationale: current.rationale, evidence: current.evidence, confidence: current.confidence })) return current;
+          const fields = { title: command.title, rationale: command.rationale, evidence: command.evidence ?? {}, confidence: command.confidence, executionPlan: command.executionPlan === undefined ? current.executionPlan : command.executionPlan === null ? null : parseExecutionPlan(command.executionPlan) };
+          if (stable(fields) === stable({ title: current.title, rationale: current.rationale, evidence: current.evidence, confidence: current.confidence, executionPlan: current.executionPlan })) return current;
           const [updated] = await tx.update(seoRecommendations).set({ ...fields, updatedAt: nextTime(current) }).where(eq(seoRecommendations.id, current.id)).returning();
           await event(tx, current, updated, "refreshed", "Same-fingerprint evidence refreshed", identity); return updated;
         }
-        const [created] = await tx.insert(seoRecommendations).values(command).returning();
+        const [created] = await tx.insert(seoRecommendations).values({ ...command, executionPlan: command.executionPlan == null ? null : parseExecutionPlan(command.executionPlan) }).returning();
         await event(tx, null, created, "created", "Recommendation created", identity); return created;
       });
     },

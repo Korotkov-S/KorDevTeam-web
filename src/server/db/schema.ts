@@ -931,6 +931,7 @@ export const seoRecommendations = pgTable(
     queryId: uuid("query_id").references(() => seoQueries.id, { onDelete: "set null" }),
     issueType: varchar("issue_type", { length: 120 }).notNull(),
     evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+    executionPlan: jsonb("execution_plan").$type<import("../seo-monitoring/recommendationExecutionPlan").ExecutionPlan | null>(),
     confidence: seoRecommendationConfidence("confidence").notNull(),
     status: seoRecommendationStatus("status").notNull().default("new"),
     fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
@@ -961,9 +962,39 @@ export const seoRecommendationHistory = pgTable("seo_recommendation_history", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => [
   index("seo_recommendation_history_lookup_idx").on(table.recommendationId, table.createdAt),
-  check("seo_recommendation_history_type_valid", sql`${table.eventType} IN ('created','refreshed','revised','status')`),
+  check("seo_recommendation_history_type_valid", sql`${table.eventType} IN ('created','refreshed','revised','status','approval','execution_applied','execution_verified','execution_failed')`),
   check("seo_recommendation_history_reason_valid", sql`length(btrim(${table.reason})) > 0`),
   check("seo_recommendation_history_snapshots_valid", sql`(${table.beforeSnapshot} IS NULL OR jsonb_typeof(${table.beforeSnapshot})='object') AND jsonb_typeof(${table.afterSnapshot})='object' AND jsonb_typeof(${table.actor})='object'`),
+]);
+
+export const seoRecommendationExecutions = pgTable("seo_recommendation_executions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  recommendationId: uuid("recommendation_id").notNull().references(() => seoRecommendations.id, { onDelete: "restrict" }),
+  approvalHistoryId: uuid("approval_history_id").notNull().references(() => seoRecommendationHistory.id, { onDelete: "restrict" }),
+  approvedByAdminUserId: uuid("approved_by_admin_user_id").notNull().references(() => adminUsers.id, { onDelete: "restrict" }),
+  approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+  approvedRecommendation: jsonb("approved_recommendation").$type<Record<string, unknown>>().notNull(),
+  recommendationHash: varchar("recommendation_hash", { length: 64 }).notNull(),
+  approvedPlan: jsonb("approved_plan").$type<import("../seo-monitoring/recommendationExecutionPlan").ExecutionPlan>().notNull(),
+  contentEntryId: uuid("content_entry_id").notNull().references(() => contentEntries.id, { onDelete: "restrict" }),
+  baseSnapshot: jsonb("base_snapshot").$type<import("../seo-monitoring/recommendationExecutionPlan").PublishedSnapshot>().notNull(),
+  baseHash: varchar("base_hash", { length: 64 }).notNull(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  appliedSnapshot: jsonb("applied_snapshot").$type<import("../seo-monitoring/recommendationExecutionPlan").PublishedSnapshot | null>(),
+  appliedVersion: integer("applied_version"), appliedHash: varchar("applied_hash", { length: 64 }),
+  appliedChangeId: uuid("applied_change_id").references(() => seoChanges.id, { onDelete: "restrict" }),
+  appliedByMcpTokenId: uuid("applied_by_mcp_token_id").references(() => mcpTokens.id, { onDelete: "restrict" }),
+  appliedAt: timestamp("applied_at", { withTimezone: true }),
+  lastVerificationAttempt: jsonb("last_verification_attempt").$type<{ checkedAt: string; errorCode: string } | null>(),
+  completion: jsonb("completion").$type<import("../seo-monitoring/recommendationExecutionPlan").PublicExecutionProof | null>(),
+  completionHash: varchar("completion_hash", { length: 64 }), completedRecommendationHash: varchar("completed_recommendation_hash", { length: 64 }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, t => [
+  uniqueIndex("seo_recommendation_execution_approval_uq").on(t.approvalHistoryId),
+  uniqueIndex("seo_recommendation_execution_active_uq").on(t.recommendationId).where(sql`${t.supersededAt} IS NULL`),
+  check("seo_execution_hashes_valid", sql`${t.baseHash} ~ '^[a-f0-9]{64}$' AND ${t.recommendationHash} ~ '^[a-f0-9]{64}$'`),
+  check("seo_execution_applied_complete", sql`COALESCE(((${t.appliedAt} IS NULL AND ${t.appliedSnapshot} IS NULL AND ${t.appliedVersion} IS NULL AND ${t.appliedHash} IS NULL AND ${t.appliedChangeId} IS NULL AND ${t.appliedByMcpTokenId} IS NULL) OR (${t.appliedAt} IS NOT NULL AND ${t.appliedSnapshot} IS NOT NULL AND ${t.appliedVersion} > 0 AND ${t.appliedHash} ~ '^[a-f0-9]{64}$' AND ${t.appliedChangeId} IS NOT NULL AND ${t.appliedByMcpTokenId} IS NOT NULL)), false)`),
+  check("seo_execution_completed_complete", sql`COALESCE(((${t.completedAt} IS NULL AND ${t.completion} IS NULL AND ${t.completionHash} IS NULL AND ${t.completedRecommendationHash} IS NULL) OR (${t.appliedAt} IS NOT NULL AND ${t.completedAt} IS NOT NULL AND ${t.completion} IS NOT NULL AND ${t.completionHash} ~ '^[a-f0-9]{64}$' AND ${t.completedRecommendationHash} ~ '^[a-f0-9]{64}$')), false)`),
 ]);
 
 export const geoTopics = pgTable(

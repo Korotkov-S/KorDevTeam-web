@@ -486,9 +486,12 @@ databaseTest("active recommendation fingerprints deduplicate and status transiti
     repository.updateRecommendationStatus(first.id, "new", "dismissed"),
     { message: "seo_recommendation_status_conflict" },
   );
-  await repository.updateRecommendationStatus(first.id, "accepted", "implemented");
   await assert.rejects(
-    repository.updateRecommendationStatus(first.id, "implemented", "accepted"),
+    repository.updateRecommendationStatus(first.id, "accepted", "implemented"),
+    { message: "seo_recommendation_transition_invalid" },
+  );
+  await assert.rejects(
+    repository.updateRecommendationStatus(first.id, "accepted", "accepted"),
     { message: "seo_recommendation_transition_invalid" },
   );
 });
