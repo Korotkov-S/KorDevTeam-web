@@ -1,5 +1,7 @@
 # Recommendation reconciliation
 
+For explicitly owner-approved exact patches, see [protected execution](approved-seo-recommendation-execution.md). Migration0024 blocks generic transitions into implemented; approval/application/public verification have separate append-only events. Old accepted status alone is not authority. Evidence reconciliation never publishes a page.
+
 `list_seo_recommendation_history` reads one card's before/after snapshots, reasons, times and actors under seo:read. `revise_seo_recommendation` requires seo:read+seo:write and expectedUpdatedAt; it cannot change page/query/issue/fingerprint identity. Admin Changes links expose the same immutable history without writes during reads. Pre-migration changes are not reconstructed: the first new update stores the full existing before image.
 
 Actual create, deduplicated evidence refresh, status changes and explicit revisions all append audit events transactionally. Each mutation advances updatedAt by at least1ms. Concurrent stale differing revisions fail closed. An identical-content replay is a no-op even with its original timestamp; changing only a retry reason does not manufacture another revision. New externally resolved tasks may be dismissed with a factual reason; never mark them implemented to invent work or rank improvement.
