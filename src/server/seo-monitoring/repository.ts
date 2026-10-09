@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 
 import type { createDb } from "../db/client";
 import {
@@ -20,6 +20,7 @@ import { summarizeRankPlan } from "./rankQueue";
 import { createPageControlRepository } from "./pageControlRepository";
 import { createSeoEffectsRepository, type EffectListInput } from "./effectsRepository";
 import { createRecommendationHistoryRepository, type RecommendationActor, type RecommendationRevision } from "./recommendationHistory";
+import type { ChangeJournalFilters } from "./changeJournal";
 
 export type SeoDatabase = ReturnType<typeof createDb>;
 type Transaction = Parameters<Parameters<SeoDatabase["transaction"]>[0]>[0];
@@ -1016,13 +1017,34 @@ export function createSeoRepository(db: SeoDatabase) {
       return change;
     },
 
-    async listChanges(filters: { pagePath?: string; dateFrom?: string; dateTo?: string }, page: { limit: number; cursor: string | null }) {
+    async listChanges(filters: ChangeJournalFilters, page: { limit: number; cursor: string | null }) {
       const offset = cursorOffset(page.cursor);
       const conditions = [];
+      if (filters.changeId) conditions.push(eq(seoChanges.id, filters.changeId));
       if (filters.pagePath) conditions.push(eq(seoChanges.pagePath, filters.pagePath));
-      if (filters.dateFrom) conditions.push(gte(seoChanges.appliedAt, new Date(`${filters.dateFrom}T00:00:00.000Z`)));
-      if (filters.dateTo) conditions.push(lte(seoChanges.appliedAt, new Date(`${filters.dateTo}T23:59:59.999Z`)));
-      const rows = await db.select().from(seoChanges).where(and(...conditions)).orderBy(desc(seoChanges.appliedAt), desc(seoChanges.id))
+      if (filters.dateFrom) conditions.push(filters.timeZone ? sql`(${seoChanges.appliedAt} AT TIME ZONE 'Europe/Moscow')::date >= ${filters.dateFrom}::date`
+        : gte(seoChanges.appliedAt, new Date(`${filters.dateFrom}T00:00:00.000Z`)));
+      if (filters.dateTo) conditions.push(filters.timeZone ? sql`(${seoChanges.appliedAt} AT TIME ZONE 'Europe/Moscow')::date <= ${filters.dateTo}::date`
+        : lte(seoChanges.appliedAt, new Date(`${filters.dateTo}T23:59:59.999Z`)));
+      if (filters.changeType) conditions.push(eq(seoChanges.type, filters.changeType));
+      if (filters.queryText) {
+        const pattern = `%${filters.queryText.replace(/[\\%_]/g, "\\$&")}%`;
+        conditions.push(or(ilike(seoChanges.summary, pattern), ilike(seoChanges.pagePath, pattern))!);
+      }
+      if (filters.effectStatus) {
+        const source = filters.source ?? "yandex_webmaster";
+        if (filters.effectStatus === "unchecked") conditions.push(sql`${seoChanges.type} <> 'other' AND NOT EXISTS
+          (SELECT 1 FROM seo_change_evaluations e WHERE e.change_id = ${seoChanges.id} AND e.source = ${source})`);
+        else {
+          const state = filters.effectStatus === "waiting" ? sql`latest.status LIKE 'pending_%'` : sql`latest.status = ${filters.effectStatus}`;
+          const exists = sql`EXISTS (SELECT 1 FROM (SELECT DISTINCT ON (e.checkpoint) e.result->>'status' AS status
+            FROM seo_change_evaluations e WHERE e.change_id = ${seoChanges.id} AND e.source = ${source}
+            ORDER BY e.checkpoint, e.evaluated_at DESC, e.created_at DESC, e.id DESC) latest WHERE ${state})`;
+          conditions.push(filters.effectStatus === "not_applicable" ? or(eq(seoChanges.type, "other"), exists)! : exists);
+        }
+      }
+      const order = filters.sort === "oldest" ? asc : desc;
+      const rows = await db.select().from(seoChanges).where(and(...conditions)).orderBy(order(seoChanges.appliedAt), order(seoChanges.id))
         .limit(page.limit + 1).offset(offset);
       return { items: rows.slice(0, page.limit), nextCursor: rows.length > page.limit ? String(offset + page.limit) : null };
     },

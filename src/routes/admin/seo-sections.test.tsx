@@ -159,7 +159,8 @@ test("pages, semantics, and changes screens contain only their working entities"
 
   const changesMarkup = html(<SeoChangesPage data={{ filters, changes: { items: [], nextCursor: null }, recommendations: { items: [], nextCursor: null } }} csrfToken="csrf" />, "/admin/seo/changes/");
   assert.match(changesMarkup, /Журнал изменений/u);
-  assert.match(changesMarkup, /Рекомендации агента/u);
+  assert.match(changesMarkup, /Предложения/u);
+  assert.doesNotMatch(changesMarkup, /Рекомендации агента/u);
   assert.doesNotMatch(changesMarkup, /Точные позиции/u);
 });
 

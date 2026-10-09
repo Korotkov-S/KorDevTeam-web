@@ -6,7 +6,7 @@ import type { SeoService } from "../../server/seo-monitoring/service";
 import { requireAdminPage } from "./auth.server";
 import { adminHeaders, requestCspNonce } from "./headers";
 
-export type SeoSection = "overview" | "positions" | "traffic" | "pages" | "semantics" | "changes";
+export type SeoSection = "overview" | "positions" | "traffic" | "pages" | "semantics" | "changes" | "change-detail";
 type Authenticator = Pick<AdminAuthService, "authenticate">;
 type SectionService = Pick<SeoService,
   "getDashboard" | "getOverview" | "getTrafficReport" | "getRankControl" | "listRankChecks" |
@@ -85,7 +85,8 @@ export function parseSeoSectionFilters(url: URL, now: Date) {
 function safeResponse(request: Request, error: unknown): Response {
   const code = error instanceof Error ? error.message : "seo_dashboard_unavailable";
   const validation = new Set(["seo_date_invalid", "seo_date_range_invalid", "seo_source_invalid", "seo_region_invalid",
-    "seo_device_invalid", "seo_frequency_band_invalid", "seo_page_path_invalid", "seo_page_origin_invalid", "seo_cursor_invalid", "seo_change_invalid", "seo_recommendation_invalid"]);
+    "seo_device_invalid", "seo_frequency_band_invalid", "seo_page_path_invalid", "seo_page_origin_invalid", "seo_cursor_invalid", "seo_change_invalid", "seo_recommendation_invalid",
+    "seo_change_type_invalid", "seo_change_state_invalid", "seo_change_sort_invalid", "seo_change_search_invalid"]);
   return Response.json({ error: validation.has(code) ? "Проверьте параметры SEO-отчёта." : "SEO-аналитика временно недоступна." }, {
     status: validation.has(code) ? 422 : 503,
     headers: adminHeaders(requestCspNonce(request)),
@@ -98,7 +99,7 @@ export function createSeoSectionLoader(
   service: SectionService,
   clock = () => new Date(),
 ): LoaderFunction {
-  return async ({ request }: LoaderFunctionArgs) => {
+  return async ({ request, params }: LoaderFunctionArgs) => {
     await requireAdminPage(request, auth);
     try {
       const parsed = parseSeoSectionFilters(new URL(request.url), clock());
@@ -172,21 +173,48 @@ export function createSeoSectionLoader(
           service.listSemanticCore({ status: "candidate", limit: 100, cursor: null }),
         ]);
         payload = { filters: parsed.ui, semanticCore: { items: [...active.items, ...archived.items], nextCursor: active.nextCursor ?? archived.nextCursor }, candidates };
+      } else if (section === "change-detail") {
+        const changeId = params.id;
+        if (!changeId || !UUID.test(changeId)) throw Error("seo_change_invalid");
+        const changes = await service.listChanges({ changeId, limit: 1, cursor: null });
+        const change = changes.items[0];
+        if (!change) throw Response.json({ error: "Изменение не найдено." }, { status: 404, headers: adminHeaders(requestCspNonce(request)) });
+        const url = new URL(request.url);
+        const detailSource = url.searchParams.get("detailSource");
+        if (detailSource) {
+          if (!["yandex", "google"].includes(detailSource)) throw Error("seo_source_invalid");
+          parsed.ui.source = detailSource === "google" ? "google_search_console" : "yandex_webmaster";
+        }
+        const [effects, history, control, ranks] = await Promise.all([
+          service.listChangeEffects?.({ changeId, source: parsed.ui.source, limit: 100, cursor: null }) ?? { items: [], nextCursor: null },
+          service.listChangeEffects?.({ changeId, source: parsed.ui.source, history: true, limit: 50, cursor: url.searchParams.get("effectsCursor") }) ?? { items: [], nextCursor: null },
+          service.getPageControl?.({ pagePath: change.pagePath, limit: 1, cursor: null }) ?? null,
+          service.getRankControl({ dateTo: parsed.ui.dateTo }),
+        ]);
+        url.searchParams.delete("effectsCursor"); url.searchParams.delete("detailId"); url.searchParams.delete("detailSource");
+        payload = { filters: parsed.ui, change, effects, history, control, ranks,
+          backTo: `/admin/seo/changes/${url.search}#change-${change.id}`, search: new URL(request.url).search };
       } else {
         const effectsUrl = new URL(request.url);
         const changeId = effectsUrl.searchParams.get("effectChangeId");
         const recommendationId = effectsUrl.searchParams.get("recommendationId");
-        const [changes, recommendations, effects, recommendationHistory] = await Promise.all([
-          service.listChanges({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor }),
+        const journal = { queryText: effectsUrl.searchParams.get("q") ?? "", changeType: effectsUrl.searchParams.get("type") || undefined,
+          effectStatus: effectsUrl.searchParams.get("state") || undefined, sort: effectsUrl.searchParams.get("sort") || "newest" };
+        const [changes, recommendations, legacyEffects, recommendationHistory] = await Promise.all([
+          service.listChanges({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}),
+            ...journal as Parameters<SeoService["listChanges"]>[0], source: parsed.ui.source,
+            ...(effectsUrl.searchParams.get("from") || effectsUrl.searchParams.get("to") ? { dateFrom: parsed.ui.dateFrom, dateTo: parsed.ui.dateTo, timeZone: "Europe/Moscow" as const } : {}), limit: 25, cursor }),
           service.listRecommendations({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor: effectsUrl.searchParams.get("recommendationsCursor") }),
-          service.listChangeEffects?.({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50,
-            cursor: effectsUrl.searchParams.get("effectsCursor"), ...(changeId ? { changeId, history: true } : {}) }) ?? { items: [], nextCursor: null },
+          changeId ? service.listChangeEffects?.({ ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50,
+            cursor: effectsUrl.searchParams.get("effectsCursor"), changeId, history: true }) ?? { items: [], nextCursor: null } : { items: [], nextCursor: null },
           recommendationId && service.listRecommendationHistory ? service.listRecommendationHistory({ recommendationId, ...(parsed.ui.pagePath ? { pagePath: parsed.ui.pagePath } : {}), limit: 50, cursor: effectsUrl.searchParams.get("recommendationHistoryCursor") }) : { items: [], nextCursor: null },
         ]);
-        payload = { filters: parsed.ui, changes, recommendations, effects, effectsSearch: effectsUrl.search, recommendationId, recommendationHistory, recommendationsSearch: effectsUrl.search };
+        const effects = await service.listChangeEffects?.({ changeIds: changes.items.map(c => c.id), source: parsed.ui.source, limit: 100, cursor: null }) ?? { items: [], nextCursor: null };
+        payload = { filters: parsed.ui, journal, search: effectsUrl.search, changes, recommendations, effects, legacyEffects, effectsSearch: effectsUrl.search, recommendationId, recommendationHistory, recommendationsSearch: effectsUrl.search };
       }
       return Response.json(payload, { headers: adminHeaders(requestCspNonce(request)) });
     } catch (error) {
+      if (section === "change-detail") throw error instanceof Response ? error : safeResponse(request, error);
       return safeResponse(request, error);
     }
   };

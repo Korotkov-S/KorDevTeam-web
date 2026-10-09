@@ -7,6 +7,7 @@ import { SEO_QUERY_KINDS, SEO_QUERY_STATUSES, type SeoDevice, type SeoQueryKind,
 import { normalizeSeoQuery, normalizeSitePath } from "./normalization";
 import type { RecommendationRevision } from "./recommendationHistory";
 import type { SeoMetricFilters, SeoRepository } from "./repository";
+import { journalStates, type ChangeJournalFilters } from "./changeJournal";
 
 type FrequencyBand = typeof seoQueries.$inferSelect.frequencyBand;
 type ChangeType = typeof seoChanges.$inferSelect.type;
@@ -189,14 +190,27 @@ export function createSeoService(repository: SeoRepository) {
       return repository.getRankProgress(input);
     },
 
-    listChangeEffects(input: { pagePath?: string; changeId?: string; history?: boolean; limit?: number; cursor?: string | null }) {
+    listChangeEffects(input: { pagePath?: string; changeId?: string; changeIds?: string[]; source?: "yandex_webmaster" | "google_search_console"; history?: boolean; limit?: number; cursor?: string | null }) {
+      if (input.source && !sources.has(input.source)) throw Error("seo_source_invalid");
+      if (input.changeIds && (!Array.isArray(input.changeIds) || input.changeIds.length > 100)) throw Error("seo_change_invalid");
       return repository.listChangeEffects({ ...page(input), ...(input.pagePath ? { pagePath: normalizeSitePath(input.pagePath) } : {}),
+        ...(input.source ? { source: input.source } : {}), ...(input.changeIds ? { changeIds: input.changeIds.map(id => uuid(id, "seo_change_invalid")) } : {}),
         ...(input.changeId ? { changeId: uuid(input.changeId, "seo_change_invalid") } : {}), history: input.history === true });
     },
-    listChanges(input: { pagePath?: string; dateFrom?: string; dateTo?: string; limit?: number; cursor?: string | null }) {
+    listChanges(input: ChangeJournalFilters & { limit?: number; cursor?: string | null }) {
       if ((input.dateFrom ? 1 : 0) !== (input.dateTo ? 1 : 0)) throw new Error("seo_date_range_invalid");
       if (input.dateFrom && input.dateTo) filters({ dateFrom: input.dateFrom, dateTo: input.dateTo });
+      if (input.changeType && !changeTypes.has(input.changeType)) throw Error("seo_change_type_invalid");
+      if (input.effectStatus && !(journalStates as readonly string[]).includes(input.effectStatus)) throw Error("seo_change_state_invalid");
+      if (input.sort && !["newest", "oldest"].includes(input.sort)) throw Error("seo_change_sort_invalid");
+      if (input.source && !sources.has(input.source)) throw Error("seo_source_invalid");
+      if (input.timeZone && input.timeZone !== "Europe/Moscow") throw Error("seo_date_invalid");
+      if (input.queryText && input.queryText.length > 200) throw Error("seo_change_search_invalid");
       return repository.listChanges({
+        ...(input.changeId ? { changeId: uuid(input.changeId, "seo_change_invalid") } : {}),
+        ...(input.queryText?.trim() ? { queryText: input.queryText.trim() } : {}),
+        ...(input.changeType ? { changeType: input.changeType } : {}), ...(input.effectStatus ? { effectStatus: input.effectStatus } : {}),
+        ...(input.sort ? { sort: input.sort } : {}), ...(input.source ? { source: input.source } : {}), ...(input.timeZone ? { timeZone: input.timeZone } : {}),
         ...(input.pagePath ? { pagePath: normalizeSitePath(input.pagePath) } : {}),
         ...(input.dateFrom ? { dateFrom: input.dateFrom, dateTo: input.dateTo! } : {}),
       }, page(input));

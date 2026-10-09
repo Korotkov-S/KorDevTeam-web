@@ -2,13 +2,13 @@ import React from "react";
 import type { ChangeEffectRow } from "../../server/seo-monitoring/effectsRepository";
 import type { EffectStatus } from "../../server/seo-monitoring/effects";
 
-const labels: Record<EffectStatus, string> = { not_applicable: "Операционное событие — не контентная гипотеза", pending_period: "Ожидание полного периода",
+export const effectLabels: Record<EffectStatus, string> = { not_applicable: "Операционное событие — не контентная гипотеза", pending_period: "Ожидание полного периода",
   pending_source: "Ожидание свежего успешного сбора", pending_coverage: "Периоды покрыты не полностью", pending_refresh: "Ожидание подтверждённого переобхода/индексации",
   pending_provenance: "Версия страницы на момент изменения не подтверждена",
   confounded: "Есть последующие изменения страницы", incompatible: "Несовместимая страница или группа ключей", insufficient_data: "Недостаточно показов",
   improved: "Средняя позиция улучшилась", declined: "Средняя позиция ухудшилась", no_material_change: "Изменение меньше рабочего порога" };
 const n = (value: number | null) => value === null ? "нет данных" : value.toFixed(2);
-export function SeoEffectsPanel({ data, search = "" }: { data: { items: ChangeEffectRow[]; nextCursor: string | null }; search?: string }) {
+export function SeoEffectsPanel({ data, search = "", showHistoryLinks = true }: { data: { items: ChangeEffectRow[]; nextCursor: string | null }; search?: string; showHistoryLinks?: boolean }) {
   const href = (changeId: string | null, cursor: string | null) => {
     const p = new URLSearchParams(search); p.delete("effectsCursor"); p.delete("effectChangeId");
     if (changeId) p.set("effectChangeId", changeId); if (cursor) p.set("effectsCursor", cursor);
@@ -23,12 +23,13 @@ export function SeoEffectsPanel({ data, search = "" }: { data: { items: ChangeEf
       const r = row.result;
       return <li key={row.id} className="rounded-lg border border-border p-4"><h3 className="font-medium">{row.summary}</h3>
         <p className="text-sm">{row.pagePath} · {row.source === "yandex_webmaster" ? "Яндекс Вебмастер" : "Google Search Console"} · {row.checkpoint} дней {row.checkpoint === 7 ? "(ранний сигнал)" : row.checkpoint === 14 ? "(промежуточное)" : "(итоговое наблюдение)"}</p>
-        <p className="mt-2 font-medium">{labels[r.status]}</p>
+        <p className="mt-2 font-medium">{effectLabels[r.status]}</p>
         <p className="text-sm">База: {r.windows.before.from} — {r.windows.before.to}; после: {r.windows.after.from} — {r.windows.after.to}. Группа: {r.cohort.length} ключей.</p>
         <p className="text-sm">Показы: {r.baseline.impressions} → {r.after.impressions}; клики/показы: {r.baseline.clicks}/{r.baseline.impressions} → {r.after.clicks}/{r.after.impressions}.</p>
+        <p className="text-sm">CTR: {r.baseline.ctr === null ? "нет данных" : `${(r.baseline.ctr * 100).toFixed(2)}%`} → {r.after.ctr === null ? "нет данных" : `${(r.after.ctr * 100).toFixed(2)}%`}.</p>
         <p className="text-sm">Средние позиции по фиксированным ключам: {n(r.baseline.averagePosition)} → {n(r.after.averagePosition)}; допустимая дельта: {n(r.positionDelta)}.</p>
         <p className="text-xs text-muted-foreground">{r.baseline.retrospective ? "Ретроспективная реконструкция базы" : "База сравнения"}: {r.baseline.capturedAt}; полнота базы: {r.baseline.complete ? "да" : "нет"}; после: {r.after.complete ? "да" : "нет"}. Последний сбор: {r.latestSource?.completedAt ?? "нет данных"}; проверка индекса: {r.index?.checkedAt ?? "нет данных"}; обход: {r.index?.lastCrawlAt ?? "нет данных"}.</p>
-        <a className="text-sm underline" href={href(row.changeId, null)}>История измерений</a>
+        {showHistoryLinks ? <a className="text-sm underline" href={href(row.changeId, null)}>История измерений</a> : null}
       </li>;
     })}</ul>}
     {data.nextCursor ? <a className="underline" href={href(historyId, data.nextCursor)}>Следующие измерения</a> : null}

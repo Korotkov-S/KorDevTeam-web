@@ -13,6 +13,58 @@ const principal = {
 };
 const auth = { authenticate: async () => principal };
 
+test("detail resolves the requested event independently of the first journal page and reads only saved evidence", async () => {
+  const fixture = serviceFixture(); const reads: any[] = [];
+  const id = "00000000-0000-4000-8000-000000000003";
+  const loader = createSeoSectionLoader("change-detail" as never, auth, { ...fixture.service,
+    listChanges: async (input: any) => { reads.push(input); return { items: input.changeId === id ? [{ id, pagePath: "/blog/test/", summary: "Event", appliedAt: "2026-10-01T12:00:00Z" }] : [], nextCursor: null }; },
+    listChangeEffects: async (input: any) => { reads.push(input); return { items: [], nextCursor: null }; },
+  } as never);
+  const response = await loader({ request: new Request(`https://kordev.team/admin/seo/changes/${id}/?source=google&cursor=50&q=CRM`, { headers: { cookie: createAdminCookie("a".repeat(43)) } }), params: { id }, context: {} }) as Response;
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.change?.id, id);
+  assert.ok(reads.some(r => r.changeId === id && r.limit === 1));
+  assert.ok(reads.some(r => r.changeId === id && r.history === true));
+  assert.match(data.backTo, /cursor=50/);
+  assert.match(data.backTo, /q=CRM/);
+  assert.match(data.backTo, /#change-00000000-0000-4000-8000-000000000003$/);
+});
+
+test("detail rejects malformed or unknown ids without disclosing a different journal entry", async () => {
+  const fixture = serviceFixture();
+  for (const [id, expected] of [["bad", 422], ["00000000-0000-4000-8000-000000000003", 404]] as const) {
+    await assert.rejects(() => Promise.resolve(createSeoSectionLoader("change-detail" as never, auth, fixture.service as never)({ request: new Request("https://kordev.team/admin/seo/changes/", { headers: { cookie: createAdminCookie("a".repeat(43)) } }), params: { id }, context: {} })), (error: unknown) => error instanceof Response && error.status === expected);
+  }
+});
+
+test("detail source changes do not overwrite the origin journal source, filters or cursor", async () => {
+  const fixture = serviceFixture(); const reads: any[] = [];
+  const id = "00000000-0000-4000-8000-000000000003";
+  const loader = createSeoSectionLoader("change-detail", auth, { ...fixture.service,
+    listChanges: async () => ({ items: [{ id, pagePath: "/blog/test/" }], nextCursor: null }),
+    listChangeEffects: async (input: any) => { reads.push(input); return { items: [], nextCursor: null }; },
+  } as never);
+  const response = await loader({ request: new Request(`https://kordev.team/admin/seo/changes/${id}/?source=yandex&state=improved&cursor=25&detailSource=google`, { headers: { cookie: createAdminCookie("a".repeat(43)) } }), params: { id }, context: {} }) as Response;
+  const data = await response.json();
+  assert.equal(data.filters.source, "google_search_console");
+  assert.equal(reads[0].source, "google_search_console");
+  assert.equal(data.backTo, `/admin/seo/changes/?source=yandex&state=improved&cursor=25#change-${id}`);
+});
+
+test("journal batches only the displayed event ids and selected source instead of using a global truncated effects page", async () => {
+  const fixture = serviceFixture(); const reads: any[] = [];
+  const id = "00000000-0000-4000-8000-000000000003";
+  const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,
+    listChanges: async (input: any) => { reads.push(input); return { items: [{ id, pagePath: "/blog/test/" }], nextCursor: "25" }; },
+    listChangeEffects: async (input: any) => { reads.push(input); return { items: [], nextCursor: null }; },
+  } as never);
+  const response = await loader({ request: new Request("https://kordev.team/admin/seo/changes/?source=google&q=CRM&sort=oldest&cursor=25", { headers: { cookie: createAdminCookie("a".repeat(43)) } }), params: {}, context: {} }) as Response;
+  assert.equal(response.status, 200);
+  assert.deepEqual(reads[0], { queryText: "CRM", changeType: undefined, effectStatus: undefined, sort: "oldest", source: "google_search_console", limit: 25, cursor: "25" });
+  assert.deepEqual(reads[1], { changeIds: [id], source: "google_search_console", limit: 100, cursor: null });
+});
+
 test("authenticated changes history stays scoped and preserves current filters", async () => {
   const fixture = serviceFixture(); let captured;
   const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,
@@ -40,16 +92,18 @@ test("closed recommendations beyond first50 are discoverable with independent cu
 });
 
 test("changes loader reads immutable effect history without evaluating or collecting", async () => {
-  const fixture = serviceFixture(); let captured;
+  const fixture = serviceFixture(); const reads: any[] = [];
   const loader = createSeoSectionLoader("changes", auth, { ...fixture.service,
-    listChangeEffects: async (input: unknown) => { captured = input; return { items: [{ id: "history" }], nextCursor: null }; },
+    listChangeEffects: async (input: any) => { reads.push(input); return { items: [{ id: input.history ? "history" : "latest" }], nextCursor: null }; },
   } as never);
   const response = await loader({ request: new Request("https://kordev.team/admin/seo/changes/?page=%2Fblog%2Ftest%2F&effectsCursor=50&effectChangeId=00000000-0000-4000-8000-000000000003", {
     headers: { cookie: createAdminCookie("a".repeat(43)) },
   }), params: {}, context: {} }) as Response;
   assert.equal(response.status, 200);
-  assert.deepEqual(captured, { pagePath: "/blog/test/", limit: 50, cursor: "50", changeId: "00000000-0000-4000-8000-000000000003", history: true });
-  assert.equal((await response.json()).effects.items[0].id, "history");
+  assert.deepEqual(reads[0], { pagePath: "/blog/test/", limit: 50, cursor: "50", changeId: "00000000-0000-4000-8000-000000000003", history: true });
+  const data = await response.json();
+  assert.equal(data.effects.items[0].id, "latest");
+  assert.equal(data.legacyEffects.items[0].id, "history");
 });
 
 function serviceFixture() {
@@ -72,7 +126,7 @@ function serviceFixture() {
   };
 }
 
-const expected: Record<SeoSection, string[]> = {
+const expected: Record<Exclude<SeoSection, "change-detail">, string[]> = {
   overview: ["getDashboard", "getOverview", "getTrafficReport", "getRankControl", "listRecommendations"],
   positions: ["getRankControl", "listRankChecks", "getDashboard", "getDashboard"],
   traffic: ["getDashboard", "getTrafficReport", "listQueries"],

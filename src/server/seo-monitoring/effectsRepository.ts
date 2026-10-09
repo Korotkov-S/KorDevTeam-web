@@ -10,7 +10,7 @@ function stable(value: unknown): string {
   if (value && typeof value === "object") return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${stable(v)}`).join(",")}}`;
   return JSON.stringify(value);
 }
-export type EffectListInput = { pagePath?: string; changeId?: string; history?: boolean; limit: number; cursor: string | null };
+export type EffectListInput = { pagePath?: string; changeId?: string; changeIds?: string[]; source?: EffectSource; history?: boolean; limit: number; cursor: string | null };
 export function createSeoEffectsRepository(db: SeoDatabase) {
   return {
     async evaluateAll(now = new Date()) {
@@ -103,7 +103,10 @@ export function createSeoEffectsRepository(db: SeoDatabase) {
       if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 100) throw Error("seo_limit_invalid");
       if (input.cursor !== null && (!/^\d+$/.test(input.cursor) || !Number.isSafeInteger(Number(input.cursor)))) throw Error("seo_cursor_invalid");
       if (input.history && !input.changeId) throw Error("seo_effect_history_change_required");
+      if (input.changeIds?.length === 0) return { items: [], nextCursor: null };
       const conditions = [input.pagePath ? eq(seoChanges.pagePath, input.pagePath) : undefined,
+        input.changeIds ? inArray(seoChangeEvaluations.changeId, input.changeIds) : undefined,
+        input.source ? eq(seoChangeEvaluations.source, input.source) : undefined,
         input.changeId ? eq(seoChangeEvaluations.changeId, input.changeId) : undefined];
       const fields = { id: seoChangeEvaluations.id, changeId: seoChangeEvaluations.changeId, source: seoChangeEvaluations.source,
         checkpoint: seoChangeEvaluations.checkpoint, evaluatedAt: seoChangeEvaluations.evaluatedAt, result: seoChangeEvaluations.result,
