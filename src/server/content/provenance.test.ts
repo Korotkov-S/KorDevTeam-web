@@ -126,9 +126,11 @@ databaseTest("source conflict on an update rolls back its revision and leaves th
 
 databaseTest("source migration rejects legacy duplicates without merging or deleting either entry", async () => {
   const { db } = await setup();
+  await db.execute(sql`DROP TABLE seo_recommendation_executions`);
+  await db.execute(sql`ALTER TABLE seo_recommendations DROP COLUMN execution_plan`);
   await db.execute(sql`ALTER TABLE content_entries DROP CONSTRAINT content_entries_telegram_valid`);
   await db.execute(sql`DROP INDEX content_entries_telegram_post_uq, content_entries_telegram_url_uq`);
-  await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at = 1791459000000`);
+  await db.execute(sql`DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1791459000000`);
   await db.insert(contentEntries).values(["legacy-one", "legacy-two"].map(slug => parseContentCommand(command(slug))));
   await assert.rejects(() => migrate(db, { migrationsFolder: "drizzle" }));
   assert.equal((await db.select().from(contentEntries)).length, 2);

@@ -157,11 +157,11 @@ export function createSeoAdminAction(auth: Authenticator, service: Service, conf
       } else if (intent === "record-change") {
         await service.recordChange({ pagePath: value(form, "pagePath"), summary: value(form, "summary"),
           type: value(form, "type") as "content" | "metadata" | "structure" | "interlinking" | "technical" | "other" }, { adminUserId: principal.userId });
-      } else if (intent === "approve-recommendation") {
+      } else if (intent === "approve-recommendation" || intent === "consider-recommendation") {
         if (!execution) throw Error("seo_execution_unavailable");
         const baseVersion = value(form, "expectedBaseVersion");
         await execution.approve({ recommendationId: value(form, "id"), expectedUpdatedAt: value(form, "expectedUpdatedAt"),
-          ...(baseVersion ? { expectedBaseVersion: Number(baseVersion), expectedBaseHash: value(form, "expectedBaseHash") } : {}) }, { adminUserId: principal.userId });
+          ...(intent === "consider-recommendation" ? { mode: "consideration" as const } : baseVersion ? { expectedBaseVersion: Number(baseVersion), expectedBaseHash: value(form, "expectedBaseHash") } : {}) }, { adminUserId: principal.userId });
       } else if (intent === "recommendation-status") {
         await service.updateRecommendationStatus({ id: value(form, "id"), expectedStatus: value(form, "expectedStatus") as "new" | "accepted" | "rejected" | "implemented" | "dismissed",
           status: value(form, "status") as "new" | "accepted" | "rejected" | "implemented" | "dismissed" }, { adminUserId: principal.userId });

@@ -9,6 +9,14 @@ import { createAdminCookie } from "../../server/auth/cookie";
 import { AdminSeoDashboard, meta as seoMeta, type SeoAdminLoaderData } from "./seo";
 import { createSeoAdminAction, createSeoAdminLoader } from "./seo.server";
 import { SeoChangesPage } from "./seo-changes";
+import { load } from "cheerio";
+import { acceptedFixture, fixture, executionTestUrl } from "../../../tests/helpers/seoExecution";
+import { createSeoService } from "../../server/seo-monitoring/service";
+import { createSeoRepository } from "../../server/seo-monitoring/repository";
+import { SeoRecommendationCard } from "./seo-recommendation-card";
+import { readRecommendationPreviews } from "./seo-recommendation-preview.server";
+import { eq } from "drizzle-orm";
+import { contentEntries, seoRecommendationHistory, seoRecommendationExecutions, seoChanges } from "../../server/db/schema";
 
 const adminId = "00000000-0000-4000-8000-000000000001";
 const queryId = "00000000-0000-4000-8000-000000000002";
@@ -137,6 +145,41 @@ test("rejection_does_not_execute", async () => {
   const form = new FormData(); for (const [key, value] of Object.entries({ _csrf: csrf, intent: "recommendation-status", id: recommendationId, expectedStatus: "new", status: "rejected" })) form.set(key, value);
   const response = await createSeoAdminAction(auth, { ...service(), async updateRecommendationStatus() { rejected++; return {}; } } as never, config, { async approve() { approved++; } } as never)({ request: request("/admin/seo/", form), params: {}, context: {} });
   assert.equal(response.status, 200); assert.equal(rejected, 1); assert.equal(approved, 0);
+});
+const databaseTest = executionTestUrl ? test : test.skip;
+async function recommendationForm(f: Awaited<ReturnType<typeof fixture>>, intent: string) {
+  const work = await readRecommendationPreviews(f.repo, [f.recommendation]);
+  const router = createMemoryRouter([{ path: "*", element: <SeoRecommendationCard recommendation={f.recommendation} work={work[f.recommendation.id]} csrfToken={csrf} /> }]);
+  const $ = load(renderToStaticMarkup(<RouterProvider router={router} />));
+  const form = $("form").filter((_, el) => $(el).find(`input[name="intent"][value="${intent}"]`).length > 0);
+  assert.equal(form.length, 1);
+  const data = new FormData();
+  form.find("input[name],button[name]").each((_, el) => { data.set($(el).attr("name")!, $(el).attr("value")!); });
+  return data;
+}
+databaseTest("owner_cancels_accepted_permission_through_rendered_form_and_real_action", async () => {
+  const f = await acceptedFixture(), form = await recommendationForm(f, "recommendation-status");
+  const ownerAuth = { authenticate: async () => ({ ...principal, userId: f.admin.id }) };
+  const response = await createSeoAdminAction(ownerAuth, createSeoService(createSeoRepository(f.db)), config, f.repo)({ request: request("/admin/seo/", form), params: {}, context: {} });
+  assert.equal(response.status, 200);
+  assert.equal((await f.repo.get(f.recommendation.id)).recommendation.status, "dismissed");
+  await assert.rejects(f.repo.apply(f.command, f.executor), /seo_execution_.*conflict/);
+  assert.equal((await f.db.select().from(seoChanges)).length, 0);
+  assert.equal((await f.repo.readPublishedSnapshot(f.entry.id)).entry.version, 1);
+  const events = await f.db.select().from(seoRecommendationHistory);
+  assert.equal(events.at(-1)?.afterSnapshot.status, "dismissed");
+  assert.equal(events.at(-1)?.actor.adminUserId, f.admin.id);
+});
+databaseTest("consideration_only_form_works_for_a_stale_nonnull_plan", async () => {
+  const f = await fixture();
+  await f.db.update(contentEntries).set({ version: 2 }).where(eq(contentEntries.id, f.entry.id));
+  const form = await recommendationForm(f, "consider-recommendation");
+  const ownerAuth = { authenticate: async () => ({ ...principal, userId: f.admin.id }) };
+  const response = await createSeoAdminAction(ownerAuth, createSeoService(createSeoRepository(f.db)), config, f.repo)({ request: request("/admin/seo/", form), params: {}, context: {} });
+  assert.equal(response.status, 200);
+  assert.equal((await f.repo.get(f.recommendation.id)).recommendation.status, "accepted");
+  assert.equal((await f.db.select().from(seoRecommendationExecutions)).length, 0);
+  assert.equal((await f.db.select().from(seoChanges)).length, 0);
 });
 
 test("SEO dashboard has an explicit non-error browser title", () => {

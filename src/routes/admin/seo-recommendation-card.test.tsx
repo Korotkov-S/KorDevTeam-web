@@ -38,3 +38,14 @@ test("preview_card_version_and_diff_are_one_read_not_a_stale_list_row", () => {
   assert.match(rendered, /Свежая карточка/); assert.match(rendered, /value="2026-10-09T11:00:00.000Z"/);
   assert.doesNotMatch(rendered, /value="2026-10-09T10:00:00.000Z"/);
 });
+test("accepted_rejection_uses_cancellation_transition", () => {
+  const rendered = html({ ...preview, state: "ready", canApprove: false }, { ...recommendation, status: "accepted" });
+  assert.match(rendered, /name="status" value="dismissed"/);
+  assert.match(rendered, /Отменить согласование/);
+  assert.doesNotMatch(rendered, /name="status" value="rejected"/);
+});
+test("unsupported_new_plan_has_explicit_consideration_only_intent", () => {
+  const rendered = html({ ...preview, supported: false, canApprove: false, errorCode: "seo_execution_page_conflict" });
+  assert.match(rendered, /value="consider-recommendation"/);
+  assert.doesNotMatch(rendered, /value="approve-recommendation"|name="expectedBaseHash"/);
+});

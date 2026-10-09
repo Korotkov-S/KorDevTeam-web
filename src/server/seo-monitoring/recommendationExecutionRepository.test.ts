@@ -3,7 +3,7 @@ import test from "node:test";
 import { eq, sql } from "drizzle-orm";
 import { createDb } from "../db/client";
 import { resetTestDatabase } from "../db/testDatabase";
-import { adminUsers, contentEntries, contentRevisions, contentRelations, geoExperiments, seoChanges, mcpTokens, seoRecommendations, seoRecommendationHistory, seoRecommendationExecutions } from "../db/schema";
+import { adminUsers, contentEntries, contentRevisions, contentRelations, geoExperiments, geoCrawlerChecks, geoReferralDailyMetrics, seoCollectionRuns, seoChanges, mcpTokens, seoRecommendations, seoRecommendationHistory, seoRecommendationExecutions } from "../db/schema";
 import { createRecommendationHistoryRepository } from "./recommendationHistory";
 import { createRecommendationExecutionRepository } from "./recommendationExecutionRepository";
 import { hashExecutionJson, parseExecutionPlan } from "./recommendationExecutionPlan";
@@ -39,6 +39,20 @@ databaseTest("old_accepted_is_blocked", async () => {
   const f = await fixture(); await f.db.update(seoRecommendations).set({ executionPlan: null, status: "accepted" }).where(eq(seoRecommendations.id, f.recommendation.id));
   assert.equal((await f.repo.get(f.recommendation.id)).state, "blocked");
   assert.equal((await f.db.select().from(seoRecommendationExecutions)).length, 0);
+});
+databaseTest("consideration_only_accepts_stale_or_unpublished_plan_without_execution", async () => {
+  for (const status of ["published", "draft"] as const) {
+    const f = await fixture();
+    await f.db.update(contentEntries).set({ status, version: 2 }).where(eq(contentEntries.id, f.entry.id));
+    const input = { recommendationId: f.recommendation.id, expectedUpdatedAt: f.recommendation.updatedAt.toISOString(), mode: "consideration" as const };
+    await assert.rejects(f.repo.approve({ ...input, expectedUpdatedAt: "2000-01-01T00:00:00Z" }, f.actor), /seo_execution_card_conflict/);
+    const result = await f.repo.approve(input, f.actor);
+    assert.equal(result.recommendation.status, "accepted"); assert.equal(result.state, "blocked");
+    assert.equal((await f.db.select().from(seoRecommendationExecutions)).length, 0);
+    assert.equal((await f.db.select().from(seoChanges)).length, 0);
+    const events = await f.db.select().from(seoRecommendationHistory);
+    assert.equal(events.length, 2); assert.match(events[1].reason, /consideration only/);
+  }
 });
 databaseTest("reapproval_preserves_previous_approval", async () => {
   const f = await fixture(); const first = await f.repo.approve(f.approveInput, f.actor);
@@ -143,6 +157,36 @@ databaseTest("later_manual_edit_does_not_republish_or_claim_current_success", as
   assert.equal((await f.db.select().from(seoChanges)).length, 1);
 });
 const experimentFields = { pagePath: "/blog/audit/", actionType: "content_answer" as const, hypothesis: "Проверка", platform: "yandex_alice" as const, mode: "live_ui" as const, language: "ru", region: "RU", promptSetFingerprint: "d".repeat(64), primaryMetric: "citation_rate" as const, direction: "increase" as const, minimumDelta: "0.01", expectedSignal: "Цитирование" };
+databaseTest("delayed_geo_apply_rechecks_official_baseline_and_rolls_back_publication", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const day = (offset: number) => new Date(Date.parse(today) - offset * 86400000).toISOString().slice(0, 10);
+  for (const metric of ["ai_referrals", "crawler_health"] as const) {
+    for (const scenario of ["missing", "incomplete", "sufficient", ...(metric === "ai_referrals" ? ["too_small"] : [])]) {
+      const f = await acceptedFixture();
+      const [experiment] = await f.db.insert(geoExperiments).values({ ...experimentFields, recommendationId: f.recommendation.id,
+        primaryMetric: metric, status: "approved", approvedByAdminUserId: f.admin.id, approvedAt: new Date(),
+        createdAt: new Date(Date.now() - 35 * 86400000), baseline: { complete: true, value: 100, sample: 31 } }).returning();
+      if (metric === "ai_referrals" && scenario !== "missing") {
+        await f.db.insert(seoCollectionRuns).values({ source: "yandex_metrika", requestedFrom: day(scenario === "incomplete" ? 27 : 28), requestedTo: day(1), status: "success", metadata: { slices: { aiReferrals: "success" } } });
+        await f.db.insert(geoReferralDailyMetrics).values({ observationDate: day(1), platform: "yandex_alice", landingPath: f.plan.pagePath, users: 1, newUsers: 0, visits: scenario === "too_small" ? 1 : 12, pageviews: 12 });
+      } else if (metric === "crawler_health" && scenario !== "missing") {
+        for (let offset = 1; offset <= (scenario === "incomplete" ? 27 : 28); offset++) await f.db.insert(geoCrawlerChecks).values({ checkDate: day(offset), target: f.plan.pagePath, bot: "indexability", status: "pass", httpStatus: 200 });
+      }
+      if (scenario === "sufficient") {
+        assert.equal((await f.repo.apply(f.command, f.executor)).work.state, "applied");
+        assert.equal((await f.db.select().from(geoExperiments))[0].status, "active");
+      } else {
+        await assert.rejects(f.repo.apply(f.command, f.executor), /geo_experiment_baseline_invalid/);
+        assert.deepEqual(await f.repo.readPublishedSnapshot(f.entry.id), f.snapshot);
+        assert.equal((await f.db.select().from(seoChanges)).length, 0);
+        assert.equal((await f.db.select().from(contentRevisions)).length, 0);
+        assert.equal((await f.db.select().from(geoExperiments))[0].id, experiment.id);
+        assert.equal((await f.db.select().from(geoExperiments))[0].status, "approved");
+        assert.equal((await f.repo.get(f.recommendation.id)).state, "ready");
+      }
+    }
+  }
+});
 databaseTest("geo_page_interval_cannot_be_bypassed_by_another_prompt_set", async () => {
   const f = await acceptedFixture();
   const [change] = await f.db.insert(seoChanges).values({ pagePath: f.plan.pagePath, type: "content", summary: "Предыдущее изменение" }).returning();

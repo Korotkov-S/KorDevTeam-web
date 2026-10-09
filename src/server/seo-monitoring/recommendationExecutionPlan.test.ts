@@ -68,3 +68,10 @@ test("markdown_media_cannot_expand_approval", () => {
     }
   }
 });
+test("duplicate_reference_definitions_cannot_change_rendered_image_or_video", () => {
+  for (const [reference, extension] of [["![Кейс][pic]", "webp"], ["[Видео][pic]", "mp4"]]) {
+    const snapshot = base(`${reference}\n\n[pic]: /old.${extension}`);
+    const bodyMd = `${reference}\n\n[pic]: /new.${extension}\n[pic]: /old.${extension}`;
+    assert.throws(() => prepareExecutionPatch(snapshot, parseExecutionPlan(plan(snapshot, { bodyMd }))), /seo_execution_media_change_forbidden/);
+  }
+});

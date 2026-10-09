@@ -47,6 +47,10 @@ import { resetTestDatabase } from "./testDatabase";
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
 
+async function dropRecommendationExecutions(db: ReturnType<typeof createDb>) {
+  await db.execute(sql`DROP TABLE seo_recommendation_executions`);
+  await db.execute(sql`ALTER TABLE seo_recommendations DROP COLUMN execution_plan`);
+}
 async function dropTelegramIdentity(db: ReturnType<typeof createDb>) {
   await db.execute(sql`ALTER TABLE content_entries DROP CONSTRAINT content_entries_telegram_valid`);
   await db.execute(sql`DROP INDEX content_entries_telegram_post_uq, content_entries_telegram_url_uq`);
@@ -102,6 +106,7 @@ test("SEO schema keeps Yandex Metrica traffic separate from search observations"
 databaseTest("0012 reconstructs legacy GEO prompt sets and distrusts incomplete runs", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropRecommendationExecutions(db);
   await dropTelegramIdentity(db);
   await db.execute(sql`ALTER TABLE geo_experiments DROP CONSTRAINT geo_experiments_surface_valid, DROP COLUMN surface, DROP COLUMN session_personalized`);
   await db.execute(sql`DROP TABLE seo_recommendation_history`);
@@ -676,6 +681,7 @@ databaseTest("SEO query lifecycle defaults to a candidate and rejects incoherent
 databaseTest("0008 promotes non-API tracked queries but turns legacy API noise into candidates", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropRecommendationExecutions(db);
   await db.execute(sql`DROP TABLE seo_recommendation_history`);
   await db.execute(sql`DROP TABLE seo_change_evaluations`);
   await db.execute(sql`DROP TABLE seo_index_observations`);
@@ -916,6 +922,7 @@ databaseTest("lead delivery and rate-limit counters reject negative values", asy
 databaseTest("0002 additively upgrades existing delivery jobs with a zero provider counter", async () => {
   await resetTestDatabase(TEST_DATABASE_URL);
   const db = createDb(TEST_DATABASE_URL);
+  await dropRecommendationExecutions(db);
   await db.execute(sql`DROP TABLE seo_recommendation_history`);
   await db.execute(sql`DROP TABLE seo_change_evaluations`);
   await db.execute(sql`DROP TABLE seo_index_observations`);

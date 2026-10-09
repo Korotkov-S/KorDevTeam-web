@@ -82,7 +82,7 @@ function markdownMedia(markdown: string): string {
   const capture = () => (tree: unknown) => { root = tree as MarkdownNode; };
   renderToStaticMarkup(createElement(ReactMarkdown, { remarkPlugins: [remarkGfm, capture], children: markdown }));
   const definitions = new Map<string, MarkdownNode>(), nodes: MarkdownNode[] = [];
-  function walk(node: MarkdownNode) { nodes.push(node); if (node.type === "definition") definitions.set(node.identifier!, node); node.children?.forEach(walk); }
+  function walk(node: MarkdownNode) { nodes.push(node); if (node.type === "definition" && !definitions.has(node.identifier!)) definitions.set(node.identifier!, node); node.children?.forEach(walk); }
   if (root) walk(root);
   const media: JsonValue[] = [];
   for (const node of nodes) {

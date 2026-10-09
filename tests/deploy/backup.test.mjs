@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.mcp_tokens': '0', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
 const postMigrationTableCounts = {
   ...preMigrationTableCounts,
-  'drizzle.__drizzle_migrations': '24',
+  'drizzle.__drizzle_migrations': '25',
   'public.leads': '0',
   'public.lead_attachments': '0',
   'public.lead_delivery_jobs': '0',
@@ -22,6 +22,7 @@ const postMigrationTableCounts = {
   'public.seo_changes': '0',
   'public.seo_change_evaluations': '0',
   'public.seo_recommendation_history': '0',
+  'public.seo_recommendation_executions': '0',
   'public.seo_collection_runs': '0',
   'public.seo_daily_metrics': '0',
   'public.seo_index_observations': '0',
@@ -98,6 +99,7 @@ const migrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0021_seo_recommendation_history.sql')).digest('hex'), created_at: '1791451800000' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0022_geo_experiment_cohorts.sql')).digest('hex'), created_at: '1791455400000' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0023_content_telegram_identity.sql')).digest('hex'), created_at: '1791459000000' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0024_seo_recommendation_executions.sql')).digest('hex'), created_at: '1791538444216' },
 ];
 const tableCounts = postMigrationTableCounts;
 function inventoryQuery(sql, tables = tableCounts) {
@@ -182,6 +184,7 @@ test('database inventory counts all actual tables and fails when a required tabl
     'ad_vk_oauth_states', 'ad_vk_sync_runs', 'ad_vk_accounts', 'ad_vk_campaigns', 'ad_vk_ad_groups',
     'ad_vk_ads', 'ad_vk_creative_versions', 'ad_vk_daily_metrics', 'ad_vk_experiment_links',
     'admin_password_reset_requests',
+    'seo_recommendation_executions',
   ]) {
     await assert.rejects(databaseInventory({ query: async sql => {
       const result = inventoryQuery(sql);

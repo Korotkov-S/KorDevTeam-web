@@ -839,6 +839,11 @@ databaseTest("GEO experiment excludes responses completed outside its full resul
 
 databaseTest("same-page concurrent GEO implementations with different prompt fingerprints cannot bypass fourteen days", async t => {
   const f = await experimentFixture(); t.after(() => f.pool.end());
+  await f.pool.query(`INSERT INTO seo_collection_runs (source, requested_from, requested_to, status, metadata)
+    VALUES ('yandex_metrika','2026-07-04','2026-08-14','success','{"slices":{"aiReferrals":"success"}}'::jsonb)`);
+  await f.pool.query(`INSERT INTO geo_referral_daily_metrics (observation_date,platform,landing_path,users,new_users,visits,pageviews)
+    VALUES ('2026-07-31','chatgpt_search','/services/crm/',12,0,12,12),
+      ('2026-08-14','chatgpt_search','/services/crm/',12,0,12,12)`);
   const change = await f.change();
   const ids: string[] = [];
   for (const hash of ["a", "b"]) {

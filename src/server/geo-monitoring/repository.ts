@@ -407,8 +407,9 @@ export async function linkApprovedGeoExperimentInTransaction(tx: Parameters<Para
     metric: experiment.primaryMetric,
     pagePath: experiment.pagePath,
   });
-  if (experiment.primaryMetric !== "ai_referrals" && experiment.primaryMetric !== "crawler_health"
-    && (!metric.complete || !("completeSnapshots" in metric) || metric.completeSnapshots < 3)) {
+  if (!metric.complete || (experiment.primaryMetric === "ai_referrals" ? (metric.value ?? 0) < 10
+    : experiment.primaryMetric === "crawler_health" ? metric.sample < 28
+    : !("completeSnapshots" in metric) || metric.completeSnapshots < 3)) {
     throw new Error("geo_experiment_baseline_invalid");
   }
   const baseline = {

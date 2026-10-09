@@ -112,8 +112,8 @@ export function createRecommendationExecutionRepository(db: SeoDatabase) {
       const [execution] = await db.select().from(seoRecommendationExecutions).where(and(eq(seoRecommendationExecutions.recommendationId, id), isNull(seoRecommendationExecutions.supersededAt))).orderBy(desc(seoRecommendationExecutions.approvedAt)).limit(1);
       return executionWork(recommendation, execution ?? null, await currentPage(db, recommendation, execution ?? null));
     },
-    async approve(input: { recommendationId: string; expectedUpdatedAt: string; expectedBaseVersion?: number; expectedBaseHash?: string }, actor: { adminUserId: string }): Promise<RecommendationWork> {
-      const parsed = z.strictObject({ recommendationId: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }), expectedBaseVersion: z.number().int().positive().optional(), expectedBaseHash: z.string().regex(/^[a-f0-9]{64}$/).optional() }).safeParse(input);
+    async approve(input: { recommendationId: string; expectedUpdatedAt: string; expectedBaseVersion?: number; expectedBaseHash?: string; mode?: "consideration" }, actor: { adminUserId: string }): Promise<RecommendationWork> {
+      const parsed = z.strictObject({ recommendationId: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }), expectedBaseVersion: z.number().int().positive().optional(), expectedBaseHash: z.string().regex(/^[a-f0-9]{64}$/).optional(), mode: z.literal("consideration").optional() }).safeParse(input);
       if (!parsed.success) throw Error("seo_execution_command_invalid");
       if (!z.strictObject({ adminUserId: z.uuid() }).safeParse(actor).success) throw Error("seo_actor_invalid");
       return db.transaction(async tx => {
@@ -125,7 +125,7 @@ export function createRecommendationExecutionRepository(db: SeoDatabase) {
         if (!["new", "accepted"].includes(before.status)) throw Error("seo_execution_status_conflict");
         const [previous] = await tx.select().from(seoRecommendationExecutions).where(and(eq(seoRecommendationExecutions.recommendationId, before.id), isNull(seoRecommendationExecutions.supersededAt))).for("update");
         if (previous?.appliedAt) throw Error("seo_execution_already_applied");
-        const plan = before.executionPlan ? parseExecutionPlan(before.executionPlan) : null;
+        const plan = input.mode !== "consideration" && before.executionPlan ? parseExecutionPlan(before.executionPlan) : null;
         const page = plan ? await readPublishedSnapshot(tx, plan.contentEntryId, true) : null;
         if (plan && page) {
           if (before.pagePath !== plan.pagePath || input.expectedBaseVersion !== plan.baseVersion || input.expectedBaseHash !== plan.baseHash) throw Error("seo_execution_page_conflict");
@@ -134,7 +134,7 @@ export function createRecommendationExecutionRepository(db: SeoDatabase) {
         const now = new Date();
         if (previous) await tx.update(seoRecommendationExecutions).set({ supersededAt: now }).where(eq(seoRecommendationExecutions.id, previous.id));
         const [recommendation] = await tx.update(seoRecommendations).set({ status: "accepted", updatedAt: nextRecommendationTime(before) }).where(eq(seoRecommendations.id, before.id)).returning();
-        const event = await appendRecommendationEvent(tx, before, recommendation, "approval", previous ? "Owner explicitly approved updated variant" : "Owner approved recommendation", actor, now);
+        const event = await appendRecommendationEvent(tx, before, recommendation, "approval", input.mode === "consideration" ? "Owner accepted for consideration only; publication not authorized" : previous ? "Owner explicitly approved updated variant" : "Owner approved recommendation", actor, now);
         let execution: Execution | null = null;
         if (plan && page) [execution] = await tx.insert(seoRecommendationExecutions).values({ recommendationId: before.id, approvalHistoryId: event.id,
           approvedByAdminUserId: actor.adminUserId, approvedAt: now, approvedRecommendation: recommendationSnapshot(recommendation), recommendationHash: hashExecutionJson(recommendationSnapshot(recommendation)),
