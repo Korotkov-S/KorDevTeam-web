@@ -17,6 +17,16 @@ export type RecommendationWork = { recommendation: Recommendation; execution: Ex
 export type WorkSummary = Pick<RecommendationWork, "state" | "errorCode"> & { recommendationId: string; title: string; updatedAt: string; pagePath: string | null; executionId: string | null };
 export type WorkPageInput = { limit?: number; cursor?: string | null };
 export type WorkPage = { items: WorkSummary[]; nextCursor: string | null };
+const workCursorSchema = z.strictObject({ v: z.literal(1), queue: z.literal("seo-accepted-v1"), id: z.uuid(), createdAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/).refine(v => Number.isFinite(+new Date(v))) });
+function workCursor(value: string | null | undefined) {
+  if (value == null) return null;
+  try {
+    if (!/^[A-Za-z0-9_-]{1,512}$/.test(value)) throw Error();
+    const bytes = Buffer.from(value, "base64url");
+    if (bytes.toString("base64url") !== value) throw Error();
+    return workCursorSchema.parse(JSON.parse(bytes.toString("utf8")));
+  } catch { throw Error("seo_cursor_invalid"); }
+}
 export const executionCommandSchema = z.strictObject({ recommendationId: z.uuid(), executionId: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }) });
 export const completeExecutionCommandSchema = executionCommandSchema.extend({ criteriaEvidence: criterionEvidenceSchema });
 export function checkedCompleteExecutionCommand(input: CompleteExecutionCommand, actor: { mcpTokenId: string }) {
@@ -60,13 +70,40 @@ export function executionWork(recommendation: Recommendation, execution: Executi
   return result;
 }
 async function currentPage(db: Reader, recommendation: Recommendation, execution: Execution | null, lock = false) {
-  const id = execution?.contentEntryId ?? recommendation.executionPlan?.contentEntryId;
+  let id = execution?.contentEntryId ?? recommendation.executionPlan?.contentEntryId;
+  if (!id) {
+    const path = /^\/(blog|cases|services)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/$/.exec(recommendation.pagePath ?? "");
+    if (path) {
+      const kind = path[1] === "blog" ? "article" : path[1] === "cases" ? "case" : "service";
+      const [entry] = await db.select({ id: contentEntries.id }).from(contentEntries)
+        .where(and(eq(contentEntries.kind, kind), eq(contentEntries.slug, path[2]), eq(contentEntries.status, "published"))).limit(1);
+      id = entry?.id;
+    }
+  }
   if (!id) return null;
   try { return await readPublishedSnapshot(db, id, lock); }
   catch (error) { if (error instanceof Error && ["seo_execution_page_not_found", "seo_execution_page_unsupported"].includes(error.message)) return null; throw error; }
 }
 export function createRecommendationExecutionRepository(db: SeoDatabase) {
   const repository = {
+    async list(input: WorkPageInput = {}): Promise<WorkPage> {
+      const limit = input.limit ?? 25;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw Error("seo_limit_invalid");
+      const cursor = workCursor(input.cursor);
+      const rows = await db.select({ id: seoRecommendations.id,
+        createdAt: sql<string>`to_char(${seoRecommendations.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` })
+        .from(seoRecommendations).where(and(eq(seoRecommendations.status, "accepted"), cursor
+          ? sql`(${seoRecommendations.createdAt}, ${seoRecommendations.id}) > (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)` : undefined))
+        .orderBy(asc(seoRecommendations.createdAt), asc(seoRecommendations.id)).limit(limit + 1);
+      const selected = rows.slice(0, limit);
+      const items = await Promise.all(selected.map(async row => {
+        const work = await repository.get(row.id);
+        return { recommendationId: row.id, title: work.recommendation.title, updatedAt: work.recommendation.updatedAt.toISOString(),
+          pagePath: work.recommendation.pagePath, executionId: work.execution?.id ?? null, state: work.state, errorCode: work.errorCode };
+      }));
+      const last = selected.at(-1);
+      return { items, nextCursor: rows.length > limit && last ? Buffer.from(JSON.stringify({ v: 1, queue: "seo-accepted-v1", ...last })).toString("base64url") : null };
+    },
     readPublishedSnapshot: (id: string) => { if (!z.uuid().safeParse(id).success) throw Error("seo_execution_command_invalid"); return readPublishedSnapshot(db, id); },
     async get(id: string): Promise<RecommendationWork> {
       if (!z.uuid().safeParse(id).success) throw Error("seo_execution_command_invalid");

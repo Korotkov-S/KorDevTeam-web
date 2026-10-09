@@ -6,7 +6,7 @@ import { createMcpContentService } from "./contentService";
 import { createMcpMediaService } from "./mediaService";
 import { createMcpTokenRepository, type McpTokenRepository } from "./tokenRepository";
 import { createMcpTokenService, type McpTokenService } from "./tokenService";
-import { getSeoMonitoringService } from "../seo-monitoring/runtime";
+import { getSeoMonitoringService, getSeoRecommendationExecutionService } from "../seo-monitoring/runtime";
 import { createMcpSeoService } from "../seo-monitoring/mcpService";
 import { getGeoMonitoringService } from "../geo-monitoring/runtime";
 import { createMcpGeoService } from "../geo-monitoring/mcpService";
@@ -38,7 +38,7 @@ function buildMcpServices() {
     token: getMcpTokenService(),
     content: createMcpContentService(getAdminContentService()),
     media: createMcpMediaService(getMediaService()),
-    seoForToken: (tokenId: string) => createMcpSeoService(getSeoMonitoringService(), tokenId),
+    seoForToken: (tokenId: string) => createMcpSeoService(getSeoMonitoringService(), tokenId, getSeoRecommendationExecutionService()),
     geoForToken: (tokenId: string) => createMcpGeoService(getGeoMonitoringService(), tokenId),
     adsForToken: (tokenId: string) => createMcpAdvertisingService(getAdvertisingService(), tokenId),
     vkAds: getMcpVkAdsService(),

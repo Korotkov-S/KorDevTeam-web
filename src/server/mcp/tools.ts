@@ -6,6 +6,8 @@ import type { McpPrincipal, McpScope } from "./contracts";
 import type { McpContentSelector, McpContentService, McpContentSnapshot } from "./contentService";
 import type { McpMediaService } from "./mediaService";
 import type { McpSeoService } from "../seo-monitoring/mcpService";
+import { executionCommandSchema, completeExecutionCommandSchema } from "../seo-monitoring/recommendationExecutionRepository";
+import { parseExecutionPlan } from "../seo-monitoring/recommendationExecutionPlan";
 import type { McpGeoService } from "../geo-monitoring/mcpService";
 import type { McpAdvertisingService } from "../advertising/mcpService";
 import type { McpVkAdsService } from "../advertising/vk/mcpService";
@@ -458,6 +460,19 @@ const errorMessages: Record<string, string> = {
   mcp_pagination_invalid: "Некорректные параметры страницы.",
   mcp_scope_required: "Для этой операции недостаточно прав токена.",
   seo_evidence_invalid: "Доказательства рекомендации содержат некорректные метрики или даты.",
+  seo_execution_approval_required: "Нужно явное одобрение владельцем точного варианта изменений в админке.",
+  seo_execution_approval_superseded: "Это одобрение заменено новым. Прочитайте актуальную карточку.",
+  seo_execution_card_conflict: "Карточка изменилась после одобрения. Нужно новое одобрение владельца.",
+  seo_execution_page_conflict: "Опубликованная версия изменилась. Перечитайте страницу и согласуйте новый вариант.",
+  seo_execution_status_conflict: "Статус рекомендации не разрешает выполнение.",
+  seo_execution_already_applied: "Изменения уже применены. Продолжите только проверку результата.",
+  seo_execution_not_applied: "Сначала примените одобренный вариант защищённой командой.",
+  seo_execution_page_unsupported: "Этот тип страницы не поддерживает защищённое выполнение.",
+  seo_execution_plan_invalid: "План изменений не соответствует разрешённому формату или лимиту.",
+  seo_execution_command_invalid: "Команда выполнения содержит недопустимые параметры.",
+  seo_execution_verification_failed: "Публичная проверка не подтверждена. Статус остаётся прежним.",
+  seo_execution_completion_conflict: "Повтор завершения отличается от сохранённого результата.",
+  seo_execution_unavailable: "Сервис защищённого выполнения временно недоступен.",
   seo_date_invalid: "Укажите корректную дату в формате YYYY-MM-DD.",
   seo_date_range_invalid: "Диапазон SEO-данных должен содержать от 1 до 366 дней.",
   seo_cursor_invalid: "Некорректный курсор списка SEO-данных.",
@@ -714,6 +729,29 @@ export function createKordevMcpServer(
     }, input => run("upload_image", () => services.media.uploadImage(input, principal.adminUserId)));
   }
 
+  if (has("seo:read", "content:read")) {
+    server.registerTool("list_seo_recommendation_work", {
+      title: "Очередь принятых SEO-рекомендаций", description: "Читает всю очередь accepted независимо от даты создания, включая blocked legacy и applied. Продолжайте по nextCursor. Чтение не выполняет изменений.",
+      inputSchema: z.strictObject({ limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(512).regex(/^[A-Za-z0-9_-]+$/).nullable().optional() }),
+      outputSchema: withError(genericRecord), annotations: annotations(true),
+    }, input => run("list_seo_recommendation_work", () => services.seo.listRecommendationWork(input)));
+    server.registerTool("get_seo_recommendation_work", {
+      title: "Точный вариант SEO-рекомендации", description: "Карточка, опубликованная версия, одобренный неизменяемый план и факты выполнения; также для восстановления applied/completed. Не утверждает и не публикует.",
+      inputSchema: z.strictObject({ recommendationId: z.uuid() }), outputSchema: withError(genericRecord), annotations: annotations(true),
+    }, input => run("get_seo_recommendation_work", () => services.seo.getRecommendationWork(input)));
+  }
+  if (has("seo:read", "seo:write", "content:read", "content:write", "content:publish")) {
+    server.registerTool("apply_seo_recommendation", {
+      title: "Применить одобренную SEO-рекомендацию", description: "Атомарно публикует только точный, явно одобренный владельцем patch. Не принимает новый текст или подмену actor. Повтор не публикует заново. applied ещё не означает implemented.",
+      inputSchema: executionCommandSchema, outputSchema: withError(genericRecord), annotations: { ...annotations(false), idempotentHint: true },
+    }, input => run("apply_seo_recommendation", () => services.seo.applyRecommendation(input)));
+  }
+  if (has("seo:read", "seo:write", "content:read")) {
+    server.registerTool("complete_seo_recommendation", {
+      title: "Проверить выполнение SEO-рекомендации", description: "Сервер проверяет публичный HTML, точную версию CMS и доказательства критериев. Только подтверждённый результат получает implemented; повтор не публикует страницу.",
+      inputSchema: completeExecutionCommandSchema, outputSchema: withError(genericRecord), annotations: { ...annotations(false), idempotentHint: true },
+    }, input => run("complete_seo_recommendation", () => services.seo.completeRecommendation(input)));
+  }
   if (has("seo:read")) {
     server.registerTool("list_seo_recommendation_history", {
       title: "История SEO-рекомендации", description: "Неизменяемые прежние и новые доказательства, причина и автор обновления одной рекомендации. Чтение не меняет карточку.",
@@ -869,7 +907,7 @@ export function createKordevMcpServer(
   if (has("seo:read", "seo:write")) {
     server.registerTool("revise_seo_recommendation", {
       title: "Обновить доказательства SEO-рекомендации", description: "Обновляет существующую карточку с expectedUpdatedAt и причиной, сохраняя прежнюю версию. Не меняет страницу/ядро, не утверждает и не внедряет решение автоматически.",
-      inputSchema: z.strictObject({ id: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }), title: z.string().trim().min(1).max(300), rationale: z.string().trim().min(1).max(5000), evidence: genericRecord, confidence: z.enum(["low", "medium", "high"]), status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]).optional(), reason: z.string().trim().min(1).max(2000) }),
+      inputSchema: z.strictObject({ id: z.uuid(), expectedUpdatedAt: z.iso.datetime({ offset: true }), title: z.string().trim().min(1).max(300), rationale: z.string().trim().min(1).max(5000), evidence: genericRecord, confidence: z.enum(["low", "medium", "high"]), status: z.enum(["new", "accepted", "rejected", "implemented", "dismissed"]).optional(), reason: z.string().trim().min(1).max(2000), executionPlan: z.unknown().transform((value, ctx) => { try { return value === null ? null : parseExecutionPlan(value); } catch { ctx.addIssue({ code: "custom", message: "seo_execution_plan_invalid" }); return z.NEVER; } }).optional() }),
       outputSchema: withError(genericRecord), annotations: annotations(false),
     }, input => run("revise_seo_recommendation", () => services.seo.reviseRecommendation(input)));
     server.registerTool("create_seo_candidate", {

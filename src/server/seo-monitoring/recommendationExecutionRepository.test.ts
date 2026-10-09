@@ -156,3 +156,37 @@ databaseTest("unapproved_linked_geo_experiment_cannot_execute", async () => {
   await assert.rejects(f.repo.apply(f.command, f.executor), /geo_experiment_state_invalid/);
   assert.equal((await f.db.select().from(seoChanges)).length, 0);
 });
+databaseTest("old_accepted_queue_is_date_independent_and_read_only", async () => {
+  const f = await acceptedFixture();
+  await f.db.update(seoRecommendations).set({ createdAt: new Date("2001-01-01T00:00:00Z") }).where(eq(seoRecommendations.id, f.recommendation.id));
+  const before = await f.db.select().from(seoRecommendationHistory);
+  const result = await f.repo.list({ limit: 1 });
+  assert.equal(result.items[0].recommendationId, f.recommendation.id); assert.equal(result.items[0].state, "blocked");
+  assert.equal((await f.db.select().from(seoRecommendationHistory)).length, before.length);
+  assert.equal((await f.db.select().from(seoChanges)).length, 0);
+});
+databaseTest("keyset_queue_does_not_skip_after_status_change", async () => {
+  const f = await acceptedFixture();
+  const other = await f.history.create({ title: "Старое принятое", rationale: "Факт", issueType: "technical", confidence: "high", fingerprint: "f".repeat(64) }, { operation: "test" });
+  await f.history.status(other.id, "new", "accepted", { operation: "test" });
+  const first = await f.repo.list({ limit: 1 }); assert.ok(first.nextCursor);
+  await f.history.status(f.recommendation.id, "accepted", "dismissed", { operation: "test" });
+  const second = await f.repo.list({ limit: 1, cursor: first.nextCursor });
+  assert.equal(second.items[0].recommendationId, other.id); assert.equal(second.nextCursor, null);
+  assert.equal(second.items[0].errorCode, "seo_execution_approval_required");
+});
+databaseTest("invalid_cursor_cannot_cross_query", async () => {
+  const f = await fixture();
+  for (const cursor of ["0", "{}", Buffer.from(JSON.stringify({ v: 1, queue: "other", id: f.recommendation.id, createdAt: "2020-01-01T00:00:00.000000Z" })).toString("base64url")]) {
+    await assert.rejects(f.repo.list({ cursor }), /seo_cursor_invalid/);
+  }
+  await assert.rejects(f.repo.list({ limit: 101 }), /seo_limit_invalid/);
+});
+databaseTest("legacy_work_reads_published_base_without_a_plan_or_writes", async () => {
+  const f = await fixture();
+  await f.db.update(seoRecommendations).set({ executionPlan: null }).where(eq(seoRecommendations.id, f.recommendation.id));
+  const work = await f.repo.get(f.recommendation.id);
+  assert.equal(work.currentPage?.entry.id, f.entry.id);
+  assert.equal(work.errorCode, "seo_execution_approval_required");
+  assert.equal((await f.db.select().from(seoChanges)).length, 0);
+});

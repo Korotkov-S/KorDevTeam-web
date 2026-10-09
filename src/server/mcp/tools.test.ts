@@ -8,6 +8,25 @@ import type { McpPrincipal, McpScope } from "./contracts";
 import { createKordevMcpServer, type McpAuditRecord, type McpServices } from "./tools";
 
 const ENTRY_ID = "00000000-0000-4000-8000-000000000010";
+test("tool_scopes_enforce_content_publish_and_strict_execution_authority", async t => {
+  for (const scopes of [["seo:read"], ["seo:read", "content:read"], ["seo:read", "seo:write", "content:read", "content:write"], ["seo:read", "seo:write", "content:read", "content:write", "content:publish"]] as McpScope[][]) {
+    const c = await connected(scopes); t.after(() => c.client.close());
+    const names = (await c.client.listTools()).tools.map(tool => tool.name);
+    assert.equal(names.includes("get_seo_recommendation_work"), scopes.includes("content:read"));
+    assert.equal(names.includes("apply_seo_recommendation"), scopes.includes("content:publish"));
+    assert.equal(names.includes("complete_seo_recommendation"), scopes.includes("content:read") && scopes.includes("seo:write"));
+  }
+  let writes = 0;
+  const c = await connected(["seo:read", "seo:write", "content:read", "content:write", "content:publish"], services({ seo: {
+    async applyRecommendation(input) { writes++; return { input, work: {} } as never; },
+  } })); t.after(() => c.client.close());
+  const args = { recommendationId: ENTRY_ID, executionId: ENTRY_ID, expectedUpdatedAt: "2026-10-09T10:00:00Z" };
+  assert.notEqual((await c.client.callTool({ name: "apply_seo_recommendation", arguments: args })).isError, true);
+  for (const extra of [{ actor: ENTRY_ID }, { snapshot: {} }, { url: "https://evil.example" }, { changeId: ENTRY_ID }, { patch: { title: "Other" } }]) {
+    assert.equal((await c.client.callTool({ name: "apply_seo_recommendation", arguments: { ...args, ...extra } })).isError, true);
+  }
+  assert.equal(writes, 1);
+});
 const ACTOR_ID = "00000000-0000-4000-8000-000000000020";
 
 test("MCP exposes safe Telegram conflict codes without database details", async t => {

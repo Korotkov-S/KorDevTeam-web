@@ -8,7 +8,7 @@ export function createRecommendationExecutionService(repository: RecommendationE
 } = {}) {
   const verify = options.verify ?? verifyPublishedExecution, invalidate = options.invalidate ?? invalidateAllContentCaches;
   return {
-    get: repository.get, approve: repository.approve,
+    list: repository.list, get: repository.get, approve: repository.approve,
     async apply(command: ExecutionCommand, actor: { mcpTokenId: string }) {
       const result = await repository.apply(command, actor); invalidate(); return result;
     },

@@ -18,6 +18,12 @@ import { checkGeoCrawlerHealth } from "../geo-monitoring/crawlerHealth";
 import { createPageControlRepository } from "./pageControlRepository";
 import { createSeoEffectsRepository } from "./effectsRepository";
 import { createRecommendationHistoryRepository } from "./recommendationHistory";
+import { createRecommendationExecutionRepository } from "./recommendationExecutionRepository";
+import { createRecommendationExecutionService } from "./recommendationExecutionService";
+
+export function getSeoRecommendationExecutionService() {
+  return createRecommendationExecutionService(createRecommendationExecutionRepository(getDb()));
+}
 
 export function reconcileSeoRecommendations(commands: unknown) {
   return createRecommendationHistoryRepository(getDb()).reconcile(commands, { operation: "saved-audit-reconcile" });

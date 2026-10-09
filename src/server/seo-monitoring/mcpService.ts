@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 
 import type { SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "./contracts";
 import type { SeoService } from "./service";
+import type { RecommendationExecutionService } from "./recommendationExecutionService";
+import { checkedExecutionCommand, checkedCompleteExecutionCommand, type WorkPageInput } from "./recommendationExecutionRepository";
+import { parseExecutionPlan, type ExecutionCommand, type CompleteExecutionCommand } from "./recommendationExecutionPlan";
 
 type Frequency = "high" | "medium" | "low" | "unclassified";
 type RecommendationStatus = "new" | "accepted" | "rejected" | "implemented" | "dismissed";
@@ -45,15 +48,27 @@ function validateEvidence(value: unknown, key = "", depth = 0): void {
 
 function json<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 
-export function createMcpSeoService(service: Backing, tokenId: string) {
+export function createMcpSeoService(service: Backing, tokenId: string, execution?: RecommendationExecutionService) {
   const actor = { mcpTokenId: tokenId };
+  function executions() { if (!execution) throw Error("seo_execution_unavailable"); return execution; }
   return {
+    async listRecommendationWork(input: WorkPageInput) { return json(await executions().list(input)); },
+    async getRecommendationWork(input: { recommendationId: string }) { return json(await executions().get(input.recommendationId)); },
+    async applyRecommendation(command: ExecutionCommand) {
+      checkedExecutionCommand(command, actor); return json(await executions().apply(command, actor));
+    },
+    async completeRecommendation(input: CompleteExecutionCommand) {
+      const command = checkedCompleteExecutionCommand(input, actor); return json(await executions().complete(command, actor));
+    },
     async getOverview(filters: Filters) { return json(await service.getOverview(filters)); },
     async getPageControl(input: Parameters<Backing["getPageControl"]>[0]) { return json(await service.getPageControl(input)); },
     async listChangeEffects(input: Parameters<Backing["listChangeEffects"]>[0]) { return json(await service.listChangeEffects(input)); },
     async listRecommendationHistory(input: Parameters<Backing["listRecommendationHistory"]>[0]) { return json(await service.listRecommendationHistory(input)); },
     async reviseRecommendation(command: Parameters<Backing["reviseRecommendation"]>[0]) {
-      validateEvidence(command.evidence); return json(await service.reviseRecommendation(command, actor));
+      validateEvidence(command.evidence);
+      if (Buffer.byteLength(stable(command.evidence), "utf8") > 16_384) throw Error("seo_evidence_invalid");
+      if (command.executionPlan != null) parseExecutionPlan(command.executionPlan);
+      return json(await service.reviseRecommendation(command, actor));
     },
     async listQueries(input: Filters & Page) {
       const { limit, cursor, ...filters } = input;

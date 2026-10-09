@@ -2,9 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createMcpSeoService } from "./mcpService";
+test("mcp_cannot_invent_admin_approval_or_replace_patch", async () => {
+  let captured: unknown;
+  const service = createMcpSeoService({} as never, tokenId, { async apply(command: unknown, actor: unknown) { captured = { command, actor }; return { work: {} }; } } as never);
+  const command = { recommendationId: queryId, executionId: queryId, expectedUpdatedAt: "2026-10-09T10:00:00Z" };
+  await service.applyRecommendation(command);
+  assert.deepEqual(captured, { command, actor: { mcpTokenId: tokenId } });
+  await assert.rejects(service.applyRecommendation({ ...command, actor: { adminUserId: queryId } } as never), /seo_execution_command_invalid/);
+});
 
 const tokenId = "00000000-0000-4000-8000-000000000001";
 const queryId = "00000000-0000-4000-8000-000000000002";
+
+test("revise_plan_keeps_evidence_limit_separate", async () => {
+  let writes = 0;
+  const service = createMcpSeoService({ async reviseRecommendation() { writes++; return { item: {}, unchanged: false }; } } as never, tokenId);
+  const command = { id: queryId, expectedUpdatedAt: "2026-10-09T10:00:00Z", title: "План", rationale: "Факт", confidence: "high" as const, evidence: {}, reason: "Точный patch",
+    executionPlan: { schemaVersion: 1 as const, operation: "publish_patch" as const, contentEntryId: queryId, pagePath: "/blog/test/", baseVersion: 1, baseHash: "a".repeat(64), patch: { bodyMd: "Текст ".repeat(4000) }, criteria: [{ id: "text", description: "Текст" }] } };
+  await service.reviseRecommendation(command);
+  await assert.rejects(service.reviseRecommendation({ ...command, evidence: { rows: Array(20).fill("a".repeat(1000)) } }), /seo_evidence_invalid/);
+  assert.equal(writes, 1);
+});
 
 test("recommendation revision preserves actor and history reads do not mutate", async () => {
   let written, read;

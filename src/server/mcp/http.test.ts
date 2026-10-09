@@ -62,6 +62,7 @@ function tokenService() {
       if (token === "read-token") return principal("read-token-id", ["content:read"]);
       if (token === "write-token") return principal("write-token-id", ["content:write"]);
       if (token === "ads-token") return principal("ads-token-id", ["ads:read"]);
+      if (token === "seo-executor") return principal("seo-executor-id", ["seo:read", "seo:write", "content:read", "content:write", "content:publish"]);
       return null;
     },
   };
@@ -241,6 +242,13 @@ test("HTTP principal with advertising scope receives only advertising read tools
   const names = (await readMcpJson(response)).result.tools.map((tool: { name: string }) => tool.name).sort();
   assert.equal(names.length, 17);
   assert.ok(names.every((name: string) => /^(?:get|list)_(?:ad|ads|vk_)/u.test(name)));
+});
+test("HTTP advertises protected SEO execution only for authorized publishing principal", async t => {
+  const origin = await start(t);
+  const response = await post(origin, legacyList, { authorization: "Bearer seo-executor" });
+  const names = (await readMcpJson(response)).result.tools.map((tool: { name: string }) => tool.name);
+  for (const name of ["list_seo_recommendation_work", "get_seo_recommendation_work", "apply_seo_recommendation", "complete_seo_recommendation"]) assert.ok(names.includes(name));
+  assert.equal(names.includes("approve_seo_recommendation"), false);
 });
 
 test("successful MCP tool logs safe identifiers without authorization or arguments", async t => {
