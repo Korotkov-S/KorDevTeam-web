@@ -9,8 +9,8 @@ Object.assign(globalThis, { React, window: dom.window, document: dom.window.docu
   Node: dom.window.Node, Event: dom.window.Event, MouseEvent: dom.window.MouseEvent, IS_REACT_ACT_ENVIRONMENT: true });
 Object.defineProperty(globalThis, "navigator", { configurable: true, value: dom.window.navigator });
 const require = createRequire(import.meta.url);
-const { cleanup, fireEvent, render, waitFor } = require("@testing-library/react");
-const { createMemoryRouter, RouterProvider } = require("react-router");
+const { act, cleanup, fireEvent, render, waitFor } = require("@testing-library/react");
+const { createMemoryRouter, RouterProvider, useLoaderData } = require("react-router");
 const { SeoChangesPage } = require("./seo-changes");
 const { SeoChangeDetail } = require("./seo-change-detail");
 const id = "00000000-0000-4000-8000-000000000003";
@@ -48,4 +48,20 @@ test("applying dates uses the event calendar and resets the old pagination curso
   const params = new URLSearchParams(router.state.location.search);
   assert.equal(params.get("from"), "2026-10-01"); assert.equal(params.get("to"), "2026-10-08");
   assert.equal(params.get("q"), "CRM"); assert.equal(params.has("cursor"), false);
+});
+
+test("detail source selector follows restored loader data after browser history navigation", async () => {
+  const detail = { filters, change, effects: { items: [], nextCursor: null }, history: { items: [], nextCursor: null }, control: null,
+    ranks: { regions: [], rows: [] }, backTo: start };
+  function DetailRoute() { return <SeoChangeDetail data={useLoaderData()} />; }
+  const router = createMemoryRouter([{ path: "*", element: <DetailRoute />, loader: ({ request }: any) => ({ ...detail,
+    filters: { ...filters, source: new URL(request.url).searchParams.get("source") === "google" ? "google_search_console" : "yandex_webmaster" } }) }], { initialEntries: ["/?source=yandex"] });
+  const view = render(<RouterProvider router={router} />);
+  await waitFor(() => assert.equal(view.getByLabelText("Источник средних позиций").value, "yandex"));
+  fireEvent.change(view.getByLabelText("Источник средних позиций"), { target: { value: "google" } });
+  await act(async () => { await router.navigate("/?source=google"); });
+  assert.equal(router.state.loaderData["0"].filters.source, "google_search_console");
+  assert.equal(view.getByLabelText("Источник средних позиций").value, "google");
+  await act(async () => { await router.navigate(-1); });
+  await waitFor(() => assert.equal(view.getByLabelText("Источник средних позиций").value, "yandex"));
 });

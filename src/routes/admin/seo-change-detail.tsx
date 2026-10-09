@@ -32,7 +32,7 @@ export function SeoChangeDetail({ data }: { data: ChangeDetailData }) {
       <div><dt className="text-muted-foreground">ID события</dt><dd className="break-all">{change.id}</dd></div>
       <div><dt className="text-muted-foreground">Записал</dt><dd className="break-all">{change.actorAdminUserId ? `Администратор ${change.actorAdminUserId}` : change.actorMcpTokenId ? `MCP ${change.actorMcpTokenId}` : "Источник автора не сохранён"}</dd></div>
     </dl><p className="mt-4 text-xs text-muted-foreground">Журнал хранит описание и подтверждённую версию, когда она известна, а не полный diff текста. Неизвестная историческая версия не восстанавливается из текущей страницы. Операционное событие не является контентной гипотезой.</p></Panel>
-    <Form method="get" className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
+    <Form key={filters.source} method="get" className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
       {[...params.entries()].filter(([key]) => !["detailSource", "effectsCursor"].includes(key)).map(([key,value], i) => <input key={`${key}:${i}`} type="hidden" name={key} value={value} />)}
       <label className="text-sm">Источник средних позиций<select name="detailSource" defaultValue={filters.source === "google_search_console" ? "google" : "yandex"} className="ml-3 rounded border bg-background p-2"><option value="yandex">Яндекс Вебмастер</option><option value="google">Google Search Console</option></select></label><button className="rounded bg-primary px-4 py-2 text-primary-foreground">Показать сохранённые данные</button>
     </Form>

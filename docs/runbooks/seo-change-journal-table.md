@@ -29,7 +29,9 @@ Desktop and mobile component screenshots use explicitly labeled synthetic fixtur
 
 ## Acceptance, 9 October 2026
 
-Local complete `npm test` with the disposable PostgreSQL database and CI fixture configuration passed: application 1195/1195, server JavaScript 224 passed / 2 existing skips / 0 failed. Typecheck, build and diff checks passed. Four fixture screenshots (journal/details, 1440/390 px) were inspected; the table scrolls internally on mobile without body overflow. Independent review rechecked the four corrected findings and passed 31 non-DB tests.
+Final local complete `npm test` with the disposable PostgreSQL database and CI fixture configuration passed: application 1196/1196, server JavaScript 224 passed / 2 existing skips / 0 failed. Typecheck, build and diff checks passed. Four fixture screenshots (journal/details, 1440/390 px) were inspected; the table scrolls internally on mobile without body overflow. Independent review rechecked the initial four corrected findings and passed 31 non-DB tests, then independently passed the three UI scenarios including browser Back.
+
+The final follow-up remounts the source form when loader source changes, preventing an uncontrolled selector from retaining Google after browser Back restores Yandex evidence. Its regression was observed failing without the fix and passing with it, with each real data-router transition flushed and checked separately. The prior 1195-test revision was not deployed; its CI run `37901126094` was cancelled as superseded before release.
 
 An earlier invalid full run raced the build's removal of `build/server/index.js`, failing `admin browser flow previews, publishes, unpublishes, restores and deletes without rebuild` and `admin security boundary enforces headers, csrf, expiry and safe returns` with `ERR_MODULE_NOT_FOUND`. The authoritative complete run was repeated after the build, with zero failures; the failed log is retained as diagnostic evidence.
 
