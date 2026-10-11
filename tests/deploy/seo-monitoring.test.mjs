@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
@@ -89,4 +89,11 @@ test("systemd separates daily free collection from weekly night rank control", (
   const result = spawnSync("systemd-analyze", ["verify", "deploy/systemd/kordevteam-seo-collect.service", "deploy/systemd/kordevteam-seo-collect.timer",
     "deploy/systemd/kordevteam-seo-rank-collect.service", "deploy/systemd/kordevteam-seo-rank-collect.timer"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
+});
+
+test("a source failure cannot schedule another whole free collection", {
+  skip: process.platform !== "linux" || process.getuid?.() !== 0 || !existsSync("/run/systemd/system"),
+}, () => {
+  const result = spawnSync("bash", ["tests/deploy/seo-restart-policy.sh", "deploy/systemd/kordevteam-seo-collect.service"], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
