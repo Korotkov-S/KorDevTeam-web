@@ -47,25 +47,23 @@ export function BlogCategoryContent({
   posts: BlogPostCardView[];
 }) {
   return (
-    <div className="pt-20">
-      <Blog
-        mode="category"
-        posts={posts}
-        heading={{
-          eyebrow: "Категория блога",
-          title: category.h1,
-          description: category.intro,
-        }}
-        serviceLink={{ href: category.serviceHref, label: category.serviceLabel }}
-        breadcrumbs={(
-          <nav aria-label="Хлебные крошки" className="mb-8 flex flex-wrap items-center gap-2 text-sm text-[var(--public-subtle)]">
-            <Link to="/blog/" className="underline underline-offset-4">Блог</Link>
-            <span aria-hidden="true">→</span>
-            <span aria-current="page">{category.h1}</span>
-          </nav>
-        )}
-      />
-    </div>
+    <Blog
+      mode="category"
+      posts={posts}
+      heading={{
+        eyebrow: "Категория блога",
+        title: category.h1,
+        description: category.intro,
+      }}
+      serviceLink={{ href: category.serviceHref, label: category.serviceLabel }}
+      breadcrumbs={(
+        <nav aria-label="Хлебные крошки" className="mb-8 flex flex-wrap items-center gap-2 text-sm text-[var(--public-subtle)]">
+          <Link to="/blog/" className="underline underline-offset-4">Блог</Link>
+          <span aria-hidden="true">→</span>
+          <span aria-current="page">{category.h1}</span>
+        </nav>
+      )}
+    />
   );
 }
 

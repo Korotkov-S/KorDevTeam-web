@@ -16,5 +16,5 @@ export async function loader() {
 }
 export default function BlogIndex() {
   const value = useLoaderData<typeof loader>();
-  return <div className="pt-20"><Blog posts={value.posts} mode="index" /></div>;
+  return <Blog posts={value.posts} mode="index" />;
 }

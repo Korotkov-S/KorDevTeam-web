@@ -72,6 +72,7 @@ test("category content renders breadcrumbs, one H1 and the profile service link"
   );
   const document = new JSDOM(markup).window.document;
 
+  assert.equal(document.body.firstElementChild?.tagName, "SECTION");
   assert.equal(document.querySelectorAll("h1").length, 1);
   assert.equal(document.querySelector('nav[aria-label="Хлебные крошки"] a[href="/blog/"]')?.textContent, "Блог");
   assert.equal(document.querySelector('nav[aria-label="Хлебные крошки"] [aria-current="page"]')?.textContent, "CRM и управление продажами");
