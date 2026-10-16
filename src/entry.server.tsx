@@ -11,6 +11,7 @@ import { readAdminAuthConfig } from "./server/auth/config";
 import { readPublicMediaConfig } from "./server/media/config";
 import { checkMcpReady } from "./server/mcp/runtime";
 import { assertVkLeadWebhookConfig } from "./server/vk-leads/config";
+import { requestCspNonce } from "./routes/admin/headers";
 export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
@@ -52,15 +53,16 @@ export default function handleRequest(
 ) {
   return new Promise<Response>((resolve, reject) => {
     let shellRendered = false;
-    const nonce = request.headers.get("x-kordev-csp-nonce") ?? undefined;
+    const nonce = requestCspNonce(request) ?? undefined;
     const { pipe } = renderToPipeableStream(
       <ServerRouter context={routerContext} url={request.url} nonce={nonce} />,
       {
+        nonce,
         onAllReady() {
           shellRendered = true;
           const body = new PassThrough();
           responseHeaders.set("Content-Type", "text/html");
-          responseHeaders.set("Cache-Control", "no-cache");
+          if (!responseHeaders.has("Cache-Control")) responseHeaders.set("Cache-Control", "no-cache");
           pipe(body);
           resolve(
             new Response(Readable.toWeb(body) as ReadableStream, {

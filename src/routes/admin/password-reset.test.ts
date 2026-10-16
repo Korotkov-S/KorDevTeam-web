@@ -14,9 +14,8 @@ const config: AdminAuthConfig = {
   sessionTtlMs: 43_200_000,
 };
 
-function postRequest(path: string, form: FormData, resetToken?: string): Request {
+function postRequest(path: string, form: FormData): Request {
   const cookies = [createLoginCsrfCookie(csrf).split(";", 1)[0]];
-  if (resetToken) cookies.push(`__Host-kordev_admin_password_reset=${resetToken}`);
   return new Request(`https://kordev.team${path}`, {
     method: "POST",
     body: form,
@@ -30,7 +29,7 @@ function postRequest(path: string, form: FormData, resetToken?: string): Request
 });
 }
 
-test("reset-password loader preserves the bearer token after a cross-site email navigation and cleans the URL", async () => {
+test("reset-password loader renders the bearer token without a cookie redirect", async () => {
   const token = "t".repeat(43);
   const loader = createResetPasswordLoader(() => csrf);
   const captured = await loader({
@@ -40,22 +39,20 @@ test("reset-password loader preserves the bearer token after a cross-site email 
     params: {},
     context: {},
   });
-  assert.equal(captured.status, 302);
-  assert.equal(captured.headers.get("Location"), "/admin/reset-password/");
-  assert.match(captured.headers.get("Set-Cookie") ?? "", new RegExp(`__Host-kordev_admin_password_reset=${token}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Lax`));
+  assert.equal(captured.status, 200);
+  assert.equal(captured.headers.get("Location"), null);
+  assert.equal(captured.headers.get("Referrer-Policy"), "no-referrer");
+  assert.equal(captured.headers.get("Cache-Control"), "no-store");
+  assert.doesNotMatch(captured.headers.get("Set-Cookie") ?? "", /__Host-kordev_admin_password_reset=/);
+  assert.deepEqual(await captured.json(), { loginCsrf: csrf, tokenPresent: true, resetToken: token });
+});
 
-  const clean = await loader({
-    request: new Request("https://kordev.team/admin/reset-password/", {
-      headers: {
-        cookie: `__Host-kordev_admin_password_reset=${token}`,
-        "x-kordev-csp-nonce": "n".repeat(22),
-      },
-    }),
-    params: {},
-    context: {},
-  });
-  assert.equal(clean.status, 200);
-  assert.deepEqual(await clean.json(), { loginCsrf: csrf, tokenPresent: true });
+test("reset-password loader rejects missing, malformed and ambiguous bearer tokens", async () => {
+  const loader = createResetPasswordLoader(() => csrf);
+  for (const query of ["", "?token=bad", `?token=${"t".repeat(43)}&token=${"u".repeat(43)}`]) {
+    const response = await loader({ request: new Request(`https://kordev.team/admin/reset-password/${query}`), params: {}, context: {} });
+    assert.deepEqual(await response.json(), { loginCsrf: csrf, tokenPresent: false, resetToken: "" });
+  }
 });
 
 test("forgot-password action sends a thirty-minute link but returns a generic response", async () => {
@@ -110,7 +107,7 @@ test("forgot-password response does not reveal a known login through SMTP latenc
   assert.equal(response.status, 200);
 });
 
-test("reset-password action changes the password and redirects without keeping the token", async () => {
+test("reset-password action uses the submitted bearer token without a reset cookie", async () => {
   const received: Array<{ token: string; newPassword: string }> = [];
   const action = createResetPasswordAction({
     resetPassword: async input => {
@@ -120,10 +117,11 @@ test("reset-password action changes the password and redirects without keeping t
   }, config);
   const form = new FormData();
   form.set("_loginCsrf", csrf);
+  form.set("resetToken", "t".repeat(43));
   form.set("newPassword", "совершенно-новый-пароль-2026");
   form.set("confirmPassword", "совершенно-новый-пароль-2026");
 
-  const response = await action({ request: postRequest("/admin/reset-password/", form, "t".repeat(43)), params: {}, context: {} });
+  const response = await action({ request: postRequest("/admin/reset-password/", form), params: {}, context: {} });
   assert.equal(response.status, 302);
   assert.equal(response.headers.get("Location"), "/admin/login/?reset=success");
   assert.deepEqual(received, [{ token: "t".repeat(43), newPassword: "совершенно-новый-пароль-2026" }]);
@@ -134,17 +132,52 @@ test("reset-password action reports expired links and mismatched passwords", asy
   const action = createResetPasswordAction({ resetPassword: async () => false }, config);
   const expired = new FormData();
   expired.set("_loginCsrf", csrf);
+  expired.set("resetToken", "t".repeat(43));
   expired.set("newPassword", "совершенно-новый-пароль-2026");
   expired.set("confirmPassword", "совершенно-новый-пароль-2026");
-  const expiredResponse = await action({ request: postRequest("/admin/reset-password/", expired, "t".repeat(43)), params: {}, context: {} });
+  const expiredResponse = await action({ request: postRequest("/admin/reset-password/", expired), params: {}, context: {} });
   assert.equal(expiredResponse.status, 400);
   assert.equal((await expiredResponse.json()).error, "Ссылка недействительна или уже использована. Запросите новую.");
 
   const mismatched = new FormData();
   mismatched.set("_loginCsrf", csrf);
+  mismatched.set("resetToken", "t".repeat(43));
   mismatched.set("newPassword", "совершенно-новый-пароль-2026");
   mismatched.set("confirmPassword", "другой-новый-пароль-2026");
-  const mismatchedResponse = await action({ request: postRequest("/admin/reset-password/", mismatched, "t".repeat(43)), params: {}, context: {} });
+  const mismatchedResponse = await action({ request: postRequest("/admin/reset-password/", mismatched), params: {}, context: {} });
   assert.equal(mismatchedResponse.status, 400);
   assert.equal((await mismatchedResponse.json()).error, "Пароли не совпадают.");
+});
+
+test("reset-password action rejects missing, malformed and duplicate tokens before changing a password", async () => {
+  let changes = 0;
+  const action = createResetPasswordAction({ resetPassword: async () => { changes++; return true; } }, config);
+  for (const tokens of [[], ["bad"], ["t".repeat(43), "u".repeat(43)]]) {
+    const form = new FormData();
+    form.set("_loginCsrf", csrf);
+    form.set("newPassword", "test-password-valid");
+    form.set("confirmPassword", "test-password-valid");
+    for (const token of tokens) form.append("resetToken", token);
+    const response = await action({ request: postRequest("/admin/reset-password/", form), params: {}, context: {} });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /Ссылка недействительна/);
+  }
+  assert.equal(changes, 0);
+});
+
+test("reset-password action still requires same-origin and the pre-auth CSRF proof", async () => {
+  let changes = 0;
+  const action = createResetPasswordAction({ resetPassword: async () => { changes++; return true; } }, config);
+  for (const headers of [{ origin: "https://other.example" }, { cookie: "" }]) {
+    const form = new FormData();
+    form.set("_loginCsrf", csrf);
+    form.set("resetToken", "t".repeat(43));
+    form.set("newPassword", "test-password-valid");
+    form.set("confirmPassword", "test-password-valid");
+    const request = postRequest("/admin/reset-password/", form);
+    for (const [name, value] of Object.entries(headers)) request.headers.set(name, value);
+    const response = await action({ request, params: {}, context: {} });
+    assert.equal(response.status, 403);
+  }
+  assert.equal(changes, 0);
 });
