@@ -60,7 +60,7 @@ export default function handleRequest(
           shellRendered = true;
           const body = new PassThrough();
           responseHeaders.set("Content-Type", "text/html");
-          responseHeaders.set("Cache-Control", "no-cache");
+          if (!responseHeaders.has("Cache-Control")) responseHeaders.set("Cache-Control", "no-cache");
           pipe(body);
           resolve(
             new Response(Readable.toWeb(body) as ReadableStream, {

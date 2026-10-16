@@ -13,16 +13,13 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const RESET_COOKIE_SCOPE = "Path=/; Secure; HttpOnly; SameSite=Lax";
 
 function responseHeaders(request: Request): Headers {
-  return adminHeaders(requestCspNonce(request));
+  const headers = adminHeaders(requestCspNonce(request));
+  headers.set("Referrer-Policy", "no-referrer");
+  return headers;
 }
 
 function formString(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value : "";
-}
-
-function verifyOrigin(request: Request, config: AdminAuthConfig): void {
-  if (request.method !== "POST" || request.headers.get("origin") !== config.trustedOrigin.origin ||
-      request.headers.get("sec-fetch-site") !== "same-origin") throw new Error("admin_origin_invalid");
 }
 
 function readResetToken(request: Request): string {
@@ -41,12 +38,18 @@ function clearResetCookie(): string {
   return `${RESET_COOKIE}=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${RESET_COOKIE_SCOPE}`;
 }
 
+function verifyOrigin(request: Request, config: AdminAuthConfig): void {
+  if (request.method !== "POST" || request.headers.get("origin") !== config.trustedOrigin.origin ||
+      request.headers.get("sec-fetch-site") !== "same-origin") throw new Error("admin_origin_invalid");
+}
+
 export function createResetPasswordLoader(csrfFactory: () => string = generateLoginCsrf) {
   return async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url);
     if (url.searchParams.has("token")) {
       const headers = responseHeaders(request);
-      const token = url.searchParams.get("token") ?? "";
+      const tokens = url.searchParams.getAll("token");
+      const token = tokens.length === 1 ? tokens[0] ?? "" : "";
       headers.append("Set-Cookie", TOKEN_PATTERN.test(token) ? createResetCookie(token) : clearResetCookie());
       return redirect("/admin/reset-password/", { headers });
     }

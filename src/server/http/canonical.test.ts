@@ -23,3 +23,15 @@ test("blog pagination survives canonicalization as a route parameter", () => {
     assert.equal(canonicalizeRequest(new Request(`https://kordev.team${pathname}`, { headers: { accept: "text/html" } }))?.search, "");
   }
 });
+
+test("admin recovery, login return paths and filters survive HTML canonicalization", () => {
+  for (const path of [
+    `/admin/reset-password/?token=${"A".repeat(43)}`,
+    "/admin/login/?returnTo=%2Fadmin%2Fcontent%2Farticle%2F&reset=success",
+    "/admin/content/article/?status=draft&page=2",
+  ]) {
+    assert.equal(canonicalizeRequest(new Request(`https://kordev.team${path}`, { headers: { accept: "text/html" } })), null);
+  }
+  const redirected = canonicalizeRequest(new Request(`https://www.kordev.team/admin/reset-password?token=${"A".repeat(43)}`, { headers: { accept: "text/html" } }));
+  assert.equal(redirected?.href, `https://kordev.team/admin/reset-password/?token=${"A".repeat(43)}`);
+});

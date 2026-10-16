@@ -1,3 +1,5 @@
+import { isAdminPath } from "../../lib/adminPath";
+
 const trackingParameters = new Set(["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "yclid", "gclid"]);
 
 export function canonicalizeRequest(request: Request): URL | null {
@@ -14,10 +16,14 @@ export function canonicalizeRequest(request: Request): URL | null {
     target.port = "";
   }
   target.pathname = `${source.pathname.replace(/\/+$/, "")}/`;
-  target.search = "";
-  for (const [name, value] of source.searchParams) {
-    const pagination = target.pathname === "/blog/" && name === "page" && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value));
-    if (trackingParameters.has(name) || pagination) target.searchParams.append(name, value);
+  // Admin queries carry authentication proofs, return paths and UI filters.
+  // Public SEO query cleanup must not discard these route inputs.
+  if (!isAdminPath(source.pathname)) {
+    target.search = "";
+    for (const [name, value] of source.searchParams) {
+      const pagination = target.pathname === "/blog/" && name === "page" && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value));
+      if (trackingParameters.has(name) || pagination) target.searchParams.append(name, value);
+    }
   }
   return target.href === source.href ? null : target;
 }
