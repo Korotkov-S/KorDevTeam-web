@@ -3,6 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryRouter, RouterProvider } from "react-router";
+import { load } from "cheerio";
 
 import { SeoSectionLayout } from "./seo-layout";
 import { SeoOverviewPage } from "./seo-overview";
@@ -72,6 +73,20 @@ test("overview is a decision summary and labels Metrica behavior separately", ()
     assert.match(markup, new RegExp(label, "u"));
   assert.match(markup, /Последние данные Метрики: 26\.09\.2026/u);
   assert.doesNotMatch(markup, /Семантическое ядро.*Кандидаты/su);
+});
+
+test("overview top cards open the same Russia desktop query group on Positions, retaining dates", () => {
+  const $ = load(html(<SeoOverviewPage data={{ filters, dashboard, previousOverview: dashboard.overview, traffic,
+    rankControl, recommendations: { items: [], nextCursor: null } }} />));
+  const link = $("a").toArray().find(node => $(node).text().includes("В топ-3"));
+  assert.ok(link);
+  const url = new URL($(link).attr("href")!, "https://kordev.team");
+  assert.equal(url.pathname, "/admin/seo/positions/");
+  assert.equal(url.searchParams.get("rankBucket"), "top3");
+  assert.equal(url.searchParams.get("rankRegion"), "ru");
+  assert.equal(url.searchParams.get("rankDevice"), "desktop");
+  assert.equal(url.searchParams.get("from"), "2026-08-31");
+  assert.equal(url.searchParams.get("to"), "2026-09-27");
 });
 
 test("positions page shows exact city/device ranks and dd.mm.yyyy dates", () => {

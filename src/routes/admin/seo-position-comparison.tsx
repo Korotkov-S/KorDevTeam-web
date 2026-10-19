@@ -1,5 +1,5 @@
 import React from "react";
-import { Form } from "react-router";
+import { Form, useSearchParams } from "react-router";
 import { formatDate, integer, Panel, position, type RankControl, type SeoFilters } from "./seo-shared";
 
 type AverageSource = { items: Array<{ id: string; impressions: number; averagePosition: number | null }>;
@@ -7,7 +7,10 @@ type AverageSource = { items: Array<{ id: string; impressions: number; averagePo
 export type PositionAverages = { yandex: AverageSource; google: AverageSource };
 
 export function PositionPeriodFilters({ filters }: { filters: SeoFilters }) {
+  const [search] = useSearchParams();
   return <Form method="get" className="grid gap-3 rounded-xl border p-4 sm:grid-cols-4">
+    {["rankRegion", "rankDevice", "rankBucket", "rankQuery"].flatMap(name => search.has(name)
+      ? [<input key={name} type="hidden" name={name} value={search.get(name)!} />] : [])}
     <label>Период средних позиций<select name="range" defaultValue={filters.range} className="block w-full rounded border p-2">
       <option value="7">7 дней</option><option value="28">28 дней</option><option value="90">90 дней</option><option value="custom">Свой период</option>
     </select></label>
