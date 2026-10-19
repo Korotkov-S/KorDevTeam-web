@@ -9,6 +9,7 @@ import { adminRouteHeaders } from "./headers";
 import { createSeoSectionLoader } from "./seo-read.server";
 import { formatDate, PageHeader, Panel, RankControlPanel, type RankControl, type SeoFilters } from "./seo-shared";
 import { PositionPeriodFilters, SeoPositionComparison, type PositionAverages } from "./seo-position-comparison";
+import { RankQueryDrilldown } from "./seo-position-drilldown";
 
 type Data = {
   rankProgress?: RankProgress | null;
@@ -41,10 +42,11 @@ export function SeoPositionsPage({ data }: { data: Data }) {
       <PageHeader title="Точные позиции" description="Место kordev.team в органической выдаче Яндекса по утверждённым ключам, городам и устройствам. Это не средняя позиция по показам." />
       <RankProgressPanel progress={data.rankProgress ?? null} />
       <PositionPeriodFilters filters={data.filters} />
+      <RankQueryDrilldown control={data.rankControl} />
       <SeoPositionComparison control={data.rankControl} averages={data.averages} filters={data.filters} />
-      <Panel title="Ключевые слова по регионам">
-        <RankControlPanel control={data.rankControl} />
-      </Panel>
+      <details className="rounded-xl border border-border bg-card p-5"><summary className="cursor-pointer text-xl font-semibold">Полная матрица по регионам и устройствам</summary>
+        <div className="mt-4"><RankControlPanel control={data.rankControl} showSummary={false} /></div>
+      </details>
       <Panel title="Последние контрольные проверки">
         {data.rankChecks.items.length ? (
           <div className="overflow-x-auto">
