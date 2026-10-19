@@ -11,6 +11,7 @@ import {
   geoCollectionAttempts,
   geoCollectionJobs,
   geoCoverageCycles,
+  geoObservations,
 } from "../db/schema";
 import { eq, ne, and, notInArray } from "drizzle-orm";
 import { createGeoRepository } from "./repository";
@@ -19,6 +20,44 @@ import { createGeoQueueRepository } from "./queueRepository";
 const url = process.env.TEST_DATABASE_URL ?? "",
   databaseTest = url ? test : test.skip;
 const now = new Date("2026-10-05T06:00:00Z");
+
+databaseTest("queue evidence belongs to the current run and exact prompt, never another platform or historical run", async () => {
+  const f = await fixture();
+  try {
+    const prompts = await f.db.select().from(geoPrompts).limit(2);
+    const [cycle] = await f.db.insert(geoCoverageCycles).values({ startedAt: now, promptIds: prompts.map(p => p.id) }).returning();
+    const runs = await f.db.insert(geoRuns).values(["yandex_alice", "chatgpt_search", "yandex_alice"].map(platform => ({
+      platform: platform as "yandex_alice" | "chatgpt_search", mode: "live_ui" as const, surface: platform === "yandex_alice" ? "alice_web" : "chatgpt_search_web",
+      region: "RU", language: "ru", status: "success" as const, promptIds: prompts.map(p => p.id), plannedCount: 6, completedCount: 6, storedCount: 6,
+      startedAt: now, completedAt: now, initiatedByMcpTokenId: f.token,
+      promptSetFingerprint: "b".repeat(64),
+    }))).returning();
+    await f.db.insert(geoCollectionJobs).values(runs.slice(0, 2).map(run => ({
+      cycleId: cycle.id, promptId: prompts[0].id, promptText: prompts[0].promptText, platform: run.platform, surface: run.surface!,
+      mode: run.mode, language: run.language, region: run.region, state: "complete", runId: run.id, completedRepetitions: 3,
+    })));
+    await f.db.insert(geoObservations).values(runs.flatMap((run, index) => prompts.flatMap(prompt => [1, 2, 3].map(repetition => ({
+      runId: run.id, promptId: prompt.id, repetition, observedAt: now,
+      mentioned: index !== 0 || prompt.id !== prompts[0].id, linked: index !== 0, cited: index !== 0,
+      sourceOrder: index === 0 ? null : 1, responseHash: "a".repeat(64), sessionPersonalized: index === 0,
+      responseExcerpt: "private excerpt must not enter queue", responseSnapshot: "private snapshot must not enter queue",
+    })))));
+    const page = await f.queue.listQueue({ limit: 1 });
+    assert.equal(page.nextCursor, "1");
+    const first = page.items[0] as typeof page.items[0] & { observations: Array<{ id: string; mentioned: boolean; linked: boolean; cited: boolean; observedAt: Date; sessionPersonalized: boolean }> };
+    assert.equal(first.platform, "yandex_alice");
+    assert.equal(first.observations.length, 3);
+    assert.ok(first.observations.every(o => !o.mentioned && !o.linked && !o.cited && o.sessionPersonalized));
+    const secondPage = await f.queue.listQueue({ cursor: "1", limit: 1 });
+    const second = secondPage.items[0] as typeof first;
+    assert.equal(second.platform, "chatgpt_search");
+    assert.equal(second.observations.length, 3);
+    assert.ok(second.observations.every(o => o.mentioned && o.linked && o.cited && !o.sessionPersonalized));
+    assert.equal(second.observations[0].observedAt.toISOString(), now.toISOString());
+    assert.equal(secondPage.nextCursor, null);
+    assert.doesNotMatch(JSON.stringify([page, secondPage]), /private excerpt|private snapshot|responseSnapshot|responseExcerpt/);
+  } finally { await f.db.$client.end(); }
+});
 async function fixture() {
   await resetTestDatabase(url);
   const db = createDb(url);
