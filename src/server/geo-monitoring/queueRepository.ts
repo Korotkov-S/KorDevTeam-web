@@ -505,8 +505,34 @@ export function createGeoQueueRepository(db: Database) {
         limit > 200
       )
         throw new Error("geo_cursor_invalid");
+      const pageItems = selected.slice(offset, offset + limit);
+      const runIds = [...new Set<string>(pageItems.flatMap(j => j.runId ? [j.runId] : []))];
+      // Read only compact evidence for this page; full answers remain behind
+      // the authenticated observation-detail endpoint.
+      const observations = runIds.length ? await db.select({
+        id: geoObservations.id,
+        runId: geoObservations.runId,
+        promptId: geoObservations.promptId,
+        repetition: geoObservations.repetition,
+        observedAt: geoObservations.observedAt,
+        mentioned: geoObservations.mentioned,
+        linked: geoObservations.linked,
+        cited: geoObservations.cited,
+        sessionPersonalized: geoObservations.sessionPersonalized,
+      }).from(geoObservations).where(inArray(geoObservations.runId, runIds))
+        .orderBy(asc(geoObservations.repetition)) : [];
+      const byRunAndPrompt = new Map<string, typeof observations>();
+      for (const observation of observations) {
+        const key = `${observation.runId}:${observation.promptId}`;
+        const rows = byRunAndPrompt.get(key) ?? [];
+        rows.push(observation);
+        byRunAndPrompt.set(key, rows);
+      }
       return {
-        items: selected.slice(offset, offset + limit),
+        items: pageItems.map(j => ({
+          ...j,
+          observations: j.runId ? byRunAndPrompt.get(`${j.runId}:${j.promptId}`) ?? [] : [],
+        })),
         nextCursor:
           offset + limit < selected.length ? String(offset + limit) : null,
         coverage,
