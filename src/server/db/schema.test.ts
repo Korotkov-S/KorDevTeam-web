@@ -48,6 +48,8 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = TEST_DATABASE_URL ? test : test.skip;
 
 async function dropRecommendationExecutions(db: ReturnType<typeof createDb>) {
+  // Historical-upgrade fixtures replay every later migration, including 0025.
+  await db.execute(sql`DROP TABLE content_view_receipts, content_view_totals, content_view_sessions, content_view_rate_limits`);
   await db.execute(sql`DROP TABLE seo_recommendation_executions`);
   await db.execute(sql`ALTER TABLE seo_recommendations DROP COLUMN execution_plan`);
 }

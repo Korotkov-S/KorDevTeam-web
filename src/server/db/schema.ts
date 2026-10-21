@@ -292,6 +292,31 @@ export const contentEntries = pgTable(
   ],
 );
 
+export const contentViewTotals = pgTable("content_view_totals", {
+  entryId: uuid("entry_id").primaryKey().references(() => contentEntries.id, { onDelete: "cascade" }),
+  views: bigint("views", { mode: "bigint" }).notNull().default(sql`0`),
+}, table => [check("content_view_totals_nonnegative", sql`${table.views} >= 0`)]);
+
+export const contentViewSessions = pgTable("content_view_sessions", {
+  sessionHash: text("session_hash").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, table => [index("content_view_sessions_expiry").on(table.expiresAt)]);
+
+export const contentViewReceipts = pgTable("content_view_receipts", {
+  sessionHash: text("session_hash").notNull().references(() => contentViewSessions.sessionHash, { onDelete: "cascade" }),
+  entryId: uuid("entry_id").notNull().references(() => contentEntries.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, table => [primaryKey({ columns: [table.sessionHash, table.entryId] })]);
+
+export const contentViewRateLimits = pgTable("content_view_rate_limits", {
+  key: text("key").notNull(),
+  bucketStart: timestamp("bucket_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, table => [primaryKey({ columns: [table.key, table.bucketStart] }), index("content_view_rate_limits_expiry").on(table.expiresAt)]);
+
 export const contentRelations = pgTable(
   "content_relations",
   {
