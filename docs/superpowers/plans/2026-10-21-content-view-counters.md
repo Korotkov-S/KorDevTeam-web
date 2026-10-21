@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-content-view-counters-design.md` — утверждена владельцем в чате 21 октября 2026.
 
+**Implementation checkpoint (21 October):** Tasks 1–5 implemented in this isolated branch. Task 6 local acceptance: Node 22 full suite 1550 pass, 0 fail, 2 environment skips (Linux systemd and optional actual content-release image); typecheck/db:check/build and local crawl (94 sitemap + 15 internal URLs, zero view receipts) passed. Independent final review is next. Provider-side receipt, owner approval of final privacy text/digest, integration choice and any production release remain pending; nothing deployed.
+
 ## Global Constraints
 
 - Один материал — один просмотр за браузерный сеанс; новый сеанс после **30 минут бездействия**. Обновление и соседние вкладки не увеличивают число.
@@ -154,6 +156,6 @@ Add named cases: `20 concurrent same-session writes increase once`; `different s
 - [x] Match each spec section to Tasks 1–6; confirm all Interfaces names and error/result shapes are consistent. Data/retention → 1–2; sessions/consent → 3; providers → 4; UI/SSR → 5; receipt evidence/release → 6.
 - [x] Check five Review Focus tests are specified in the owning task and include real browser/DB races, not just in-memory mocks. They are planned tests, not claimed executed tests.
 - [x] Check plan does not add a second analytics account, change content, reuse admin/lead secrets or expand scopes.
-- [ ] Confirm user has reviewed this plan and selected execution method before invoking implementation skills.
+- [x] Confirm user has reviewed this plan and selected execution method before invoking implementation skills. Owner selected 1 (inline).
 
 Recommended execution: **Native in the current isolated session**, sequential tasks with test/commit checkpoints, then one independent whole-branch review. The tasks share session/consent/API contracts closely, so keeping one implementation context avoids repeated handoffs; independent review remains required before merge.

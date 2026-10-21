@@ -14,6 +14,7 @@ import { loadPortfolioSources } from "../../src/server/portfolio/loader";
 import { startTestRuntime } from "./support/runtime";
 import { seoSnapshot } from "./support/seoSnapshot";
 import { seedHomeServices } from "./support/homeFixtures";
+import { CONSENT_VERSION } from "../../src/lib/consent";
 
 test("published pages preserve SEO and meaningful visible HTML through hydration and without JavaScript", { timeout: 120_000 }, async t => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -118,7 +119,7 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
       }
       if (pathname === "/privacy/") {
         const policyText = await noJs.$eval("article", element => element.textContent ?? "");
-        for (const required of ["2026-09-18", "Яндекс.Метрика", "Top.Mail.Ru", "отказ"]) {
+        for (const required of [CONSENT_VERSION, "Яндекс.Метрика", "Top.Mail.Ru", "отказ", "IndexedDB", "30 минут", "48 часов"]) {
           assert.match(policyText, new RegExp(required, "i"));
         }
         assert.ok(await noJs.$('button[data-consent-settings="true"]'));
