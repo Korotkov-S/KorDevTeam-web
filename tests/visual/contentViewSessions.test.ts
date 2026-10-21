@@ -13,11 +13,17 @@ async function bundle() {
   const result = await build({ stdin: { contents: 'export {createViewSessionStore} from "./src/lib/contentViews/sessionStore"; export {createContentViewsController,createViewTransport} from "./src/lib/contentViews/controller";', resolveDir: process.cwd() }, bundle: true, platform: "browser", format: "iife", globalName: "ViewTest", write: false });
   return result.outputFiles[0].text;
 }
-async function install(page: Page, origin: string, code: string) {
+async function install(page: Page, origin: string, code: string, accepted = false) {
   await page.setUserAgent("Mozilla/5.0 Chrome/133.0.0.0 Safari/537.36");
+  if (accepted) {
+    await page.evaluateOnNewDocument(({ key, version }) => localStorage.setItem(key, JSON.stringify({ version, decision: "accepted" })), { key: CONSENT_STORAGE_KEY, version: CONSENT_VERSION });
+    await page.setRequestInterception(true);
+    page.on("request", request => { if (/mc\.yandex|top-fwz1/.test(request.url())) void request.abort(); else void request.continue(); });
+  }
   await page.goto(`${origin}/privacy/`);
   await page.waitForFunction(() => document.documentElement.dataset.hydrated === "true");
-  await page.waitForSelector('[role="dialog"]');
+  if (!accepted) await page.waitForSelector('[role="dialog"]');
+  else await page.waitForSelector('script[data-kordev-analytics]');
   await page.evaluate(code + ";window.ViewTest=ViewTest;");
 }
 test("real IndexedDB shares first generation, refresh and exactly 30-minute rotation atomically", { skip: !process.env.TEST_DATABASE_URL }, async t => {
@@ -43,11 +49,11 @@ test("real server expiry rotates one shared token; concurrent tabs store only on
   const [entry] = await db.insert(contentEntries).values({ kind: "article", slug: "test", title: "Test", status: "published" }).returning();
   const runtime = await startTestRuntime({ CONTENT_VIEWS_ENABLED: "true" }); t.after(runtime.close);
   const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] }); t.after(() => browser.close());
-  const code = await bundle(); const pages = await Promise.all([browser.newPage(), browser.newPage()]); await Promise.all(pages.map(p => install(p, runtime.origin, code)));
+  const code = await bundle(); const pages = await Promise.all([browser.newPage(), browser.newPage()]); await Promise.all(pages.map(p => install(p, runtime.origin, code, true)));
   const record = (p: Page) => p.evaluate(`(async()=>{const api=window.ViewTest; const controller=api.createContentViewsController({store:api.createViewSessionStore(),transport:api.createViewTransport(),clock:Date.now,isConsentCurrent:()=>true}); const result=await controller.record(${JSON.stringify(entry.id)}); controller.dispose();return result;})()`);
-  const first = await Promise.all(pages.map(record)); assert.equal(first.filter(r => r?.counted).length, 1); assert.ok(first.every(r => r?.views === "1"));
+  const first = await Promise.all(pages.map(record)); assert.equal(first.filter(r => r?.counted).length, 1, JSON.stringify(first)); assert.ok(first.every(r => r?.views === "1"), JSON.stringify(first));
   await db.execute(sql`UPDATE content_view_sessions SET expires_at=now()-interval '1 second'`);
-  const next = await Promise.all(pages.map(record)); assert.equal(next.filter(r => r?.counted).length, 1); assert.ok(next.every(r => r?.views === "2"));
+  const next = await Promise.all(pages.map(record)); assert.equal(next.filter(r => r?.counted).length, 1, JSON.stringify(next)); assert.ok(next.every(r => r?.views === "2"), JSON.stringify(next));
   assert.equal((await db.execute(sql`SELECT count(*)::int AS n FROM content_view_sessions WHERE expires_at > now()`)).rows[0].n, 1);
 });
 test("real consent revocation in tab B aborts tab A request and clears the shared identifier", { skip: !process.env.TEST_DATABASE_URL }, async t => {
