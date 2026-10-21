@@ -32,7 +32,7 @@ export function createViewSessionStore() {
       } catch { resolve(fallback); }
     });
   }
-  const active = (s: LocalViewSession | null, now: number) => s && now >= s.lastActivityAt && now - s.lastActivityAt < TTL;
+  const active = (s: LocalViewSession | null, now: number) => s && now - s.lastActivityAt < TTL;
   return {
     current(): Promise<LocalViewSession | null> { return change(s => s, null); },
     getOrCreate(now: number): Promise<LocalViewSession | null> {
@@ -48,7 +48,7 @@ export function createViewSessionStore() {
     noteActivity(now: number): Promise<LocalViewSession | null> {
       return change((s, store) => {
         if (!s) return null;
-        const next = active(s, now) ? { ...s, lastActivityAt: now } : fresh(now, s.generation + 1);
+        const next = active(s, now) ? { ...s, lastActivityAt: Math.max(now, s.lastActivityAt) } : fresh(now, s.generation + 1);
         store.put(next, "current"); return next;
       }, null);
     },

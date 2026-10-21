@@ -86,3 +86,16 @@ test("a receipt from a retired cross-tab generation cannot emit a unique goal", 
   await c.activate(); const pending = c.record("a"); await new Promise(resolve => setTimeout(resolve, 0));
   await f.store.rotate("first", 1); finish(receipt); assert.equal(await pending, null); c.dispose();
 });
+test("retired activation cannot clear the accepted replacement controller's shared session", async () => {
+  const f = fixture(); let release: (value: LocalViewSession | null) => void = () => {};
+  let first = true;
+  const store = { ...f.store, getOrCreate: async () => first ? (first = false, await new Promise<LocalViewSession | null>(resolve => { release = resolve; })) : f.store.getOrCreate(0) };
+  const transport = async (path: "session" | "record") => path === "record" ? receipt : { expiresAt: "date" };
+  const old = createContentViewsController({ ...f, store, transport });
+  const activation = old.activate(); old.dispose();
+  const current = createContentViewsController({ ...f, store, transport });
+  assert.deepEqual(await current.record("a"), receipt);
+  release(f.session()); await activation;
+  assert.ok(await store.current(), "old cleanup must not erase the live session");
+  assert.deepEqual(await current.record("a"), receipt); current.dispose();
+});

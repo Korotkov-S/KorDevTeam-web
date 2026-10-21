@@ -120,3 +120,33 @@ test("StrictMode and route rerenders produce one initial page view and one hit p
   view.rerender(<React.StrictMode><ConsentProvider><AnalyticsScripts path="/blog/a/?query=private" /></ConsentProvider></React.StrictMode>);
   assert.equal((window as any)._tmr?.length, 2);
 });
+test("a keyed accepted replacement owns vendor state after the old cleanup runs", async () => {
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "accepted" }));
+  const view = render(<ConsentProvider><AnalyticsScripts key="old" /></ConsentProvider>);
+  await waitFor(() => assert.ok((window as any)._tmr));
+  const ym = (window as any).ym, tmr = (window as any)._tmr;
+  view.rerender(<ConsentProvider><AnalyticsScripts key="new" /></ConsentProvider>);
+  await act(async () => {});
+  assert.equal((window as any).ym, ym); assert.equal((window as any)._tmr, tmr);
+  view.unmount(); await act(async () => {});
+  assert.equal((window as any).ym, undefined);
+});
+test("BFCache restores add one pathname hit even on the same path, normal pageshow adds none", async () => {
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "accepted" }));
+  render(<ConsentProvider><AnalyticsScripts path="/" /></ConsentProvider>);
+  await waitFor(() => assert.equal((window as any)._tmr?.length, 1));
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: false })));
+  assert.equal((window as any)._tmr?.length, 1);
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: true })));
+  assert.equal((window as any)._tmr?.filter((call: any) => call.type === "pageView").length, 2);
+  assert.equal((window as any).ym?.a?.filter((call: any) => call[1] === "hit").length, 2);
+});
+test("BFCache restore rereads withdrawn consent before sending a hit", async () => {
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "accepted" }));
+  render(<ConsentProvider><AnalyticsScripts /></ConsentProvider>);
+  await waitFor(() => assert.ok((window as any)._tmr));
+  const queue = (window as any)._tmr;
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "rejected" }));
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: true })));
+  assert.equal(queue.length, 1); assert.equal((window as any)._tmr, undefined);
+});

@@ -11,6 +11,7 @@ import {
   CONSENT_STORAGE_KEY,
   createConsentRecord,
   parseConsentRecord,
+  readStoredConsent,
   type ConsentDecision,
 } from "../lib/consent";
 
@@ -62,14 +63,13 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let restoredDecision: ConsentDecision = "unknown";
-    try {
-      restoredDecision = parseConsentRecord(window.localStorage.getItem(CONSENT_STORAGE_KEY));
-    } catch {
-      restoredDecision = "unknown";
-    }
-    setDecision(restoredDecision);
+    setDecision(readStoredConsent());
     setRestorationReady(true);
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) { setDecision(readStoredConsent()); setSettingsOpen(false); }
+    };
+    window.addEventListener("pageshow", restore, true);
+    return () => window.removeEventListener("pageshow", restore, true);
   }, []);
 
   useEffect(() => {

@@ -19,6 +19,23 @@ type AnalyticsWindow = Window & typeof globalThis & {
 
 let dom: JSDOM;
 
+test("initial vendor hits retain a safe external referral origin, never its private path/query", () => {
+  Object.defineProperty(document, "referrer", { configurable: true, value: "https://chatgpt.com/c/private-conversation?prompt=secret#answer" });
+  setAnalyticsConsent(document, true); loadYandexMetrika(document); loadTopMailRu(document);
+  const target = window as AnalyticsWindow;
+  assert.deepEqual(target.ym?.a?.find(call => call[1] === "hit")?.[3], { referer: "https://chatgpt.com/" });
+  assert.equal(target._tmr?.[0]?.referrer, "https://chatgpt.com/");
+  assert.doesNotMatch(JSON.stringify([target.ym?.a, target._tmr]), /private-conversation|prompt|secret|answer/);
+});
+test("initial internal referrer is pathname-only and unsafe schemes are discarded", () => {
+  for (const [referrer, expected] of [["https://kordev.team/blog/a/?token=private#anchor", "/blog/a/"], ["javascript:private", ""], ["https://kordev.team/admin/?token=private", ""]]) {
+    setAnalyticsConsent(document, false);
+    Object.defineProperty(document, "referrer", { configurable: true, value: referrer });
+    setAnalyticsConsent(document, true); loadYandexMetrika(document); loadTopMailRu(document);
+    assert.equal((window as AnalyticsWindow)._tmr?.[0]?.referrer, expected);
+  }
+});
+
 test("SPA page hits normalize paths, suppress first/query/hash duplicates and preserve back navigation", () => {
   setAnalyticsConsent(document, true); loadYandexMetrika(document); loadTopMailRu(document);
   const target = window as AnalyticsWindow;

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-content-view-counters-design.md` — утверждена владельцем в чате 21 октября 2026.
 
-**Implementation checkpoint (21 October):** Tasks 1–5 implemented in this isolated branch. Task 6 local acceptance: Node 22 full suite 1550 pass, 0 fail, 2 environment skips (Linux systemd and optional actual content-release image); typecheck/db:check/build and local crawl (94 sitemap + 15 internal URLs, zero view receipts) passed. Independent final review is next. Provider-side receipt, owner approval of final privacy text/digest, integration choice and any production release remain pending; nothing deployed.
+**Implementation checkpoint (21 October):** Tasks 1–5 implemented in this isolated branch. Task 6 local acceptance after the independent whole-branch review and one RED→GREEN fix pass: Node 22 full suite **1559 pass, 0 fail, 2 environment skips** (Linux systemd and optional actual content-release image); targeted regressions 42/42, typecheck/db:check/build and local crawl (94 sitemap + 15 internal URLs, zero view receipts) passed. All six Important findings addressed; no Critical or deferred Minor. See [review record](../reviews/2026-10-21-content-view-counters.md). Provider-side receipt, owner approval of final privacy text/digest, integration choice and any production release remain pending; nothing deployed.
 
 ## Global Constraints
 

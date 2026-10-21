@@ -112,7 +112,7 @@ export function loadYandexMetrika(document: Document): void {
     trackLinks: true,
   });
     const path = publicPath(document.location.pathname);
-    if (path) target.ym(YANDEX_COUNTER_ID, "hit", path, { referer: "" });
+    if (path) target.ym(YANDEX_COUNTER_ID, "hit", path, { referer: safeDocumentReferrer(document) });
   } catch { /* blocked vendor cannot break the public page */ }
 }
 
@@ -128,7 +128,7 @@ export function loadTopMailRu(document: Document): void {
     type: "pageView",
     start: Date.now(),
     url: publicPath(document.location.pathname) ?? "/",
-    referrer: "",
+    referrer: safeDocumentReferrer(document),
   }); } catch { /* keep the site usable when a vendor throws */ }
 
   const script = document.createElement("script");
@@ -175,10 +175,19 @@ function publicPath(input: string): string | null {
   } catch { return null; }
 }
 
-export function trackPublicPageView(input: { path: string; referrerPath?: string }): void {
+function safeDocumentReferrer(document: Document): string {
+  try {
+    const source = new URL(document.referrer);
+    if (source.protocol !== "https:" && source.protocol !== "http:") return "";
+    // External source domains retain attribution without leaking private paths.
+    return source.origin === document.location.origin ? publicPath(source.pathname) ?? "" : `${source.origin}/`;
+  } catch { return ""; }
+}
+
+export function trackPublicPageView(input: { path: string; referrerPath?: string; restored?: boolean }): void {
   if (typeof document === "undefined") return;
   const state = consentState(document); const path = publicPath(input.path);
-  if (!state.accepted || !path || state.lastPath === path) return;
+  if (!state.accepted || !path || (!input.restored && state.lastPath === path)) return;
   const referrer = input.referrerPath ? publicPath(input.referrerPath) ?? "" : state.lastPath ?? "";
   state.lastPath = path;
   const target = analyticsWindow(document);
@@ -193,5 +202,5 @@ export function trackContentOpen(input: { contentType: "article" | "case"; slug:
   const goal = `${contentType}_open_unique`; const params = { contentType, slug, path };
   const target = analyticsWindow(document);
   try { target?.ym?.(YANDEX_COUNTER_ID, "reachGoal", goal, params); } catch { /* never roll back the server count */ }
-  try { target?._tmr?.push({ id: TOP_MAIL_COUNTER_ID, type: "reachGoal", goal, url: path, referrer: "", params }); } catch { /* independent vendors */ }
+  try { target?._tmr?.push({ id: TOP_MAIL_COUNTER_ID, type: "reachGoal", goal, url: path, referrer: safeDocumentReferrer(document), params }); } catch { /* independent vendors */ }
 }

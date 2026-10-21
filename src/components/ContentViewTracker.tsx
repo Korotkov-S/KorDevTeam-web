@@ -6,19 +6,23 @@ export function ContentViewTracker({ entryId, onCount }: { entryId: string; onCo
   const { enabled, record } = useContentViews();
   useEffect(() => {
     if (!enabled) return;
-    let retired = false, started = false;
+    let retired = false, started = false, generation = 0;
     const start = () => {
       if (retired || started || document.visibilityState !== "visible" || (document as Document & { prerendering?: boolean }).prerendering) return;
       started = true;
+      const attempt = ++generation;
       void record(entryId).then(receipt => {
-        if (retired || !receipt || receipt.target.entryId !== entryId) return;
+        if (retired || attempt !== generation || !receipt || receipt.target.entryId !== entryId) return;
         onCount(receipt.views); trackUniqueContentOpen(receipt);
       }).catch(() => { /* a failed write does not hide the known SSR count */ });
     };
     // Coalesce React's synchronous StrictMode replay before starting any request.
     queueMicrotask(start);
+    const hide = () => { generation++; };
+    const restore = (event: PageTransitionEvent) => { if (event.persisted) { generation++; started = false; start(); } };
     document.addEventListener("visibilitychange", start); document.addEventListener("prerenderingchange", start);
-    return () => { retired = true; document.removeEventListener("visibilitychange", start); document.removeEventListener("prerenderingchange", start); };
+    window.addEventListener("pagehide", hide); window.addEventListener("pageshow", restore);
+    return () => { retired = true; window.removeEventListener("pagehide", hide); window.removeEventListener("pageshow", restore); document.removeEventListener("visibilitychange", start); document.removeEventListener("prerenderingchange", start); };
   }, [enabled, entryId, record, onCount]);
   return null;
 }

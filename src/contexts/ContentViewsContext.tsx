@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { useConsent } from "./ConsentContext";
-import { CONSENT_STORAGE_KEY, parseConsentRecord } from "../lib/consent";
+import { CONSENT_STORAGE_KEY, parseConsentRecord, readStoredConsent } from "../lib/consent";
 import { createViewSessionStore } from "../lib/contentViews/sessionStore";
 import { createContentViewsController, createViewTransport } from "../lib/contentViews/controller";
 import type { ViewReceipt } from "../lib/contentViews/contracts";
@@ -14,6 +14,7 @@ export function ContentViewsProvider({ enabled, children }: { enabled: boolean; 
   const store = useMemo(() => createViewSessionStore(), []);
   const allowed = useRef(false); allowed.current = enabled && restorationReady && decision === "accepted";
   const [controller, setController] = useState<ReturnType<typeof createContentViewsController> | null>(null);
+  const [restoreEpoch, setRestoreEpoch] = useState(0);
   useEffect(() => {
     if (!enabled || !restorationReady) return;
     if (decision !== "accepted") { void store.clear(); setController(null); return; }
@@ -26,10 +27,18 @@ export function ContentViewsProvider({ enabled, children }: { enabled: boolean; 
         allowed.current = false; current.dispose(); void store.clear();
       }
     };
-    window.addEventListener("pointerdown", activity, { passive: true }); window.addEventListener("keydown", activity);
+    const restore = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      allowed.current = enabled && readStoredConsent() === "accepted";
+      current.dispose();
+      if (!allowed.current) void store.clear();
+      setRestoreEpoch(value => value + 1);
+    };
+    window.addEventListener("pageshow", restore, true);
+    window.addEventListener("pointerdown", activity, { passive: true }); window.addEventListener("keydown", activity); window.addEventListener("wheel", activity, { passive: true });
     window.addEventListener("storage", revoke);
-    return () => { current.dispose(); window.removeEventListener("pointerdown", activity); window.removeEventListener("keydown", activity); window.removeEventListener("storage", revoke); };
-  }, [enabled, restorationReady, decision, store]);
+    return () => { current.dispose(); window.removeEventListener("pageshow", restore, true); window.removeEventListener("pointerdown", activity); window.removeEventListener("keydown", activity); window.removeEventListener("wheel", activity); window.removeEventListener("storage", revoke); };
+  }, [enabled, restorationReady, decision, store, restoreEpoch]);
   useEffect(() => { if (controller && visible()) controller.activity(); }, [controller, location.key]);
   const record = useCallback(async (id: string) => visible() && allowed.current && controller ? controller.record(id) : null, [controller]);
   return <ContentViewsContext.Provider value={{ enabled, record }}>{children}</ContentViewsContext.Provider>;

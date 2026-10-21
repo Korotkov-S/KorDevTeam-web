@@ -45,7 +45,9 @@ export function createContentViewsController(deps: { store: ViewSessionStore; tr
     if (!live()) return null;
     if (!activation) activation = (async () => {
       const s = await deps.store.getOrCreate(deps.clock());
-      if (!live()) { await deps.store.clear(); return null; }
+      // Disposing a component is not revocation: another owner may share this token.
+      // The consent provider owns clearing storage on an actual withdrawal.
+      if (!live()) return null;
       if (!s) return null;
       try { return await register(s); }
       catch (error) {

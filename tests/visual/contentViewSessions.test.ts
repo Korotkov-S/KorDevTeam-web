@@ -35,6 +35,9 @@ test("real IndexedDB shares first generation, refresh and exactly 30-minute rota
   const get = (p: Page, now: number) => p.evaluate(now => (window as any).ViewTest.createViewSessionStore().getOrCreate(now), now);
   const [a, b] = await Promise.all(pages.map(p => get(p, 1000)));
   assert.equal(a.token, b.token); assert.equal(a.generation, 1);
+  assert.equal((await get(pages[1], 999)).token, a.token, "clock regression must not create another session");
+  const activity = await pages[1].evaluate(() => (window as any).ViewTest.createViewSessionStore().noteActivity(998));
+  assert.equal(activity.token, a.token); assert.equal(activity.lastActivityAt, 1000);
   await pages[0].reload(); await pages[0].evaluate(code + ";window.ViewTest=ViewTest;");
   assert.equal((await get(pages[0], 1_800_999)).token, a.token);
   const rotated = await Promise.all(pages.map(p => get(p, 1_801_000)));
@@ -79,4 +82,21 @@ test("real consent revocation in tab B aborts tab A request and clears the share
   for (let n = 0; !aborted && n < 50; n++) await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(aborted, true);
   assert.equal(await a.evaluate(() => document.querySelector('script[data-kordev-analytics]') === null), true);
+});
+test("trusted wheel renews genuine activity, synthetic wheel and programmatic scrolling do not", { skip: !process.env.TEST_DATABASE_URL }, async t => {
+  await resetTestDatabase(process.env.TEST_DATABASE_URL!);
+  const runtime = await startTestRuntime({ CONTENT_VIEWS_ENABLED: "true" }); t.after(runtime.close);
+  const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] }); t.after(() => browser.close());
+  const page = await browser.newPage(); await install(page, runtime.origin, await bundle(), true); await page.bringToFront();
+  await page.waitForFunction(async () => !!await (window as any).ViewTest.createViewSessionStore().current());
+  const reset = () => page.evaluate(async () => {
+    const db: IDBDatabase = await new Promise(resolve => { const request = indexedDB.open("kordev-content-views", 1); request.onsuccess = () => resolve(request.result); });
+    await new Promise<void>(resolve => { const tx = db.transaction("session", "readwrite"); const store = tx.objectStore("session"); const get = store.get("current"); get.onsuccess = () => store.put({ ...get.result, lastActivityAt: Date.now() - 600_000 }, "current"); tx.oncomplete = () => resolve(); }); db.close();
+    return (await (window as any).ViewTest.createViewSessionStore().current()).lastActivityAt;
+  });
+  const previous = await reset();
+  await page.evaluate(() => { window.dispatchEvent(new WheelEvent("wheel", { deltaY: 100 })); window.scrollBy(0, 100); });
+  assert.equal(await page.evaluate(async () => (await (window as any).ViewTest.createViewSessionStore().current()).lastActivityAt), previous);
+  await page.mouse.move(400, 400); await page.mouse.wheel({ deltaY: 100 });
+  await page.waitForFunction(async old => (await (window as any).ViewTest.createViewSessionStore().current()).lastActivityAt > old, {}, previous);
 });

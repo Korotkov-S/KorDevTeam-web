@@ -6,6 +6,8 @@
 
 One published article/case is counted once per browser session, shared by same-origin tabs in IndexedDB. Thirty minutes without genuine activity starts a new session; another browser/device can count again. This is not a unique-person measurement. Indexable=false published materials remain eligible. Cards, SSR, GET/HEAD, prefetch and previews never write. No historical prefill.
 
+Visible trusted pointer, keyboard and wheel input count as activity; synthetic scrolling and idle timers do not. Shared timestamps never regress when a queued tab operation carries an older browser time; server expiry remains authoritative. Native BFCache restoration is a new opening (not a mere visibility change): reread consent first, then reuse/rotate the shared session and send one page hit. Unmounted owners cannot clear a replacement's session or tear down its analytics.
+
 Consent version: `2026-10-21-content-views-v1`. The banner and `/privacy/` disclose first-party counts, random session ID, 30-minute inactivity, 48-hour protective retention after expiry, persistent anonymous totals, short-lived hashed-IP rate limits, and withdrawal. Legacy acceptance requires a new choice. Rejection across tabs stops recording and clears the local session. SSR numbers remain public. Owner review of the exact final privacy text and SHA-256 is a release gate.
 
 ## Storage, limits and failure behavior
@@ -19,6 +21,8 @@ Enabled read failure shows “—”, never a fabricated zero; known SSR values 
 ## External analytics
 
 Existing counters only: Yandex Metrica `105288175`, Top.Mail.Ru `3793508`. Both receive pathname-only page views and `article_open_unique` / `case_open_unique` on a new server receipt. Parameters exactly `{contentType,slug,path}`; no own token, entry UUID, contacts, query or fragment. Historic `project_open` remains a Yandex click goal, not a case view. Yandex defer:true plus one explicit initial hit prevents automatic query-bearing/duplicate initial views; subsequent SPA paths use hit. Mail uses pageView/reachGoal queues. Consent withdrawal removes vendors; blocked vendors never roll back a server count.
+
+The initial HTTP(S) referrer retains only the external source origin (including AI referral domains), or a public pathname for same-origin navigation. Credentials, external private paths, query and fragment are discarded. Later SPA hits use the previous public pathname; no historic view replay after late consent.
 
 Official contracts: [Yandex SPA](https://yandex.ru/support/metrica/ru/code/counter-spa-setup), [Yandex goals](https://yandex.ru/support/metrica/ru/objects/reachgoal.html), [Mail JS API](https://top.mail.ru/help/ru/api/jsapi), [Mail SPA](https://top.mail.ru/help/ru/code/ajax).
 

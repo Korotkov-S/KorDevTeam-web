@@ -4,6 +4,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
 import { sql } from "drizzle-orm";
 import puppeteer, { type Page, type BrowserContext } from "puppeteer";
 import { createDb } from "../../src/server/db/client";
@@ -59,8 +60,9 @@ test("real opens, refresh, tabs, navigation and independent contexts obey sessio
   assert.equal(deliveredToQueues.mail.filter((call: any) => call.goal === "article_open_unique").length, 1);
   await a.p.reload(); await count(a.p, "1");
   const b = await page(context); await b.p.bringToFront(); await visit(b.p, f.runtime.origin, "/blog/a/"); await count(b.p, "1");
-  await b.p.click('a[href="/blog/b/"]'); await count(b.p, "1");
-  await b.p.goBack(); await count(b.p, "1"); await b.p.goForward(); await count(b.p, "1");
+  await b.p.click('a[href="/blog/b/"]'); await b.p.waitForFunction(() => location.pathname === "/blog/b/"); await count(b.p, "1");
+  await b.p.goBack(); await b.p.waitForFunction(() => location.pathname === "/blog/a/"); await count(b.p, "1");
+  await b.p.goForward(); await b.p.waitForFunction(() => location.pathname === "/blog/b/"); await count(b.p, "1");
   await visit(b.p, f.runtime.origin, "/cases/c/"); await count(b.p, "1");
   assert.deepEqual(await f.totals(), { a: "1", b: "1", c: "1" });
   const secondContext = await f.browser.createBrowserContext(); const other = await page(secondContext); await other.p.bringToFront(); await visit(other.p, f.runtime.origin, "/blog/a/"); await count(other.p, "2");
@@ -80,6 +82,43 @@ test("real opens, refresh, tabs, navigation and independent contexts obey sessio
   // Reloaded pages have no new unique receipt, hence no fabricated goal.
   assert.equal(goals.length, 0);
   await f.unchanged();
+});
+test("native BFCache reopening preserves current sessions, rotates expired ones and rereads consent", { skip: !enabled }, async t => {
+  const f = await setup(t);
+  // Puppeteer's default flag disables BFCache; use a separate browser with it enabled.
+  const browser = await puppeteer.launch({ headless: true, ignoreDefaultArgs: ["--disable-back-forward-cache"], args: ["--no-sandbox"] }); t.after(() => browser.close());
+  const blank = createServer((_req, res) => res.end("<!doctype html><title>Another document</title>"));
+  await new Promise<void>(resolve => blank.listen(0, "127.0.0.1", resolve)); t.after(() => new Promise<void>(resolve => blank.close(() => resolve())));
+  const address = blank.address(); assert.ok(address && typeof address !== "string");
+  const p = await browser.newPage(); await p.setViewport({ width: 1440, height: 1100 });
+  await p.setUserAgent("Mozilla/5.0 Chrome/133.0.0.0 Safari/537.36");
+  const cdp = await p.createCDPSession(); await cdp.send("Network.enable");
+  await cdp.send("Network.setBlockedURLs", { urls: ["*mc.yandex.ru*", "*top-fwz1.mail.ru*"] });
+  await p.evaluateOnNewDocument(({ key, version }) => {
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ version, decision: "accepted" }));
+    const now = Date.now.bind(Date); (window as any).clockOffset = 0; Date.now = () => now() + (window as any).clockOffset;
+    (window as any).restores = 0; window.addEventListener("pageshow", event => { if (event.persisted) (window as any).restores++; });
+  }, { key: CONSENT_STORAGE_KEY, version: CONSENT_VERSION });
+  await visit(p, f.runtime.origin, "/blog/a/"); await count(p, "1");
+  const reopen = async () => {
+    await p.goto(`http://127.0.0.1:${address.port}/`);
+    await p.goBack();
+    await p.waitForFunction(() => (window as any).restores > 0);
+  };
+  await reopen(); await count(p, "1");
+  await p.waitForFunction(() => (window as any)._tmr?.filter((item: any) => item.type === "pageView").length === 2);
+  assert.equal(await p.evaluate(() => (window as any)._tmr.filter((item: any) => item.type === "reachGoal").length), 1);
+  await p.evaluate(() => { (window as any).clockOffset = 1_800_001; });
+  await reopen(); await count(p, "2");
+  assert.equal(await p.evaluate(() => (window as any)._tmr.filter((item: any) => item.type === "pageView").length), 3);
+  assert.deepEqual(await f.totals(), { a: "2", b: "0", c: "0" });
+  await p.goto(`http://127.0.0.1:${address.port}/`);
+  const other = await browser.newPage();
+  await other.goto(f.runtime.origin + "/privacy/");
+  await other.evaluate(({ key, version }) => localStorage.setItem(key, JSON.stringify({ version, decision: "rejected" })), { key: CONSENT_STORAGE_KEY, version: CONSENT_VERSION });
+  await other.close(); await p.bringToFront(); await p.goBack();
+  await p.waitForFunction(() => (window as any).restores >= 3 && !(window as any)._tmr);
+  assert.deepEqual(await f.totals(), { a: "2", b: "0", c: "0" }); await f.unchanged();
 });
 test("hover prefetch and background tab do not count before visible activation", { skip: !enabled }, async t => {
   const f = await setup(t); const front = await page(f.browser.defaultBrowserContext()); const hidden = await page(f.browser.defaultBrowserContext());

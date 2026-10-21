@@ -41,3 +41,8 @@ export function createConsentRecord(
     decidedAt: decidedAt.toISOString(),
   };
 }
+
+export function readStoredConsent(): ConsentDecision {
+  try { return parseConsentRecord(window.localStorage.getItem(CONSENT_STORAGE_KEY)); }
+  catch { return "unknown"; }
+}

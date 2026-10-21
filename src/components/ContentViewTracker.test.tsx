@@ -25,3 +25,22 @@ test("unmounted page or revoked context ignores late receipt", async () => {
   await act(async () => {}); view.unmount();
   await act(async () => finish({ counted: true, views: "1", target: { entryId: "a", kind: "article", slug: "a", path: "/blog/a/" } })); assert.equal(updates, 0);
 });
+test("BFCache restore records a real reopening, not normal pageshow or mere visibility", async () => {
+  Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+  let calls = 0; const values: string[] = []; let finish: (value: any) => void = () => {};
+  const record = async (id: string) => {
+    calls++;
+    if (calls === 1) return new Promise<any>(resolve => { finish = resolve; });
+    return { counted: false, views: "2", target: { entryId: id, kind: "article" as const, slug: "a", path: "/blog/a/" } };
+  };
+  render(<ContentViewsTestProvider value={{ enabled: true, record }}><ContentViewTracker entryId="a" onCount={value => values.push(value)} /></ContentViewsTestProvider>);
+  await act(async () => {}); assert.equal(calls, 1);
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: false })));
+  assert.equal(calls, 1);
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: true })));
+  assert.equal(calls, 2); assert.deepEqual(values, ["2"]);
+  await act(async () => finish({ counted: true, views: "1", target: { entryId: "a", kind: "article", slug: "a", path: "/blog/a/" } }));
+  assert.deepEqual(values, ["2"], "pre-restore replies must not overwrite the restored result");
+  await act(async () => document.dispatchEvent(new dom.window.Event("visibilitychange")));
+  assert.equal(calls, 2);
+});
