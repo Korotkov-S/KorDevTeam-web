@@ -54,6 +54,9 @@ x-web: &web
     <<: [*lead-web-environment, *admin-media-environment, *email-environment, *vk-ads-read-environment, *vk-lead-webhook-environment]
     NODE_ENV: production
     CONTENT_CACHE_TTL_SECONDS: "0"
+    CONTENT_VIEWS_ENABLED: ${CONTENT_VIEWS_ENABLED:-false}
+    CONTENT_VIEWS_TRUSTED_ORIGIN: ${CONTENT_VIEWS_TRUSTED_ORIGIN:-https://kordev.team}
+    CONTENT_VIEWS_HASH_KEY: ${CONTENT_VIEWS_HASH_KEY:-}
     PORT: "3001"
     DATABASE_URL: postgresql://kordev:kordev@postgres:5432/kordev
   read_only: true

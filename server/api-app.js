@@ -18,7 +18,7 @@ function allowCorsOrigin(origin, callback) {
   callback(null, false);
 }
 
-function createApiApp({ checkReady, leadRouter, vkLeadRouter } = {}) {
+function createApiApp({ checkReady, leadRouter, vkLeadRouter, contentViewsRouter } = {}) {
   const api = express.Router();
   const apiOnly = (middleware) => (req, res, next) =>
     req.path === "/api" || req.path.startsWith("/api/") ? middleware(req, res, next) : next();
@@ -29,6 +29,7 @@ function createApiApp({ checkReady, leadRouter, vkLeadRouter } = {}) {
   // The VK callback authenticates in its path and must terminate before generic
   // request logging/body parsers can expose that token or lead contact data.
   if (vkLeadRouter) api.use("/api/vk/leads", vkLeadRouter);
+  if (contentViewsRouter) api.use("/api/content-views", contentViewsRouter);
   api.use(cors({ origin: allowCorsOrigin }));
   api.use(apiOnly(express.json({ limit: process.env.JSON_LIMIT || "25mb" })));
   api.use(apiOnly(
