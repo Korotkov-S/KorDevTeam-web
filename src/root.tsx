@@ -79,7 +79,7 @@ export default function App() {
         <PublicFooter />
       </ConsentShell>
       <ConsentBanner />
-      <AnalyticsScripts />
+      <AnalyticsScripts path={location.pathname} />
       </ContentViewsProvider>
     </ConsentProvider>
   );

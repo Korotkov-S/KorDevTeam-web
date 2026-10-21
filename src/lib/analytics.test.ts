@@ -8,6 +8,7 @@ import {
   setAnalyticsConsent,
   setAnalyticsSinkForTests,
   track,
+  trackPublicPageView,
 } from "./analytics";
 import { trackYandexGoal } from "../analytics/yandexMetrika";
 
@@ -17,6 +18,27 @@ type AnalyticsWindow = Window & typeof globalThis & {
 };
 
 let dom: JSDOM;
+
+test("SPA page hits normalize paths, suppress first/query/hash duplicates and preserve back navigation", () => {
+  setAnalyticsConsent(document, true); loadYandexMetrika(document); loadTopMailRu(document);
+  const target = window as AnalyticsWindow;
+  trackPublicPageView({ path: "/services/integrations/?secret=contact#hash" });
+  trackPublicPageView({ path: "/blog/a/?secret=contact", referrerPath: "/services/integrations/?token=private" });
+  trackPublicPageView({ path: "/blog/a/#anchor" });
+  trackPublicPageView({ path: "/services/integrations/" });
+  trackPublicPageView({ path: "/admin/" });
+  assert.deepEqual(target.ym?.a?.filter(call => call[1] === "hit").map(call => call[2]), ["/services/integrations/", "/blog/a/", "/services/integrations/"]);
+  assert.deepEqual(target._tmr?.filter(call => call.type === "pageView").map(call => call.url), ["/services/integrations/", "/blog/a/", "/services/integrations/"]);
+  assert.doesNotMatch(JSON.stringify([target.ym?.a, target._tmr]), /secret|contact|token|private|#anchor/);
+});
+test("missing/throwing vendors never break public page hits, and revocation stops them", () => {
+  setAnalyticsConsent(document, true); loadYandexMetrika(document); loadTopMailRu(document);
+  (window as AnalyticsWindow).ym = () => { throw Error("vendor blocked"); };
+  assert.doesNotThrow(() => trackPublicPageView({ path: "/blog/a/" }));
+  assert.equal((window as AnalyticsWindow)._tmr?.at(-1)?.url, "/blog/a/");
+  setAnalyticsConsent(document, false); trackPublicPageView({ path: "/cases/b/" });
+  assert.equal((window as AnalyticsWindow)._tmr, undefined);
+});
 
 beforeEach(() => {
   dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", {
