@@ -69,7 +69,7 @@ export function ConsentBanner() {
               Настройки аналитики
             </h2>
             <p id="consent-dialog-description" className="mt-2 max-w-2xl text-sm leading-6 text-[var(--public-subtle)] sm:text-base">
-              Мы используем Яндекс.Метрику и Top.Mail.Ru только с вашего разрешения. Отказ не ограничивает работу сайта.
+              Только с вашего разрешения мы считаем открытия статей и кейсов за сеанс, а также используем Яндекс.Метрику и Top.Mail.Ru. Отказ не ограничивает работу сайта.
             </p>
             <p className="mt-2 text-sm font-medium text-[var(--public-ink)]">{currentChoice}</p>
           </div>

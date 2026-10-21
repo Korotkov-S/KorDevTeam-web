@@ -85,6 +85,17 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("kordev:open-consent-settings", openSettings);
   }, [openSettings]);
 
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key === CONSENT_STORAGE_KEY || event.key === null) {
+        setDecision(parseConsentRecord(event.newValue));
+        setSettingsOpen(false);
+      }
+    };
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
+
   return (
     <ConsentContext.Provider value={{
       decision,

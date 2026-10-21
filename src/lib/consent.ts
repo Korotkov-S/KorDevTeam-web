@@ -1,4 +1,4 @@
-export const CONSENT_VERSION = "2026-09-18" as const;
+export const CONSENT_VERSION = "2026-10-21-content-views-v1" as const;
 export const CONSENT_STORAGE_KEY = "kordev.analytics-consent" as const;
 
 export type ConsentDecision = "unknown" | "accepted" | "rejected";
