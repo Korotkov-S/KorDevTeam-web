@@ -6,6 +6,7 @@ import { CasesPage } from "../pages/CasesPage";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import type { RouteSeoInput } from "../server/seo/metadata";
 import { getEntryMediaMaps } from "../server/media/presentation";
+import { readPublishedViewCounts } from "../server/content-views/read";
 export { headers } from "../server/http/cacheHeaders";
 export { meta } from "./home";
 
@@ -18,7 +19,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     description: isCases ? "Проекты KorDevTeam: задачи, решения и технологии разработки веб-сервисов, приложений и автоматизации." : "Услуги KorDevTeam: разработка веб-сервисов, мобильных приложений, CRM и интеграций для бизнеса." };
   if (!isCases) return data({ seo, catalog: "services" as const, entries: entries.map(serviceCard) }, { headers: documentHeaders });
   const media = await getEntryMediaMaps(entries.map(entry => entry.id));
-  return data({ seo, catalog: "cases" as const, entries: entries.map(entry => caseCard(entry, media[entry.id])) }, { headers: documentHeaders });
+  const counts = await readPublishedViewCounts(entries.map(entry => entry.id));
+  return data({ seo, catalog: "cases" as const, entries: entries.map(entry => caseCard(entry, media[entry.id], counts[entry.id])) }, { headers: documentHeaders });
 }
 export default function Catalog() {
   const value = useLoaderData<typeof loader>();

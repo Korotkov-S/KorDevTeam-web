@@ -6,6 +6,7 @@ import { LeadCtaSection } from "../components/public/LeadCtaSection";
 import { Section } from "../components/public/Section";
 import { ServiceCard } from "../components/public/ServiceCard";
 import type { BlockView, CommercialCaseView } from "../server/content/types";
+import { MaterialViewCount } from "../components/ContentViewTracker";
 
 type CaseSectionName = "hero" | "problem" | "solution" | "stages" | "team" | "screenshots" | "results" | "testimonial" | "services" | "cases" | "lead";
 
@@ -165,7 +166,7 @@ function CaseScreenshotSlider({ images, heading }: { images: CommercialCaseView[
   );
 }
 
-export function CommercialCasePage({ pathname, project }: { pathname: string; project: CommercialCaseView }) {
+export function CommercialCasePage({ pathname, project, entryId }: { pathname: string; project: CommercialCaseView; entryId?: string }) {
   const hasProblem = Boolean(project.problem) || project.constraints.length > 0;
   const hasSolution = Boolean(project.solution || project.architecture || project.bodyMd.trim())
     || project.integrations.length > 0 || project.technologies.length > 0 || project.features.length > 0;
@@ -191,6 +192,7 @@ export function CommercialCasePage({ pathname, project }: { pathname: string; pr
           <div className="overflow-hidden rounded-[2rem] bg-[#dfe8ff] px-6 py-9 text-[#0b1020] dark:bg-[#18243c] dark:text-white sm:rounded-[3rem] sm:px-10 sm:py-12 lg:px-14 lg:py-16">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#6541d8] dark:text-[#b7a7ff]">Кейс KorDevTeam</p>
             <h1 className="mt-7 max-w-[17ch] text-balance text-[clamp(3rem,7vw,7rem)] font-semibold leading-[.9] tracking-[-0.065em]">{project.h1}</h1>
+            {project.viewCount !== undefined && <div className="mt-4 text-sm text-[var(--public-subtle)]"><MaterialViewCount entryId={entryId} value={project.viewCount} /></div>}
             <div className="mt-9 grid gap-7 border-t border-black/15 pt-7 dark:border-white/15 lg:grid-cols-12">
               <p className="max-w-3xl text-xl leading-8 text-[#3f4a60] dark:text-[#c0c8d8] sm:text-2xl lg:col-span-8">{project.summary}</p>
               {(project.demoUrl || project.githubUrl) ? (

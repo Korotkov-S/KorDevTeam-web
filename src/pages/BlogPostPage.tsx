@@ -15,6 +15,7 @@ import type { MediaPresentationMap } from "../server/media/presentation";
 import type { BlogCategorySlug } from "../lib/blogCategories";
 import { blogCategoryPath, type BlogCategoryDefinition } from "../lib/blogCategories";
 import { BlogCard, type BlogPostCardView } from "../components/BlogCard";
+import { MaterialViewCount } from "../components/ContentViewTracker";
 
 interface BlogPostMeta {
   title: string;
@@ -142,6 +143,7 @@ function PostImageCarousel({
 }
 
 export type ArticlePresentation = {
+  viewCount?: string | null;
   title: string; excerpt: string; bodyMd: string; publishedAt?: string; updatedAt?: string;
   readTime: string; tags: string[]; coverUrl: string; imageUrls: string[]; media?: MediaPresentationMap;
   category: BlogCategorySlug | null;
@@ -150,10 +152,12 @@ export function BlogPostPage({
   article,
   category,
   relatedArticles,
+  entryId,
 }: {
   article: ArticlePresentation;
   category: Pick<BlogCategoryDefinition, "slug" | "title"> | null;
   relatedArticles: BlogPostCardView[];
+  entryId?: string;
 }) {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -224,6 +228,7 @@ export function BlogPostPage({
               <h1 className="mt-7 max-w-[18ch] break-words text-balance text-[clamp(2.625rem,7vw,7.2rem)] font-semibold leading-[.91] tracking-[-0.065em] text-[var(--public-ink)] sm:text-[clamp(3rem,7vw,7.2rem)]" itemProp="headline">
                 {meta.title}
               </h1>
+              {article.viewCount !== undefined && <div className="mt-4 text-sm text-[var(--public-subtle)]"><MaterialViewCount entryId={entryId} value={article.viewCount} /></div>}
 
               {meta.tags.length ? (
                 <ul className="mt-8 flex flex-wrap gap-2" aria-label="Темы статьи">

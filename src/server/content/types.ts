@@ -14,8 +14,8 @@ export type CtaView = { title: string | null; text: string | null; type: CtaType
 export type ServiceCardView = { slug: string; title: string; summary: string; priority: boolean };
 export const caseCategory = z.enum(["automation", "crm", "mobile", "web-service", "commerce", "support", "own-product"]);
 export type CaseCategory = z.output<typeof caseCategory>;
-export type CaseCardView = { slug: string; title: string; summary: string; result: string | null; image: ResolvedMediaAsset | null; tags: string[]; categories?: CaseCategory[]; catalogOrder?: number | null; catalogVisible?: boolean };
-export type ContentCardView = { slug: string; title: string; summary: string; image: ResolvedMediaAsset | null; tags: string[] };
+export type CaseCardView = { viewCount?: string | null; slug: string; title: string; summary: string; result: string | null; image: ResolvedMediaAsset | null; tags: string[]; categories?: CaseCategory[]; catalogOrder?: number | null; catalogVisible?: boolean };
+export type ContentCardView = { viewCount?: string | null; slug: string; title: string; summary: string; image: ResolvedMediaAsset | null; tags: string[] };
 export type FaqView = { question: string; answer: string };
 export type ServicePageView = {
   h1: string;
@@ -51,7 +51,7 @@ export type ServicePageView = {
   faq: FaqView[];
   cta: CtaView;
 };
-export type CommercialCaseView = { slug: string; h1: string; summary: string; problem: string | null; constraints: string[]; solution: string | null; architecture: string | null; integrations: string[]; technologies: string[]; features: string[]; stages: BlockView[]; team: string[]; screenshots: ResolvedMediaAsset[]; media: MediaPresentationMap; results: BlockView[]; testimonial: string | null; bodyMd: string; demoUrl: string | null; githubUrl: string | null; relatedServices: ServiceCardView[]; relatedCases: CaseCardView[]; cta: CtaView };
+export type CommercialCaseView = { viewCount?: string | null; slug: string; h1: string; summary: string; problem: string | null; constraints: string[]; solution: string | null; architecture: string | null; integrations: string[]; technologies: string[]; features: string[]; stages: BlockView[]; team: string[]; screenshots: ResolvedMediaAsset[]; media: MediaPresentationMap; results: BlockView[]; testimonial: string | null; bodyMd: string; demoUrl: string | null; githubUrl: string | null; relatedServices: ServiceCardView[]; relatedCases: CaseCardView[]; cta: CtaView };
 
 const block = z.strictObject({ title: z.string(), description: z.string() });
 const linkedBlock = block.extend({ href: z.url() });

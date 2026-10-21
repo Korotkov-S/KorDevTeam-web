@@ -93,18 +93,19 @@ export function legacyCaseContent(entry: ContentEntry, media: MediaPresentationM
     problem, constraints, solution, architecture, integrations, team, testimonial };
 }
 
-export function articlePresentation(entry: ContentEntry, media: MediaPresentationMap = {}): ArticlePresentation {
-  return { title: text(entry.payload.h1) || entry.title, excerpt: entry.excerpt, bodyMd: entry.bodyMd,
+export function articlePresentation(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null): ArticlePresentation {
+  return { ...(viewCount === null || typeof viewCount === "string" ? { viewCount } : {}), title: text(entry.payload.h1) || entry.title, excerpt: entry.excerpt, bodyMd: entry.bodyMd,
     publishedAt: entry.publishedAt?.toISOString(), updatedAt: entry.updatedAt.toISOString(),
     readTime: text(entry.payload.readTime), tags: strings(entry.payload.tags),
     category: isBlogCategorySlug(entry.payload.category) ? entry.payload.category : null,
     coverUrl: mediaUrl(text(entry.payload.coverUrl), media), imageUrls: strings(entry.payload.imageUrls).map(value => mediaUrl(value, media)), media };
 }
 
-export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {}) {
+export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null) {
   const article = articlePresentation(entry, media);
   return {
     id: entry.id,
+    ...(viewCount === null || typeof viewCount === "string" ? { viewCount } : {}),
     slug: entry.slug,
     title: article.title,
     excerpt: article.excerpt,

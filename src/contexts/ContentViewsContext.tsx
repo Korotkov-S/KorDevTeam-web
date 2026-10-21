@@ -7,7 +7,7 @@ import { createContentViewsController, createViewTransport } from "../lib/conten
 import type { ViewReceipt } from "../lib/contentViews/contracts";
 
 type Context = { enabled: boolean; record: (entryId: string) => Promise<ViewReceipt | null> };
-const ContentViewsContext = createContext<Context>({ enabled: false, record: async () => null });
+export const ContentViewsContext = createContext<Context>({ enabled: false, record: async () => null });
 const visible = () => document.visibilityState === "visible" && !(document as Document & { prerendering?: boolean }).prerendering;
 export function ContentViewsProvider({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const { decision, restorationReady } = useConsent(); const location = useLocation();

@@ -41,6 +41,10 @@ const { selectPublishedRelatedEntries } = require("../routes/blog-post") as type
 const businessCategory = getBlogCategory("business-automation")!;
 
 afterEach(cleanup);
+test("article detail renders its supplied count and preserves its factual body", () => {
+  render(<MemoryRouter initialEntries={["/blog/a/"]}><BlogPostPage article={{ title: "Article", excerpt: "Lead", bodyMd: "Сохранённый текст статьи", tags: [], readTime: "5 мин", coverUrl: "", imageUrls: [], category: null, viewCount: "21" }} category={null} relatedArticles={[]} /></MemoryRouter>);
+  assert.ok(screen.getByLabelText("21 просмотр")); assert.ok(screen.getByText("Сохранённый текст статьи"));
+});
 
 test("article opens with a visible lead and a personal author byline", () => {
   render(

@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import type { CaseCardView } from "../../server/content/types";
 import { track } from "../../lib/analytics";
+import { ViewCount } from "../public/ViewCount";
 
 const layouts = ["wide", "compact", "compact", "wide"] as const;
 const cardStyles = [
@@ -48,6 +49,7 @@ export function HomeCaseMosaic({ projects }: { projects: CaseCardView[] }) {
               {project.tags.slice(0, 2).map(tag => <span key={tag} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#10131f]">{tag}</span>)}
             </div>
             <h3 className={`max-w-3xl text-balance font-medium leading-[0.98] tracking-[-0.045em] ${isWide ? "text-4xl sm:text-5xl" : "text-3xl sm:text-4xl"}`}>{project.title}</h3>
+            {project.viewCount !== undefined && <ViewCount value={project.viewCount} className="mt-4 text-sm text-white/82" />}
             <p className="mt-5 max-w-2xl text-base leading-7 text-white/82 sm:text-lg">{project.result ?? project.summary}</p>
             <span className="mt-auto pt-8 text-sm font-semibold">Смотреть кейс <span aria-hidden="true">↗</span></span>
           </div>

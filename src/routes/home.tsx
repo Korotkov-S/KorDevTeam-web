@@ -5,6 +5,7 @@ import { serviceCard, caseCard, contentCard, curateCaseCards } from "../server/c
 import { buildRouteMeta, type RouteSeoInput } from "../server/seo/metadata";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMaps } from "../server/media/presentation";
+import { readPublishedViewCounts } from "../server/content-views/read";
 export { headers } from "../server/http/cacheHeaders";
 
 export const PRIORITY_SERVICE_SLUGS = ["business-process-automation", "web-services", "mobile-app-development"] as const;
@@ -16,8 +17,9 @@ export async function loader() {
   const selectedArticles = articles.filter(entry => entry.indexable).sort((left, right) =>
     (right.publishedAt?.getTime() ?? 0) - (left.publishedAt?.getTime() ?? 0) || left.slug.localeCompare(right.slug),
   ).slice(0, 3);
-  const media = await getEntryMediaMaps([...selectedArticles, ...cases].map(entry => entry.id));
-  const selectedCases = curateCaseCards(cases.map(entry => caseCard(entry, media[entry.id]))).slice(0, 4);
+  const ids = [...selectedArticles, ...cases].map(entry => entry.id);
+  const [media, counts] = await Promise.all([getEntryMediaMaps(ids), readPublishedViewCounts(ids)]);
+  const selectedCases = curateCaseCards(cases.map(entry => caseCard(entry, media[entry.id], counts[entry.id]))).slice(0, 4);
   const priorityRank = (slug: string) => {
     const index = PRIORITY_SERVICE_SLUGS.findIndex(priority => priority === slug);
     return index < 0 ? PRIORITY_SERVICE_SLUGS.length : index;
@@ -29,7 +31,7 @@ export async function loader() {
     seo,
     services: services.map(serviceCard).map(service => ({ ...service, priority: priorityRank(service.slug) < PRIORITY_SERVICE_SLUGS.length }))
       .sort((left, right) => priorityRank(left.slug) - priorityRank(right.slug)),
-    posts: selectedArticles.map(entry => contentCard(entry, media[entry.id])),
+    posts: selectedArticles.map(entry => contentCard(entry, media[entry.id], counts[entry.id])),
     projects: selectedCases,
   }, { headers: documentHeaders });
 }

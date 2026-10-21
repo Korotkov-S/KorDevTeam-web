@@ -55,6 +55,12 @@ function caseView(overrides: Partial<CommercialCaseView> = {}): CommercialCaseVi
 }
 
 afterEach(cleanup);
+test("case details expose a real zero and unavailable state without replacing the body", () => {
+  const view = render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView({ viewCount: "0", bodyMd: "Сохранённый текст" })} /></MemoryRouter>);
+  assert.ok(screen.getByLabelText("0 просмотров")); assert.ok(screen.getByText("Сохранённый текст"));
+  view.rerender(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView({ viewCount: null, bodyMd: "Сохранённый текст" })} /></MemoryRouter>);
+  assert.ok(screen.getByLabelText("Просмотры недоступны"));
+});
 
 test("case page omits unsupported proof and preserves the narrative order", () => {
   render(<MemoryRouter><CommercialCasePage pathname="/cases/example/" project={caseView()} /></MemoryRouter>);

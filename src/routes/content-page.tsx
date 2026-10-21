@@ -7,6 +7,7 @@ import { entrySeo } from "../server/content/presentation";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMap, getEntryMediaMaps } from "../server/media/presentation";
+import { readPublishedViewCounts } from "../server/content-views/read";
 export { headers } from "../server/http/cacheHeaders";
 export { meta } from "./home";
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -22,7 +23,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     ]);
     const mediaMaps = await getEntryMediaMaps([entry, ...relatedCases, ...relatedArticles].map(value => value.id));
     const media = Object.assign({}, ...Object.values(mediaMaps));
-    const service = servicePage(entry, media, relatedCases, relatedArticles, faqEntries);
+    const counts = await readPublishedViewCounts([...relatedCases, ...relatedArticles].map(value => value.id));
+    const service = servicePage(entry, media, relatedCases, relatedArticles, faqEntries, counts);
     const seo = {
       ...entrySeo(entry, pathname, mediaMaps[entry.id]),
       breadcrumbs: [

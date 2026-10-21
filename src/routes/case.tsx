@@ -6,6 +6,7 @@ import { entrySeo } from "../server/content/presentation";
 import { commercialCasePage } from "../server/content/commercialPresentation";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMaps } from "../server/media/presentation";
+import { readPublishedViewCounts } from "../server/content-views/read";
 export { headers } from "../server/http/cacheHeaders";
 export { meta } from "./home";
 
@@ -19,10 +20,11 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   ]);
   const mediaMaps = await getEntryMediaMaps([entry, ...relatedServices, ...relatedCases].map(value => value.id));
   const media = Object.assign({}, ...Object.values(mediaMaps));
+  const counts = await readPublishedViewCounts([entry, ...relatedCases].map(value => value.id));
   return data({ seo: entrySeo(entry, pathname, mediaMaps[entry.id]), pathname, identity: { id: entry.id, version: entry.version },
-    project: commercialCasePage(entry, media, relatedServices, relatedCases) }, { headers: documentHeaders });
+    project: commercialCasePage(entry, media, relatedServices, relatedCases, counts) }, { headers: documentHeaders });
 }
 export default function Case() {
   const value = useLoaderData<typeof loader>();
-  return <PublishedContentIdentity {...value.identity}><CommercialCasePage pathname={value.pathname} project={value.project} /></PublishedContentIdentity>;
+  return <PublishedContentIdentity {...value.identity}><CommercialCasePage key={value.identity.id} entryId={value.identity.id} pathname={value.pathname} project={value.project} /></PublishedContentIdentity>;
 }

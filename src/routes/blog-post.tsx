@@ -6,6 +6,7 @@ import { articleCard, articlePresentation, entrySeo } from "../server/content/pr
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMap, getEntryMediaMaps } from "../server/media/presentation";
 import { getBlogCategory } from "../lib/blogCategories";
+import { readPublishedViewCounts } from "../server/content-views/read";
 export { headers } from "../server/http/cacheHeaders";
 export { meta } from "./home";
 
@@ -28,6 +29,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     : [];
   const allArticles = await listPublishedEntries("article");
   const relatedEntries = selectPublishedRelatedEntries(relatedSlugs, allArticles);
+  const counts = await readPublishedViewCounts([entry, ...relatedEntries].map(value => value.id));
   const [media, relatedMedia] = await Promise.all([
     getEntryMediaMap(entry.id),
     getEntryMediaMaps(relatedEntries.map(relatedEntry => relatedEntry.id)),
@@ -35,12 +37,12 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   return data({
     identity: { id: entry.id, version: entry.version },
     seo: entrySeo(entry, new URL(request.url).pathname, media),
-    article: articlePresentation(entry, media),
+    article: articlePresentation(entry, media, counts[entry.id]),
     category,
-    relatedArticles: relatedEntries.map(relatedEntry => articleCard(relatedEntry, relatedMedia[relatedEntry.id])),
+    relatedArticles: relatedEntries.map(relatedEntry => articleCard(relatedEntry, relatedMedia[relatedEntry.id], counts[relatedEntry.id])),
   }, { headers: documentHeaders });
 }
 export default function BlogPost() {
   const value = useLoaderData<typeof loader>();
-  return <PublishedContentIdentity {...value.identity}><BlogPostPage article={value.article} category={value.category} relatedArticles={value.relatedArticles} /></PublishedContentIdentity>;
+  return <PublishedContentIdentity {...value.identity}><BlogPostPage key={value.identity.id} entryId={value.identity.id} article={value.article} category={value.category} relatedArticles={value.relatedArticles} /></PublishedContentIdentity>;
 }
