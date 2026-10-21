@@ -25,7 +25,47 @@ const require = createRequire(import.meta.url);
 const { cleanup, render } = require("@testing-library/react");
 require("../i18n");
 const { Blog } = require("./Blog") as typeof import("./Blog");
+const { BlogCard } = require("./BlogCard") as typeof import("./BlogCard");
 afterEach(cleanup);
+
+const cardPost = {
+  id: "placeholder-story", slug: "placeholder-story", title: "Статья без обложки",
+  excerpt: "Практический материал.", date: "2026-10-21", readTime: "5 мин",
+  tags: [], category: null,
+};
+
+test("blog fallback artwork fits completely with padding inside the existing card frame", () => {
+  for (const fallbackSrc of ["/opengraphlogo.jpeg", "/projects/wowbanner.png", "/projects/harmonizeMe.png", "/projects/sims.png"]) {
+    const markup = renderToStaticMarkup(<StaticRouter location="/blog/">
+      <BlogCard post={{ ...cardPost, coverUrl: "  ", imageUrls: [""] }} fallbackSrc={fallbackSrc} actionLabel="Читать далее" />
+    </StaticRouter>);
+    const image = new JSDOM(markup).window.document.querySelector("img")!;
+    assert.equal(image.getAttribute("src"), fallbackSrc);
+    assert.ok(image.classList.contains("aspect-[16/10]"), "card proportions must stay unchanged");
+    assert.ok(image.classList.contains("object-contain"), "fallback artwork must not be cropped");
+    assert.ok(image.classList.contains("p-6"), "fallback artwork needs breathing room");
+    assert.equal(image.classList.contains("object-cover"), false);
+  }
+});
+
+test("real blog covers and gallery images retain their full-bleed presentation", () => {
+  for (const media of [
+    { coverUrl: "/editorial-photo.jpg", imageUrls: ["/inside.jpg"] },
+    { coverUrl: "", imageUrls: [" /only-source-photo.jpg "] },
+    { coverUrl: "/opengraphlogo.jpeg", imageUrls: [] },
+  ]) {
+    const markup = renderToStaticMarkup(<StaticRouter location="/blog/">
+      <BlogCard post={{ ...cardPost, ...media }} fallbackSrc="/opengraphlogo.jpeg" actionLabel="Читать далее" />
+    </StaticRouter>);
+    const images = new JSDOM(markup).window.document.querySelectorAll("img");
+    assert.ok(images.length > 0);
+    for (const image of images) {
+      assert.ok(image.classList.contains("object-cover"));
+      assert.equal(image.classList.contains("object-contain"), false);
+      assert.equal(image.classList.contains("p-6"), false);
+    }
+  }
+});
 
 test("blog cards preserve ordered media and SSR article microdata", () => {
   const markup = renderToStaticMarkup(<StaticRouter location="/blog/"><Blog mode="index" posts={[{
