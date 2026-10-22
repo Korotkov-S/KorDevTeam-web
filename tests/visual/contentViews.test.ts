@@ -124,7 +124,9 @@ test("hover prefetch and background tab do not count before visible activation",
   const f = await setup(t); const front = await page(f.browser.defaultBrowserContext()); const hidden = await page(f.browser.defaultBrowserContext());
   await front.p.bringToFront(); await visit(front.p, f.runtime.origin, "/blog/");
   await front.p.hover('a[href="/blog/a/"]');
-  await hidden.p.goto(f.runtime.origin + "/blog/a/"); await hidden.p.waitForFunction(() => document.documentElement.dataset.hydrated === "true");
+  await hidden.p.goto(f.runtime.origin + "/blog/a/");
+  // Background tabs suspend animation frames; hydration changes a DOM attribute.
+  await hidden.p.waitForFunction(() => document.documentElement.dataset.hydrated === "true", { polling: "mutation" });
   assert.equal(await hidden.p.evaluate(() => document.visibilityState), "hidden");
   assert.deepEqual(await f.totals(), { a: "0", b: "0", c: "0" });
   await hidden.p.bringToFront(); await count(hidden.p, "1"); await f.unchanged();
