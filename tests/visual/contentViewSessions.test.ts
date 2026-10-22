@@ -21,7 +21,8 @@ async function install(page: Page, origin: string, code: string, accepted = fals
     page.on("request", request => { if (/mc\.yandex|top-fwz1/.test(request.url())) void request.abort(); else void request.continue(); });
   }
   await page.goto(`${origin}/privacy/`);
-  await page.waitForFunction(() => document.documentElement.dataset.hydrated === "true");
+  // Parallel installation leaves one tab hidden, where animation frames pause.
+  await page.waitForFunction(() => document.documentElement.dataset.hydrated === "true", { polling: "mutation" });
   if (!accepted) await page.waitForSelector('[role="dialog"]');
   else await page.waitForSelector('script[data-kordev-analytics]');
   await page.evaluate(code + ";window.ViewTest=ViewTest;");
