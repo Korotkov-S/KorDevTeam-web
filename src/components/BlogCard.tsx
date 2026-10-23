@@ -14,6 +14,7 @@ export type BlogPostCardView = {
   category: BlogCategorySlug | null;
   coverUrl?: string;
   imageUrls?: string[];
+  viewCount?: string | null;
 };
 
 function normalizePublicAssetUrl(url: string | undefined): string {
@@ -52,6 +53,7 @@ function blogContentCard(post: BlogPostCardView, images: ReturnType<typeof blogM
     summary: post.excerpt,
     tags: post.tags ?? [],
     image: images[0] ?? null,
+    viewCount: post.viewCount,
   };
 }
 

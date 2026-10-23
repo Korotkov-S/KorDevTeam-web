@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import puppeteer from "puppeteer";
 import { startTestRuntime } from "./support/runtime";
+import { CONSENT_VERSION } from "../../src/lib/consent";
 
 test("actual router route-import failures reload once per release then render the safe boundary", { timeout: 45_000 }, async t => {
   const runtime = await startTestRuntime();
@@ -10,11 +11,11 @@ test("actual router route-import failures reload once per release then render th
   t.after(() => browser.close());
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 1000 });
-  await page.evaluateOnNewDocument(() => localStorage.setItem("kordev.analytics-consent", JSON.stringify({
-    version: "2026-09-18",
+  await page.evaluateOnNewDocument(version => localStorage.setItem("kordev.analytics-consent", JSON.stringify({
+    version,
     decision: "rejected",
     decidedAt: "2026-09-18T09:00:00.000Z",
-  })));
+  })), CONSENT_VERSION);
   const clickDesktopBlogLink = () => page.$eval('header nav a[href="/blog/"]', anchor => {
     if (getComputedStyle(anchor.closest("nav")!).display === "none") {
       throw new Error("Desktop blog navigation must be visible");

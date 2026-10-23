@@ -1,4 +1,4 @@
-export const CONSENT_VERSION = "2026-09-18" as const;
+export const CONSENT_VERSION = "2026-10-21-content-views-v1" as const;
 export const CONSENT_STORAGE_KEY = "kordev.analytics-consent" as const;
 
 export type ConsentDecision = "unknown" | "accepted" | "rejected";
@@ -40,4 +40,9 @@ export function createConsentRecord(
     decision,
     decidedAt: decidedAt.toISOString(),
   };
+}
+
+export function readStoredConsent(): ConsentDecision {
+  try { return parseConsentRecord(window.localStorage.getItem(CONSENT_STORAGE_KEY)); }
+  catch { return "unknown"; }
 }

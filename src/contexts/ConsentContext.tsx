@@ -11,6 +11,7 @@ import {
   CONSENT_STORAGE_KEY,
   createConsentRecord,
   parseConsentRecord,
+  readStoredConsent,
   type ConsentDecision,
 } from "../lib/consent";
 
@@ -62,14 +63,13 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let restoredDecision: ConsentDecision = "unknown";
-    try {
-      restoredDecision = parseConsentRecord(window.localStorage.getItem(CONSENT_STORAGE_KEY));
-    } catch {
-      restoredDecision = "unknown";
-    }
-    setDecision(restoredDecision);
+    setDecision(readStoredConsent());
     setRestorationReady(true);
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) { setDecision(readStoredConsent()); setSettingsOpen(false); }
+    };
+    window.addEventListener("pageshow", restore, true);
+    return () => window.removeEventListener("pageshow", restore, true);
   }, []);
 
   useEffect(() => {
@@ -84,6 +84,17 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("kordev:open-consent-settings", openSettings);
     return () => window.removeEventListener("kordev:open-consent-settings", openSettings);
   }, [openSettings]);
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key === CONSENT_STORAGE_KEY || event.key === null) {
+        setDecision(parseConsentRecord(event.newValue));
+        setSettingsOpen(false);
+      }
+    };
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
 
   return (
     <ConsentContext.Provider value={{

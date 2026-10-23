@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { ContentCardView } from "../../server/content/types";
 import type { ResolvedMediaAsset } from "../../server/media/presentation";
 import { track } from "../../lib/analytics";
+import { ViewCount } from "./ViewCount";
 
 export type ContentCardProps = {
   post: ContentCardView;
@@ -45,7 +46,7 @@ export function ContentCard({
     <div className="flex flex-1 flex-col p-6">
       {post.tags.length > 0 && <p className="mb-4 text-sm text-[var(--public-violet)]">{post.tags.slice(0, 2).join(" / ")}</p>}
       <Heading itemProp={schemaType ? "headline" : undefined} className="text-xl font-semibold leading-tight tracking-tight">{post.title}</Heading>
-      {meta ? <p className="mt-3 text-sm text-[var(--public-subtle)]">{meta}</p> : null}
+      {meta || post.viewCount !== undefined ? <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--public-subtle)]">{meta}{post.viewCount !== undefined && <ViewCount value={post.viewCount} />}</p> : null}
       <p itemProp={schemaType ? "description" : undefined} className="mt-3 mb-6 text-sm leading-6 text-[var(--public-subtle)]">{post.summary}</p>
       {canonicalUrl ? <meta itemProp="url" content={canonicalUrl} /> : null}
       <Link to={href} state={linkState} prefetch="intent" onClick={() => { if (href.startsWith("/journal/")) track("journal_issue_open", { path: href }); }} className="mt-auto w-fit font-semibold text-[var(--public-blue)] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4" aria-label={`${actionLabel}: ${post.title}`}>{actionLabel} <span aria-hidden="true">↗</span></Link>

@@ -8,7 +8,11 @@ import { createHash } from 'node:crypto';
 const preMigrationTableCounts = { 'drizzle.__drizzle_migrations': '1', 'public.admin_users': '2', 'public.content_entries': '5', 'public.content_relations': '3', 'public.content_revisions': '8', 'public.mcp_tokens': '0', 'public.media_assets': '4', 'public.redirects': '2', 'public.site_settings': '1' };
 const postMigrationTableCounts = {
   ...preMigrationTableCounts,
-  'drizzle.__drizzle_migrations': '25',
+  'drizzle.__drizzle_migrations': '26',
+  'public.content_view_totals': '0',
+  'public.content_view_sessions': '0',
+  'public.content_view_receipts': '0',
+  'public.content_view_rate_limits': '0',
   'public.leads': '0',
   'public.lead_attachments': '0',
   'public.lead_delivery_jobs': '0',
@@ -100,6 +104,7 @@ const migrationHistory = [
   { hash: createHash('sha256').update(readFileSync('drizzle/0022_geo_experiment_cohorts.sql')).digest('hex'), created_at: '1791455400000' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0023_content_telegram_identity.sql')).digest('hex'), created_at: '1791459000000' },
   { hash: createHash('sha256').update(readFileSync('drizzle/0024_seo_recommendation_executions.sql')).digest('hex'), created_at: '1791538444216' },
+  { hash: createHash('sha256').update(readFileSync('drizzle/0025_content_views.sql')).digest('hex'), created_at: '1792602914145' },
 ];
 const tableCounts = postMigrationTableCounts;
 function inventoryQuery(sql, tables = tableCounts) {

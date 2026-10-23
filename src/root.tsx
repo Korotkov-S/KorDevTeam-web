@@ -26,6 +26,7 @@ import { PublicHeader } from "./components/public/PublicHeader";
 import { ConsentBanner } from "./components/public/ConsentBanner";
 import { AnalyticsScripts } from "./components/AnalyticsScripts";
 import { ConsentProvider, ConsentShell } from "./contexts/ConsentContext";
+import { ContentViewsProvider } from "./contexts/ContentViewsContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./styles/index.css";
 
@@ -33,7 +34,7 @@ declare const __RELEASE_SHA__: string;
 export function loader({ request }: LoaderFunctionArgs) {
   const admin = isAdminPath(new URL(request.url).pathname);
   const cspNonce = admin ? requestCspNonce(request) : null;
-  return data({ releaseSha: __RELEASE_SHA__, cspNonce }, { headers: admin ? adminHeaders(cspNonce) : documentHeaders });
+  return data({ releaseSha: __RELEASE_SHA__, cspNonce, contentViewsEnabled: !admin && process.env.CONTENT_VIEWS_ENABLED === "true" }, { headers: admin ? adminHeaders(cspNonce) : documentHeaders });
 }
 export function headers({ loaderHeaders }: HeadersArgs) { return loaderHeaders; }
 export const meta: MetaFunction = ({ error, location }) => buildRouteMeta({ pathname: location.pathname,
@@ -65,9 +66,11 @@ export function Layout({ children }: { children: ReactNode }) {
 
 export default function App() {
   const location = useLocation();
+  const rootData = useRouteLoaderData<typeof loader>("root");
   if (isAdminPath(location.pathname)) return <Outlet />;
   return (
     <ConsentProvider>
+      <ContentViewsProvider enabled={rootData?.contentViewsEnabled ?? false}>
       <ConsentShell className="min-h-screen bg-[var(--public-surface)] text-[var(--public-ink)]">
         <PublicHeader />
         <main id="main-content">
@@ -76,7 +79,8 @@ export default function App() {
         <PublicFooter />
       </ConsentShell>
       <ConsentBanner />
-      <AnalyticsScripts />
+      <AnalyticsScripts path={location.pathname} />
+      </ContentViewsProvider>
     </ConsentProvider>
   );
 }

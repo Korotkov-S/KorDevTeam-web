@@ -132,7 +132,7 @@ export function serviceCard(entry: ContentEntry): ServiceCardView {
   return { slug: entry.slug, title: entryTitle(entry), summary: text(entry.excerpt) ?? "", priority: false };
 }
 
-export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}): CaseCardView {
+export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null): CaseCardView {
   const screenshots = mediaRefs(entry.payload.screenshots);
   const results = blocks(entry.payload.results);
   const image = screenshots.map(id => asset(id, media)).find((value): value is ResolvedMediaAsset => value !== null)
@@ -140,6 +140,7 @@ export function caseCard(entry: ContentEntry, media: MediaPresentationMap = {}):
     ?? legacyImageAsset(entry, legacyCaseContent(entry, media).image, media);
   return {
     slug: entry.slug,
+    ...(viewCount === undefined ? {} : { viewCount }),
     title: entryTitle(entry),
     summary: text(entry.excerpt) ?? "",
     result: results[0]?.title ?? null,
@@ -162,9 +163,10 @@ export function curateCaseCards(projects: readonly CaseCardView[]): CaseCardView
     .map(({ project }) => project);
 }
 
-export function contentCard(entry: ContentEntry, media: MediaPresentationMap = {}): ContentCardView {
+export function contentCard(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null): ContentCardView {
   return {
     slug: entry.slug,
+    ...(viewCount === undefined ? {} : { viewCount }),
     title: entryTitle(entry),
     summary: text(entry.excerpt) ?? "",
     image: asset(entry.payload.coverUrl, media) ?? asset(entry.ogMediaId, media),
@@ -187,6 +189,7 @@ export function servicePage(
   relatedCases: ContentEntry[] = [],
   relatedArticles: ContentEntry[] = [],
   faqEntries: ContentEntry[] = [],
+  counts: Record<string, string | null> = {},
 ): ServicePageView {
   const priceFrom = typeof entry.payload.priceFrom === "number" && Number.isFinite(entry.payload.priceFrom)
     ? entry.payload.priceFrom : null;
@@ -227,8 +230,8 @@ export function servicePage(
       : null,
     results: blocks(entry.payload.results),
     guarantees: blocks(entry.payload.guarantees),
-    relatedCases: relatedCases.filter(entry => isPublished(entry) && entry.kind === "case").map(entry => caseCard(entry, media)),
-    relatedArticles: relatedArticles.filter(entry => isPublished(entry) && entry.kind === "article").map(entry => contentCard(entry, media)),
+    relatedCases: relatedCases.filter(entry => isPublished(entry) && entry.kind === "case").map(entry => caseCard(entry, media, counts[entry.id])),
+    relatedArticles: relatedArticles.filter(entry => isPublished(entry) && entry.kind === "article").map(entry => contentCard(entry, media, counts[entry.id])),
     faq: faq(faqEntries),
     cta: serviceCta(entry),
   };
@@ -239,6 +242,7 @@ export function commercialCasePage(
   media: MediaPresentationMap = {},
   relatedServices: ContentEntry[] = [],
   relatedCases: ContentEntry[] = [],
+  counts: Record<string, string | null> = {},
 ): CommercialCaseView {
   const legacy = legacyCaseContent(entry, media);
   const screenshots = mediaRefs(entry.payload.screenshots)
@@ -251,6 +255,7 @@ export function commercialCasePage(
   const team = strings(entry.payload.team);
   return {
     slug: entry.slug,
+    ...(counts[entry.id] === undefined ? {} : { viewCount: counts[entry.id] }),
     h1: entryTitle(entry),
     summary: text(entry.excerpt) ?? "",
     problem: text(entry.payload.problem) ?? legacy.problem,
@@ -270,7 +275,7 @@ export function commercialCasePage(
     demoUrl: text(entry.payload.demoUrl) ?? legacy.demoUrl ?? null,
     githubUrl: text(entry.payload.githubUrl) ?? legacy.githubUrl ?? null,
     relatedServices: relatedServices.filter(entry => isPublished(entry) && entry.kind === "service").map(serviceCard),
-    relatedCases: relatedCases.filter(entry => isPublished(entry) && entry.kind === "case").map(entry => caseCard(entry, media)),
+    relatedCases: relatedCases.filter(entry => isPublished(entry) && entry.kind === "case").map(entry => caseCard(entry, media, counts[entry.id])),
     cta: caseCta(entry),
   };
 }

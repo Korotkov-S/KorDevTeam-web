@@ -11,6 +11,8 @@ import { readAdminAuthConfig } from "./server/auth/config";
 import { readPublicMediaConfig } from "./server/media/config";
 import { checkMcpReady } from "./server/mcp/runtime";
 import { assertVkLeadWebhookConfig } from "./server/vk-leads/config";
+import { checkContentViewsReady } from "./server/content-views/config";
+export { createContentViewsRouter } from "./server/content-views/http";
 export { canonicalizeRequest } from "./server/http/canonical";
 export { legacyProjectRedirect } from "./server/http/legacyProject";
 export { checkDatabaseReady } from "./server/db/client";
@@ -36,6 +38,7 @@ export async function runLeadRetention(options: { limit?: number } = {}): Promis
 
 export async function checkApplicationReady(): Promise<void> {
   await checkDatabaseReady();
+  await checkContentViewsReady();
   await checkMcpReady();
   assertLeadWebConfig(process.env);
   assertVkLeadWebhookConfig(process.env);

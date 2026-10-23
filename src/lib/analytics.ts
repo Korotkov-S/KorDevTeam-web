@@ -31,7 +31,7 @@ const YANDEX_SCRIPT_SELECTOR = 'script[data-kordev-analytics="yandex"]';
 const TOP_MAIL_SCRIPT_SELECTOR = 'script[data-kordev-analytics="top-mail"]';
 const ALLOWED_PAYLOAD_KEYS = ["path", "serviceSlug", "projectSlug", "errorCode"] as const;
 
-type DocumentConsentState = { accepted: boolean; generation: number };
+type DocumentConsentState = { accepted: boolean; generation: number; lastPath?: string };
 
 const consentByDocument = new WeakMap<Document, DocumentConsentState>();
 let testSink: ((event: AnalyticsEvent, payload: AnalyticsPayload) => void) | null = null;
@@ -103,13 +103,17 @@ export function loadYandexMetrika(document: Document): void {
   guardLateLoad(document, script, consent.generation);
   document.head.appendChild(script);
 
-  target.ym(YANDEX_COUNTER_ID, "init", {
+  try { target.ym(YANDEX_COUNTER_ID, "init", {
+    defer: true,
     ssr: true,
     webvisor: false,
     clickmap: true,
     accurateTrackBounce: true,
     trackLinks: true,
   });
+    const path = publicPath(document.location.pathname);
+    if (path) target.ym(YANDEX_COUNTER_ID, "hit", path, { referer: safeDocumentReferrer(document) });
+  } catch { /* blocked vendor cannot break the public page */ }
 }
 
 export function loadTopMailRu(document: Document): void {
@@ -119,11 +123,13 @@ export function loadTopMailRu(document: Document): void {
   if (!target || document.querySelector(TOP_MAIL_SCRIPT_SELECTOR)) return;
 
   target._tmr ||= [];
-  target._tmr.push({
+  try { target._tmr.push({
     id: TOP_MAIL_COUNTER_ID,
     type: "pageView",
     start: Date.now(),
-  });
+    url: publicPath(document.location.pathname) ?? "/",
+    referrer: safeDocumentReferrer(document),
+  }); } catch { /* keep the site usable when a vendor throws */ }
 
   const script = document.createElement("script");
   script.async = true;
@@ -139,6 +145,7 @@ export function setAnalyticsConsent(document: Document, accepted: boolean): void
   consentByDocument.set(document, {
     accepted,
     generation: previous.generation + (previous.accepted === accepted ? 0 : 1),
+    lastPath: accepted ? (previous.accepted ? previous.lastPath : publicPath(document.location.pathname) ?? undefined) : undefined,
   });
   if (!accepted) removeVendorState(document);
 }
@@ -156,5 +163,44 @@ export function track(event: AnalyticsEvent, payload?: AnalyticsPayload): void {
   if (!consentState(document).accepted) return;
   const target = window as AnalyticsWindow;
   if (typeof target.ym !== "function") return;
-  target.ym(YANDEX_COUNTER_ID, "reachGoal", event, safePayload);
+  try { target.ym(YANDEX_COUNTER_ID, "reachGoal", event, safePayload); } catch { /* analytics is non-blocking */ }
+}
+
+function publicPath(input: string): string | null {
+  try {
+    if (!input.startsWith("/") || input.startsWith("//")) return null;
+    const path = new URL(input, "https://kordev.team").pathname;
+    if (/^\/(?:admin|preview)(?:\/|$)/.test(path)) return null;
+    return path;
+  } catch { return null; }
+}
+
+function safeDocumentReferrer(document: Document): string {
+  try {
+    const source = new URL(document.referrer);
+    if (source.protocol !== "https:" && source.protocol !== "http:") return "";
+    // External source domains retain attribution without leaking private paths.
+    return source.origin === document.location.origin ? publicPath(source.pathname) ?? "" : `${source.origin}/`;
+  } catch { return ""; }
+}
+
+export function trackPublicPageView(input: { path: string; referrerPath?: string; restored?: boolean }): void {
+  if (typeof document === "undefined") return;
+  const state = consentState(document); const path = publicPath(input.path);
+  if (!state.accepted || !path || (!input.restored && state.lastPath === path)) return;
+  const referrer = input.referrerPath ? publicPath(input.referrerPath) ?? "" : state.lastPath ?? "";
+  state.lastPath = path;
+  const target = analyticsWindow(document);
+  try { target?.ym?.(YANDEX_COUNTER_ID, "hit", path, { referer: referrer }); } catch { /* independent vendors */ }
+  try { target?._tmr?.push({ id: TOP_MAIL_COUNTER_ID, type: "pageView", url: path, referrer }); } catch { /* independent vendors */ }
+}
+
+export function trackContentOpen(input: { contentType: "article" | "case"; slug: string; path: string }): void {
+  if (typeof document === "undefined" || !consentState(document).accepted) return;
+  const { contentType, slug, path } = input;
+  if (!["article", "case"].includes(contentType) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || path !== `/${contentType === "article" ? "blog" : "cases"}/${slug}/`) return;
+  const goal = `${contentType}_open_unique`; const params = { contentType, slug, path };
+  const target = analyticsWindow(document);
+  try { target?.ym?.(YANDEX_COUNTER_ID, "reachGoal", goal, params); } catch { /* never roll back the server count */ }
+  try { target?._tmr?.push({ id: TOP_MAIL_COUNTER_ID, type: "reachGoal", goal, url: path, referrer: safeDocumentReferrer(document), params }); } catch { /* independent vendors */ }
 }

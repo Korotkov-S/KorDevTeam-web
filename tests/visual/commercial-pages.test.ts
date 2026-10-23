@@ -9,6 +9,7 @@ import sharp from "sharp";
 import { resetTestDatabase } from "../../src/server/db/testDatabase";
 import { startTestRuntime } from "../ssr/support/runtime";
 import { seedCommercialFixtures } from "./support/commercialFixtures";
+import { CONSENT_VERSION } from "../../src/lib/consent";
 
 const viewports = [
   { name: "desktop", width: 1440, height: 1100 },
@@ -130,7 +131,7 @@ test("commercial pages remain responsive, visible and decodable at desktop and m
         page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
         page.on("pageerror", error => errors.push(String(error)));
         await page.setViewport(viewport);
-        await page.evaluateOnNewDocument(() => localStorage.setItem("kordev.analytics-consent", JSON.stringify({ version: "2026-09-18", decision: "rejected", decidedAt: "2026-09-18T09:00:00.000Z" })));
+        await page.evaluateOnNewDocument(version => localStorage.setItem("kordev.analytics-consent", JSON.stringify({ version, decision: "rejected", decidedAt: "2026-10-21T09:00:00.000Z" })), CONSENT_VERSION);
         await page.goto(`${runtime.origin}${route.pathname}`, { waitUntil: "networkidle2" });
         await waitForHydration(page);
         await dismissConsent(page);
@@ -269,7 +270,7 @@ test("analytics vendors are requested only after explicit consent", { timeout: 1
     if (!raw) return null;
     const value = JSON.parse(raw) as { version?: unknown; decision?: unknown };
     return { version: value.version, decision: value.decision };
-  }), { version: "2026-09-18", decision: "accepted" });
+  }), { version: CONSENT_VERSION, decision: "accepted" });
 });
 
 test("reduced motion removes infinite animation without hiding the commercial hero", { timeout: 120_000 }, async t => {

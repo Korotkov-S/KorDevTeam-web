@@ -11,6 +11,7 @@ import { listPublishedEntries, type ContentEntry } from "../server/content/servi
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMaps } from "../server/media/presentation";
 import type { RouteSeoInput } from "../server/seo/metadata";
+import { readPublishedViewCounts } from "../server/content-views/read";
 export { headers } from "../server/http/cacheHeaders";
 export { meta } from "./home";
 
@@ -25,6 +26,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   const selected = selectPublishedCategory(params.category, await listPublishedEntries("article"));
   if (!selected) throw new Response(null, { status: 404, headers: documentHeaders });
   const media = await getEntryMediaMaps(selected.entries.map(entry => entry.id));
+  const counts = await readPublishedViewCounts(selected.entries.map(entry => entry.id));
   const seo: RouteSeoInput = {
     pathname: blogCategoryPath(selected.category.slug),
     title: selected.category.seoTitle,
@@ -35,7 +37,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   return data({
     seo,
     category: selected.category,
-    posts: selected.entries.map(entry => articleCard(entry, media[entry.id])),
+    posts: selected.entries.map(entry => articleCard(entry, media[entry.id], counts[entry.id])),
   }, { headers: documentHeaders });
 }
 

@@ -98,9 +98,55 @@ test("stored acceptance loads vendors only after the consent restoration effect"
   (window as Window & { ym?: (...args: unknown[]) => void }).ym = (...args: unknown[]) => calls.push(args);
   view.unmount();
 
+  await waitFor(() => assert.equal(document.querySelector('script[src*="mc.yandex.ru"]'), null));
+
   assert.deepEqual(calls, [[105288175, "destruct"]]);
   assert.equal(document.querySelector('script[src*="mc.yandex.ru"]'), null);
   assert.equal(document.querySelector('script[src*="top-fwz1.mail.ru"]'), null);
   assert.equal((window as Window & { ym?: unknown }).ym, undefined);
   assert.equal((window as Window & { _tmr?: unknown })._tmr, undefined);
+});
+
+test("StrictMode and route rerenders produce one initial page view and one hit per new pathname", async () => {
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "accepted" }));
+  const scripts: Node[] = [];
+  const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node instanceof dom.window.HTMLScriptElement && node.dataset.kordevAnalytics === "yandex") scripts.push(node); })));
+  observer.observe(document.head, { childList: true });
+  const view = render(<React.StrictMode><ConsentProvider><AnalyticsScripts path="/" /></ConsentProvider></React.StrictMode>);
+  await waitFor(() => assert.equal((window as any)._tmr?.length, 1));
+  assert.equal(scripts.length, 1); observer.disconnect();
+  view.rerender(<React.StrictMode><ConsentProvider><AnalyticsScripts path="/blog/a/" /></ConsentProvider></React.StrictMode>);
+  await waitFor(() => assert.equal((window as any)._tmr?.filter((call: any) => call.type === "pageView").length, 2));
+  view.rerender(<React.StrictMode><ConsentProvider><AnalyticsScripts path="/blog/a/?query=private" /></ConsentProvider></React.StrictMode>);
+  assert.equal((window as any)._tmr?.length, 2);
+});
+test("a keyed accepted replacement owns vendor state after the old cleanup runs", async () => {
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "accepted" }));
+  const view = render(<ConsentProvider><AnalyticsScripts key="old" /></ConsentProvider>);
+  await waitFor(() => assert.ok((window as any)._tmr));
+  const ym = (window as any).ym, tmr = (window as any)._tmr;
+  view.rerender(<ConsentProvider><AnalyticsScripts key="new" /></ConsentProvider>);
+  await act(async () => {});
+  assert.equal((window as any).ym, ym); assert.equal((window as any)._tmr, tmr);
+  view.unmount(); await act(async () => {});
+  assert.equal((window as any).ym, undefined);
+});
+test("BFCache restores add one pathname hit even on the same path, normal pageshow adds none", async () => {
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "accepted" }));
+  render(<ConsentProvider><AnalyticsScripts path="/" /></ConsentProvider>);
+  await waitFor(() => assert.equal((window as any)._tmr?.length, 1));
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: false })));
+  assert.equal((window as any)._tmr?.length, 1);
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: true })));
+  assert.equal((window as any)._tmr?.filter((call: any) => call.type === "pageView").length, 2);
+  assert.equal((window as any).ym?.a?.filter((call: any) => call[1] === "hit").length, 2);
+});
+test("BFCache restore rereads withdrawn consent before sending a hit", async () => {
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "accepted" }));
+  render(<ConsentProvider><AnalyticsScripts /></ConsentProvider>);
+  await waitFor(() => assert.ok((window as any)._tmr));
+  const queue = (window as any)._tmr;
+  window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ version: CONSENT_VERSION, decision: "rejected" }));
+  await act(async () => window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: true })));
+  assert.equal(queue.length, 1); assert.equal((window as any)._tmr, undefined);
 });
