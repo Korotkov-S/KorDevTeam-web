@@ -30,7 +30,7 @@ const commercialServiceSource = z.strictObject({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   title: z.string().trim().min(1),
   excerpt: z.string().trim().min(1),
-  bodyMd: z.string().trim().min(300),
+  bodyMd: z.string().refine(value => value.trim().length >= 300),
   seoTitle: z.string().trim().min(1).max(180),
   seoDescription: z.string().trim().min(1).max(320),
   payload: z.record(z.string(), z.unknown()),
