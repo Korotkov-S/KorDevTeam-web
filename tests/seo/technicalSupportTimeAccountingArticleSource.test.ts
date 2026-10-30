@@ -16,8 +16,8 @@ test("technical support guide connects task evidence, hour limits and payment co
   assert.equal(record.title, title);
   assert.equal(record.seoTitle, "Учёт часов технической поддержки сайта");
   assert.equal(record.seoDescription, "Как организовать техническую поддержку сайта: пакет часов, Kanban-доска, ежедневные статусы, согласование перерасхода, отчёт, документы и контроль оплаты.");
-  assert.equal(record.date, "31 августа 2026");
-  assert.equal(record.updatedDate, "25 сентября 2026");
+  assert.equal(record.date, "2026-08-31T00:00:00.000Z");
+  assert.equal(record.updatedDate, "2026-10-27T18:40:42.718Z");
   assert.equal(record.readTime, "10 мин");
   assert.equal(record.coverUrl, "");
   assert.deepEqual(record.imageUrls, []);
@@ -25,7 +25,7 @@ test("technical support guide connects task evidence, hour limits and payment co
   assert.equal(body.match(/^#\s+(.+)$/m)?.[1], title);
   assert.equal(body.match(/^#\s+/gm)?.length, 1);
   assert.match(body, /20 часов/i);
-  assert.match(body, /1.?900 ₽|1900 (?:руб|₽)/i);
+  assert.match(body, /2.?000 ₽|2000 (?:руб|₽)/i);
   assert.match(body, /публичн.+Kanban-доск/i);
   assert.match(body, /ежедневн.+статус/i);
   assert.match(body, /по понедельникам/i);

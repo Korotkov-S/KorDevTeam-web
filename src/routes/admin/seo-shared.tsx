@@ -1,5 +1,5 @@
-import React from "react";
-import { Form, Link, useMatches } from "react-router";
+import React, { useState } from "react";
+import { Form, Link, useLocation, useMatches } from "react-router";
 
 import type { SeoDevice, SeoQueryKind, SeoQueryStatus, SeoSourceId } from "../../server/seo-monitoring/contracts";
 
@@ -79,15 +79,24 @@ export function MetricCard({ title, value, note }: { title: string; value: strin
 }
 
 export function SearchFilters({ filters, dashboard, compact = false }: { filters: SeoFilters; dashboard?: SearchDashboard; compact?: boolean }) {
+  const location = useLocation();
+  const appliedKey = JSON.stringify([location.key, filters.range, filters.dateFrom, filters.dateTo, filters.source,
+    filters.regionId, filters.device, filters.frequencyBand, filters.pagePath]);
+  return <SearchFilterForm key={appliedKey} filters={filters} dashboard={dashboard} compact={compact} />;
+}
+
+function SearchFilterForm({ filters, dashboard, compact }: { filters: SeoFilters; dashboard?: SearchDashboard; compact: boolean }) {
+  const [range, setRange] = useState(filters.range);
   const yandex = filters.source === "yandex_webmaster";
   return <Form method="get" className={`grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 ${compact ? "xl:grid-cols-5" : "xl:grid-cols-6"}`}>
     <label className="grid gap-1 text-sm"><span>Источник поиска</span><select name="source" defaultValue={yandex ? "yandex" : "google"} className="rounded-lg border border-input bg-background px-3 py-2"><option value="yandex">Яндекс</option><option value="google">Google</option></select></label>
-    <label className="grid gap-1 text-sm"><span>Период</span><select name="range" defaultValue={filters.range} className="rounded-lg border border-input bg-background px-3 py-2"><option value="7">7 дней</option><option value="28">28 дней</option><option value="90">90 дней</option><option value="custom">Свой период</option></select></label>
-    <label className="grid gap-1 text-sm"><span>С даты</span><input type="date" name="from" defaultValue={filters.dateFrom} className="rounded-lg border border-input bg-background px-3 py-2" /></label>
-    <label className="grid gap-1 text-sm"><span>По дату</span><input type="date" name="to" defaultValue={filters.dateTo} className="rounded-lg border border-input bg-background px-3 py-2" /></label>
+    <label className="grid gap-1 text-sm"><span>Период</span><select name="range" value={range} onChange={event => setRange(event.target.value as SeoFilters["range"])} className="rounded-lg border border-input bg-background px-3 py-2"><option value="7">7 дней</option><option value="28">28 дней</option><option value="90">90 дней</option><option value="custom">Свой период</option></select></label>
+    <label className="grid gap-1 text-sm"><span>С даты</span><input type="date" name="from" defaultValue={filters.dateFrom} onChange={() => setRange("custom")} className="rounded-lg border border-input bg-background px-3 py-2" /></label>
+    <label className="grid gap-1 text-sm"><span>По дату</span><input type="date" name="to" defaultValue={filters.dateTo} onChange={() => setRange("custom")} className="rounded-lg border border-input bg-background px-3 py-2" /></label>
     {yandex && dashboard ? <label className="grid gap-1 text-sm"><span>Регион показов</span><select name="region" defaultValue={filters.regionId ?? ""} className="rounded-lg border border-input bg-background px-3 py-2"><option value="">Все регионы</option>{dashboard.availableRegions.filter((region) => region.source === "yandex_webmaster").map((region) => <option key={region.id} value={region.id} disabled={!region.externalId}>{region.displayName}{region.externalId ? "" : " — данных пока нет"}</option>)}</select></label> : null}
     {!compact ? <><label className="grid gap-1 text-sm"><span>Устройство</span><select name="device" defaultValue={filters.device ?? ""} className="rounded-lg border border-input bg-background px-3 py-2"><option value="">Все</option><option value="desktop">Компьютеры</option><option value="mobile">Смартфоны</option><option value="tablet">Планшеты</option></select></label><label className="grid gap-1 text-sm"><span>Частотность</span><select name="frequency" defaultValue={filters.frequencyBand ?? ""} className="rounded-lg border border-input bg-background px-3 py-2"><option value="">Все</option><option value="high">ВЧ</option><option value="medium">СЧ</option><option value="low">НЧ</option><option value="unclassified">Не классифицированы</option></select></label><label className="grid gap-1 text-sm"><span>Страница</span><input name="page" defaultValue={filters.pagePath} placeholder="/services/.../" className="rounded-lg border border-input bg-background px-3 py-2" /></label></> : null}
     <button className="self-end rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground">Применить</button>
+    <p className="col-span-full text-sm text-muted-foreground">Применённый период: {formatDate(filters.dateFrom)} — {formatDate(filters.dateTo)}</p>
   </Form>;
 }
 
