@@ -33,6 +33,17 @@ export function PublicFooter(): React.JSX.Element {
               Telegram
             </a>
           </div>
+          <address className="mt-4 text-sm not-italic leading-6 text-[var(--public-subtle)]">
+            Владимир, ул. Студёная Гора, 44А
+          </address>
+          <a
+            className="mt-1 inline-block text-sm font-medium text-[var(--public-blue)] hover:text-[var(--public-violet)]"
+            href="https://yandex.ru/maps/org/kordev_team/95566348708/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Мы на Яндекс Картах
+          </a>
         </div>
 
         <nav aria-label="Навигация в подвале" className="grid grid-cols-2 gap-x-10 gap-y-3 text-sm">
