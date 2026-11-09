@@ -83,3 +83,13 @@ test("redirected duplicates count as one independently checked competitor", asyn
   assert.deepEqual(report.findings.find(finding => finding.factorId === "price"),
     { factorId: "price", checked: 1, observed: 1 });
 });
+
+test("nested elements cannot amplify text extraction across the whole page", async () => {
+  const nestedHtml = "<h1>Разработка CRM</h1>" + "<summary>".repeat(12) + "описание ".repeat(70_000) + "</summary>".repeat(12);
+  const report = await buildCompetitorReport(snapshot, [competitor, unavailable], async url => ({
+    finalUrl: url,
+    html: url === competitor ? nestedHtml : "<h1>Разработка CRM</h1><p>Стоимость от 100 000 рублей.</p>",
+  }));
+  assert.equal(report.pages[1].status, "unavailable");
+  assert.equal(report.pages[2].status, "checked");
+});

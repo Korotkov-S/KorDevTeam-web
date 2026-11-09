@@ -217,14 +217,18 @@ function hiddenNodes(root: AnyNode): WeakSet<AnyNode> | null {
   return hidden;
 }
 
-function visibleText(root: AnyNode | undefined, hidden: WeakSet<AnyNode>): string {
+function visibleText(root: AnyNode | undefined, hidden: WeakSet<AnyNode>, spend: (units: number) => void): string {
   const parts: string[] = [];
   const pending: (AnyNode | null)[] = root ? [root] : [];
   while (pending.length) {
     const node = pending.pop()!;
+    spend(1);
     if (node === null) { parts.push(" "); continue; }
     if (hidden.has(node)) continue;
-    if (node.type === "text") parts.push(node.data);
+    if (node.type === "text") {
+      spend(node.data.length);
+      parts.push(node.data);
+    }
     if ("children" in node) {
       if ("name" in node && blockTags.has(node.name)) {
         parts.push(" ");
@@ -243,20 +247,26 @@ function contentFromHtml(html: string): PageContent | null {
   const $ = load(html);
   const hidden = hiddenNodes($.root()[0]);
   if (!hidden) return null;
+  // Repeated extraction from nested blocks shares one per-page budget.
+  let remainingTextWork = 2 * 1024 * 1024;
+  const readText = (node: AnyNode | undefined) => visibleText(node, hidden, units => {
+    remainingTextWork -= units;
+    if (remainingTextWork < 0) throw new Error("seo_competitor_page_unavailable");
+  });
   const title = compact($("head > title").first().text());
   const description = compact($("meta[name=description]").attr("content") ?? "");
   const jsonLd = [...new Set($("script[type='application/ld+json']").toArray().flatMap(el =>
     [...$(el).text().matchAll(/"@type"\s*:\s*"([A-Za-z][A-Za-z0-9]{0,60})"/gu)].map(match => match[1])
   ))].slice(0, 12);
   const visible = (selector: string) => $(selector).toArray().filter(el => !hidden.has(el));
-  const opening = visibleText(visible("main")[0] ?? $("body")[0], hidden).slice(0, 800);
-  const blocks = visible("h1,h2,h3,h4,p,li,dt,dd,td,summary,button").map(el => visibleText(el, hidden)).filter(Boolean);
-  const headings = visible("h1,h2,h3,h4").map(el => visibleText(el, hidden)).filter(Boolean);
-  const h1 = visible("h1").map(el => visibleText(el, hidden)).filter(Boolean);
+  const opening = readText(visible("main")[0] ?? $("body")[0]).slice(0, 800);
+  const blocks = visible("h1,h2,h3,h4,p,li,dt,dd,td,summary,button").map(el => readText(el)).filter(Boolean);
+  const headings = visible("h1,h2,h3,h4").map(el => readText(el)).filter(Boolean);
+  const h1 = visible("h1").map(el => readText(el)).filter(Boolean);
   if (!h1.length && blocks.join(" ").length < 100) return null;
   const links = visible("a[href], button").map(el => ({
     url: ($(el).attr("href") ?? "").trim(),
-    text: visibleText(el, hidden) || compact($(el).attr("aria-label") || ""),
+    text: readText(el) || compact($(el).attr("aria-label") || ""),
   })).filter(l => !/^(?:javascript|data):/iu.test(l.url));
   const forms = visible("form").map(form => $(form).find("input:not([type=hidden]),textarea,select")
     .toArray().filter(el => !hidden.has(el)).map(el => $(el).attr("aria-label") || $(el).attr("placeholder") || $(el).attr("name"))
