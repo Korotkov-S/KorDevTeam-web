@@ -265,3 +265,13 @@ test("invalid Base64/XML and HTTP errors expose only stable safe codes", async (
     return true;
   });
 });
+
+test("a title truncated inside an emoji is safe to store with the rank", async () => {
+  const fixture = xml(["https://kordev.team/"]).replace("</url>", `</url><title>${"a".repeat(299)}🚀</title>`);
+  const provider = createYandexSearchProvider(config, async () => Response.json({
+    done: true, response: { rawData: Buffer.from(fixture).toString("base64") },
+  }));
+  const result = await provider.pollSearch("op-fixture");
+  assert.equal(result?.position, 1);
+  assert.doesNotMatch(result?.topResults?.[0].title ?? "", /[\u0000\uD800-\uDFFF]/u);
+});

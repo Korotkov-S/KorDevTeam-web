@@ -80,9 +80,9 @@ export async function loadCompetitors({ request }: LoaderFunctionArgs) {
   const selectedId = searchParams.get("snapshot");
   const snapshot = selectedReport?.report.snapshot ?? snapshots.find(s => s.id === selectedId) ?? snapshots[0] ?? null;
   const reports = snapshot ? await repo.listReports(snapshot.id) : [];
-  const eligible = new Set(snapshot ? eligibleCompetitors(snapshot).map(result => result.url) : []);
+  const eligible = new Set(snapshot ? eligibleCompetitors(snapshot).map(result => result.position) : []);
   const entries = snapshot?.results.map(result => ({
-    ...result, kind: classifyResult(result), eligible: eligible.has(result.url),
+    ...result, kind: classifyResult(result), eligible: eligible.has(result.position),
   })) ?? [];
   const factors = serviceFactors.map(({ id, group, label, proposal }) => ({ id, group, label, proposal }));
   const targetUrl = snapshot && publicTargetUrl(snapshot.targetPath);

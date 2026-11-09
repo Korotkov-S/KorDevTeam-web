@@ -94,6 +94,15 @@ async function readHtml(response: Response): Promise<string> {
   return new TextDecoder(charset === "windows-1251" ? charset : "utf-8").decode(Buffer.concat(chunks));
 }
 
+function resolveBeforeDeadline(resolve: NonNullable<Options["resolve"]>, hostname: string, signal: AbortSignal) {
+  signal.throwIfAborted();
+  return new Promise<Address[]>((accept, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    resolve(hostname).then(accept, reject).finally(() => signal.removeEventListener("abort", abort));
+  });
+}
+
 export async function readCompetitorPage(source: string, options: Options = {}): Promise<{ finalUrl: string; html: string }> {
   const resolve = options.resolve ?? (host => lookup(host, { all: true }));
   const open = options.open ?? openPinned;
@@ -104,7 +113,7 @@ export async function readCompetitorPage(source: string, options: Options = {}):
     for (let step = 0; step <= 3; step++) {
       if (visited.has(url.href)) return unavailable();
       visited.add(url.href);
-      const addresses = await resolve(url.hostname);
+      const addresses = await resolveBeforeDeadline(resolve, url.hostname, signal);
       signal.throwIfAborted();
       if (!addresses.length || addresses.some(item => isIP(item.address) !== item.family || !publicAddress(item.address))) {
         return unavailable();

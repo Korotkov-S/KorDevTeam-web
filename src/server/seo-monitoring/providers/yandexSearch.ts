@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 
 import type { SeoDevice, YandexSearchConfig } from "../contracts";
+import { snapshotExcerpt } from "../snapshotText";
 import { boundedRetryAfter, SeoProviderError } from "./provider-error";
 
 const API_URL = "https://searchapi.api.cloud.yandex.net/v2/web/searchAsync";
@@ -150,7 +151,7 @@ function parseResult(xml: string, targetHost: string): YandexRankResult {
     }
     if (!match && url.hostname.toLowerCase() === targetHost) match = { position: index + 1, url: url.href };
     if (index < 10 && url.href.length <= 2048) {
-      const title = $(node).parent().children("title").text().replace(/\s+/g, " ").trim().slice(0, 300);
+      const title = snapshotExcerpt($(node).parent().children("title").text().replace(/\s+/g, " ").trim());
       topResults.push({ position: index + 1, url: url.href, title });
     }
   }

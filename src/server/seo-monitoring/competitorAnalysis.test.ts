@@ -61,3 +61,25 @@ test("price ranges stay intact and animated digits do not stand in for a deliver
   assert.equal(opening_price.excerpt, "200–250 тыс. ₽");
   assert.equal(timing.excerpt, "Первый этап занимает 2–3 рабочих дня.");
 });
+
+test("oversized HTML structure is unavailable and clipped evidence includes its match", async () => {
+  const largeHtml = "<h1>Разработка CRM</h1>" + "<div></div>".repeat(12_001);
+  const longPrice = "описание ".repeat(60) + "Бюджет 100 000 рублей";
+  const report = await buildCompetitorReport(snapshot, [competitor, unavailable], async url => ({
+    finalUrl: url,
+    html: url === competitor ? largeHtml : `<main><h1>Разработка CRM</h1><p>${longPrice}</p></main>`,
+  }));
+  assert.equal(report.pages[1].status, "unavailable");
+  assert.match(report.pages[0].facts.price.excerpt ?? "", /100 000 рублей/u);
+});
+
+test("redirected duplicates count as one independently checked competitor", async () => {
+  const report = await buildCompetitorReport(snapshot, [competitor, unavailable], async url => ({
+    finalUrl: url === target ? target : "https://same-company.example/crm/",
+    html: url === target ? "<h1>Разработка CRM</h1>" : "<h1>CRM под ключ</h1><p>Стоимость от 100 000 рублей.</p>",
+  }));
+  assert.equal(report.pages[1].status, "checked");
+  assert.equal(report.pages[2].status, "unavailable");
+  assert.deepEqual(report.findings.find(finding => finding.factorId === "price"),
+    { factorId: "price", checked: 1, observed: 1 });
+});

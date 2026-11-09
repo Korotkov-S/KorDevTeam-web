@@ -1,4 +1,7 @@
 import { load } from "cheerio";
+import type { AnyNode } from "domhandler";
+
+import { snapshotExcerpt } from "./snapshotText";
 import type { SerpResult } from "./providers/yandexSearch";
 
 export type RankSerp = {
@@ -88,12 +91,22 @@ type Factor = {
 };
 
 const compact = (s: string) => s.replace(/\s+/gu, " ").trim();
-const match = (values: string[], expression: RegExp) => values.find(value => expression.test(value));
+function match(values: string[], expression: RegExp) {
+  for (const value of values) {
+    const found = expression.exec(value);
+    if (found) {
+      const start = Math.max(0, Math.min(found.index - 40, value.length - 300));
+      return value.slice(start, start + 300);
+    }
+  }
+}
 const text = (expression: RegExp) => (p: PageContent) => match(p.blocks, expression);
 const heading = (expression: RegExp) => (p: PageContent) => match(p.headings, expression);
 const link = (expression: RegExp) => (p: PageContent) => {
-  const item = p.links.find(l => expression.test(l.url) || expression.test(l.text));
-  return item ? [item.text, item.url].filter(Boolean).join(" · ") : undefined;
+  for (const item of p.links) {
+    const evidence = match([item.text, item.url], expression);
+    if (evidence) return evidence;
+  }
 };
 
 const priceAmount = String.raw`\d{1,9}(?: \d{3}){0,3}(?:[,.]\d{1,2})?`;
@@ -173,7 +186,10 @@ export function publicTargetUrl(path: string | null): string | null {
 }
 
 export function eligibleCompetitors(snapshot: CompetitorSnapshot) {
+  const seen = new Set<string>();
   return snapshot.results.filter(result => {
+    if (seen.has(result.url)) return false;
+    seen.add(result.url);
     const url = new URL(result.url);
     const host = url.hostname.replace(/^www\./iu, "");
     return url.protocol === "https:" && !url.username && !url.password && !url.port &&
@@ -182,30 +198,70 @@ export function eligibleCompetitors(snapshot: CompetitorSnapshot) {
   });
 }
 
+const blockTags = new Set(["h1", "h2", "h3", "h4", "p", "section", "div", "article", "li", "br"]);
+const ignoredTags = new Set(["script", "style", "noscript", "template"]);
+
+function hiddenNodes(root: AnyNode): WeakSet<AnyNode> | null {
+  const hidden = new WeakSet<AnyNode>();
+  const pending = [{ node: root, depth: 0, inheritedHidden: false }];
+  while (pending.length) {
+    const { node, depth, inheritedHidden } = pending.pop()!;
+    if (depth > 64) return null;
+    const isHidden = inheritedHidden || ("attribs" in node &&
+      (ignoredTags.has(node.name) || "hidden" in node.attribs || node.attribs["aria-hidden"] === "true"));
+    if (isHidden) hidden.add(node);
+    if ("children" in node) {
+      for (const child of node.children) pending.push({ node: child, depth: depth + 1, inheritedHidden: isHidden });
+    }
+  }
+  return hidden;
+}
+
+function visibleText(root: AnyNode | undefined, hidden: WeakSet<AnyNode>): string {
+  const parts: string[] = [];
+  const pending: (AnyNode | null)[] = root ? [root] : [];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (node === null) { parts.push(" "); continue; }
+    if (hidden.has(node)) continue;
+    if (node.type === "text") parts.push(node.data);
+    if ("children" in node) {
+      if ("name" in node && blockTags.has(node.name)) {
+        parts.push(" ");
+        pending.push(null);
+      }
+      for (let index = node.children.length - 1; index >= 0; index--) pending.push(node.children[index]);
+    }
+  }
+  return compact(parts.join(""));
+}
+
 function contentFromHtml(html: string): PageContent | null {
+  // Bound structural work separately from the download byte limit.
+  let tags = 0;
+  for (const _ of html.matchAll(/<[a-z]/giu)) if (++tags > 12_000) return null;
   const $ = load(html);
+  const hidden = hiddenNodes($.root()[0]);
+  if (!hidden) return null;
   const title = compact($("head > title").first().text());
   const description = compact($("meta[name=description]").attr("content") ?? "");
   const jsonLd = [...new Set($("script[type='application/ld+json']").toArray().flatMap(el =>
     [...$(el).text().matchAll(/"@type"\s*:\s*"([A-Za-z][A-Za-z0-9]{0,60})"/gu)].map(match => match[1])
   ))].slice(0, 12);
-  $("script,style,noscript,template,[hidden],[aria-hidden=true]").remove();
-  // Preserve boundaries between blocks when reading the beginning of the page.
-  $("h1,h2,h3,h4,p,section,div,article,li,br").before(" ").after(" ");
-  const main = $("main").first();
-  const opening = compact((main.length ? main : $("body")).text()).slice(0, 800);
-  const blocks = $("h1,h2,h3,h4,p,li,dt,dd,td,summary,button").toArray().map(el => compact($(el).text())).filter(Boolean);
-  const headings = $("h1,h2,h3,h4").toArray().map(el => compact($(el).text())).filter(Boolean);
-  const h1 = $("h1").toArray().map(el => compact($(el).text())).filter(Boolean);
+  const visible = (selector: string) => $(selector).toArray().filter(el => !hidden.has(el));
+  const opening = visibleText(visible("main")[0] ?? $("body")[0], hidden).slice(0, 800);
+  const blocks = visible("h1,h2,h3,h4,p,li,dt,dd,td,summary,button").map(el => visibleText(el, hidden)).filter(Boolean);
+  const headings = visible("h1,h2,h3,h4").map(el => visibleText(el, hidden)).filter(Boolean);
+  const h1 = visible("h1").map(el => visibleText(el, hidden)).filter(Boolean);
   if (!h1.length && blocks.join(" ").length < 100) return null;
-  const links = $("a[href], button").toArray().map(el => ({
+  const links = visible("a[href], button").map(el => ({
     url: ($(el).attr("href") ?? "").trim(),
-    text: compact($(el).text() || $(el).attr("aria-label") || ""),
+    text: visibleText(el, hidden) || compact($(el).attr("aria-label") || ""),
   })).filter(l => !/^(?:javascript|data):/iu.test(l.url));
-  const forms = $("form").toArray().map(form => $(form).find("input:not([type=hidden]),textarea,select")
-    .toArray().map(el => $(el).attr("aria-label") || $(el).attr("placeholder") || $(el).attr("name"))
+  const forms = visible("form").map(form => $(form).find("input:not([type=hidden]),textarea,select")
+    .toArray().filter(el => !hidden.has(el)).map(el => $(el).attr("aria-label") || $(el).attr("placeholder") || $(el).attr("name"))
     .filter(Boolean).join(", ")).filter(Boolean);
-  const imageAlt = $("main img[alt], article img[alt]").toArray().map(el => compact($(el).attr("alt") ?? "")).filter(Boolean);
+  const imageAlt = visible("main img[alt], article img[alt]").map(el => compact($(el).attr("alt") ?? "")).filter(Boolean);
   return { title, description, h1, headings, blocks, opening, links, forms, jsonLd, imageAlt };
 }
 
@@ -230,14 +286,24 @@ export async function buildCompetitorReport(
       }
       const facts: Record<string, Evidence> = {};
       for (const factor of serviceFactors) {
-        const excerpt = factor.read(parsed)?.trim().slice(0, 300);
+        const excerpt = snapshotExcerpt(factor.read(parsed)?.trim() ?? "");
         facts[factor.id] = excerpt ? { status: "observed", excerpt } : { status: "not_observed" };
       }
-      return { url, finalUrl, checkedAt, status: "checked", title: parsed.title.slice(0, 300), facts };
+      return { url, finalUrl, checkedAt, status: "checked", title: snapshotExcerpt(parsed.title), facts };
     } catch {
       return { url, checkedAt: clock().toISOString(), status: "unavailable", title: "", facts: {} };
     }
   }));
+  const checkedDomains = new Set(["kordev.team"]);
+  for (const [index, page] of pages.entries()) {
+    if (index === 0 || page.status !== "checked") continue;
+    const domain = new URL(page.finalUrl ?? page.url).hostname.replace(/^www\./iu, "").replace(/\.$/u, "");
+    if (checkedDomains.has(domain) || domain.endsWith(".kordev.team")) {
+      pages[index] = { ...page, status: "unavailable", title: "", facts: {} };
+    } else {
+      checkedDomains.add(domain);
+    }
+  }
   const findings = serviceFactors.flatMap(factor => {
     if (!factor.proposal || pages[0].facts[factor.id]?.status !== "not_observed") return [];
     const compared = pages.slice(1).filter(page => page.facts[factor.id]);

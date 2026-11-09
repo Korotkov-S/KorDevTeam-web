@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { buildCompetitorReport, classifyResult, competitorReportHref, eligibleCompetitors, publicTargetUrl, serviceFactors, type CompetitorAiAnalysis, type CompetitorReport, type PageReader } from "./competitorAnalysis";
 import { readCompetitorPage } from "./competitorPageReader";
+import { invalidSnapshotText } from "./snapshotText";
 import type { CompetitorRepository } from "./competitorRepository";
 
 export const competitorSnapshotIdSchema = z.union([z.uuid(), z.string().regex(/^archive-[a-z0-9-]{1,80}$/u)]);
@@ -30,23 +31,26 @@ export const competitorRunInput = z.strictObject({
   operationId: z.uuid().describe("Создайте UUID для этого запуска. Для повтора передайте тот же UUID и тот же набор позиций."),
 });
 
+const analysisText = (max: number) => z.string().trim().min(1).max(max).refine(value => !invalidSnapshotText.test(value));
+
 export const competitorAnalysisInput = z.strictObject({
   reportId: z.uuid(),
-  summary: z.string().trim().min(1).max(1500),
+  summary: analysisText(1500),
   insights: z.array(z.strictObject({
     factorId: z.string().regex(/^[a-z][a-z_]{0,49}$/u),
     positions: z.array(z.number().int().min(0).max(10)).min(1).max(8)
       .describe("Позиции в исходном топ-10, 0 обозначает нашу страницу."),
-    text: z.string().trim().min(1).max(1000),
-    nextStep: z.string().trim().min(1).max(500).optional(),
+    text: analysisText(1000),
+    nextStep: analysisText(500).optional(),
   })).max(10),
-  limitations: z.array(z.string().trim().min(1).max(400)).max(6),
+  limitations: z.array(analysisText(400)).max(6),
 });
 
 type AnalysisInput = Omit<z.infer<typeof competitorAnalysisInput>, "reportId">;
 function positionsInReport(report: CompetitorReport) {
-  const ranks = new Map(report.snapshot.results.map(entry => [entry.url, entry.position]));
-  return report.pages.map((page, index) => ({ page, position: index === 0 ? 0 : ranks.get(page.url) }));
+  return report.pages.map((page, index) => ({
+    page, position: index === 0 ? 0 : report.snapshot.results.find(entry => entry.url === page.url)?.position,
+  }));
 }
 
 function analysisContent(report: CompetitorReport, input: AnalysisInput): Omit<CompetitorAiAnalysis, "savedAt"> {
@@ -88,9 +92,9 @@ export function createCompetitorMcpService(
       const after = cursor?.id ? { checkedAt: cursor.checkedAt, id: cursor.id } : undefined;
       const result = await repository.listSnapshotsPage(filters, limit ?? 10, after);
       return { ...result, items: result.items.map(snapshot => {
-        const eligible = new Set(eligibleCompetitors(snapshot).map(entry => entry.url));
+        const eligible = new Set(eligibleCompetitors(snapshot).map(entry => entry.position));
         return { ...snapshot, targetUrl: publicTargetUrl(snapshot.targetPath), results: snapshot.results.map(entry => ({
-          ...entry, kind: classifyResult(entry), eligible: eligible.has(entry.url),
+          ...entry, kind: classifyResult(entry), eligible: eligible.has(entry.position),
         })) };
       }) };
     },
