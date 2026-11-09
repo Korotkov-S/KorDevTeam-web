@@ -133,10 +133,16 @@ databaseTest(
       position: 3,
       resultUrl: "https://kordev.team/",
       resultLimit: 100,
+      topResults: [
+        { position: 1, url: "https://competitor.example/", title: "Competitor" },
+        { position: 3, url: "https://kordev.team/", title: "KorDevTeam" },
+      ],
     };
     await repo.saveResult(job.id, result, now);
     await repo.saveResult(job.id, result, now);
-    assert.equal((await db.select().from(seoRankChecks)).length, 1);
+    const checks = await db.select().from(seoRankChecks);
+    assert.equal(checks.length, 1);
+    assert.deepEqual(checks[0].serp, { queryText: job.queryText, targetPath: job.targetPath, results: result.topResults });
     const progress = await repo.summarizePlan(a.runId);
     assert.equal(progress.storedCount, 1);
     assert.equal(progress.remainingCount, 959);

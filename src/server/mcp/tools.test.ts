@@ -27,6 +27,37 @@ test("tool_scopes_enforce_content_publish_and_strict_execution_authority", async
   }
   assert.equal(writes, 1);
 });
+test("competitor MCP gives readers saved evidence and restricts scanning and analysis writes", async t => {
+  const calls: unknown[] = [];
+  const provided = {
+    ...services(),
+    competitors: {
+      async listSnapshots(input: unknown) { return { items: [input], nextCursor: null }; },
+      async listReports() { return { items: [], nextCursor: null }; },
+      async getReport() { return { id: ENTRY_ID, report: {} }; },
+      async runComparison(input: unknown) { calls.push(input); return { id: ENTRY_ID }; },
+      async saveAnalysis(input: unknown) { calls.push(input); return { id: ENTRY_ID }; },
+    },
+  } as McpServices;
+  const reader = await connected(["seo:read"], provided);
+  const writer = await connected(["seo:read", "seo:write"], provided);
+  t.after(async () => { await reader.client.close(); await writer.client.close(); });
+  const readNames = (await reader.client.listTools()).tools.map(tool => tool.name);
+  assert.ok(readNames.includes("list_seo_competitor_snapshots"));
+  assert.ok(readNames.includes("list_seo_competitor_reports"));
+  assert.ok(readNames.includes("get_seo_competitor_report"));
+  assert.equal(readNames.includes("run_seo_competitor_comparison"), false);
+  assert.equal(readNames.includes("save_seo_competitor_analysis"), false);
+  const input = { snapshotId: "archive-2026-11-07-crm", positions: [1, 3], operationId: ENTRY_ID };
+  assert.equal((await writer.client.callTool({ name: "run_seo_competitor_comparison", arguments: { ...input, url: "https://other.example" } })).isError, true);
+  assert.notEqual((await writer.client.callTool({ name: "run_seo_competitor_comparison", arguments: input })).isError, true);
+  assert.notEqual((await writer.client.callTool({ name: "save_seo_competitor_analysis", arguments: {
+    reportId: ENTRY_ID, summary: "Цена встречается на части страниц.", insights: [{ factorId: "price", positions: [0, 1], text: "Сопоставить бюджет.", nextStep: "Уточнить объём работ." }], limitations: [],
+  } })).isError, true);
+  assert.deepEqual(calls[0], input);
+  assert.equal(calls.length, 2);
+});
+
 const ACTOR_ID = "00000000-0000-4000-8000-000000000020";
 
 test("MCP exposes safe Telegram conflict codes without database details", async t => {

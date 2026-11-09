@@ -29,6 +29,8 @@ export default [
     layout("routes/admin/seo-layout.tsx", [
       route("admin/seo/", "routes/admin/seo-overview.tsx"),
       route("admin/seo/positions/", "routes/admin/seo-positions.tsx"),
+      route("admin/seo/competitors/", "routes/admin/seo-competitors.tsx"),
+      route("admin/seo/competitors/:id/export.csv", "routes/admin/seo-competitors-export.ts"),
       route("admin/seo/traffic/", "routes/admin/seo-traffic.tsx"),
       route("admin/seo/pages/", "routes/admin/seo-pages.tsx"),
       route("admin/seo/semantics/", "routes/admin/seo-semantics.tsx"),
