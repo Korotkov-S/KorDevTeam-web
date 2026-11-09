@@ -32,7 +32,9 @@ function createRequestGate(timing: RequestTiming) {
 // Shared by all provider instances in this process, not one limiter per worker.
 const sharedRequestGate = createRequestGate({ now: Date.now, sleep: ms => new Promise(resolve => setTimeout(resolve, ms)) });
 
-export type YandexRankResult = {
+export type SerpResult = { position: number; url: string; title: string };
+
+export type YandexRankResult = ({
   status: "found";
   position: number;
   resultUrl: string;
@@ -42,7 +44,7 @@ export type YandexRankResult = {
   position: null;
   resultUrl: null;
   resultLimit: number;
-};
+}) & { topResults?: SerpResult[] };
 
 function invalidResponse(): never {
   throw new SeoProviderError("seo_yandex_search_response_invalid", false);
@@ -133,21 +135,28 @@ function parseResult(xml: string, targetHost: string): YandexRankResult {
   const $ = load(xml, { xmlMode: true });
   const grouping = $("yandexsearch > response > results > grouping");
   if (grouping.length !== 1 || $("yandexsearch > response > error").length > 0) return invalidResponse();
-  const urls = grouping.find("group > doc > url").toArray().map((node) => $(node).text().trim());
-  if (urls.length > RESULT_LIMIT) return invalidResponse();
-  for (let index = 0; index < urls.length; index++) {
-    let url: URL;
-    try {
-      url = new URL(urls[index]);
-    } catch {
-      return invalidResponse();
+  const docs = grouping.find("group > doc > url").toArray();
+  if (docs.length > RESULT_LIMIT) return invalidResponse();
+  const topResults: SerpResult[] = [];
+  let match: { position: number; url: string } | undefined;
+  for (const [index, node] of docs.entries()) {
+    if (match && index >= 10) break;
+    const raw = $(node).text().trim();
+    let url: URL | undefined;
+    try { url = new URL(raw); } catch { /* Handled below. */ }
+    if (!url || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+      if (!match) return invalidResponse();
+      continue;
     }
-    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) return invalidResponse();
-    if (url.hostname.toLocaleLowerCase("en-US") === targetHost) {
-      return { status: "found", position: index + 1, resultUrl: url.href, resultLimit: RESULT_LIMIT };
+    if (!match && url.hostname.toLowerCase() === targetHost) match = { position: index + 1, url: url.href };
+    if (index < 10 && url.href.length <= 2048) {
+      const title = $(node).parent().children("title").text().replace(/\s+/g, " ").trim().slice(0, 300);
+      topResults.push({ position: index + 1, url: url.href, title });
     }
   }
-  return { status: "not_found", position: null, resultUrl: null, resultLimit: RESULT_LIMIT };
+  return match
+    ? { status: "found", position: match.position, resultUrl: match.url, resultLimit: RESULT_LIMIT, topResults }
+    : { status: "not_found", position: null, resultUrl: null, resultLimit: RESULT_LIMIT, topResults };
 }
 
 export function createYandexSearchProvider(

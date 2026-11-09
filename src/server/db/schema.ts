@@ -23,6 +23,7 @@ import {
 
 import type { AcceptedResponse } from "../leads/contracts";
 import type { VkAdsCheckpoint } from "../advertising/vk/contracts";
+import type { CompetitorAiAnalysis, CompetitorReport, RankSerp } from "../seo-monitoring/competitorAnalysis";
 import type { IndexObservation, IndexStatus } from "../seo-monitoring/pageControl";
 
 export const seoIndexObservations = pgTable("seo_index_observations", {
@@ -858,6 +859,7 @@ export const seoRankChecks = pgTable(
     position: integer("position"),
     resultUrl: text("result_url"),
     resultLimit: integer("result_limit").notNull().default(100),
+    serp: jsonb("serp").$type<RankSerp>(),
     importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -879,6 +881,16 @@ export const seoRankChecks = pgTable(
     ),
   ],
 );
+
+export const seoCompetitorReports = pgTable("seo_competitor_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  snapshotId: text("snapshot_id").notNull(),
+  report: jsonb("report").$type<CompetitorReport>().notNull(),
+  analysis: jsonb("analysis").$type<CompetitorAiAnalysis>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("seo_competitor_reports_snapshot_idx").on(table.snapshotId, table.createdAt),
+]);
 
 export const seoCollectionRuns = pgTable(
   "seo_collection_runs",
@@ -2023,6 +2035,7 @@ export const schema = {
   seoQueries,
   seoDailyMetrics,
   seoRankChecks,
+  seoCompetitorReports,
   seoRankRuns,
   seoRankJobs,
   seoRankSubmissions,

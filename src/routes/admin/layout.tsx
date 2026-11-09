@@ -57,7 +57,7 @@ export default function AdminLayout() {
   const data = useLoaderData<AdminLayoutData>();
   const location = useLocation();
   return (
-    <SidebarProvider defaultOpen={data.sidebarOpen}>
+    <SidebarProvider defaultOpen={data.sidebarOpen} className="print:[&_[data-slot=sidebar]]:hidden">
       <Sidebar collapsible="icon">
         <SidebarHeader className="border-b border-sidebar-border">
           <div className="flex min-w-0 items-center gap-2 px-2 py-1">
@@ -107,11 +107,11 @@ export default function AdminLayout() {
         <SidebarRail />
       </Sidebar>
       <SidebarInset className="min-w-0 overflow-x-hidden">
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur print:hidden">
           <SidebarTrigger aria-label="Свернуть или открыть меню" title="Свернуть или открыть меню" className="size-9" />
           <p className="text-sm font-medium">Административная панель</p>
         </header>
-        <div data-admin-content="true" className="min-w-0 p-4 sm:p-6 lg:p-8">
+        <div data-admin-content="true" className="min-w-0 p-4 sm:p-6 lg:p-8 print:p-0">
           <Outlet />
         </div>
       </SidebarInset>

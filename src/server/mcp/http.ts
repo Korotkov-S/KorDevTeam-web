@@ -91,6 +91,7 @@ export function createMcpRouter(dependencies: McpHttpDependencies = {}) {
       const scopedServices = dependencies.services ?? {
         content: runtime!.content,
         media: runtime!.media,
+        competitors: runtime!.competitors,
         seo: runtime!.seoForToken(principal.tokenId),
         geo: runtime!.geoForToken(principal.tokenId),
         ads: runtime!.adsForToken(principal.tokenId),

@@ -244,10 +244,12 @@ export function createRankQueueRepository(db: ReturnType<typeof createDb>) {
           .select()
           .from(seoRankRuns)
           .where(eq(seoRankRuns.id, job.runId));
+        const { topResults, ...rank } = result;
         await tx
           .insert(seoRankChecks)
           .values({
-            ...result,
+            ...rank,
+            serp: topResults ? { queryText: job.queryText, targetPath: job.targetPath, results: topResults } : null,
             checkDate: run.checkDate,
             checkedAt: now,
             queryId: job.queryId,

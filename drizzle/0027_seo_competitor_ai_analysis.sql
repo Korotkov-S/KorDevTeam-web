@@ -1,0 +1,1 @@
+ALTER TABLE "seo_competitor_reports" ADD COLUMN "analysis" jsonb;

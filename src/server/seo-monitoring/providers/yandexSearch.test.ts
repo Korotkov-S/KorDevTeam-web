@@ -157,6 +157,7 @@ test("async Search API submits the fixed rank slice and polls its operation", as
     position: 2,
     resultUrl: "https://kordev.team/services/crm/",
     resultLimit: 100,
+    topResults: [{ position: 1, url: "https://example.test/", title: "" }, { position: 2, url: "https://kordev.team/services/crm/", title: "" }],
   });
   assert.equal(pending, null);
   assert.equal(operationId, "op-123");
@@ -209,7 +210,26 @@ test("only the exact target hostname counts and a miss is explicit", async () =>
     position: null,
     resultUrl: null,
     resultLimit: 100,
+    topResults: [
+      { position: 1, url: "https://notkordev.team/", title: "" },
+      { position: 2, url: "https://kordev.team.evil.test/", title: "" },
+      { position: 3, url: "https://blog.kordev.team/", title: "" },
+    ],
   });
+});
+
+test("the stored top 10 keeps highlighted titles without changing ranks beyond the top 10", async () => {
+  const urls = Array.from({ length: 12 }, (_, index) =>
+    index === 11 ? "https://kordev.team/services/crm/" : `https://competitor-${index}.example/`);
+  const fixture = xml(urls).replace("</url>", "</url><title>Разработка <hlword>CRM</hlword> на заказ</title>");
+  const provider = createYandexSearchProvider(config, async () => Response.json({
+    done: true, response: { rawData: Buffer.from(fixture).toString("base64") },
+  }));
+  const result = await provider.pollSearch("op-fixture");
+  assert.equal(result?.position, 12);
+  assert.equal(result?.topResults?.length, 10);
+  assert.equal(result?.topResults?.[0].title, "Разработка CRM на заказ");
+  assert.equal(result?.topResults?.at(-1)?.position, 10);
 });
 
 test("invalid Base64/XML and HTTP errors expose only stable safe codes", async () => {
