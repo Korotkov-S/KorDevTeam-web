@@ -24,6 +24,18 @@ test("blog pagination survives canonicalization as a route parameter", () => {
   }
 });
 
+test("case chapter URLs preserve one valid timestamp on the video case only", () => {
+  const html = { headers: { accept: "text/html" } };
+  const path = "/cases/teharmatura-automation/";
+  assert.equal(canonicalizeRequest(new Request(`https://kordev.team${path}?t=129`, html)), null);
+  assert.equal(canonicalizeRequest(new Request("http://www.kordev.team/cases/teharmatura-automation?t=25&unknown=x", html))?.href,
+    `https://kordev.team${path}?t=25`);
+  for (const suffix of ["?t=304", "?t=-1", "?t=2.5", "?t=25&t=58"]) {
+    assert.equal(canonicalizeRequest(new Request(`https://kordev.team${path}${suffix}`, html))?.search, "");
+  }
+  assert.equal(canonicalizeRequest(new Request("https://kordev.team/cases/amch/?t=25", html))?.search, "");
+});
+
 test("admin recovery, login return paths and filters survive HTML canonicalization", () => {
   for (const path of [
     `/admin/reset-password/?token=${"A".repeat(43)}`,

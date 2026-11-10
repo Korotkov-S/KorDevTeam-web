@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { CaseCard } from "../components/public/CaseCard";
+import { CaseVideo } from "../components/public/CaseVideo";
 import { LeadCtaSection } from "../components/public/LeadCtaSection";
 import { Section } from "../components/public/Section";
 import { ServiceCard } from "../components/public/ServiceCard";
@@ -166,7 +167,9 @@ function CaseScreenshotSlider({ images, heading }: { images: CommercialCaseView[
   );
 }
 
-export function CommercialCasePage({ pathname, project, entryId }: { pathname: string; project: CommercialCaseView; entryId?: string }) {
+export function CommercialCasePage({ pathname, project, entryId, video }: {
+  pathname: string; project: CommercialCaseView; entryId?: string; video?: { body: [string, string]; start: number | null } | null;
+}) {
   const hasProblem = Boolean(project.problem) || project.constraints.length > 0;
   const hasSolution = Boolean(project.solution || project.architecture || project.bodyMd.trim())
     || project.integrations.length > 0 || project.technologies.length > 0 || project.features.length > 0;
@@ -255,7 +258,11 @@ export function CommercialCasePage({ pathname, project, entryId }: { pathname: s
             {project.integrations.length ? <div><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Интеграции</h3><TextList items={project.integrations} /></div> : null}
             {project.technologies.length ? <div><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Технологии</h3><TextList items={project.technologies} /></div> : null}
           </div> : null}
-          {project.bodyMd.trim() ? <MarkdownContent markdown={project.bodyMd} media={project.media} proseClassName="mt-12" /> : null}
+          {video ? <>
+            <MarkdownContent markdown={video.body[0]} media={project.media} proseClassName="mt-12" />
+            <CaseVideo start={video.start} />
+            <MarkdownContent markdown={video.body[1]} media={project.media} />
+          </> : project.bodyMd.trim() ? <MarkdownContent markdown={project.bodyMd} media={project.media} proseClassName="mt-12" /> : null}
         </StorySection>
       </CaseSection> : null}
 
