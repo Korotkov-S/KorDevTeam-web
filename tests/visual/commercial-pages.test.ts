@@ -126,6 +126,12 @@ test("commercial pages remain responsive, visible and decodable at desktop and m
   await seedCommercialFixtures(databaseUrl);
   const runtime = await startTestRuntime({ DATABASE_URL: databaseUrl });
   t.after(runtime.close);
+  const videoRange = await fetch(`${runtime.origin}${CASE_VIDEO.src}`, { headers: { Range: "bytes=0-32767" } });
+  assert.equal(videoRange.status, 206);
+  assert.match(videoRange.headers.get("content-type") ?? "", /^video\/mp4\b/);
+  assert.match(videoRange.headers.get("content-range") ?? "", /^bytes 0-32767\/[1-9]\d*$/);
+  assert.match(videoRange.headers.get("cache-control") ?? "", /\bimmutable\b/);
+  assert.equal((await videoRange.arrayBuffer()).byteLength, 32768);
   const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
   t.after(() => browser.close());
   const screenshotDirectory = await mkdtemp(path.join(tmpdir(), "kordev-commercial-"));
