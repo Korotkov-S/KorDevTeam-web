@@ -1,6 +1,7 @@
 export const CASE_VIDEO_PATH = "/cases/teharmatura-automation/";
+const originalVideoUrl = "https://bc767411-eeed330e-54b2-4c7b-9c68-7b4b6a155cc6.s3.twcstorage.ru/projects/portfolio/teharmatura-automation/krany-balashikhi-bitrix24-1c-697f83b62476.mp4";
 export const CASE_VIDEO = {
-  src: "https://bc767411-eeed330e-54b2-4c7b-9c68-7b4b6a155cc6.s3.twcstorage.ru/projects/portfolio/teharmatura-automation/krany-balashikhi-bitrix24-1c-697f83b62476.mp4",
+  src: "/assets/krany-balashikhi-bitrix24-1c.f63a128648a8.mp4",
   poster: "/projects/portfolio/teharmatura-automation/krany-balashikhi-bitrix24-1c-poster.jpg",
   name: "Краны Балашихи. От письма до заказа в 1С",
   description: "Тестовая демонстрация интеграции Битрикс24 и 1С. Разбор заявки из PDF, проверка позиций, создание заказа в 1С и возврат его номера в CRM.",
@@ -26,10 +27,12 @@ export function readCaseVideoStart(pathname: string, params: URLSearchParams): n
   return seconds < CASE_VIDEO.duration ? seconds : null;
 }
 
-export function splitCaseVideoBody(pathname: string, body: string): [string, string] | null {
+export function removeCaseVideoLink(pathname: string, body: string): string | null {
   if (pathname !== CASE_VIDEO_PATH) return null;
   const blocks = body.split(/\r?\n\r?\n/);
-  const index = blocks.findIndex(block => block.startsWith("[") && block.endsWith(`](${CASE_VIDEO.src})`) && !block.includes("\n"));
+  const index = blocks.findIndex(block => block.startsWith("[") && !block.includes("\n")
+    && [originalVideoUrl, CASE_VIDEO.src].some(url => block.endsWith(`](${url})`)));
   if (index < 0) return null;
-  return [blocks.slice(0, index).join("\n\n"), blocks.slice(index + 1).join("\n\n")];
+  blocks.splice(index, 1);
+  return blocks.join("\n\n");
 }
