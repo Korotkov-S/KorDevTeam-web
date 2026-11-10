@@ -168,13 +168,13 @@ function CaseScreenshotSlider({ images, heading }: { images: CommercialCaseView[
 }
 
 export function CommercialCasePage({ pathname, project, entryId, video }: {
-  pathname: string; project: CommercialCaseView; entryId?: string; video?: { body: [string, string]; start: number | null } | null;
+  pathname: string; project: CommercialCaseView; entryId?: string; video?: { start: number | null } | null;
 }) {
   const hasProblem = Boolean(project.problem) || project.constraints.length > 0;
   const hasSolution = Boolean(project.solution || project.architecture || project.bodyMd.trim())
     || project.integrations.length > 0 || project.technologies.length > 0 || project.features.length > 0;
   const index = [
-    project.screenshots.length ? ["Интерфейс", "#case-screenshots"] : null,
+    video ? ["Видео", "#case-video"] : project.screenshots.length ? ["Интерфейс", "#case-screenshots"] : null,
     hasProblem ? ["Задача", "#case-problem"] : null,
     project.results.length ? ["Результаты", "#case-results"] : null,
     hasSolution ? ["Решение", "#case-solution"] : null,
@@ -224,11 +224,13 @@ export function CommercialCasePage({ pathname, project, entryId, video }: {
         </Section>
       </CaseSection>
 
-      {project.screenshots.length ? <CaseSection name="screenshots" id="case-screenshots">
+      {video || project.screenshots.length ? <CaseSection name="screenshots" id="case-screenshots">
         <Section className="border-t border-border py-14 lg:py-20">
-          <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">Интерфейс</p>
-          <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">Как выглядит продукт</h2>
-          <CaseScreenshotSlider key={project.slug} images={project.screenshots} heading={project.h1} />
+          <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--public-violet)]">{video ? "Видео кейса" : "Интерфейс"}</p>
+          <h2 className="mt-4 text-5xl font-semibold leading-[.95] tracking-[-0.055em] sm:text-7xl">
+            {video ? "Как работает интеграция" : "Как выглядит продукт"}
+          </h2>
+          {video ? <CaseVideo start={video.start} /> : <CaseScreenshotSlider key={project.slug} images={project.screenshots} heading={project.h1} />}
         </Section>
       </CaseSection> : null}
 
@@ -258,11 +260,7 @@ export function CommercialCasePage({ pathname, project, entryId, video }: {
             {project.integrations.length ? <div><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Интеграции</h3><TextList items={project.integrations} /></div> : null}
             {project.technologies.length ? <div><h3 className="mb-5 text-2xl font-semibold tracking-[-0.03em]">Технологии</h3><TextList items={project.technologies} /></div> : null}
           </div> : null}
-          {video ? <>
-            <MarkdownContent markdown={video.body[0]} media={project.media} proseClassName="mt-12" />
-            <CaseVideo start={video.start} />
-            <MarkdownContent markdown={video.body[1]} media={project.media} />
-          </> : project.bodyMd.trim() ? <MarkdownContent markdown={project.bodyMd} media={project.media} proseClassName="mt-12" /> : null}
+          {project.bodyMd.trim() ? <MarkdownContent markdown={project.bodyMd} media={project.media} proseClassName="mt-12" /> : null}
         </StorySection>
       </CaseSection> : null}
 

@@ -7,7 +7,7 @@ import { commercialCasePage } from "../server/content/commercialPresentation";
 import { documentHeaders } from "../server/http/cacheHeaders";
 import { getEntryMediaMaps } from "../server/media/presentation";
 import { readPublishedViewCounts } from "../server/content-views/read";
-import { readCaseVideoStart, splitCaseVideoBody } from "../lib/caseVideo";
+import { readCaseVideoStart, removeCaseVideoLink } from "../lib/caseVideo";
 export { headers } from "../server/http/cacheHeaders";
 export { meta } from "./home";
 
@@ -23,10 +23,10 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const media = Object.assign({}, ...Object.values(mediaMaps));
   const counts = await readPublishedViewCounts([entry, ...relatedCases].map(value => value.id));
   const project = commercialCasePage(entry, media, relatedServices, relatedCases, counts);
-  const videoBody = splitCaseVideoBody(pathname, project.bodyMd);
-  const video = videoBody ? { body: videoBody, start: readCaseVideoStart(pathname, searchParams) } : null;
+  const videoBody = removeCaseVideoLink(pathname, project.bodyMd);
+  const video = videoBody !== null ? { start: readCaseVideoStart(pathname, searchParams) } : null;
   return data({ seo: entrySeo(entry, pathname, mediaMaps[entry.id]), pathname, identity: { id: entry.id, version: entry.version },
-    project, video }, { headers: documentHeaders });
+    project: { ...project, bodyMd: videoBody ?? project.bodyMd }, video }, { headers: documentHeaders });
 }
 export default function Case() {
   const value = useLoaderData<typeof loader>();

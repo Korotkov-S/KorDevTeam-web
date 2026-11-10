@@ -21,7 +21,7 @@ export function CaseVideo({ start }: { start: number | null }) {
       <meta itemProp="duration" content="PT5M3.4S" />
       <meta itemProp="isFamilyFriendly" content="true" />
       <link itemProp="url" href={pageUrl} />
-      <link itemProp="contentUrl" href={video.src} />
+      <link itemProp="contentUrl" href={new URL(video.src, SITE_ORIGIN).href} />
       <link itemProp="thumbnailUrl" href={posterUrl} />
       <span itemProp="thumbnail" itemScope itemType="https://schema.org/ImageObject">
         <link itemProp="contentUrl" href={posterUrl} />
@@ -34,8 +34,8 @@ export function CaseVideo({ start }: { start: number | null }) {
         <source src={source} type="video/mp4" />
         <a href={source}>Открыть видео</a>
       </video>
-      <h4 className="mb-3 mt-6 text-lg font-semibold">Главы видео</h4>
-      <ol className="space-y-2 text-base leading-6">
+      <h3 className="mb-3 mt-6 text-lg font-semibold">Главы видео</h3>
+      <ol className="grid gap-x-8 gap-y-2 text-base leading-6 md:grid-cols-2">
         {video.chapters.map((chapter, index) => (
           <li key={chapter.start} itemProp="hasPart" itemScope itemType="https://schema.org/Clip">
             <meta itemProp="startOffset" content={String(chapter.start)} />

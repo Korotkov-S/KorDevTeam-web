@@ -10,6 +10,7 @@ import { resetTestDatabase } from "../../src/server/db/testDatabase";
 import { startTestRuntime } from "../ssr/support/runtime";
 import { seedCommercialFixtures } from "./support/commercialFixtures";
 import { CONSENT_VERSION } from "../../src/lib/consent";
+import { CASE_VIDEO, CASE_VIDEO_PATH } from "../../src/lib/caseVideo";
 
 const viewports = [
   { name: "desktop", width: 1440, height: 1100 },
@@ -40,7 +41,6 @@ const portfolioPaths = new Set([
   "/cases/jully-bride/",
   "/cases/sims-dynasty-tree/",
   "/cases/noodome/",
-  "/cases/teharmatura-automation/",
 ]);
 
 const vendorPattern = /(?:mc\.yandex\.ru|top-fwz1\.mail\.ru)/;
@@ -98,6 +98,18 @@ async function assertPortfolioScreenshots(page: Page, pathname: string): Promise
   }
 }
 
+async function assertCaseVideo(page: Page): Promise<void> {
+  const player = "#case-screenshots #case-video video";
+  assert.equal(await page.$$eval("main video", videos => videos.length), 1);
+  assert.equal(await page.$$eval("#case-screenshots figure img", images => images.length), 0);
+  assert.equal(await page.$eval(`${player} source`, source => source.getAttribute("src")), CASE_VIDEO.src);
+  assert.equal(await page.$eval(player, video => {
+    const box = video.getBoundingClientRect();
+    return box.width > 0 && box.height > 0 && box.right <= innerWidth;
+  }), true);
+  assert.equal(await page.$$eval('#case-video [itemtype="https://schema.org/Clip"]', clips => clips.length), CASE_VIDEO.chapters.length);
+}
+
 async function dismissConsent(page: Page): Promise<void> {
   const button = await page.$('button[data-consent-action="choice"]');
   if (button) {
@@ -137,6 +149,7 @@ test("commercial pages remain responsive, visible and decodable at desktop and m
         await dismissConsent(page);
         await assertPageLayout(page, route.pathname);
         if (portfolioPaths.has(route.pathname)) await assertPortfolioScreenshots(page, route.pathname);
+        if (route.pathname === CASE_VIDEO_PATH) await assertCaseVideo(page);
         assert.deepEqual(errors, [], `${route.pathname} must hydrate without browser errors`);
 
         if (route.pathname === "/") {
@@ -189,6 +202,7 @@ test("commercial pages keep meaningful layout without JavaScript", { timeout: 24
         }, `${route.pathname} must apply the public stylesheet without JavaScript`);
         await assertPageLayout(page, route.pathname);
         if (portfolioPaths.has(route.pathname)) await assertPortfolioScreenshots(page, route.pathname);
+        if (route.pathname === CASE_VIDEO_PATH) await assertCaseVideo(page);
         await page.close();
       });
     }
