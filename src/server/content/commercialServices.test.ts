@@ -50,8 +50,8 @@ test("support package amount agrees with hourly rate and hours", async () => {
   const sources = await loadCommercialServiceSources();
   const support = sources.find(source => source.slug === "additional-service")!;
   assert.equal(support.payload.pricePackageHours, 20);
-  assert.equal(support.payload.priceHourlyRate, 2000);
-  assert.equal(support.payload.priceFrom, 40000);
+  assert.equal(support.payload.priceHourlyRate, 2200);
+  assert.equal(support.payload.priceFrom, 44000);
   assert.equal(support.payload.priceFrom, Number(support.payload.pricePackageHours) * Number(support.payload.priceHourlyRate));
   assert.match(JSON.stringify(support), /Kanban/);
   assert.match(JSON.stringify(support), /MCP/);
