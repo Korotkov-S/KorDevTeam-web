@@ -25,7 +25,7 @@ test("technical support guide connects task evidence, hour limits and payment co
   assert.equal(body.match(/^#\s+(.+)$/m)?.[1], title);
   assert.equal(body.match(/^#\s+/gm)?.length, 1);
   assert.match(body, /20 часов/i);
-  assert.match(body, /2.?000 ₽|2000 (?:руб|₽)/i);
+  assert.match(body, /2.?200 ₽|2200 (?:руб|₽)/i);
   assert.match(body, /публичн.+Kanban-доск/i);
   assert.match(body, /ежедневн.+статус/i);
   assert.match(body, /по понедельникам/i);
