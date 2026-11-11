@@ -218,11 +218,3 @@ html {
     transition-duration: 0.01ms !important;
   }
 }
-
-.home-hero-orb {
-  transition: transform 240ms ease;
-}
-
-.home-hero-orb:hover {
-  transform: translateY(-7px) rotate(-2deg);
-}

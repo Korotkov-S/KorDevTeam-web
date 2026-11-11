@@ -9,6 +9,7 @@ import { ContentCard } from "../components/public/ContentCard";
 import { LeadCtaSection } from "../components/public/LeadCtaSection";
 import { Section, SectionHeading } from "../components/public/Section";
 import { CtaLink } from "../components/public/CtaLink";
+import { CASE_VIDEO_PATH } from "../lib/caseVideo";
 import type { CaseCardView, ContentCardView, ServiceCardView } from "../server/content/types";
 
 export function HomePage({ services = [], projects = [], posts = [] }: {
@@ -20,8 +21,16 @@ export function HomePage({ services = [], projects = [], posts = [] }: {
     {projects.length > 0 && <Section id="cases">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <SectionHeading eyebrow="Практика" title="Задачи бизнеса. Работающие решения." description="Веб-сервисы, приложения и интеграции — от задачи до реализации." />
-        <CtaLink to="/cases/" variant="secondary">Все кейсы</CtaLink>
+        <div className="flex flex-wrap gap-3">
+          {projects.some(project => `/cases/${project.slug}/` === CASE_VIDEO_PATH) && (
+            <CtaLink to={`${CASE_VIDEO_PATH}?t=25#case-video`} variant="secondary">Демо «Краны Балашихи»</CtaLink>
+          )}
+          <CtaLink to="/cases/" variant="secondary">Все кейсы</CtaLink>
+        </div>
       </div>
+      <p className="mt-5 text-sm text-[var(--public-subtle)]">
+        Подключаем оплату через <span className="font-semibold text-[var(--public-ink)]">CloudPayments</span> и <span className="font-semibold text-[var(--public-ink)]">ЮKassa</span>.
+      </p>
       <HomeCaseMosaic projects={projects} />
     </Section>}
     {services.length > 0 && <Section id="services" className="border-t border-border">

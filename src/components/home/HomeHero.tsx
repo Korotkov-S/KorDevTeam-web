@@ -1,33 +1,94 @@
 import React from "react";
+import { ArrowUpRight, LifeBuoy, PanelsTopLeft, Smartphone, Workflow } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Section } from "../public/Section";
 import { CtaLink } from "../public/CtaLink";
 
-const disciplines = [
-  { label: "CRM", className: "bg-[#e9ff64] text-[#10131f]" },
-  { label: "API", className: "bg-[#ff7448] text-white" },
-  { label: "WEB", className: "bg-[var(--public-blue)] text-white" },
-  { label: "APP", className: "bg-[#9c6cff] text-white" },
-  { label: "AI", className: "bg-[#111827] text-white dark:bg-white dark:text-[#111827]" },
+const taskPaths = [
+  {
+    title: "Разработать сайт или приложение",
+    description: "Веб-сервисы, личные кабинеты и мобильные приложения для клиентов и сотрудников.",
+    to: "/services/",
+    icon: PanelsTopLeft,
+  },
+  {
+    title: "Связать системы и убрать ручной ввод",
+    description: "Заявки, заказы и документы переходят между сайтом, 1С и CRM по согласованным правилам.",
+    to: "/services/integrations/",
+    icon: Workflow,
+  },
+  {
+    title: "Передать проект на сопровождение",
+    description: "Сайт, приложение, 1С и Битрикс24 в одних руках. Сопровождаем действующие проекты, включая сайты на 1С-Битрикс.",
+    to: "/#contact",
+    icon: LifeBuoy,
+  },
 ] as const;
 
+const platformMarks = [
+  { name: "WordPress", file: "wordpress", position: "lg:left-[14%] lg:top-[14%]" },
+  { name: "Drupal", file: "drupal", position: "lg:left-[17%] lg:top-[79%]" },
+  { name: "Telegram", file: "telegram", position: "lg:left-[93%] lg:top-[47%]" },
+  { name: "AXELOT WMS", file: "axelot", position: "lg:left-[83%] lg:top-[79%]" },
+];
+
+const platformBadgeClass = "flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-white/85 px-2.5 text-xs font-semibold text-[#151b37] lg:absolute lg:h-10 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:border lg:border-violet-100 lg:px-3 lg:shadow-[0_6px_20px_rgba(66,48,145,0.08)]";
+
 export function HomeHero() {
-  return <Section id="home-hero" className="relative overflow-hidden !pb-20 !pt-14 sm:!pt-20 lg:!pb-28 lg:!pt-24">
-    <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-12 -z-10 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,var(--public-hero-glow)_0%,transparent_68%)] sm:h-[44rem] sm:w-[44rem]" />
-    <div className="flex flex-col items-center text-center">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--public-violet)] sm:text-sm">KorDevTeam · разработка и автоматизация</p>
-      <ul aria-label="Направления работы" className="mt-8 flex items-center justify-center pl-3 sm:mt-10 sm:pl-5">
-        {disciplines.map((discipline, index) => <li key={discipline.label} className={`home-hero-orb relative -ml-3 grid h-16 w-16 place-items-center rounded-full border-4 border-[var(--public-surface)] text-xs font-bold tracking-[0.08em] shadow-sm sm:-ml-5 sm:h-20 sm:w-20 sm:text-sm ${discipline.className}`} style={{ zIndex: index === 2 ? 2 : 1 }}>
-          {discipline.label}
-        </li>)}
-      </ul>
-      <h1 className="mt-9 max-w-[76rem] text-balance text-[clamp(3.6rem,8.7vw,8.5rem)] font-medium leading-[0.84] tracking-[-0.075em] text-[var(--public-ink)]">
-        Собираем бизнес в работающую систему
-      </h1>
-      <p className="mt-8 max-w-3xl text-balance text-lg leading-8 text-[var(--public-subtle)] sm:text-xl">Автоматизируем процессы, соединяем CRM и внешние сервисы, создаём веб-продукты и мобильные приложения.</p>
-      <div className="mt-9 flex flex-wrap justify-center gap-3">
-        <CtaLink to="/#contact">Обсудить проект</CtaLink>
-        <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
+  return <>
+    <Section id="home-hero" className="relative isolate !pb-11 !pt-12 sm:!pt-16 lg:!pb-28 lg:!pt-24">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden lg:block">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.09),transparent_68%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.14),transparent_68%)]" />
+        <div className="absolute inset-x-[5%] inset-y-[9%] -rotate-[7deg] rounded-[50%] border border-violet-400/25 dark:border-violet-300/20" />
+        <div className="absolute inset-x-[9%] inset-y-[15%] rotate-[6deg] rounded-[50%] border border-dashed border-blue-400/25 dark:border-blue-300/20" />
       </div>
-    </div>
-  </Section>;
+      <div className="mx-auto max-w-4xl text-center">
+        <h1 className="mx-auto max-w-[14em] text-balance text-[clamp(2.25rem,5vw,4.25rem)] font-semibold leading-[1.04] tracking-[-0.052em] text-[var(--public-ink)]">
+          Берём на себя всю разработку для вашего бизнеса
+        </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-7 text-[var(--public-subtle)] sm:mt-6 sm:text-xl sm:leading-8">
+          Сайты, мобильные приложения, 1С и Битрикс24. Запускаем новые проекты, объединяем разные системы в одну и развиваем то, что уже работает.
+        </p>
+        <div className="mt-7 flex flex-wrap justify-center gap-3 sm:mt-8">
+          <CtaLink to="/#contact">Обсудить задачу</CtaLink>
+          <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
+        </div>
+      </div>
+      <ul aria-label="Системы, с которыми работаем" className="mt-6 flex flex-wrap justify-center gap-1.5 lg:pointer-events-none lg:absolute lg:inset-0 lg:mt-0">
+        <li className={`${platformBadgeClass} lg:left-[87%] lg:top-[14%]`}>
+          <img src="/system-logos/1c.webp" alt="1С" width={144} height={80} className="h-auto w-9" />
+        </li>
+        <li className={`${platformBadgeClass} lg:left-[7.5%] lg:top-[48%]`}>
+          <img src="/system-logos/b24.webp" alt="Битрикс24" width={312} height={56} className="h-auto w-[5.25rem]" />
+        </li>
+        {platformMarks.map(({ name, file, position }) => (
+          <li key={name} className={`${platformBadgeClass} ${position}`}>
+            <img src={`/system-logos/${file}.webp`} alt="" width={72} height={72} className="size-4" />
+            {name}
+          </li>
+        ))}
+        <li className={`${platformBadgeClass} lg:left-1/2 lg:top-[89%]`}>
+          <Smartphone aria-hidden="true" size={15} />
+          Android и iOS
+        </li>
+      </ul>
+    </Section>
+    <Section id="task-paths" className="!pb-10 !pt-0 lg:!pb-14">
+      <h2 className="mb-4 text-xl font-semibold tracking-[-0.025em] text-[var(--public-ink)] sm:text-2xl">С чем к нам приходят</h2>
+      <ul className="grid gap-3 md:grid-cols-3">
+        {taskPaths.map(({ title, description, to, icon: Icon }) => (
+          <li key={title}>
+            <Link to={to} className="group flex h-full flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)] sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <Icon aria-hidden="true" size={21} className="text-[var(--public-violet)]" />
+                <ArrowUpRight aria-hidden="true" size={16} className="text-[var(--public-subtle)] group-hover:text-[var(--public-violet)]" />
+              </div>
+              <h3 className="mt-3 text-base font-semibold leading-tight text-[var(--public-ink)] sm:text-lg">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--public-subtle)]">{description}</p>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  </>;
 }

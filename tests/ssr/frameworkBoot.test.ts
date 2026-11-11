@@ -35,8 +35,12 @@ test("one runtime serves health and server-rendered home", async (t) => {
   const response = await fetch(`${runtime.origin}/`);
   const html = await response.text();
   assert.equal(response.status, 200);
-  assert.equal(seoSnapshot(html).h1.length, 1);
-  assert.ok(seoSnapshot(html).h1[0].length > 20);
+  const seo = seoSnapshot(html);
+  assert.deepEqual(seo.h1, ["Берём на себя всю разработку для вашего бизнеса"]);
+  assert.deepEqual(seo.title, ["ИТ-поддержка бизнеса, разработка и автоматизация | KorDevTeam"]);
+  assert.equal(seo.description.length, 1);
+  assert.match(seo.description[0], /Интегрируем 1С и Битрикс24/);
+  assert.deepEqual(seo.canonical, ["https://kordev.team/"]);
   for (const id of ["home-hero", "proof", "cases", "services", "krasotula", "process", "contact"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }

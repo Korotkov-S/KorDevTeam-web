@@ -25,12 +25,14 @@ afterEach(cleanup);
 test("home renders the editorial commercial sequence without unverified metrics", () => {
   render(<MemoryRouter><HomePage services={services} projects={projects} posts={posts} /></MemoryRouter>);
   assert.equal(screen.getAllByRole("heading", { level: 1 }).length, 1);
-  assert.deepEqual([...document.querySelectorAll("section[id]")].map(node => node.id), ["home-hero", "proof", "cases", "services", "krasotula", "process", "insights", "contact"]);
-  for (const label of ["Смотреть кейсы", "Обсудить проект", "Интеграция и автоматизация бизнеса", "Krasotula CRM"]) {
+  assert.ok(screen.getByRole("heading", { level: 1, name: "Берём на себя всю разработку для вашего бизнеса" }));
+  assert.deepEqual([...document.querySelectorAll("section[id]")].map(node => node.id), ["home-hero", "task-paths", "proof", "cases", "services", "krasotula", "process", "insights", "contact"]);
+  for (const label of ["Смотреть кейсы", "Интеграция и автоматизация бизнеса", "Krasotula CRM"]) {
     assert.ok(screen.getByText(label, { exact: false }));
   }
   assert.ok(screen.getByRole("button", { name: "Отправить заявку" }));
   assert.doesNotMatch(document.body.textContent ?? "", /95%|8 недель|83%/);
+  assert.equal(screen.getByRole("link", { name: "Обсудить задачу", exact: true }).getAttribute("href"), "/#contact");
   assert.equal(screen.getByRole("link", { name: /Смотреть кейсы/ }).getAttribute("href"), "/cases/");
   assert.ok(document.querySelector('a[href="/cases/delivery/"]'));
   assert.ok(document.querySelector('a[href="/services/business-process-automation/"]'));
@@ -93,7 +95,6 @@ test("home uses a distinctive editorial composition instead of uniform card grid
 
   render(<MemoryRouter><HomePage services={editorialServices} projects={editorialProjects} /></MemoryRouter>);
 
-  assert.equal(within(screen.getByRole("list", { name: "Направления работы" })).getAllByRole("listitem").length, 5);
   assert.deepEqual(
     [...document.querySelectorAll("[data-home-case-layout]")].map(node => node.getAttribute("data-home-case-layout")),
     ["wide", "compact", "compact", "wide"],
