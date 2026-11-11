@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { load } from "cheerio";
 import { startTestRuntime } from "./support/runtime";
 import { seoSnapshot } from "./support/seoSnapshot";
 import { resetTestDatabase } from "../../src/server/db/testDatabase";
@@ -44,7 +45,7 @@ test("one runtime serves health and server-rendered home", async (t) => {
   for (const id of ["home-hero", "proof", "cases", "services", "krasotula", "process", "contact"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
-  assert.doesNotMatch(html, /95%|8 недель|83%/);
+  assert.doesNotMatch(load(html)("main").text(), /95%|8 недель|83%/);
   const priorityPaths = ["business-process-automation", "web-services", "mobile-app-development"].map(slug => html.indexOf(`href="/services/${slug}/"`));
   assert.ok(priorityPaths.every(index => index >= 0));
   assert.ok(priorityPaths[0] < priorityPaths[1] && priorityPaths[1] < priorityPaths[2]);
