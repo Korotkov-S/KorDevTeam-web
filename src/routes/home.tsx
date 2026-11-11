@@ -24,8 +24,8 @@ export async function loader() {
     const index = PRIORITY_SERVICE_SLUGS.findIndex(priority => priority === slug);
     return index < 0 ? PRIORITY_SERVICE_SLUGS.length : index;
   };
-  const seo: RouteSeoInput = { pathname: "/", title: "Автоматизация продаж и операционных процессов",
-    description: "KorDevTeam разрабатывает CRM, веб-сервисы, мобильные приложения и интеграции под ключ. У нас есть собственный продукт Красотуля-CRM для малого бизнеса.",
+  const seo: RouteSeoInput = { pathname: "/", title: "ИТ-поддержка бизнеса, разработка и автоматизация",
+    description: "KorDevTeam разрабатывает сайты, веб-сервисы, мобильные приложения и CRM. Интегрируем 1С и Битрикс24, берём действующие проекты на сопровождение.",
     indexable: true, kind: "home" };
   return data({
     seo,
