@@ -36,7 +36,7 @@ const platformBadgeClass = "flex h-8 items-center gap-1.5 whitespace-nowrap roun
 
 export function HomeHero() {
   return <>
-    <Section id="home-hero" className="relative isolate !pb-11 !pt-12 sm:!pt-16 lg:!pb-28 lg:!pt-24">
+    <Section id="home-hero" className="relative isolate flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col justify-center !pb-11 !pt-12 sm:!pt-16 lg:!pb-28 lg:!pt-24">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden lg:block">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.09),transparent_68%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.14),transparent_68%)]" />
         <div className="absolute inset-x-[5%] inset-y-[9%] -rotate-[7deg] rounded-[50%] border border-violet-400/25 dark:border-violet-300/20" />
@@ -73,7 +73,7 @@ export function HomeHero() {
         </li>
       </ul>
     </Section>
-    <Section id="task-paths" className="!pb-10 !pt-0 lg:!pb-14">
+    <Section id="task-paths" className="!pb-10 !pt-10 sm:!pt-12 lg:!pb-14">
       <h2 className="mb-4 text-xl font-semibold tracking-[-0.025em] text-[var(--public-ink)] sm:text-2xl">С чем к нам приходят</h2>
       <ul className="grid gap-3 md:grid-cols-3">
         {taskPaths.map(({ title, description, to, icon: Icon }) => (
