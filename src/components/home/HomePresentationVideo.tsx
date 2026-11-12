@@ -1,11 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "../ui/dialog";
 
 const presentationPath = "/presentations/kordev-outsourced-team-v4";
+const previewImage = `${presentationPath}-preview.jpg`;
+const previewClassName = "size-full rounded-full object-cover";
 
 export function HomePresentationVideo() {
   const [open, setOpen] = useState(false);
+  const [animatePreview, setAnimatePreview] = useState(false);
+
+  useEffect(() => {
+    const preference = window.matchMedia?.("(prefers-reduced-motion: no-preference)");
+    if (!preference) return;
+
+    const update = () => setAnimatePreview(preference.matches);
+    update();
+    preference.addEventListener("change", update);
+    return () => preference.removeEventListener("change", update);
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -16,7 +29,22 @@ export function HomePresentationVideo() {
             aria-label="Смотреть видеопрезентацию, 57 секунд"
             className="relative block size-12 cursor-pointer rounded-full border-[3px] border-[var(--public-surface)] ring-1 ring-[var(--public-blue)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--public-blue)] max-[360px]:size-10 sm:size-20 sm:border-4 motion-safe:animate-[home-presentation-nudge_650ms_ease_1.2s_2]"
           >
-            <img src={`${presentationPath}-preview.jpg`} alt="" width="192" height="192" className="size-full rounded-full object-cover" />
+            {animatePreview ? (
+              <video
+                aria-hidden="true"
+                autoPlay
+                muted
+                playsInline
+                src={`${presentationPath}-preview.mp4`}
+                poster={previewImage}
+                width="192"
+                height="192"
+                className={previewClassName}
+                onError={() => setAnimatePreview(false)}
+              />
+            ) : (
+              <img src={previewImage} alt="" width="192" height="192" className={previewClassName} />
+            )}
             <span className="absolute right-0 bottom-0 grid size-5 place-items-center rounded-full bg-black/80 text-white sm:size-8">
               <Play aria-hidden="true" className="size-2.5 fill-current sm:size-3.5" />
             </span>
