@@ -37,7 +37,7 @@ const disciplines = [
 
 export function HomeHero() {
   return <>
-    <Section id="home-hero" className="flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col items-center justify-center !py-8 text-center max-[360px]:!py-4 sm:!py-12 sm:[@media(max-height:700px)]:!py-6">
+    <Section id="home-hero" className="relative flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col items-center justify-center !py-8 text-center max-[360px]:!py-4 sm:!py-12 sm:[@media(max-height:700px)]:!py-6">
       <ul aria-label="Направления работы" className="isolate flex items-center justify-center -space-x-2.5 sm:-space-x-5">
         {disciplines.map(({ label, className }) => (
           <li key={label} className={`relative grid size-12 shrink-0 place-items-center rounded-full border-[3px] border-[var(--public-surface)] text-[10px] font-bold tracking-[0.08em] shadow-sm sm:size-20 sm:border-4 sm:text-sm ${className}`}>
@@ -47,17 +47,25 @@ export function HomeHero() {
           </li>
         ))}
       </ul>
-      <h1 className="mt-5 max-w-5xl text-balance text-[clamp(2.125rem,6vw,5.375rem)] font-semibold leading-[1.02] tracking-[-0.056em] text-[var(--public-ink)] sm:mt-9">
+      <h1 className="mt-5 max-w-5xl text-balance text-[clamp(2.125rem,6vw,5.375rem)] font-semibold leading-[1.02] tracking-[-0.056em] text-[var(--public-ink)] max-[360px]:mt-3 sm:mt-9">
         Ваш отдел разработки <span className="whitespace-nowrap text-[var(--public-blue)]">на аутсорсе</span>
       </h1>
-      <p className="mt-5 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] sm:mt-6 sm:text-xl sm:leading-8">
+      <p className="mt-5 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] max-[360px]:mt-3 max-[360px]:leading-5 sm:mt-6 sm:text-xl sm:leading-8">
         Берём на себя разработку и поддержку сайта, мобильного приложения, 1С и Битрикс24.
       </p>
-      <p className="mt-4 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] sm:text-xl sm:leading-8">
+      <p className="mt-4 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] max-[360px]:mt-3 max-[360px]:leading-5 sm:text-xl sm:leading-8">
         Запускаем новые проекты, объединяем разные системы в одну и развиваем то, что уже работает.
       </p>
 
-      <div className="mt-6 flex flex-wrap justify-center gap-3 max-[360px]:mt-4 sm:mt-8">
+      <div className="mt-5 sm:mt-7 lg:absolute lg:right-10 lg:bottom-6 lg:mt-0 lg:text-right xl:bottom-10">
+        <p className="text-sm leading-5 text-[var(--public-subtle)]">Сопровождение проектов</p>
+        <p className="mt-1 text-xl font-semibold leading-tight text-[var(--public-ink)] sm:text-2xl">
+          От 40 000 ₽ в месяц<sup>*</sup>
+        </p>
+        <small className="mt-1 block text-xs leading-5 text-[var(--public-subtle)]">* При заказе от 20 часов в месяц.</small>
+      </div>
+
+      <div className="mt-6 flex flex-wrap justify-center gap-3 max-[360px]:mt-4 max-[360px]:grid max-[360px]:w-full max-[360px]:grid-cols-2 max-[360px]:gap-2 max-[360px]:[&>a]:px-1 max-[360px]:[&>a]:text-xs sm:mt-8">
         <CtaLink to="/#contact">Обсудить задачу</CtaLink>
         <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
       </div>
