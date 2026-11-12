@@ -104,3 +104,13 @@ test("home uses a distinctive editorial composition instead of uniform card grid
     ["01", "02", "03"],
   );
 });
+
+test("the first screen offers the presentation without mounting the video before opening", () => {
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+
+  const hero = document.getElementById("home-hero");
+  assert.ok(hero);
+  const trigger = within(hero).getByRole("button", { name: "Смотреть видеопрезентацию, 57 секунд" });
+  assert.equal(trigger.getAttribute("aria-haspopup"), "dialog");
+  assert.equal(document.querySelector("video"), null);
+});
