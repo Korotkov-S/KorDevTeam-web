@@ -67,7 +67,7 @@ export function PublicHeader(): React.JSX.Element {
   }, [isMenuOpen]);
 
   return (
-    <header className="border-b border-[color:color-mix(in_srgb,var(--public-ink)_12%,transparent)] bg-[var(--public-surface)] text-[var(--public-ink)]">
+    <header className="min-h-[var(--public-header-min-height)] border-b border-[color:color-mix(in_srgb,var(--public-ink)_12%,transparent)] bg-[var(--public-surface)] text-[var(--public-ink)]">
       <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-6 px-5 py-4 lg:px-8">
         <Link to="/" aria-label="KorDevTeam — главная">
           <Wordmark className="text-xl" />
