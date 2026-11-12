@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowUpRight, LifeBuoy, PanelsTopLeft, Smartphone, Workflow } from "lucide-react";
+import { ArrowUpRight, LifeBuoy, PanelsTopLeft, Workflow } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Section } from "../public/Section";
 import { CtaLink } from "../public/CtaLink";
@@ -19,59 +19,48 @@ const taskPaths = [
   },
   {
     title: "Передать проект на сопровождение",
-    description: "Сайт, приложение, 1С и Битрикс24 в одних руках. Сопровождаем действующие проекты, включая сайты на 1С-Битрикс.",
+    description: "Поддерживаем действующие сайты, мобильные приложения и интеграции. Работаем с сайтами на 1С-Битрикс.",
     to: "/#contact",
     icon: LifeBuoy,
   },
 ] as const;
 
-const platformMarks = [
-  { name: "WordPress", file: "wordpress", position: "lg:left-[14%] lg:top-[14%]" },
-  { name: "Drupal", file: "drupal", position: "lg:left-[17%] lg:top-[79%]" },
-  { name: "Telegram", file: "telegram", position: "lg:left-[93%] lg:top-[47%]" },
-  { name: "AXELOT WMS", file: "axelot", position: "lg:left-[83%] lg:top-[79%]" },
-];
-
-const platformBadgeClass = "flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-white/85 px-2.5 text-xs font-semibold text-[#151b37] lg:absolute lg:h-10 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:border lg:border-violet-100 lg:px-3 lg:shadow-[0_6px_20px_rgba(66,48,145,0.08)]";
+const disciplines = [
+  { label: "CRM", className: "bg-[#e9ff64] text-[#10131f]" },
+  { label: "API", className: "bg-[#ff7448] text-white" },
+  { label: "WEB", className: "z-[2] bg-[var(--public-blue)] text-[var(--public-action-foreground)]" },
+  { label: "APP", className: "bg-[#9c6cff] text-white" },
+  { label: "AI", className: "bg-[#111827] text-white dark:bg-white dark:text-[#111827]" },
+  { label: "1С", className: "bg-[#c82731] text-white" },
+  { label: "Битрикс24", className: "bg-[#bdefff] text-[#0b4669]" },
+] as const;
 
 export function HomeHero() {
   return <>
-    <Section id="home-hero" className="relative isolate flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col justify-center !pb-11 !pt-12 sm:!pt-16 lg:!pb-28 lg:!pt-24">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden lg:block">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.09),transparent_68%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.14),transparent_68%)]" />
-        <div className="absolute inset-x-[5%] inset-y-[9%] -rotate-[7deg] rounded-[50%] border border-violet-400/25 dark:border-violet-300/20" />
-        <div className="absolute inset-x-[9%] inset-y-[15%] rotate-[6deg] rounded-[50%] border border-dashed border-blue-400/25 dark:border-blue-300/20" />
-      </div>
-      <div className="mx-auto max-w-4xl text-center">
-        <h1 className="mx-auto max-w-[14em] text-balance text-[clamp(2.25rem,5vw,4.25rem)] font-semibold leading-[1.04] tracking-[-0.052em] text-[var(--public-ink)]">
-          Берём на себя всю разработку для вашего бизнеса
-        </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-7 text-[var(--public-subtle)] sm:mt-6 sm:text-xl sm:leading-8">
-          Сайты, мобильные приложения, 1С и Битрикс24. Запускаем новые проекты, объединяем разные системы в одну и развиваем то, что уже работает.
-        </p>
-        <div className="mt-7 flex flex-wrap justify-center gap-3 sm:mt-8">
-          <CtaLink to="/#contact">Обсудить задачу</CtaLink>
-          <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
-        </div>
-      </div>
-      <ul aria-label="Системы, с которыми работаем" className="mt-6 flex flex-wrap justify-center gap-1.5 lg:pointer-events-none lg:absolute lg:inset-0 lg:mt-0">
-        <li className={`${platformBadgeClass} lg:left-[87%] lg:top-[14%]`}>
-          <img src="/system-logos/1c.webp" alt="1С" width={144} height={80} className="h-auto w-9" />
-        </li>
-        <li className={`${platformBadgeClass} lg:left-[7.5%] lg:top-[48%]`}>
-          <img src="/system-logos/b24.webp" alt="Битрикс24" width={312} height={56} className="h-auto w-[5.25rem]" />
-        </li>
-        {platformMarks.map(({ name, file, position }) => (
-          <li key={name} className={`${platformBadgeClass} ${position}`}>
-            <img src={`/system-logos/${file}.webp`} alt="" width={72} height={72} className="size-4" />
-            {name}
+    <Section id="home-hero" className="flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col items-center justify-center !py-8 text-center max-[360px]:!py-4 sm:!py-12 sm:[@media(max-height:700px)]:!py-6">
+      <ul aria-label="Направления работы" className="isolate flex items-center justify-center -space-x-2.5 sm:-space-x-5">
+        {disciplines.map(({ label, className }) => (
+          <li key={label} className={`relative grid size-12 shrink-0 place-items-center rounded-full border-[3px] border-[var(--public-surface)] text-[10px] font-bold tracking-[0.08em] shadow-sm sm:size-20 sm:border-4 sm:text-sm ${className}`}>
+            {label === "Битрикс24" ? (
+              <span className="text-[8px] leading-tight tracking-normal sm:text-xs">Битрикс<span className="block sm:inline">24</span></span>
+            ) : <span>{label}</span>}
           </li>
         ))}
-        <li className={`${platformBadgeClass} lg:left-1/2 lg:top-[89%]`}>
-          <Smartphone aria-hidden="true" size={15} />
-          Android и iOS
-        </li>
       </ul>
+      <h1 className="mt-5 max-w-5xl text-balance text-[clamp(2.125rem,6vw,5.375rem)] font-semibold leading-[1.02] tracking-[-0.056em] text-[var(--public-ink)] sm:mt-9">
+        Ваш отдел разработки <span className="whitespace-nowrap text-[var(--public-blue)]">на аутсорсе</span>
+      </h1>
+      <p className="mt-5 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] sm:mt-6 sm:text-xl sm:leading-8">
+        Берём на себя разработку и поддержку сайта, мобильного приложения, 1С и Битрикс24.
+      </p>
+      <p className="mt-4 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] sm:text-xl sm:leading-8">
+        Запускаем новые проекты, объединяем разные системы в одну и развиваем то, что уже работает.
+      </p>
+
+      <div className="mt-6 flex flex-wrap justify-center gap-3 max-[360px]:mt-4 sm:mt-8">
+        <CtaLink to="/#contact">Обсудить задачу</CtaLink>
+        <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
+      </div>
     </Section>
     <Section id="task-paths" className="!pb-10 !pt-10 sm:!pt-12 lg:!pb-14">
       <h2 className="mb-4 text-xl font-semibold tracking-[-0.025em] text-[var(--public-ink)] sm:text-2xl">С чем к нам приходят</h2>
