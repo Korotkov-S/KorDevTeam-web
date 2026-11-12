@@ -22,8 +22,12 @@ const taskPaths = [
     description: "Поддерживаем действующие сайты, мобильные приложения и интеграции. Работаем с сайтами на 1С-Битрикс.",
     to: "/#contact",
     icon: LifeBuoy,
+    offer: {
+      price: "От 40\u202F000 ₽ в месяц",
+      condition: "При заказе от 20 часов в месяц.",
+    },
   },
-] as const;
+];
 
 const disciplines = [
   { label: "CRM", className: "bg-[#e9ff64] text-[#10131f]" },
@@ -65,7 +69,7 @@ export function HomeHero() {
     <Section id="task-paths" className="!pb-10 !pt-10 sm:!pt-12 lg:!pb-14">
       <h2 className="mb-4 text-xl font-semibold tracking-[-0.025em] text-[var(--public-ink)] sm:text-2xl">С чем к нам приходят</h2>
       <ul className="grid gap-3 md:grid-cols-3">
-        {taskPaths.map(({ title, description, to, icon: Icon }) => (
+        {taskPaths.map(({ title, description, to, icon: Icon, offer }) => (
           <li key={title}>
             <Link to={to} className="group flex h-full flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)] sm:p-5">
               <div className="flex items-center justify-between gap-3">
@@ -74,6 +78,12 @@ export function HomeHero() {
               </div>
               <h3 className="mt-3 text-base font-semibold leading-tight text-[var(--public-ink)] sm:text-lg">{title}</h3>
               <p className="mt-2 text-sm leading-6 text-[var(--public-subtle)]">{description}</p>
+              {offer && (
+                <div className="mt-3 border-t border-border pt-3">
+                  <p className="font-semibold text-[var(--public-ink)]">{offer.price}<sup>*</sup></p>
+                  <small className="mt-1 block text-xs leading-5 text-[var(--public-subtle)]">* {offer.condition}</small>
+                </div>
+              )}
             </Link>
           </li>
         ))}
