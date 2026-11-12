@@ -37,7 +37,7 @@ const disciplines = [
 
 export function HomeHero() {
   return <>
-    <Section id="home-hero" className="flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col items-center justify-center !py-8 text-center max-[360px]:!py-4 sm:!py-12 sm:[@media(max-height:700px)]:!py-6">
+    <Section id="home-hero" className="relative flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col items-center justify-center !py-8 text-center max-[360px]:!py-4 sm:!py-12 sm:[@media(max-height:700px)]:!py-6">
       <ul aria-label="Направления работы" className="isolate flex items-center justify-center -space-x-2.5 sm:-space-x-5">
         {disciplines.map(({ label, className }) => (
           <li key={label} className={`relative grid size-12 shrink-0 place-items-center rounded-full border-[3px] border-[var(--public-surface)] text-[10px] font-bold tracking-[0.08em] shadow-sm sm:size-20 sm:border-4 sm:text-sm ${className}`}>
@@ -57,7 +57,7 @@ export function HomeHero() {
         Запускаем новые проекты, объединяем разные системы в одну и развиваем то, что уже работает.
       </p>
 
-      <div className="mt-5 sm:mt-7">
+      <div className="mt-5 sm:mt-7 lg:absolute lg:right-10 lg:bottom-6 lg:mt-0 lg:text-right xl:bottom-10">
         <p className="text-sm leading-5 text-[var(--public-subtle)]">Сопровождение проектов</p>
         <p className="mt-1 text-xl font-semibold leading-tight text-[var(--public-ink)] sm:text-2xl">
           От 40 000 ₽ в месяц<sup>*</sup>
