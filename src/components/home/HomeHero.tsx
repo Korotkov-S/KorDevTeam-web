@@ -3,6 +3,7 @@ import { ArrowUpRight, LifeBuoy, PanelsTopLeft, Workflow } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Section } from "../public/Section";
 import { CtaLink } from "../public/CtaLink";
+import { HomePresentationVideo } from "./HomePresentationVideo";
 
 const taskPaths = [
   {
@@ -38,16 +39,19 @@ const disciplines = [
 export function HomeHero() {
   return <>
     <Section id="home-hero" className="relative flex min-h-[calc(100dvh-var(--public-header-min-height))] flex-col items-center justify-center !py-8 text-center max-[360px]:!py-4 sm:!py-12 sm:[@media(max-height:700px)]:!py-6">
-      <ul aria-label="Направления работы" className="isolate flex items-center justify-center -space-x-2.5 sm:-space-x-5">
-        {disciplines.map(({ label, className }) => (
-          <li key={label} className={`relative grid size-12 shrink-0 place-items-center rounded-full border-[3px] border-[var(--public-surface)] text-[10px] font-bold tracking-[0.08em] shadow-sm sm:size-20 sm:border-4 sm:text-sm ${className}`}>
-            {label === "Битрикс24" ? (
-              <span className="text-[8px] leading-tight tracking-normal sm:text-xs">Битрикс<span className="block sm:inline">24</span></span>
-            ) : <span>{label}</span>}
-          </li>
-        ))}
-      </ul>
-      <h1 className="mt-5 max-w-5xl text-balance text-[clamp(2.125rem,6vw,5.375rem)] font-semibold leading-[1.02] tracking-[-0.056em] text-[var(--public-ink)] max-[360px]:mt-3 sm:mt-9">
+      <div className="flex items-start gap-2 sm:gap-3">
+        <ul aria-label="Направления работы" className="isolate flex items-center justify-center -space-x-2.5 sm:-space-x-5">
+          {disciplines.map(({ label, className }) => (
+            <li key={label} className={`relative grid size-12 shrink-0 place-items-center rounded-full border-[3px] border-[var(--public-surface)] text-[10px] font-bold tracking-[0.08em] shadow-sm max-[360px]:size-10 sm:size-20 sm:border-4 sm:text-sm ${className}`}>
+              {label === "Битрикс24" ? (
+                <span className="text-[8px] leading-tight tracking-normal sm:text-xs">Битрикс<span className="block sm:inline">24</span></span>
+              ) : <span>{label}</span>}
+            </li>
+          ))}
+        </ul>
+        <HomePresentationVideo />
+      </div>
+      <h1 className="mt-5 max-w-5xl text-balance text-[clamp(2.125rem,6vw,5.375rem)] font-semibold leading-[1.02] tracking-[-0.056em] text-[var(--public-ink)] max-[360px]:mt-4 sm:mt-9">
         Ваш отдел разработки <span className="whitespace-nowrap text-[var(--public-blue)]">на аутсорсе</span>
       </h1>
       <p className="mt-5 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] max-[360px]:mt-3 max-[360px]:leading-5 sm:mt-6 sm:text-xl sm:leading-8">
