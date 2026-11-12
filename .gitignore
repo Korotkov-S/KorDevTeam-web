@@ -1,5 +1,6 @@
 node_modules
-.yarn
+.yarn/*
+!.yarn/patches/
 .react-router
 build
 dist
