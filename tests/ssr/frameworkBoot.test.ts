@@ -37,7 +37,7 @@ test("one runtime serves health and server-rendered home", async (t) => {
   const html = await response.text();
   assert.equal(response.status, 200);
   const seo = seoSnapshot(html);
-  assert.deepEqual(seo.h1, ["Берём на себя всю разработку для вашего бизнеса"]);
+  assert.deepEqual(seo.h1, ["Ваш отдел разработки на аутсорсе"]);
   assert.deepEqual(seo.title, ["ИТ-поддержка бизнеса, разработка и автоматизация | KorDevTeam"]);
   assert.equal(seo.description.length, 1);
   assert.match(seo.description[0], /Интегрируем 1С и Битрикс24/);
