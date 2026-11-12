@@ -22,12 +22,8 @@ const taskPaths = [
     description: "Поддерживаем действующие сайты, мобильные приложения и интеграции. Работаем с сайтами на 1С-Битрикс.",
     to: "/#contact",
     icon: LifeBuoy,
-    offer: {
-      price: "От 40\u202F000 ₽ в месяц",
-      condition: "При заказе от 20 часов в месяц.",
-    },
   },
-];
+] as const;
 
 const disciplines = [
   { label: "CRM", className: "bg-[#e9ff64] text-[#10131f]" },
@@ -51,17 +47,25 @@ export function HomeHero() {
           </li>
         ))}
       </ul>
-      <h1 className="mt-5 max-w-5xl text-balance text-[clamp(2.125rem,6vw,5.375rem)] font-semibold leading-[1.02] tracking-[-0.056em] text-[var(--public-ink)] sm:mt-9">
+      <h1 className="mt-5 max-w-5xl text-balance text-[clamp(2.125rem,6vw,5.375rem)] font-semibold leading-[1.02] tracking-[-0.056em] text-[var(--public-ink)] max-[360px]:mt-3 sm:mt-9">
         Ваш отдел разработки <span className="whitespace-nowrap text-[var(--public-blue)]">на аутсорсе</span>
       </h1>
-      <p className="mt-5 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] sm:mt-6 sm:text-xl sm:leading-8">
+      <p className="mt-5 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] max-[360px]:mt-3 max-[360px]:leading-5 sm:mt-6 sm:text-xl sm:leading-8">
         Берём на себя разработку и поддержку сайта, мобильного приложения, 1С и Битрикс24.
       </p>
-      <p className="mt-4 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] sm:text-xl sm:leading-8">
+      <p className="mt-4 max-w-[42rem] text-pretty text-base leading-6 text-[var(--public-subtle)] max-[360px]:mt-3 max-[360px]:leading-5 sm:text-xl sm:leading-8">
         Запускаем новые проекты, объединяем разные системы в одну и развиваем то, что уже работает.
       </p>
 
-      <div className="mt-6 flex flex-wrap justify-center gap-3 max-[360px]:mt-4 sm:mt-8">
+      <div className="mt-5 sm:mt-7">
+        <p className="text-sm leading-5 text-[var(--public-subtle)]">Сопровождение проектов</p>
+        <p className="mt-1 text-xl font-semibold leading-tight text-[var(--public-ink)] sm:text-2xl">
+          От 40 000 ₽ в месяц<sup>*</sup>
+        </p>
+        <small className="mt-1 block text-xs leading-5 text-[var(--public-subtle)]">* При заказе от 20 часов в месяц.</small>
+      </div>
+
+      <div className="mt-6 flex flex-wrap justify-center gap-3 max-[360px]:mt-4 max-[360px]:grid max-[360px]:w-full max-[360px]:grid-cols-2 max-[360px]:gap-2 max-[360px]:[&>a]:px-1 max-[360px]:[&>a]:text-xs sm:mt-8">
         <CtaLink to="/#contact">Обсудить задачу</CtaLink>
         <CtaLink to="/cases/" variant="secondary">Смотреть кейсы</CtaLink>
       </div>
@@ -69,7 +73,7 @@ export function HomeHero() {
     <Section id="task-paths" className="!pb-10 !pt-10 sm:!pt-12 lg:!pb-14">
       <h2 className="mb-4 text-xl font-semibold tracking-[-0.025em] text-[var(--public-ink)] sm:text-2xl">С чем к нам приходят</h2>
       <ul className="grid gap-3 md:grid-cols-3">
-        {taskPaths.map(({ title, description, to, icon: Icon, offer }) => (
+        {taskPaths.map(({ title, description, to, icon: Icon }) => (
           <li key={title}>
             <Link to={to} className="group flex h-full flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-[var(--public-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-blue)] sm:p-5">
               <div className="flex items-center justify-between gap-3">
@@ -78,12 +82,6 @@ export function HomeHero() {
               </div>
               <h3 className="mt-3 text-base font-semibold leading-tight text-[var(--public-ink)] sm:text-lg">{title}</h3>
               <p className="mt-2 text-sm leading-6 text-[var(--public-subtle)]">{description}</p>
-              {offer && (
-                <div className="mt-3 border-t border-border pt-3">
-                  <p className="font-semibold text-[var(--public-ink)]">{offer.price}<sup>*</sup></p>
-                  <small className="mt-1 block text-xs leading-5 text-[var(--public-subtle)]">* {offer.condition}</small>
-                </div>
-              )}
             </Link>
           </li>
         ))}
