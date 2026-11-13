@@ -96,7 +96,7 @@ test("successful persisted lead emits form_submit_success once", async () => {
   fillRequiredFields();
 
   fireEvent.click(screen.getByRole("button", { name: "Отправить заявку" }));
-  await screen.findByText(/Заявка принята/);
+  await waitFor(() => assert.ok(document.querySelector('[data-lead-state="success"]')));
 
   assert.deepEqual(events.filter((event) => event === "form_submit_success"), ["form_submit_success"]);
 });
@@ -137,12 +137,11 @@ test("renders labelled native fields with the approved attachment formats", () =
   assert.equal(screen.getByLabelText(/согласен/i).getAttribute("value"), "accepted");
   const success = document.getElementById("lead-submitted-message");
   const error = document.getElementById("lead-submit-error");
-  assert.equal(success?.getAttribute("role"), "status");
-  assert.equal(success?.getAttribute("tabindex"), "-1");
+  assert.equal(success?.querySelector('[role="status"]')?.getAttribute("tabindex"), "-1");
   assert.equal(error?.getAttribute("role"), "alert");
   assert.equal(error?.getAttribute("tabindex"), "-1");
   assert.match(screen.getByText("Ответим в течение рабочего дня").textContent ?? "", /рабочего дня/);
-  assert.ok(screen.getByText("Пн–Пт, 09:00–18:00 по Москве"));
+  assert.match(form?.textContent ?? "", /Пн–Пт, 09:00–18:00 по Москве/u);
   assert.equal(screen.getByRole("link", { name: /обработку персональных данных/i }).getAttribute("href"), "/privacy/");
 });
 
@@ -174,7 +173,7 @@ test("submits from the native keyboard form path as multipart without a Content-
   const phone = screen.getByLabelText("Телефон");
   fireEvent.keyDown(phone, { key: "Enter", code: "Enter" });
   fireEvent.submit(phone.closest("form")!);
-  await screen.findByText(/Заявка принята/);
+  await waitFor(() => assert.ok(document.querySelector('[data-lead-state="success"]')));
 
   assert.ok(capturedBody instanceof FormData);
   assert.deepEqual([...capturedBody.keys()].sort(), [
@@ -233,12 +232,24 @@ test("shows an accessible progress state and focuses the response-time confirmat
   assert.equal(sending.getAttribute("data-lead-state"), "sending");
 
   resolveRequest(jsonResponse(201, { leadId: VALID_LEAD_ID }));
-  const success = await screen.findByText(/Заявка принята.*рабочего дня.*09:00–18:00/u);
+  const success = await waitFor(() => {
+    const confirmation = document.querySelector('[data-lead-state="success"]');
+    assert.ok(confirmation);
+    return confirmation;
+  });
 
   assert.equal(form.getAttribute("aria-busy"), "false");
-  assert.equal(success.getAttribute("data-lead-state"), "success");
+  assert.equal(form.hidden, true);
+  assert.ok(screen.getByRole("heading", { name: "Заявка принята" }));
+  assert.match(success.textContent ?? "", /рабочего дня.*09:00–18:00/u);
   assert.equal(success.getAttribute("role"), "status");
   assert.equal(document.activeElement, success);
+
+  fireEvent.click(screen.getByRole("button", { name: "Отправить ещё одну заявку" }));
+  const name = screen.getByLabelText("Имя") as HTMLInputElement;
+  assert.equal(form.hidden, false);
+  assert.equal(name.value, "");
+  assert.equal(document.activeElement, name);
 });
 
 test("reuses an idempotency key only for an unchanged retry and resets it after editing", async () => {
@@ -321,9 +332,10 @@ test("uses a new idempotency key after file changes and after a successful submi
   });
   shouldSucceed = true;
   fireEvent.click(button);
-  await screen.findByText(/Заявка принята/);
+  await waitFor(() => assert.ok(document.querySelector('[data-lead-state="success"]')));
   assert.notEqual(keys[0], keys[1]);
 
+  fireEvent.click(screen.getByRole("button", { name: "Отправить ещё одну заявку" }));
   fillRequiredFields();
   fireEvent.click(button);
   await waitFor(() => assert.equal(keys.length, 3));
@@ -343,7 +355,7 @@ test("treats only 200 or 201 with a UUID leadId as success", async () => {
     fillRequiredFields();
     fireEvent.click(screen.getByRole("button", { name: "Отправить заявку" }));
     assert.ok(await screen.findByText("Не удалось отправить заявку. Попробуйте ещё раз."));
-    assert.equal(screen.queryByText(/Заявка принята/), null);
+    assert.equal(document.querySelector('[data-lead-state="success"]'), null);
     view.unmount();
   }
 });

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -76,11 +77,19 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
   const openedRef = useRef(false);
   const startedRef = useRef(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  const focusNameOnReset = useRef(false);
+  const succeeded = submissionState === "success";
 
   useEffect(() => setHydrated(true), []);
   useEffect(() => {
-    if (submissionState === "success" || submissionState === "error") statusRef.current?.focus();
-  }, [submissionState]);
+    if (succeeded) confirmationRef.current?.focus();
+    if (submissionState === "error") statusRef.current?.focus();
+    if (submissionState === "idle" && focusNameOnReset.current) {
+      focusNameOnReset.current = false;
+      formRef.current?.querySelector<HTMLInputElement>('[name="name"]')?.focus();
+    }
+  }, [submissionState, succeeded]);
 
   const analyticsPayload = () => ({ path: normalizeSnapshotText(pagePath) });
 
@@ -187,7 +196,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
         setFile(null);
         setErrors({});
         form.reset();
-        setStatus(t("contact.form.status.success"));
+        setStatus("");
         setSubmissionState("success");
         track("form_submit_success", analyticsPayload());
         return;
@@ -210,9 +219,18 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
     }
   };
 
-  return (
+  const startAnother = () => {
+    focusNameOnReset.current = true;
+    setSubmissionState("idle");
+  };
+
+  const anotherLabel = t("contact.form.another");
+  const anotherClassName = "inline-flex min-h-11 items-center text-sm font-semibold text-[var(--public-blue)] underline underline-offset-4 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-4";
+
+  const form = (
     <form
       ref={formRef}
+      hidden={succeeded}
       action="/api/leads"
       method="post"
       encType="multipart/form-data"
@@ -220,7 +238,7 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
       aria-busy={pending}
       onFocusCapture={trackOpen}
       onSubmit={handleSubmit}
-      className={cn("space-y-5", className)}
+      className={cn("space-y-5 peer-target:hidden", className)}
     >
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
@@ -347,25 +365,56 @@ export function LeadForm({ pagePath = "/", className }: LeadFormProps) {
         ref={statusRef}
         role={submissionState === "error" ? "alert" : "status"}
         aria-live={submissionState === "error" ? "assertive" : "polite"}
-        tabIndex={submissionState === "success" || submissionState === "error" ? -1 : undefined}
-        data-lead-state={submissionState}
+        tabIndex={submissionState === "error" ? -1 : undefined}
+        data-lead-state={succeeded ? undefined : submissionState}
         className={cn(
           "min-h-5 rounded-2xl border px-4 py-3 text-sm font-medium outline-none",
           submissionState === "idle" && "border-transparent px-0 py-0 text-muted-foreground",
           submissionState === "invalid" && "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100",
           submissionState === "sending" && "border-blue-200 bg-blue-50 text-blue-950 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100",
-          submissionState === "success" && "border-emerald-300 bg-emerald-50 text-emerald-950 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100",
           submissionState === "error" && "border-red-300 bg-red-50 text-red-950 focus-visible:ring-2 focus-visible:ring-red-500 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100",
         )}
       >
         {status}
       </p>
-      <p id="lead-submitted-message" role="status" tabIndex={-1} className="hidden text-sm text-[var(--public-green)] target:block">
-        Заявка отправлена. Мы свяжемся с вами в течение рабочего дня.
-      </p>
       <p id="lead-submit-error" role="alert" tabIndex={-1} className="hidden text-sm text-destructive target:block">
         Не удалось отправить заявку. Попробуйте ещё раз.
       </p>
     </form>
+  );
+
+  return (
+    <>
+      <div
+        id="lead-submitted-message"
+        tabIndex={-1}
+        className={cn("peer scroll-mt-28 rounded-[1.75rem] border border-black/5 bg-white/80 px-6 py-8 dark:border-white/10 dark:bg-white/5 sm:px-10 sm:py-10", !succeeded && "hidden target:block")}
+      >
+        <div
+          ref={confirmationRef}
+          role="status"
+          tabIndex={-1}
+          data-lead-state={succeeded ? "success" : undefined}
+          className="scroll-mt-28 rounded-xl outline-none"
+        >
+          <span className="mb-5 grid size-12 place-items-center rounded-full bg-[var(--public-blue)]/10 text-[var(--public-blue)]">
+            <Check aria-hidden="true" className="size-6" />
+          </span>
+          <h3 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            {t("contact.form.success.title")}
+          </h3>
+          <p className="mt-3 text-base leading-7 text-muted-foreground">{t("contact.form.responseTime")}.</p>
+          <p className="text-sm leading-6 text-muted-foreground">{t("contact.form.workingHours")}</p>
+        </div>
+        {succeeded ? (
+          <button type="button" onClick={startAnother} className={cn("mt-4 cursor-pointer", anotherClassName)}>
+            {anotherLabel}
+          </button>
+        ) : (
+          <a href="#lead-name" className={cn("mt-4", anotherClassName)}>{anotherLabel}</a>
+        )}
+      </div>
+      {form}
+    </>
   );
 }
