@@ -53,8 +53,10 @@ test("home omits empty content categories while retaining its contact form", () 
   assert.equal(maxContact.getAttribute("href"), "https://max.ru/u/f9LHodD0cOJpymJqsmOnWwFeDCCZGy15ba7H_HhajC8Vnm6U12_ZrsEX8uY");
   assert.equal(maxContact.getAttribute("target"), "_blank");
   for (const rel of ["noopener", "noreferrer"]) assert.ok(maxContact.relList.contains(rel));
-  assert.ok(screen.getByText("Ответим в течение рабочего дня"));
-  assert.ok(screen.getByText("Пн–Пт, 09:00–18:00 по Москве"));
+  const form = document.querySelector("#contact form");
+  assert.ok(form);
+  assert.ok(within(form).getByText("Ответим в течение рабочего дня"));
+  assert.ok(within(form).getByText("Пн–Пт, 09:00–18:00 по Москве"));
 });
 
 test("contact form is introduced by the person who answers the request", () => {
