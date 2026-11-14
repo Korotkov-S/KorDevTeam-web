@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { cn } from "./ui/utils";
@@ -7,6 +7,7 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 import type { MediaPresentationMap } from "../server/media/presentation";
 
 const DEFAULT_FALLBACK_IMAGE_SRC = "/opengraphlogo.jpeg";
+const VIDEO_EXTENSION = /\.(mp4|webm|mov)(?:[?#].*)?$/i;
 
 function MarkdownVideo({ href }: { href: string }) {
   const [isVertical, setIsVertical] = useState(false);
@@ -33,6 +34,33 @@ function MarkdownVideo({ href }: { href: string }) {
   );
 }
 
+const PortraitMediaBlock: NonNullable<Components["blockquote"]> = ({ node, children, ...props }) => {
+  const blocks = node?.children.filter(child => child.type === "element") ?? [];
+  const lastBlock = blocks.at(-1);
+  const videoLink = lastBlock?.tagName === "p" && lastBlock.children.length === 1
+    ? lastBlock.children[0]
+    : undefined;
+
+  // A Markdown quote can group copy and a photo with a final video link titled "portrait".
+  if (blocks.length < 2 || videoLink?.type !== "element" || videoLink.tagName !== "a" ||
+      videoLink.properties.title !== "portrait" ||
+      !VIDEO_EXTENSION.test(String(videoLink.properties.href ?? ""))) {
+    return <blockquote className="my-12 border-l-4 border-[var(--public-violet)] pl-6 text-2xl leading-[1.45] tracking-[-0.02em] text-foreground sm:pl-8 sm:text-3xl" {...props}>{children}</blockquote>;
+  }
+
+  const items = React.Children.toArray(children).filter(child => typeof child !== "string" || child.trim());
+  return (
+    <section className="my-10 grid items-center gap-6 rounded-[1.75rem] border border-border bg-secondary/40 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,16rem)] xl:gap-8">
+      <div className="min-w-0 [&_h3]:mt-0 [&_h3]:mb-3 [&_h3]:text-2xl [&_p]:mb-4 [&_p]:text-base [&_p:last-child]:mb-0 [&_img]:my-0 [&_img]:rounded-2xl">
+        {items.slice(0, -1)}
+      </div>
+      <div className="mx-auto w-full max-w-64 [&_p]:m-0 [&_video]:my-0 [&_video]:block [&_video]:aspect-[9/16] [&_video]:w-full [&_video]:max-h-none">
+        {items.at(-1)}
+      </div>
+    </section>
+  );
+};
+
 const markdownComponents = {
   h1: ({ node, ...props }: any) => (
     <h2 className="mb-8 mt-16 text-balance text-4xl font-semibold leading-[.98] tracking-[-0.045em] text-foreground sm:text-5xl" {...props} />
@@ -51,7 +79,7 @@ const markdownComponents = {
   ),
   a: ({ node, ...props }: any) => {
     const href = typeof props.href === "string" ? props.href : "";
-    const isVideo = /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(href);
+    const isVideo = VIDEO_EXTENSION.test(href);
 
     if (isVideo) {
       return <MarkdownVideo href={href} />;
@@ -75,9 +103,7 @@ const markdownComponents = {
     <ol className="mb-8 ml-5 list-decimal space-y-3 text-lg leading-8 text-foreground/85 marker:font-semibold marker:text-[var(--public-violet)] sm:text-xl" {...props} />
   ),
   li: ({ node, ...props }: any) => <li className="pl-2" {...props} />,
-  blockquote: ({ node, ...props }: any) => (
-    <blockquote className="my-12 border-l-4 border-[var(--public-violet)] pl-6 text-2xl leading-[1.45] tracking-[-0.02em] text-foreground sm:pl-8 sm:text-3xl" {...props} />
-  ),
+  blockquote: PortraitMediaBlock,
   hr: ({ node, ...props }: any) => <hr className="my-12 border-border" {...props} />,
   strong: ({ node, ...props }: any) => <strong className="text-foreground" {...props} />,
   table: ({ node, ...props }: any) => (

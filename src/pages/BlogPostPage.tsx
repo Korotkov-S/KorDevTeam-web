@@ -28,7 +28,7 @@ interface BlogPostMeta {
 }
 
 function hasMarkdownVideo(md: string): boolean {
-  return /\]\([^)]*\.(?:mp4|webm|mov)(?:[?#][^)]*)?\)/i.test(md);
+  return /\]\([^)]*\.(?:mp4|webm|mov)(?:[?#][^)]*)?(?:\s+["'][^"']*["'])?\)/i.test(md);
 }
 function stripFirstMarkdownH1(md: string): string {
   return md.replace(/^\s*#\s+.+\s*$/m, "").trim();

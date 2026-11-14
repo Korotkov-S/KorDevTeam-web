@@ -248,3 +248,38 @@ test("published related lookup omits an unavailable article and preserves curate
     ["related-one", "related-three"],
   );
 });
+
+test("an opted-in portrait video stays beside its article text and photo, outside the hero gallery", () => {
+  const { container } = render(
+    <MemoryRouter initialEntries={["/blog/editorial/"]}>
+      <BlogPostPage article={{
+        title: "Роботизация производства",
+        excerpt: "Оценка участка",
+        bodyMd: [
+          "> ### Поездка в Киржач",
+          ">",
+          "> Смотрели, как устроена работа в цехе.",
+          ">",
+          "> ![Участники поездки](/group.webp)",
+          ">",
+          '> [Смотреть видео](/workshop.mp4 "portrait")',
+          "",
+          "Первый шаг — выбрать участок.",
+        ].join("\n"),
+        tags: [],
+        readTime: "5 мин",
+        coverUrl: "/group.webp",
+        imageUrls: [],
+        category: null,
+      }} category={null} relatedArticles={[]} />
+    </MemoryRouter>,
+  );
+
+  const section = container.querySelector('[itemprop="articleBody"] section');
+  assert.ok(section);
+  assert.ok(section.firstElementChild?.textContent?.includes("Смотрели, как устроена работа в цехе."));
+  assert.equal(section.firstElementChild?.querySelector("img")?.getAttribute("alt"), "Участники поездки");
+  assert.equal(section.lastElementChild?.querySelector("video source")?.getAttribute("src"), "/workshop.mp4");
+  assert.equal(screen.getAllByAltText("Участники поездки").length, 1);
+  assert.equal(screen.getByText("Первый шаг — выбрать участок.").closest("section"), null);
+});
