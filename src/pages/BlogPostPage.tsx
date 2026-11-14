@@ -278,11 +278,10 @@ export function BlogPostPage({
                   Читайте также
                 </h2>
                 <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" itemScope itemType="https://schema.org/ItemList">
-                  {relatedArticles.map((relatedArticle, index) => (
+                  {relatedArticles.map(relatedArticle => (
                     <BlogCard
                       key={relatedArticle.id}
                       post={relatedArticle}
-                      fallbackSrc={["/opengraphlogo.jpeg", "/projects/wowbanner.png", "/projects/harmonizeMe.png"][index % 3]}
                       actionLabel={t("blog.readMore")}
                     />
                   ))}

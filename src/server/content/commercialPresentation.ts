@@ -14,7 +14,7 @@ import type {
   ServiceCardView,
   ServicePageView,
 } from "./types";
-import { legacyCaseContent } from "./presentation";
+import { articlePresentation, legacyCaseContent } from "./presentation";
 
 const ctaTypes = new Set<CtaType>(["form", "telegram", "email", "phone"]);
 
@@ -164,12 +164,16 @@ export function curateCaseCards(projects: readonly CaseCardView[]): CaseCardView
 }
 
 export function contentCard(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null): ContentCardView {
+  const { coverUrl, imageUrls } = articlePresentation(entry, media);
+  const previewUrl = [coverUrl, ...imageUrls].map(url => url.trim()).find(Boolean) ?? "";
   return {
     slug: entry.slug,
     ...(viewCount === undefined ? {} : { viewCount }),
     title: entryTitle(entry),
     summary: text(entry.excerpt) ?? "",
-    image: asset(entry.payload.coverUrl, media) ?? asset(entry.ogMediaId, media),
+    image: asset(entry.payload.coverUrl, media)
+      ?? legacyImageAsset(entry, previewUrl, media)
+      ?? asset(entry.ogMediaId, media),
     tags: strings(entry.payload.tags),
   };
 }

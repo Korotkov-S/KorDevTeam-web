@@ -34,17 +34,23 @@ const cardPost = {
   tags: [], category: null,
 };
 
-test("blog fallback artwork fits completely with padding inside the existing card frame", () => {
-  for (const fallbackSrc of ["/opengraphlogo.jpeg", "/projects/wowbanner.png", "/projects/harmonizeMe.png", "/projects/sims.png"]) {
+test("articles without media share a decorative placeholder in the blog and category lists", () => {
+  const posts = [
+    { ...cardPost, coverUrl: "  ", imageUrls: [""] },
+    { ...cardPost, id: "another", slug: "another", title: "Ещё одна статья" },
+  ];
+  for (const mode of ["index", "category"] as const) {
     const markup = renderToStaticMarkup(<StaticRouter location="/blog/">
-      <BlogCard post={{ ...cardPost, coverUrl: "  ", imageUrls: [""] }} fallbackSrc={fallbackSrc} actionLabel="Читать далее" />
+      <Blog mode={mode} posts={posts} />
     </StaticRouter>);
-    const image = new JSDOM(markup).window.document.querySelector("img")!;
-    assert.equal(image.getAttribute("src"), fallbackSrc);
-    assert.ok(image.classList.contains("aspect-[16/10]"), "card proportions must stay unchanged");
-    assert.ok(image.classList.contains("object-contain"), "fallback artwork must not be cropped");
-    assert.ok(image.classList.contains("p-6"), "fallback artwork needs breathing room");
-    assert.equal(image.classList.contains("object-cover"), false);
+    const cards = new JSDOM(markup).window.document.querySelectorAll('article[itemtype="https://schema.org/BlogPosting"]');
+    assert.equal(cards.length, posts.length);
+    for (const card of cards) {
+      assert.equal(card.querySelector("img"), null);
+      const cover = card.querySelector("[data-article-placeholder]");
+      assert.equal(cover?.getAttribute("aria-hidden"), "true");
+      assert.ok(cover?.classList.contains("aspect-[16/10]"));
+    }
   }
 });
 
@@ -55,7 +61,7 @@ test("real blog covers and gallery images retain their full-bleed presentation",
     { coverUrl: "/opengraphlogo.jpeg", imageUrls: [] },
   ]) {
     const markup = renderToStaticMarkup(<StaticRouter location="/blog/">
-      <BlogCard post={{ ...cardPost, ...media }} fallbackSrc="/opengraphlogo.jpeg" actionLabel="Читать далее" />
+      <BlogCard post={{ ...cardPost, ...media }} actionLabel="Читать далее" />
     </StaticRouter>);
     const images = new JSDOM(markup).window.document.querySelectorAll("img");
     assert.ok(images.length > 0);
@@ -63,6 +69,7 @@ test("real blog covers and gallery images retain their full-bleed presentation",
       assert.ok(image.classList.contains("object-cover"));
       assert.equal(image.classList.contains("object-contain"), false);
       assert.equal(image.classList.contains("p-6"), false);
+      assert.equal(image.closest("article")?.querySelector("[data-article-placeholder]"), null);
     }
   }
 });
