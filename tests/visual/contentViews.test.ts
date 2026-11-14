@@ -69,8 +69,20 @@ test("real opens, refresh, tabs, navigation and independent contexts obey sessio
   const source = await (await fetch(f.runtime.origin + "/blog/a/")).text(); assert.match(source, /aria-label="2 просмотра"/); assert.match(source, /Сохранённый текст статьи А/);
   for (const pathname of ["/", "/blog/", "/cases/", "/services/s/"]) { const html = await (await fetch(f.runtime.origin + pathname)).text(); assert.match(html, /data-view-count="[012]"/); }
   await visit(other.p, f.runtime.origin, "/blog/");
-  const modes = await other.p.$$eval("article img", images => images.map(image => ({ src: image.getAttribute("src"), classes: image.className })));
-  assert.ok(modes.some(image => image.classes.includes("object-contain") && image.classes.includes("p-6"))); assert.ok(modes.some(image => image.src === "/projects/wowbanner.png" && image.classes.includes("object-cover")));
+  const previews = await other.p.$$eval('article[itemtype="https://schema.org/BlogPosting"]', cards => Object.fromEntries(cards.map(card => {
+    const image = card.querySelector("img");
+    const placeholder = card.querySelector("[data-article-placeholder]");
+    return [
+      card.querySelector("a")?.getAttribute("href"),
+      {
+        cover: image?.getAttribute("src") ?? null,
+        cropsPhoto: image?.classList.contains("object-cover") ?? false,
+        decorativePlaceholder: placeholder?.getAttribute("aria-hidden") === "true",
+      },
+    ];
+  })));
+  assert.deepEqual(previews["/blog/a/"], { cover: null, cropsPhoto: false, decorativePlaceholder: true });
+  assert.deepEqual(previews["/blog/b/"], { cover: "/projects/wowbanner.png", cropsPhoto: true, decorativePlaceholder: false });
   const artifacts = await mkdtemp(path.join(tmpdir(), "kordev-content-views-"));
   for (const viewport of [{ name: "desktop", width: 1440, height: 1100 }, { name: "mobile", width: 390, height: 844 }]) {
     await other.p.setViewport(viewport); await visit(other.p, f.runtime.origin, "/blog/a/"); await count(other.p, "2");
