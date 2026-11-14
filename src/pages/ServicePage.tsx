@@ -526,7 +526,7 @@ export function ServicePage({ pathname, service }: { pathname: string; service: 
     {service.relatedArticles.length > 0 && <ServiceSection name="articles" className="border-y border-border bg-[#f5f6f9] dark:bg-[#111722]">
       <Section>
         <SectionHeading eyebrow="Экспертиза" title="Материалы по теме" />
-        <div className="mt-12 grid gap-5 md:grid-cols-3">{service.relatedArticles.map(post => <ContentCard key={post.slug} post={post} />)}</div>
+        <div className="mt-12 grid gap-5 md:grid-cols-3">{service.relatedArticles.map(post => <ContentCard key={post.slug} post={post} showArticlePlaceholder />)}</div>
       </Section>
     </ServiceSection>}
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { caseCard, commercialCasePage, servicePage } from "./commercialPresentation";
+import { caseCard, commercialCasePage, contentCard, servicePage } from "./commercialPresentation";
 import { legacyCaseContent } from "./presentation";
 import type { ContentEntry } from "./types";
 
@@ -27,6 +27,18 @@ const localCover = {
   width: 1600,
   height: 1000,
 };
+
+test("compact article previews use their own legacy covers or gallery images", () => {
+  const article: ContentEntry = {
+    ...serviceFixture(),
+    kind: "article",
+    payload: { coverUrl: "/blog/real-cover.webp", imageUrls: ["/blog/gallery.webp"] },
+  };
+
+  assert.equal(contentCard(article).image?.src, "/blog/real-cover.webp");
+  assert.equal(contentCard({ ...article, payload: { imageUrls: ["/blog/gallery.webp"] } }).image?.src, "/blog/gallery.webp");
+  assert.equal(contentCard({ ...article, payload: {} }).image, null);
+});
 
 test("service presentation omits empty optional blocks and preserves confirmed payload", () => {
   const view = servicePage(serviceFixture({

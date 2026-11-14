@@ -26,14 +26,13 @@ function normalizePublicAssetUrl(url: string | undefined): string {
   return `/${value.replace(/^\.\//, "")}`;
 }
 
-function blogMedia(post: BlogPostCardView, fallbackSrc: string) {
+function blogMedia(post: BlogPostCardView) {
   const urls = [...new Set(
     [post.coverUrl, ...(post.imageUrls ?? [])]
       .map(normalizePublicAssetUrl)
       .filter(Boolean),
   )];
-  const sources = urls.length > 0 ? urls : [normalizePublicAssetUrl(fallbackSrc)];
-  const images = sources.map((src, index) => ({
+  return urls.map((src, index) => ({
     id: `blog:${post.id}:${index}`,
     src,
     srcSet: "",
@@ -43,10 +42,9 @@ function blogMedia(post: BlogPostCardView, fallbackSrc: string) {
     width: null,
     height: null,
   }));
-  return { images, isFallback: urls.length === 0 };
 }
 
-function blogContentCard(post: BlogPostCardView, images: ReturnType<typeof blogMedia>["images"]): ContentCardView {
+function blogContentCard(post: BlogPostCardView, images: ReturnType<typeof blogMedia>): ContentCardView {
   return {
     slug: post.slug,
     title: post.title,
@@ -64,18 +62,16 @@ function getBlogDateTime(value: string): string | undefined {
 
 export function BlogCard({
   post,
-  fallbackSrc,
   actionLabel,
 }: {
   post: BlogPostCardView;
-  fallbackSrc: string;
   actionLabel: string;
 }) {
-  const { images, isFallback } = blogMedia(post, fallbackSrc);
+  const images = blogMedia(post);
   return <ContentCard
     post={blogContentCard(post, images)}
     images={images}
-    imageObjectFitClass={isFallback ? "object-contain bg-muted/30 p-6" : undefined}
+    showArticlePlaceholder
     meta={<><time dateTime={getBlogDateTime(post.date)} itemProp="datePublished">{formatBlogDate(post.date)}</time>{post.readTime ? ` · ${post.readTime}` : null}</>}
     actionLabel={actionLabel}
     schemaType="https://schema.org/BlogPosting"

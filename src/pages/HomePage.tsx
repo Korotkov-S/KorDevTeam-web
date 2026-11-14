@@ -42,7 +42,7 @@ export function HomePage({ services = [], projects = [], posts = [] }: {
     <ProcessSteps />
     {posts.length > 0 && <Section id="insights" className="border-t border-border">
       <SectionHeading eyebrow="Делимся опытом" title="О технологиях через практику" description="Разбираем автоматизацию, разработку и работу с цифровыми продуктами." />
-      <div className="mt-10 grid gap-5 md:grid-cols-3">{posts.map(post => <ContentCard key={post.slug} post={post} />)}</div>
+      <div className="mt-10 grid gap-5 md:grid-cols-3">{posts.map(post => <ContentCard key={post.slug} post={post} showArticlePlaceholder />)}</div>
       <div className="mt-8 flex flex-wrap gap-3">
         <CtaLink to="/blog/" variant="secondary">Все статьи</CtaLink>
         <CtaLink to="/journal/" variant="secondary">Журнал</CtaLink>

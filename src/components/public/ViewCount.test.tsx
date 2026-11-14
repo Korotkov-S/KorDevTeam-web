@@ -22,7 +22,7 @@ test("accessible Russian labels, exact big integers and unavailable state render
 test("case, home mosaic, blog and generic cards show supplied counts; disabled fixtures stay hidden", () => {
   const project = { slug: "a", title: "Case", summary: "Summary", result: null, image: null, tags: [], viewCount: "21" };
   const post = { slug: "a", title: "Article", summary: "Summary", image: null, tags: [], viewCount: "21" };
-  const html = renderToStaticMarkup(<StaticRouter location="/"><CaseCard project={project} /><HomeCaseMosaic projects={[project]} /><ContentCard post={post} /><BlogCard post={{ ...post, id: "a", excerpt: "Excerpt", date: "2026-10-21", readTime: "5 мин", category: null }} fallbackSrc="/opengraphlogo.jpeg" actionLabel="Читать" /></StaticRouter>);
+  const html = renderToStaticMarkup(<StaticRouter location="/"><CaseCard project={project} /><HomeCaseMosaic projects={[project]} /><ContentCard post={post} /><BlogCard post={{ ...post, id: "a", excerpt: "Excerpt", date: "2026-10-21", readTime: "5 мин", category: null }} actionLabel="Читать" /></StaticRouter>);
   assert.equal(new JSDOM(html).window.document.querySelectorAll('[aria-label="21 просмотр"]').length, 4);
   assert.doesNotMatch(renderToStaticMarkup(<StaticRouter location="/"><CaseCard project={{ ...project, viewCount: undefined }} /></StaticRouter>), /просмотр/);
 });

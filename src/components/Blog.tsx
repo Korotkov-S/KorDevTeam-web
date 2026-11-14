@@ -96,19 +96,6 @@ export function Blog({
   };
 
   const paginationItems = buildPaginationItems(currentPage, totalPages);
-  const postCardImageBySlug: Record<string, string> = {
-    "krasotulya-crm-launch": "/blog/krasotula1.jpeg",
-    "krasotulya-problem-1-data-fragmentation": "/blog/krasotula2.jpeg",
-    "krasotulya-problem-4-email-campaigns": "/krasotula4.png",
-    "krasotulya-landing-launch": "/krasotula6.png",
-  };
-
-  const cardImages = [
-    "/opengraphlogo.jpeg",
-    "/projects/wowbanner.png",
-    "/projects/harmonizeMe.png",
-    "/projects/sims.png",
-  ];
   const resolvedHeading = heading ?? {
     eyebrow: t("blog.title"),
     title: t("blog.title"),
@@ -142,14 +129,9 @@ export function Blog({
         {mode === "index" ? <BlogCategoryNav counts={categoryCounts} /> : null}
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" itemScope itemType="https://schema.org/ItemList">
-          {currentPosts.map((post, index) => {
-            return <BlogCard
-              key={post.id}
-              post={post}
-              fallbackSrc={postCardImageBySlug[post.slug] ?? cardImages[index % cardImages.length]}
-              actionLabel={t("blog.readMore")}
-            />;
-          })}
+          {currentPosts.map(post => (
+            <BlogCard key={post.id} post={post} actionLabel={t("blog.readMore")} />
+          ))}
         </div>
 
         {mode === "index" && totalPages > 1 && (
