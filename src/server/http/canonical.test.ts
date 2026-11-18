@@ -47,3 +47,10 @@ test("admin recovery, login return paths and filters survive HTML canonicalizati
   const redirected = canonicalizeRequest(new Request(`https://www.kordev.team/admin/reset-password?token=${"A".repeat(43)}`, { headers: { accept: "text/html" } }));
   assert.equal(redirected?.href, `https://kordev.team/admin/reset-password/?token=${"A".repeat(43)}`);
 });
+
+test("the blog video filter survives the canonical redirect only on the blog index", () => {
+  const headers = { accept: "text/html" };
+  assert.equal(canonicalizeRequest(new Request("https://kordev.team/blog?format=video&page=2", { headers }))?.href, "https://kordev.team/blog/?format=video&page=2");
+  assert.equal(canonicalizeRequest(new Request("https://kordev.team/blog/?format=video&page=2", { headers })), null);
+  assert.equal(canonicalizeRequest(new Request("https://kordev.team/video/?format=video", { headers }))?.href, "https://kordev.team/video/");
+});

@@ -248,3 +248,30 @@ test("published related lookup omits an unavailable article and preserves curate
     ["related-one", "related-three"],
   );
 });
+
+test("a standalone portrait video opens from its cover and leaves the article text readable", () => {
+  const { fireEvent } = require("@testing-library/react");
+  const { container } = render(<MemoryRouter initialEntries={["/blog/warehouse/"]}>
+    <BlogPostPage article={{
+      title: "Где разместить склад", excerpt: "Стоимость смены и доставки.",
+      bodyMd: "[Видео, 2:18](/videos/warehouse.mp4)\n\nСравните стоимость смены и доставки.",
+      tags: [], readTime: "", coverUrl: "/warehouse.png", imageUrls: [], category: null,
+    }} category={null} relatedArticles={[]} />
+  </MemoryRouter>);
+  const cover = screen.getByRole("button", { name: "Смотреть видео" });
+  assert.equal(container.querySelectorAll("video").length, 0);
+  assert.ok(screen.getByText("Сравните стоимость смены и доставки."));
+  const original = dom.window.HTMLMediaElement.prototype.play;
+  dom.window.HTMLMediaElement.prototype.play = async () => {};
+  try {
+    fireEvent.click(cover);
+    const players = container.querySelectorAll("video");
+    assert.equal(players.length, 1);
+    assert.equal(players[0].getAttribute("src"), "/videos/warehouse.mp4");
+    assert.ok(players[0].hasAttribute("playsinline"));
+    assert.ok(players[0].hasAttribute("controls"));
+    assert.equal(players[0].poster, "https://kordev.team/warehouse.png");
+  } finally {
+    dom.window.HTMLMediaElement.prototype.play = original;
+  }
+});

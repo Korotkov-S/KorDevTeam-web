@@ -3,6 +3,7 @@ import type { ArticlePresentation } from "../../pages/BlogPostPage";
 import type { Project } from "../../pages/ProjectPage";
 import type { RouteSeoInput } from "../seo/metadata";
 import type { MediaPresentationMap } from "../media/presentation";
+import { extractBlogVideo } from "../../lib/blogVideo";
 import { isBlogCategorySlug } from "../../lib/blogCategories";
 
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -103,6 +104,7 @@ export function articlePresentation(entry: ContentEntry, media: MediaPresentatio
 
 export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null) {
   const article = articlePresentation(entry, media);
+  const { video } = extractBlogVideo(article.bodyMd);
   return {
     id: entry.id,
     ...(viewCount === null || typeof viewCount === "string" ? { viewCount } : {}),
@@ -111,6 +113,7 @@ export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {
     excerpt: article.excerpt,
     date: article.publishedAt || "",
     readTime: article.readTime,
+    ...(video ? { videoDuration: video.duration } : {}),
     tags: article.tags,
     category: article.category,
     coverUrl: article.coverUrl,
