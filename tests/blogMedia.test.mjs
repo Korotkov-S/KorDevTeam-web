@@ -7,8 +7,8 @@ const video = "blog/telegram/1299/" + "1".repeat(64) + ".mp4";
 const cover = "media/v1/aa/" + "a".repeat(64) + "/original.jpg";
 
 test("video notes serve their own covers and preserve browser range seeks on the site origin", async t => {
-  const { createBlogMediaRouter } = await import("./blog-media.mjs");
-  const { blogMediaPath } = await import("./blog-media-paths.mjs");
+  const { createBlogMediaRouter } = await import("../server/blog-media.mjs");
+  const { blogMediaPath } = await import("../server/blog-media-paths.mjs");
   assert.equal(blogMediaPath(base + video, base), "/api/blog-media/" + video);
   assert.equal(blogMediaPath(base + cover, base), "/api/blog-media/" + cover);
   assert.equal(blogMediaPath("https://another.example/" + video, base), null);

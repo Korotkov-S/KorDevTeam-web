@@ -98,6 +98,6 @@ test("Telegram video posts render same-origin images and media while normal imag
   assert.equal(articleCard(video, media).coverUrl, "/api/blog-media/" + coverKey);
   assert.equal(articleCard(video, media).videoDuration, "0:57");
   assert.equal(articlePresentation(video, media).videoOrientation, "landscape");
-  assert.match(articlePresentation(video, media).bodyMd, /\]\(\/api\/blog-media\/blog\/telegram\/1299\//);
-  assert.ok(video.bodyMd.includes("https://cdn.example/"));
+  assert.equal(articlePresentation(video, media).videoSourceUrl, "/api/blog-media/" + videoKey);
+  assert.equal(articlePresentation(video, media).bodyMd, video.bodyMd);
 });

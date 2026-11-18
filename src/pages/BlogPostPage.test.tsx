@@ -254,7 +254,8 @@ test("a standalone portrait video opens from its cover and leaves the article te
   const { container } = render(<MemoryRouter initialEntries={["/blog/warehouse/"]}>
     <BlogPostPage article={{
       title: "Где разместить склад", excerpt: "Стоимость смены и доставки.",
-      bodyMd: "[Видео, 2:18](/videos/warehouse.mp4)\n\nСравните стоимость смены и доставки.",
+      bodyMd: "[Видео, 2:18](https://storage.example/warehouse.mp4)\n\nСравните стоимость смены и доставки.",
+      videoSourceUrl: "/videos/warehouse.mp4",
       tags: [], readTime: "", coverUrl: "/warehouse.png", imageUrls: [], category: null,
     }} category={null} relatedArticles={[]} />
   </MemoryRouter>);

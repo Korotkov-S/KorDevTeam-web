@@ -150,6 +150,7 @@ export type ArticlePresentation = {
   readTime: string; tags: string[]; coverUrl: string; imageUrls: string[]; media?: MediaPresentationMap;
   category: BlogCategorySlug | null;
   videoOrientation?: "landscape";
+  videoSourceUrl?: string;
 };
 export function BlogPostPage({
   article,
@@ -262,7 +263,7 @@ export function BlogPostPage({
                   <p className={`max-w-[58ch] text-lg leading-relaxed text-[var(--public-ink)] sm:text-xl ${landscape ? "" : "lg:col-start-2 lg:row-start-1"}`} itemProp="description">
                     {meta.excerpt}
                   </p>
-                  <BlogPortraitVideo video={video} poster={coverUrl || imageUrls[0]} title={meta.title} orientation={article.videoOrientation} />
+                  <BlogPortraitVideo video={article.videoSourceUrl ? { ...video, url: article.videoSourceUrl } : video} poster={coverUrl || imageUrls[0]} title={meta.title} orientation={article.videoOrientation} />
                   <div className={`min-w-0 max-w-[70ch] ${landscape ? "" : "lg:col-start-2 lg:row-start-2"}`}>
                     <MarkdownContent markdown={content} media={article.media} itemProp="articleBody" proseClassName="article-prose" />
                     {tags}
