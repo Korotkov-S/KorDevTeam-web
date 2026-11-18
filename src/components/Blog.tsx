@@ -43,20 +43,21 @@ export function Blog({
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const postsPerPage = mode === "preview" ? 3 : 6;
 
-  const blogPosts = posts;
+  const videoOnly = mode === "index" && searchParams.get("format") === "video";
   const postsResolved = true;
 
   const sortedPosts = useMemo(
-    () => sortBlogPostsByDate(blogPosts) as BlogPostCardView[],
-    [blogPosts],
+    () => sortBlogPostsByDate(posts) as BlogPostCardView[],
+    [posts],
   );
-  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / postsPerPage));
+  const matchingPosts = videoOnly ? sortedPosts.filter(post => post.videoDuration) : sortedPosts;
+  const totalPages = Math.max(1, Math.ceil(matchingPosts.length / postsPerPage));
   const requestedPage = mode === "index" ? searchParams.get("page") : null;
   const currentPage =
     mode === "index" ? normalizeBlogPage(requestedPage, totalPages) : 1;
   const startIndex = (currentPage - 1) * postsPerPage;
   const endIndex = startIndex + postsPerPage;
-  const currentPosts = mode === "category" ? sortedPosts : sortedPosts.slice(startIndex, endIndex);
+  const currentPosts = mode === "category" ? matchingPosts : matchingPosts.slice(startIndex, endIndex);
   const categoryCounts = sortedPosts.reduce<Partial<Record<BlogCategorySlug, number>>>((counts, post) => {
     if (post.category) counts[post.category] = (counts[post.category] ?? 0) + 1;
     return counts;
@@ -95,6 +96,8 @@ export function Blog({
     });
   };
 
+  const pageHref = (page: number) =>
+    videoOnly ? `/blog/?format=video${page > 1 ? `&page=${page}` : ""}` : getBlogPageHref(page);
   const paginationItems = buildPaginationItems(currentPage, totalPages);
   const resolvedHeading = heading ?? {
     eyebrow: t("blog.title"),
@@ -126,11 +129,31 @@ export function Blog({
           ) : null}
         </div>
 
-        {mode === "index" ? <BlogCategoryNav counts={categoryCounts} /> : null}
+        {mode === "index" ? (
+          <>
+            <BlogCategoryNav counts={categoryCounts} />
+            <nav aria-label="Формат материалов" className="mb-6 flex flex-wrap gap-2">
+              {[
+                { href: "/blog/", label: "Все материалы", active: !videoOnly },
+                { href: "/blog/?format=video", label: "Видео", active: videoOnly },
+              ].map(item => (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  aria-current={item.active ? "page" : undefined}
+                  className={`rounded-full border px-4 py-2 text-sm font-medium ${item.active ? "border-[var(--public-ink)] bg-[var(--public-ink)] text-[var(--background)]" : "border-border text-[var(--public-ink)] hover:bg-secondary"}`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </>
+        ) : null}
+        {videoOnly && !currentPosts.length ? <p className="mb-8 text-[var(--public-subtle)]">В блоге пока нет видео.</p> : null}
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" itemScope itemType="https://schema.org/ItemList">
           {currentPosts.map(post => (
-            <BlogCard key={post.id} post={post} actionLabel={t("blog.readMore")} />
+            <BlogCard key={post.id} post={post} actionLabel={post.videoDuration ? "Смотреть видео" : t("blog.readMore")} />
           ))}
         </div>
 
@@ -142,7 +165,7 @@ export function Blog({
                   showLabel
                   href={
                     currentPage > 1
-                      ? getBlogPageHref(currentPage - 1)
+                      ? pageHref(currentPage - 1)
                       : undefined
                   }
                   aria-disabled={currentPage === 1}
@@ -176,7 +199,7 @@ export function Blog({
                   showLabel
                   href={
                     currentPage < totalPages
-                      ? getBlogPageHref(currentPage + 1)
+                      ? pageHref(currentPage + 1)
                       : undefined
                   }
                   aria-disabled={currentPage === totalPages}
@@ -202,7 +225,7 @@ export function Blog({
                 <PaginationPrevious
                   href={
                     currentPage > 1
-                      ? getBlogPageHref(currentPage - 1)
+                      ? pageHref(currentPage - 1)
                       : undefined
                   }
                   aria-disabled={currentPage === 1}
@@ -226,7 +249,7 @@ export function Blog({
                 typeof item === "number" ? (
                   <PaginationItem key={item}>
                     <PaginationLink
-                      href={getBlogPageHref(item)}
+                      href={pageHref(item)}
                       onClick={(e) => {
                         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                         e.preventDefault();
@@ -250,7 +273,7 @@ export function Blog({
                 <PaginationNext
                   href={
                     currentPage < totalPages
-                      ? getBlogPageHref(currentPage + 1)
+                      ? pageHref(currentPage + 1)
                       : undefined
                   }
                   aria-disabled={currentPage === totalPages}

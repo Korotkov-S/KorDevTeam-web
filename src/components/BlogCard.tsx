@@ -15,6 +15,7 @@ export type BlogPostCardView = {
   coverUrl?: string;
   imageUrls?: string[];
   viewCount?: string | null;
+  videoDuration?: string;
 };
 
 function normalizePublicAssetUrl(url: string | undefined): string {
@@ -72,7 +73,7 @@ export function BlogCard({
     post={blogContentCard(post, images)}
     images={images}
     showArticlePlaceholder
-    meta={<><time dateTime={getBlogDateTime(post.date)} itemProp="datePublished">{formatBlogDate(post.date)}</time>{post.readTime ? ` · ${post.readTime}` : null}</>}
+    meta={<><time dateTime={getBlogDateTime(post.date)} itemProp="datePublished">{formatBlogDate(post.date)}</time>{post.videoDuration ? ` · Видео ${post.videoDuration}` : post.readTime ? ` · ${post.readTime}` : null}</>}
     actionLabel={actionLabel}
     schemaType="https://schema.org/BlogPosting"
     schemaItemProp="itemListElement"

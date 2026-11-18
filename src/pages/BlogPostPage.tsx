@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { BlogPortraitVideo } from "../components/BlogPortraitVideo";
+import { extractBlogVideo } from "../lib/blogVideo";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
@@ -147,6 +149,8 @@ export type ArticlePresentation = {
   title: string; excerpt: string; bodyMd: string; publishedAt?: string; updatedAt?: string;
   readTime: string; tags: string[]; coverUrl: string; imageUrls: string[]; media?: MediaPresentationMap;
   category: BlogCategorySlug | null;
+  videoOrientation?: "landscape";
+  videoSourceUrl?: string;
 };
 export function BlogPostPage({
   article,
@@ -162,14 +166,16 @@ export function BlogPostPage({
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const content = stripRepeatedLead(stripMarkdownImages(stripFirstMarkdownH1(article.bodyMd)), article.excerpt);
+  const landscape = article.videoOrientation === "landscape";
+  const { video, markdown } = extractBlogVideo(stripFirstMarkdownH1(article.bodyMd));
+  const content = stripRepeatedLead(stripMarkdownImages(markdown), article.excerpt);
   const loading = false;
   const meta: BlogPostMeta = { title: article.title, excerpt: article.excerpt, date: article.publishedAt || "",
     updatedDate: article.updatedAt, readTime: article.readTime, tags: article.tags };
   const coverUrl = article.coverUrl;
   const imageUrls = article.imageUrls;
   const imageAlts = markdownImageAlts(article.bodyMd);
-  const hasVideoMedia = hasMarkdownVideo(article.bodyMd);
+  const hasVideoMedia = video !== null || hasMarkdownVideo(article.bodyMd);
   const navigateGoBack = () => navigate("/blog/");
 
   const heroImages = (hasVideoMedia
@@ -182,6 +188,14 @@ export function BlogPostPage({
           src,
           alt: imageAlts.get(src) || `${meta.title || slug || "Изображение статьи"} — изображение ${index + 1}`,
         }));
+
+  const tags = meta.tags.length ? (
+    <ul className="mt-8 flex flex-wrap gap-2" aria-label="Темы статьи">
+      {meta.tags.map(tag => (
+        <li key={tag} className="rounded-full border border-border px-4 py-2 text-sm" itemProp="keywords">{tag}</li>
+      ))}
+    </ul>
+  ) : null;
 
   return (
     <main className="min-h-screen pt-20">
@@ -215,7 +229,7 @@ export function BlogPostPage({
             <article className="mt-9" itemScope itemType="https://schema.org/BlogPosting">
               <header>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium uppercase tracking-[0.1em] text-[var(--public-subtle)]">
-                <span>Практика KorDevTeam</span>
+                <span>{video ? "Видео" : "Практика KorDevTeam"}</span>
                 <time dateTime={parseDateToISO(meta.date)} itemProp="datePublished">{displayDate(meta.date)}</time>
                 <span>{meta.readTime}</span>
                 {meta.updatedDate && meta.updatedDate !== meta.date ? (
@@ -225,18 +239,17 @@ export function BlogPostPage({
                 ) : null}
               </div>
 
-              <h1 className="mt-7 max-w-[18ch] break-words text-balance text-[clamp(2.625rem,7vw,7.2rem)] font-semibold leading-[.91] tracking-[-0.065em] text-[var(--public-ink)] sm:text-[clamp(3rem,7vw,7.2rem)]" itemProp="headline">
+              <h1
+                className={video
+                  ? "mt-4 max-w-[25ch] break-words text-balance text-[clamp(2rem,5vw,4.75rem)] font-semibold leading-none tracking-[-0.05em] text-[var(--public-ink)]"
+                  : "mt-7 max-w-[18ch] break-words text-balance text-[clamp(2.625rem,7vw,7.2rem)] font-semibold leading-[.91] tracking-[-0.065em] text-[var(--public-ink)] sm:text-[clamp(3rem,7vw,7.2rem)]"}
+                itemProp="headline"
+              >
                 {meta.title}
               </h1>
               {article.viewCount !== undefined && <div className="mt-4 text-sm text-[var(--public-subtle)]"><MaterialViewCount entryId={entryId} value={article.viewCount} /></div>}
 
-              {meta.tags.length ? (
-                <ul className="mt-8 flex flex-wrap gap-2" aria-label="Темы статьи">
-                  {meta.tags.map(tag => (
-                    <li key={tag} className="rounded-full border border-border px-4 py-2 text-sm" itemProp="keywords">{tag}</li>
-                  ))}
-                </ul>
-              ) : null}
+              {video ? null : tags}
               </header>
 
               {heroImages.length ? (
@@ -245,6 +258,21 @@ export function BlogPostPage({
               </div>
               ) : null}
 
+              {video ? (
+                <div className={`mt-8 grid gap-x-12 gap-y-6 ${landscape ? "" : "lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] lg:grid-rows-[auto_1fr]"}`}>
+                  <p className={`max-w-[58ch] text-lg leading-relaxed text-[var(--public-ink)] sm:text-xl ${landscape ? "" : "lg:col-start-2 lg:row-start-1"}`} itemProp="description">
+                    {meta.excerpt}
+                  </p>
+                  <BlogPortraitVideo video={article.videoSourceUrl ? { ...video, url: article.videoSourceUrl } : video} poster={coverUrl || imageUrls[0]} title={meta.title} orientation={article.videoOrientation} />
+                  <div className={`min-w-0 max-w-[70ch] ${landscape ? "" : "lg:col-start-2 lg:row-start-2"}`}>
+                    <MarkdownContent markdown={content} media={article.media} itemProp="articleBody" proseClassName="article-prose" />
+                    {tags}
+                    <p className="mt-8 border-t border-border pt-4 text-sm text-[var(--public-subtle)]" itemProp="author" itemScope itemType="https://schema.org/Person">
+                      <span itemProp="name">Геннадий Коротков</span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
               <div className="mt-12 grid gap-12 lg:grid-cols-12 lg:gap-8">
               <div className="min-w-0 lg:col-span-8 lg:col-start-1">
                 <p className="mb-14 max-w-4xl text-balance text-2xl leading-[1.35] tracking-[-0.02em] text-[var(--public-ink)] sm:text-3xl" itemProp="description">
@@ -270,6 +298,7 @@ export function BlogPostPage({
                 </div>
               </aside>
               </div>
+              )}
             </article>
 
             {relatedArticles.length ? (

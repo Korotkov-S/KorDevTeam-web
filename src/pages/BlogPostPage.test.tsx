@@ -248,3 +248,46 @@ test("published related lookup omits an unavailable article and preserves curate
     ["related-one", "related-three"],
   );
 });
+
+test("a standalone portrait video opens from its cover and leaves the article text readable", () => {
+  const { fireEvent } = require("@testing-library/react");
+  const { container } = render(<MemoryRouter initialEntries={["/blog/warehouse/"]}>
+    <BlogPostPage article={{
+      title: "Где разместить склад", excerpt: "Стоимость смены и доставки.",
+      bodyMd: "[Видео, 2:18](https://storage.example/warehouse.mp4)\n\nСравните стоимость смены и доставки.",
+      videoSourceUrl: "/videos/warehouse.mp4",
+      tags: [], readTime: "", coverUrl: "/warehouse.png", imageUrls: [], category: null,
+    }} category={null} relatedArticles={[]} />
+  </MemoryRouter>);
+  const cover = screen.getByRole("button", { name: "Смотреть видео" });
+  assert.equal(container.querySelectorAll("video").length, 0);
+  assert.ok(screen.getByText("Сравните стоимость смены и доставки."));
+  const original = dom.window.HTMLMediaElement.prototype.play;
+  dom.window.HTMLMediaElement.prototype.play = async () => {};
+  try {
+    fireEvent.click(cover);
+    const players = container.querySelectorAll("video");
+    assert.equal(players.length, 1);
+    assert.equal(players[0].getAttribute("src"), "/videos/warehouse.mp4");
+    assert.ok(players[0].hasAttribute("playsinline"));
+    assert.ok(players[0].hasAttribute("controls"));
+    assert.equal(players[0].poster, "https://kordev.team/warehouse.png");
+  } finally {
+    dom.window.HTMLMediaElement.prototype.play = original;
+  }
+});
+
+test("landscape video keeps a 16:9 cover instead of using the portrait crop", () => {
+  const { container } = render(<MemoryRouter initialEntries={["/blog/team/"]}>
+    <BlogPostPage article={{
+      title: "Внешняя команда", excerpt: "Процесс и подрядчики.",
+      bodyMd: "[Видео, 0:57](/video/team.mp4)\n\nТекст.",
+      tags: [], readTime: "", coverUrl: "/cover.jpg", imageUrls: [], category: null,
+      videoOrientation: "landscape",
+    }} category={null} relatedArticles={[]} />
+  </MemoryRouter>);
+  const cover = screen.getByRole("button", { name: "Смотреть видео" });
+  assert.ok(cover.classList.contains("aspect-video"));
+  assert.equal(cover.classList.contains("aspect-[9/16]"), false);
+  assert.ok(container.querySelector('img[src="/cover.jpg"]'));
+});

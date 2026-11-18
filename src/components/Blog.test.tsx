@@ -189,3 +189,20 @@ test("category mode renders all supplied articles without pagination", () => {
   assert.equal(ssr.querySelectorAll('article[itemtype="https://schema.org/BlogPosting"]').length, 18);
   assert.equal(ssr.querySelector('nav[aria-label="Навигация по страницам"]'), null);
 });
+
+test("the video filter shows media posts and keeps the selected format in pagination links", () => {
+  const videos = Array.from({ length: 7 }, (_, index) => ({
+    ...cardPost, id: `video-${index}`, slug: `video-${index}`,
+    title: `Видео ${index}`, videoDuration: "2:18",
+  }));
+  const markup = renderToStaticMarkup(<StaticRouter location="/blog/?format=video">
+    <Blog mode="index" posts={[cardPost, ...videos]} />
+  </StaticRouter>);
+  const page = new JSDOM(markup).window.document;
+  const filter = page.querySelector('nav[aria-label="Формат материалов"]');
+  assert.equal(filter?.querySelector('[aria-current="page"]')?.textContent?.trim(), "Видео");
+  assert.equal(page.querySelectorAll("article").length, 6);
+  assert.doesNotMatch(page.body.textContent || "", /Статья без обложки/);
+  assert.ok(page.querySelector('a[href="/blog/?format=video&page=2"]'));
+  assert.ok(page.querySelector('a[href="/blog/"]'));
+});

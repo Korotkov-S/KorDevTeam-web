@@ -24,7 +24,8 @@ export function canonicalizeRequest(request: Request): URL | null {
     const videoStart = readCaseVideoStart(target.pathname, source.searchParams);
     for (const [name, value] of source.searchParams) {
       const pagination = target.pathname === "/blog/" && name === "page" && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value));
-      if (trackingParameters.has(name) || pagination || (name === "t" && videoStart !== null)) target.searchParams.append(name, value);
+      const blogVideo = target.pathname === "/blog/" && name === "format" && value === "video";
+      if (trackingParameters.has(name) || pagination || blogVideo || (name === "t" && videoStart !== null)) target.searchParams.append(name, value);
     }
   }
   return target.href === source.href ? null : target;
