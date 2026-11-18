@@ -149,6 +149,7 @@ export type ArticlePresentation = {
   title: string; excerpt: string; bodyMd: string; publishedAt?: string; updatedAt?: string;
   readTime: string; tags: string[]; coverUrl: string; imageUrls: string[]; media?: MediaPresentationMap;
   category: BlogCategorySlug | null;
+  videoOrientation?: "landscape";
 };
 export function BlogPostPage({
   article,
@@ -164,6 +165,7 @@ export function BlogPostPage({
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const landscape = article.videoOrientation === "landscape";
   const { video, markdown } = extractBlogVideo(stripFirstMarkdownH1(article.bodyMd));
   const content = stripRepeatedLead(stripMarkdownImages(markdown), article.excerpt);
   const loading = false;
@@ -256,12 +258,12 @@ export function BlogPostPage({
               ) : null}
 
               {video ? (
-                <div className="mt-8 grid gap-x-12 gap-y-6 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] lg:grid-rows-[auto_1fr]">
-                  <p className="max-w-[58ch] text-lg leading-relaxed text-[var(--public-ink)] sm:text-xl lg:col-start-2 lg:row-start-1" itemProp="description">
+                <div className={`mt-8 grid gap-x-12 gap-y-6 ${landscape ? "" : "lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] lg:grid-rows-[auto_1fr]"}`}>
+                  <p className={`max-w-[58ch] text-lg leading-relaxed text-[var(--public-ink)] sm:text-xl ${landscape ? "" : "lg:col-start-2 lg:row-start-1"}`} itemProp="description">
                     {meta.excerpt}
                   </p>
-                  <BlogPortraitVideo video={video} poster={coverUrl || imageUrls[0]} title={meta.title} />
-                  <div className="min-w-0 max-w-[70ch] lg:col-start-2 lg:row-start-2">
+                  <BlogPortraitVideo video={video} poster={coverUrl || imageUrls[0]} title={meta.title} orientation={article.videoOrientation} />
+                  <div className={`min-w-0 max-w-[70ch] ${landscape ? "" : "lg:col-start-2 lg:row-start-2"}`}>
                     <MarkdownContent markdown={content} media={article.media} itemProp="articleBody" proseClassName="article-prose" />
                     {tags}
                     <p className="mt-8 border-t border-border pt-4 text-sm text-[var(--public-subtle)]" itemProp="author" itemScope itemType="https://schema.org/Person">

@@ -3,10 +3,11 @@ import { flushSync } from "react-dom";
 import { Play } from "lucide-react";
 import type { BlogVideo } from "../lib/blogVideo";
 
-export function BlogPortraitVideo({ video, poster, title }: {
+export function BlogPortraitVideo({ video, poster, title, orientation }: {
   video: BlogVideo;
   poster?: string;
   title: string;
+  orientation?: "landscape";
 }) {
   const player = useRef<HTMLVideoElement>(null);
   const [opened, setOpened] = useState(false);
@@ -18,8 +19,10 @@ export function BlogPortraitVideo({ video, poster, title }: {
     void player.current?.play().catch(() => {});
   }
 
+  const landscape = orientation === "landscape";
+  const ratio = landscape ? "aspect-video" : "aspect-[9/16]";
   return (
-    <div className="mx-auto w-full max-w-[320px] self-start lg:col-start-1 lg:row-span-2 lg:row-start-1">
+    <div className={landscape ? "w-full max-w-[70ch]" : "mx-auto w-full max-w-[320px] self-start lg:col-start-1 lg:row-span-2 lg:row-start-1"}>
       {opened ? (
         <video
           ref={player}
@@ -30,14 +33,14 @@ export function BlogPortraitVideo({ video, poster, title }: {
           playsInline
           preload="none"
           onError={() => setFailed(true)}
-          className="aspect-[9/16] w-full rounded-[1.5rem] bg-black object-contain"
+          className={`${ratio} w-full rounded-[1.5rem] bg-black object-contain`}
         />
       ) : (
         <button
           type="button"
           onClick={play}
           aria-label="Смотреть видео"
-          className="relative isolate flex aspect-[9/16] w-full cursor-pointer items-center justify-center overflow-hidden rounded-[1.5rem] bg-neutral-900 text-white outline-offset-4 focus-visible:outline-2 focus-visible:outline-[var(--public-blue)]"
+          className={`relative isolate flex ${ratio} w-full cursor-pointer items-center justify-center overflow-hidden rounded-[1.5rem] bg-neutral-900 text-white outline-offset-4 focus-visible:outline-2 focus-visible:outline-[var(--public-blue)]`}
         >
           {poster ? <img src={poster} alt="" className="absolute inset-0 -z-10 size-full object-cover" /> : null}
           <span className="flex size-16 items-center justify-center rounded-full bg-black/75">

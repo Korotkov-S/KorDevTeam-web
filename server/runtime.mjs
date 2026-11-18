@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createServer as createHttpsServer } from "node:https";
 import { createRequire } from "node:module";
 import { configureProxy } from "./proxy.mjs";
+import { createBlogMediaRouter } from "./blog-media.mjs";
 
 const require = createRequire(import.meta.url);
 const { createApiApp } = require("./api-app.js");
@@ -45,6 +46,7 @@ app.use(async (req, res, next) => {
   if (target) return res.set("Cache-Control", "no-cache").redirect(308, target.href);
   next();
 });
+app.use("/api/blog-media", createBlogMediaRouter());
 app.use(createApiApp({
   checkReady: build.entry.module.checkApplicationReady,
   leadRouter: build.entry.module.createLeadRouter(),

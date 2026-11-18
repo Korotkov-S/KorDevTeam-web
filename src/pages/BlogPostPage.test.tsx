@@ -275,3 +275,18 @@ test("a standalone portrait video opens from its cover and leaves the article te
     dom.window.HTMLMediaElement.prototype.play = original;
   }
 });
+
+test("landscape video keeps a 16:9 cover instead of using the portrait crop", () => {
+  const { container } = render(<MemoryRouter initialEntries={["/blog/team/"]}>
+    <BlogPostPage article={{
+      title: "Внешняя команда", excerpt: "Процесс и подрядчики.",
+      bodyMd: "[Видео, 0:57](/video/team.mp4)\n\nТекст.",
+      tags: [], readTime: "", coverUrl: "/cover.jpg", imageUrls: [], category: null,
+      videoOrientation: "landscape",
+    }} category={null} relatedArticles={[]} />
+  </MemoryRouter>);
+  const cover = screen.getByRole("button", { name: "Смотреть видео" });
+  assert.ok(cover.classList.contains("aspect-video"));
+  assert.equal(cover.classList.contains("aspect-[9/16]"), false);
+  assert.ok(container.querySelector('img[src="/cover.jpg"]'));
+});

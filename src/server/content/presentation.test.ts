@@ -79,3 +79,25 @@ test("article cards never serialize the full article body or unrelated presentat
   ]);
   assert.doesNotMatch(JSON.stringify(card), /FULL ARTICLE BODY|bodyMd|updatedAt|media/);
 });
+
+test("Telegram video posts render same-origin images and media while normal images keep their URL", t => {
+  const previous = process.env.PUBLIC_MEDIA_BASE_URL;
+  process.env.PUBLIC_MEDIA_BASE_URL = "https://cdn.example/";
+  t.after(() => {
+    if (previous === undefined) delete process.env.PUBLIC_MEDIA_BASE_URL;
+    else process.env.PUBLIC_MEDIA_BASE_URL = previous;
+  });
+  const coverId = "00000000-0000-4000-8000-000000000001";
+  const coverKey = "media/v1/aa/" + "a".repeat(64) + "/original.jpg";
+  const videoKey = "blog/telegram/1299/" + "b".repeat(64) + ".mp4";
+  const media = { [coverId]: { id: coverId, src: "https://cdn.example/" + coverKey, srcSet: "", sizes: "100vw", alt: "", decorative: false, width: 1280, height: 720 } };
+  const normal = { ...entry("team-video", "Внешняя команда", "2026-11-18T08:00:00.000Z"), payload: { coverUrl: "media:" + coverId } };
+  const video = { ...normal, bodyMd: `[Видео, 0:57](https://cdn.example/${videoKey})\n\n## Заголовок\n\nТекст.` };
+
+  assert.equal(articleCard(normal, media).coverUrl, media[coverId].src);
+  assert.equal(articleCard(video, media).coverUrl, "/api/blog-media/" + coverKey);
+  assert.equal(articleCard(video, media).videoDuration, "0:57");
+  assert.equal(articlePresentation(video, media).videoOrientation, "landscape");
+  assert.match(articlePresentation(video, media).bodyMd, /\]\(\/api\/blog-media\/blog\/telegram\/1299\//);
+  assert.ok(video.bodyMd.includes("https://cdn.example/"));
+});

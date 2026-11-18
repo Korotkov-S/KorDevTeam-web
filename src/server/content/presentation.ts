@@ -4,6 +4,7 @@ import type { Project } from "../../pages/ProjectPage";
 import type { RouteSeoInput } from "../seo/metadata";
 import type { MediaPresentationMap } from "../media/presentation";
 import { extractBlogVideo } from "../../lib/blogVideo";
+import { blogMediaPath } from "../../../server/blog-media-paths.mjs";
 import { isBlogCategorySlug } from "../../lib/blogCategories";
 
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -95,11 +96,20 @@ export function legacyCaseContent(entry: ContentEntry, media: MediaPresentationM
 }
 
 export function articlePresentation(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null): ArticlePresentation {
-  return { ...(viewCount === null || typeof viewCount === "string" ? { viewCount } : {}), title: text(entry.payload.h1) || entry.title, excerpt: entry.excerpt, bodyMd: entry.bodyMd,
+  const { video } = extractBlogVideo(entry.bodyMd);
+  const coverValue = text(entry.payload.coverUrl);
+  const coverAsset = media[coverValue.replace(/^media:/, "")];
+  const cover = mediaUrl(coverValue, media);
+  const playable = video ? blogMediaPath(video.url) : null;
+  const bodyMd = video && playable ? entry.bodyMd.replace(`](${video.url})`, `](${playable})`) : entry.bodyMd;
+  const coverUrl = (video && blogMediaPath(cover)) || cover;
+  const videoOrientation = video && coverAsset?.width && coverAsset?.height && coverAsset.width > coverAsset.height
+    ? "landscape" as const : undefined;
+  return { ...(viewCount === null || typeof viewCount === "string" ? { viewCount } : {}), title: text(entry.payload.h1) || entry.title, excerpt: entry.excerpt, bodyMd,
     publishedAt: entry.publishedAt?.toISOString(), updatedAt: entry.updatedAt.toISOString(),
     readTime: text(entry.payload.readTime), tags: strings(entry.payload.tags),
     category: isBlogCategorySlug(entry.payload.category) ? entry.payload.category : null,
-    coverUrl: mediaUrl(text(entry.payload.coverUrl), media), imageUrls: strings(entry.payload.imageUrls).map(value => mediaUrl(value, media)), media };
+    coverUrl, imageUrls: strings(entry.payload.imageUrls).map(value => mediaUrl(value, media)), media, videoOrientation };
 }
 
 export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null) {
