@@ -180,7 +180,9 @@ jobs:
           systemd-analyze verify deploy/systemd/kordevteam-lead-retention.service deploy/systemd/kordevteam-lead-retention.timer
 
       - name: Test
-        run: yarn test
+        run: |
+          yarn test
+          NODE_ENV=production node --test tests/ssr-multibyte-stream.test.mjs
 
       - name: Build application
         run: yarn build

@@ -9783,7 +9783,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-dom@npm:^18.3.1":
+"react-dom@npm:18.3.1":
   version: 18.3.1
   resolution: "react-dom@npm:18.3.1"
   dependencies:
@@ -9792,6 +9792,18 @@ __metadata:
   peerDependencies:
     react: ^18.3.1
   checksum: 298954ecd8f78288dcaece05e88b570014d8f6dce5db6f66e6ee91448debeb59dcd31561dddb354eee47e6c1bb234669459060deb238ed0213497146e555a0b9
+  languageName: node
+  linkType: hard
+
+"react-dom@patch:react-dom@npm%3A18.3.1#./.yarn/patches/react-dom-npm-18.3.1-a805663f38.patch::locator=kordevteam%40workspace%3A.":
+  version: 18.3.1
+  resolution: "react-dom@patch:react-dom@npm%3A18.3.1#./.yarn/patches/react-dom-npm-18.3.1-a805663f38.patch::version=18.3.1&hash=032346&locator=kordevteam%40workspace%3A."
+  dependencies:
+    loose-envify: "npm:^1.1.0"
+    scheduler: "npm:^0.23.2"
+  peerDependencies:
+    react: ^18.3.1
+  checksum: 4468f8ed6516e96c88792a4dc8b4ca82013172c8ccc4fd0d052b071060c42bf399a270cf3d9399e32ecc2de5e019299dbb82d03e30bce0f1e60eef7204bc9bb5
   languageName: node
   linkType: hard
 

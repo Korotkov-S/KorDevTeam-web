@@ -51,6 +51,7 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("cache-control"), "no-cache");
       const serverHtml = await response.text();
+      assert.equal(serverHtml.includes("\0"), false, "server HTML contains a null byte");
       assert.doesNotMatch(serverHtml, /PRIVATE_DRAFT_SENTINEL|Закрытый черновик/);
       const server = seoSnapshot(serverHtml);
       assert.equal(server.lang, "ru");

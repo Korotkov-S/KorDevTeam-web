@@ -143,5 +143,8 @@
     "portfolio:import": "tsx scripts/import-project-portfolio.ts",
     "portfolio:media": "tsx scripts/capture-project-media.ts"
   },
-  "packageManager": "yarn@3.8.7"
+  "packageManager": "yarn@3.8.7",
+  "resolutions": {
+    "react-dom@^18.3.1": "patch:react-dom@npm%3A18.3.1#./.yarn/patches/react-dom-npm-18.3.1-a805663f38.patch"
+  }
 }
