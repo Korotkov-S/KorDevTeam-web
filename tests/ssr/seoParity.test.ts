@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { request as httpRequest } from "node:http";
 import { randomUUID } from "node:crypto";
+import { load } from "cheerio";
 import puppeteer from "puppeteer";
 import { resetTestDatabase } from "../../src/server/db/testDatabase";
 import { createDb } from "../../src/server/db/client";
@@ -51,6 +52,8 @@ test("published pages preserve SEO and meaningful visible HTML through hydration
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("cache-control"), "no-cache");
       const serverHtml = await response.text();
+      const head = load(serverHtml);
+      assert.equal(head('head link[rel="icon"][sizes="120x120"][type="image/png"]').attr("href"), "/favicon-120x120.png");
       assert.doesNotMatch(serverHtml, /PRIVATE_DRAFT_SENTINEL|Закрытый черновик/);
       const server = seoSnapshot(serverHtml);
       assert.equal(server.lang, "ru");
