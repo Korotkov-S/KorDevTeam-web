@@ -1,4 +1,5 @@
-import { PassThrough, Readable } from "node:stream";
+import { Readable } from "node:stream";
+import { createHtmlResponseStream } from "./server/http/htmlStream";
 import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
 import { renderToPipeableStream } from "react-dom/server";
@@ -61,7 +62,7 @@ export default function handleRequest(
       {
         onAllReady() {
           shellRendered = true;
-          const body = new PassThrough();
+          const body = createHtmlResponseStream();
           responseHeaders.set("Content-Type", "text/html");
           if (!responseHeaders.has("Cache-Control")) responseHeaders.set("Cache-Control", "no-cache");
           pipe(body);
