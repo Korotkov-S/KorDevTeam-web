@@ -22,7 +22,6 @@ export function assertTelegramTransition(before: EntrySource | undefined, after:
   const previous = before?.kind === "article" ? telegramProvenance(before.payload) : null;
   const next = after.kind === "article" ? telegramProvenance(after.payload) : null;
   if (previous && (previous.postId !== next?.postId || previous.url !== next?.url || previous.origin !== next?.origin)) throw new Error("content_provenance_immutable");
-  if (next && !previous && after.status === "draft" && after.indexable) throw new Error("content_validation_error");
 }
 
 export function safeContentWriteError(error: unknown): Error {
