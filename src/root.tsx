@@ -13,6 +13,7 @@ import {
   type HeadersArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
+  type LinksFunction,
 } from "react-router";
 import { MotionConfig } from "motion/react";
 import { buildRouteMeta } from "./server/seo/metadata";
@@ -31,6 +32,13 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import "./styles/index.css";
 
 declare const __RELEASE_SHA__: string;
+export const links: LinksFunction = () => [
+  { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+  ...[16, 32, 96, 120, 192, 512].map(size => ({
+    rel: "icon", type: "image/png", sizes: `${size}x${size}`, href: `/favicon-${size}x${size}.png`,
+  })),
+  { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+];
 export function loader({ request }: LoaderFunctionArgs) {
   const admin = isAdminPath(new URL(request.url).pathname);
   const cspNonce = admin ? requestCspNonce(request) : null;
