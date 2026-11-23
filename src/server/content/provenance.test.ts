@@ -10,7 +10,17 @@ import { parseAdminContentCommand } from "../admin/contentSchemas";
 import { createContentService } from "./service";
 import { parseContentCommand, type SaveContentCommand } from "./types";
 import { contentErrorStatus } from "../../routes/admin/content-http.server";
-import { safeContentWriteError } from "./provenance";
+import { assertTelegramTransition, safeContentWriteError } from "./provenance";
+
+test("new Telegram drafts allow owner-selected indexability while retaining provenance", () => {
+  for (const indexable of [true, false]) {
+    assert.doesNotThrow(() => assertTelegramTransition(undefined, { kind: "article", status: "draft", indexable, payload: source() }));
+  }
+  assert.throws(() => assertTelegramTransition(
+    { kind: "article", status: "draft", indexable: true, payload: source() },
+    { kind: "article", status: "draft", indexable: true, payload: {} },
+  ), /content_provenance_immutable/);
+});
 
 const url = process.env.TEST_DATABASE_URL ?? "";
 const databaseTest = url ? test : test.skip;
@@ -59,10 +69,16 @@ async function setup() {
   return { db, actor, admin, generic, adapters };
 }
 
-databaseTest("both repositories reject indexable new Telegram drafts and preserve ordinary defaults", async () => {
-  const { adapters } = await setup();
+databaseTest("both repositories save indexable Telegram drafts without publishing and preserve explicit exclusions", async () => {
+  const { adapters, generic } = await setup();
   for (const a of adapters) {
-    await assert.rejects(() => a.save(command(`${a.name}-unsafe`, source(), true)), /content_validation_error/);
+    const indexed = await a.save(command(`${a.name}-indexed`, source(a.name === "admin" ? "1263" : "1264"), true));
+    assert.equal(indexed.status, "draft"); assert.equal(indexed.indexable, true);
+    assert.deepEqual(indexed.payload, source(a.name === "admin" ? "1263" : "1264"));
+    assert.equal(await generic.getPublishedEntry("article", indexed.slug), null);
+    const { indexable: _explicit, ...defaultCommand } = command(`${a.name}-default`, source(a.name === "admin" ? "1267" : "1268"));
+    const defaultDraft = await a.save(defaultCommand);
+    assert.equal(defaultDraft.status, "draft"); assert.equal(defaultDraft.indexable, true);
     const ordinary = await a.save(command(`${a.name}-ordinary`, {}, true));
     assert.equal(ordinary.indexable, true);
     const safe = await a.save(command(`${a.name}-safe`, source(a.name === "admin" ? "1265" : "1266")));

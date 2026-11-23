@@ -399,6 +399,7 @@ const listContentInput = z.strictObject({
   status: z.enum(["draft", "published"]).optional(),
   query: z.string().max(300).optional(),
   ...pageFields,
+  cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).optional(),
 });
 const getContentInput = z.strictObject({
   id: z.uuid().optional(),

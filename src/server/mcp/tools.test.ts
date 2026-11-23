@@ -1,4 +1,25 @@
 import assert from "node:assert/strict";
+import { decodePage, pageOf } from "./pagination";
+
+test("list_content accepts its returned opaque cursor and exhausts two pages", async t => {
+  const firstEntry = (await services().content.list({})).items[0];
+  const entries = [firstEntry, { ...firstEntry, id: "00000000-0000-4000-8000-000000000021", slug: "second-article" }];
+  const c = await connected(["content:read"], services({ content: {
+    async list(input) { return pageOf(entries, decodePage(input.cursor, input.limit)); },
+  } }));
+  t.after(async () => { await c.client.close(); await c.server.close(); });
+  const first = await c.client.callTool({ name: "list_content", arguments: { limit: 1 } });
+  assert.notEqual(first.isError, true);
+  const page = first.structuredContent as { items: Array<{ id: string }>; nextCursor: string };
+  assert.equal(page.items[0].id, firstEntry.id);
+  const second = await c.client.callTool({ name: "list_content", arguments: { limit: 1, cursor: page.nextCursor } });
+  assert.notEqual(second.isError, true);
+  assert.deepEqual((second.structuredContent as { items: Array<{ id: string }> }).items.map(x => x.id), [entries[1].id]);
+  assert.equal((second.structuredContent as { nextCursor?: string }).nextCursor, undefined);
+  for (const cursor of ["100", "%%%", "a".repeat(1025)]) {
+    assert.equal((await c.client.callTool({ name: "list_content", arguments: { cursor } })).isError, true);
+  }
+});
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 
