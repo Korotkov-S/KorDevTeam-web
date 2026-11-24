@@ -9,21 +9,26 @@ const OPERATIONS_URL = "https://operation.api.cloud.yandex.net/operations";
 const REQUEST_TIMEOUT_MS = 20_000;
 const RESULT_LIMIT = 100;
 const MAX_RAW_BYTES = 8 * 1024 * 1024;
+const REQUEST_INTERVAL_MS = 200;
+// The default async submission quota is one POST per second. Keep a small margin.
+const SUBMISSION_INTERVAL_MS = 1100;
 const MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 const DESKTOP_USER_AGENT = "KorDevTeam SEO rank monitor/1.0 (desktop)";
 
 type RequestTiming = { now: () => number; sleep: (ms: number) => Promise<void> };
 function createRequestGate(timing: RequestTiming) {
-  let tail = Promise.resolve(), nextAt = 0;
+  let tail = Promise.resolve(), nextAt = 0, nextSubmissionAt = 0;
   return {
-    async run<T>(request: () => Promise<T>): Promise<T> {
+    async run<T>(request: () => Promise<T>, submitting: boolean): Promise<T> {
       const previous = tail;
       let release!: () => void;
       tail = new Promise<void>(resolve => { release = resolve; });
       await previous;
       try {
-        while (timing.now() < nextAt) await timing.sleep(nextAt - timing.now());
-        nextAt = timing.now() + 200;
+        while (timing.now() < Math.max(nextAt, submitting ? nextSubmissionAt : 0))
+          await timing.sleep(Math.max(nextAt, submitting ? nextSubmissionAt : 0) - timing.now());
+        nextAt = timing.now() + REQUEST_INTERVAL_MS;
+        if (submitting) nextSubmissionAt = timing.now() + SUBMISSION_INTERVAL_MS;
         return await request();
       } finally { release(); }
     },
@@ -88,7 +93,7 @@ async function requestJson(
       });
       if (result.status === 429) gate.coolDown(boundedRetryAfter(result) ?? 30);
       return result;
-    });
+    }, submitting);
   } catch (error) {
     if (!sent && error instanceof SeoProviderError) throw error;
     if (submitting)

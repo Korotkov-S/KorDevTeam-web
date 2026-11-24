@@ -19,7 +19,7 @@ const config = {
   targetHost: "kordev.team",
 };
 
-test("parallel rank requests share a five-per-second gate", async () => {
+test("parallel paid submissions stay below the default one-per-second async quota", async () => {
   let time = 0;
   const sent: number[] = [];
   const provider = createYandexSearchProvider(config, async () => {
@@ -27,7 +27,41 @@ test("parallel rank requests share a five-per-second gate", async () => {
     return Response.json({ done: false, id: "operation" });
   }, { now: () => time, sleep: async (ms: number) => { time += ms; } });
   await Promise.all(Array.from({ length: 8 }, () => provider.startSearch("crm", 225, "desktop")));
-  assert.deepEqual(sent, [0, 200, 400, 600, 800, 1000, 1200, 1400]);
+  assert.deepEqual(sent, [0, 1100, 2200, 3300, 4400, 5500, 6600, 7700]);
+});
+
+test("operation polling retains its existing rate while respecting the separate POST gate", async () => {
+  let time = 0;
+  const sent: { at: number; method: string }[] = [];
+  const provider = createYandexSearchProvider(config, async (_url, init) => {
+    sent.push({ at: time, method: init?.method ?? "GET" });
+    return Response.json({ done: false, id: "operation" });
+  }, { now: () => time, sleep: async ms => { time += ms; } });
+  await Promise.all([
+    provider.startSearch("crm", 225, "desktop"),
+    provider.pollSearch("operation"),
+    provider.pollSearch("operation"),
+    provider.startSearch("crm", 225, "mobile"),
+  ]);
+  assert.deepEqual(sent, [
+    { at: 0, method: "POST" },
+    { at: 200, method: "GET" },
+    { at: 400, method: "GET" },
+    { at: 1100, method: "POST" },
+  ]);
+});
+
+test("a POST rechecks its guard after waiting for another submission", async () => {
+  let time = 0, calls = 0;
+  const provider = createYandexSearchProvider(config, async () => {
+    calls++;
+    return Response.json({ id: "operation" });
+  }, { now: () => time, sleep: async ms => { time += ms; } });
+  await provider.startSearch("crm", 225, "desktop");
+  await assert.rejects(() => provider.startSearch("crm", 225, "mobile", () => {
+    if (time >= 1100) throw new SeoProviderError("seo_rank_waiting_night_window", false);
+  }), { message: "seo_rank_waiting_night_window" });
+  assert.equal(calls, 1);
 });
 
 test("a rejected request pauses all subsequent requests for Retry-After", async () => {
