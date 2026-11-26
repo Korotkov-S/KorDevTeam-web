@@ -65,6 +65,129 @@
 
 Транспорт меняет семантику системы. Kafka, RabbitMQ и обычный HTTP нельзя считать взаимозаменяемыми только потому, что NestJS скрывает часть настройки.
 
+## Первый микросервис на NestJS: два локальных процесса
+
+Чтобы увидеть обмен сообщениями, соберём учебный пример. Один процесс принимает список чисел и возвращает сумму, второй отправляет запрос и ждёт ответ. Это проверка транспорта и контракта; она не показывает бизнес-выгоду разделения системы.
+
+Для воспроизведения нужны Node.js 20 или новее и npm. Пример проверен на Node.js 22 с NestJS 12.6.0. Все соединения остаются на 127.0.0.1:4010. Суммирование не работает с заказами, платежами или клиентскими данными.
+
+### Подготовьте отдельную папку
+
+```bash
+mkdir nest-tcp-example
+cd nest-tcp-example
+npm init -y
+npm install --save-exact @nestjs/common@12.6.0 @nestjs/core@12.6.0 @nestjs/microservices@12.6.0 reflect-metadata@0.2.2 rxjs@7.8.2
+npm install --save-dev --save-exact typescript@5.9.2 @types/node@22.19.1
+```
+
+Создайте `tsconfig.json`:
+
+```json
+{"compilerOptions":{"target":"ES2022","module":"commonjs","moduleResolution":"node","experimentalDecorators":true,"emitDecoratorMetadata":true,"strict":true,"skipLibCheck":true,"outDir":"dist","esModuleInterop":true},"include":["server.ts","client.ts"]}
+```
+
+### Создайте обработчик сообщения
+
+Файл `server.ts`:
+
+```typescript
+import 'reflect-metadata';
+import { Controller, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MessagePattern, RpcException, Transport } from '@nestjs/microservices';
+
+@Controller()
+class SumController {
+  @MessagePattern({ cmd: 'sum.v1' })
+  sum(data: unknown): number {
+    if (!Array.isArray(data) || data.length > 100 ||
+        !data.every(value => typeof value === 'number' && Number.isFinite(value))) {
+      throw new RpcException({ code: 'invalid_numbers', message: 'Expected up to 100 finite numbers' });
+    }
+    const result = data.reduce((total: number, value: number) => total + value, 0);
+    if (!Number.isFinite(result)) {
+      throw new RpcException({ code: 'invalid_numbers', message: 'Result is outside the supported range' });
+    }
+    return result;
+  }
+}
+
+@Module({ controllers: [SumController] })
+class AppModule {}
+
+async function main() {
+  const app = await NestFactory.createMicroservice(AppModule, {
+    transport: Transport.TCP,
+    options: { host: '127.0.0.1', port: 4010 },
+    logger: false,
+  });
+  app.enableShutdownHooks();
+  await app.listen();
+  console.log('ready');
+}
+void main().catch(() => { console.error('server_start_failed'); process.exitCode = 1; });
+```
+
+Контракт `{ cmd: 'sum.v1' }` связывает отправителя и обработчик. Вход остаётся `unknown`, пока не проверены типы, количество и диапазон значений. Неверные данные дают ошибку `invalid_numbers`, а не неявное преобразование строки в число.
+
+### Отправьте запрос из другого процесса
+
+Файл `client.ts`:
+
+```typescript
+import 'reflect-metadata';
+import { ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { firstValueFrom, timeout } from 'rxjs';
+
+export async function calculate(numbers: unknown, port = 4010): Promise<number> {
+  const client = ClientProxyFactory.create({
+    transport: Transport.TCP,
+    options: { host: '127.0.0.1', port },
+  });
+  try {
+    return await firstValueFrom(client.send<number>({ cmd: 'sum.v1' }, numbers).pipe(timeout(1500)));
+  } finally {
+    client.close();
+  }
+}
+
+if (require.main === module) {
+  calculate([2, 3])
+    .then(value => console.log(value))
+    .catch(error => {
+      console.error(error?.code ?? error?.name ?? 'request_failed');
+      process.exitCode = 1;
+    });
+}
+```
+
+Скомпилируйте код и запустите сервер:
+
+```bash
+npx tsc
+node dist/server.js
+```
+
+После сообщения `ready` откройте второй терминал в той же папке и выполните `node dist/client.js`. Ожидаемый вывод — `5`. TCP-соединение закрывается в `finally`. На ожидание ответа отведено 1500мс; недоступный сервис может завершить запрос ошибкой соединения ещё раньше.
+
+### Проверьте границы контракта
+
+Вызовы `calculate` можно проверить из отдельного JavaScript-файла через `require('./dist/client.js')`:
+
+| Данные | Ожидаемый результат |
+| --- | --- |
+| `[2, 3]` | `5` |
+| `[]` | `0` |
+| `['2', 3]` | Ошибка `invalid_numbers` |
+| Массив из 101 числа | Ошибка `invalid_numbers` |
+| Два `Number.MAX_VALUE` | Ошибка `invalid_numbers` при переполнении суммы |
+| Сервис остановлен | Ошибка соединения или ограниченного ожидания |
+
+Для рабочего сервиса этого примера недостаточно: нужны согласованные права доступа, защита соединения, версия сообщения, наблюдаемость и правила повторной обработки. Учебный TCP-порт не следует выставлять наружу. Дальше в статье разобрано, как выбрать синхронный запрос или событие и что происходит при повторной доставке.
+
+Основа интерфейсов — [официальная документация NestJS по микросервисам](https://docs.nestjs.com/microservices/basics); механизм ограничения ожидания описан в [справочнике RxJS](https://rxjs.dev/api/operators/timeout).
+
 ## Синхронный вызов и асинхронное событие
 
 ### Синхронный запрос
