@@ -13,6 +13,7 @@ export type BlogPostCardView = {
   tags: string[];
   category: BlogCategorySlug | null;
   coverUrl?: string;
+  coverFocusY?: number;
   imageUrls?: string[];
   viewCount?: string | null;
   videoDuration?: string;
@@ -52,6 +53,7 @@ function blogContentCard(post: BlogPostCardView, images: ReturnType<typeof blogM
     summary: post.excerpt,
     tags: post.tags ?? [],
     image: images[0] ?? null,
+    imageFocusY: post.coverFocusY,
     viewCount: post.viewCount,
   };
 }

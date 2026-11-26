@@ -114,6 +114,12 @@ export function articlePresentation(entry: ContentEntry, media: MediaPresentatio
     }), media, videoSourceUrl, videoOrientation };
 }
 
+export function articleCoverFocusY(entry: Pick<ContentEntry, "kind" | "payload">): number | undefined {
+  const value = entry.payload.coverFocusY;
+  return entry.kind === "article" && typeof value === "number" && Number.isFinite(value)
+    && value >= 0 && value <= 100 ? value : undefined;
+}
+
 export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {}, viewCount?: string | null) {
   const article = articlePresentation(entry, media);
   const { video } = extractBlogVideo(article.bodyMd);
@@ -129,6 +135,7 @@ export function articleCard(entry: ContentEntry, media: MediaPresentationMap = {
     tags: article.tags,
     category: article.category,
     coverUrl: article.coverUrl,
+    ...(articleCoverFocusY(entry) === undefined ? {} : { coverFocusY: articleCoverFocusY(entry) }),
     imageUrls: article.imageUrls,
   };
 }

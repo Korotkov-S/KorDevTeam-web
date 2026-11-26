@@ -15,7 +15,7 @@ export type ServiceCardView = { slug: string; title: string; summary: string; pr
 export const caseCategory = z.enum(["automation", "crm", "mobile", "web-service", "commerce", "support", "own-product"]);
 export type CaseCategory = z.output<typeof caseCategory>;
 export type CaseCardView = { viewCount?: string | null; slug: string; title: string; summary: string; result: string | null; image: ResolvedMediaAsset | null; tags: string[]; categories?: CaseCategory[]; catalogOrder?: number | null; catalogVisible?: boolean };
-export type ContentCardView = { viewCount?: string | null; slug: string; title: string; summary: string; image: ResolvedMediaAsset | null; tags: string[] };
+export type ContentCardView = { viewCount?: string | null; slug: string; title: string; summary: string; image: ResolvedMediaAsset | null; imageFocusY?: number; tags: string[] };
 export type FaqView = { question: string; answer: string };
 export type ServicePageView = {
   h1: string;
@@ -135,6 +135,7 @@ export const saveContentSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...base, kind: z.literal("article"), payload: z.strictObject({
     h1: z.string().optional(), author: z.string().optional(), tags: z.array(z.string()).optional(),
     coverUrl: z.string().optional(), imageUrls: z.array(z.string()).optional(), readTime: z.string().optional(),
+    coverFocusY: z.number().min(0).max(100).optional(),
     category: z.enum(BLOG_CATEGORY_SLUGS).optional(),
     relatedArticleSlugs: z.array(z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)).length(3).optional(),
     telegramPostId: z.string().regex(/^[1-9]\d*$/).optional(),

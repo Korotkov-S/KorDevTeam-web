@@ -39,12 +39,15 @@ export function ContentCard({
   canonicalUrl,
 }: ContentCardProps) {
   const { image } = post;
+  const imageFocusY = post.imageFocusY;
+  const imageObjectPosition = typeof imageFocusY === "number" && Number.isFinite(imageFocusY)
+    && imageFocusY >= 0 && imageFocusY <= 100 ? `50% ${imageFocusY}%` : undefined;
   const media = images ?? (image ? [image] : []);
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return <article itemScope={schemaType ? true : undefined} itemType={schemaType} itemProp={schemaItemProp} className="flex flex-col overflow-hidden rounded-[var(--public-radius-card)] border border-border bg-card">
     {showArticlePlaceholder && media.length === 0 && <ArticleCoverPlaceholder />}
     {media.length > 0 && <div className={media.length > 1 ? "grid grid-flow-col auto-cols-[minmax(82%,1fr)] gap-2 overflow-x-auto bg-muted p-2 sm:auto-cols-[minmax(48%,1fr)]" : ""}>
-      {media.map((asset, index) => <img key={`${asset.id}:${index}`} src={asset.src} srcSet={asset.srcSet || undefined} sizes={asset.sizes || "(min-width: 768px) 33vw, 100vw"} width={asset.width ?? undefined} height={asset.height ?? undefined} alt={asset.alt} loading={eagerImage && index === 0 ? "eager" : "lazy"} className={`${imageAspectClass} ${imageObjectFitClass} w-full transition-transform duration-300 motion-reduce:transition-none`} />)}
+      {media.map((asset, index) => <img key={`${asset.id}:${index}`} src={asset.src} srcSet={asset.srcSet || undefined} sizes={asset.sizes || "(min-width: 768px) 33vw, 100vw"} width={asset.width ?? undefined} height={asset.height ?? undefined} alt={asset.alt} loading={eagerImage && index === 0 ? "eager" : "lazy"} style={index === 0 && imageObjectPosition ? { objectPosition: imageObjectPosition } : undefined} className={`${imageAspectClass} ${imageObjectFitClass} w-full transition-transform duration-300 motion-reduce:transition-none`} />)}
     </div>}
     <div className="flex flex-1 flex-col p-6">
       {post.tags.length > 0 && <p className="mb-4 text-sm text-[var(--public-violet)]">{post.tags.slice(0, 2).join(" / ")}</p>}

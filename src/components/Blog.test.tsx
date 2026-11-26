@@ -74,6 +74,18 @@ test("real blog covers and gallery images retain their full-bleed presentation",
   }
 });
 
+test("a video cover keeps its chosen face position without moving gallery images", () => {
+  const markup = renderToStaticMarkup(<StaticRouter location="/blog/">
+    <BlogCard post={{ ...cardPost, videoDuration: "1:56", coverFocusY: 12,
+      coverUrl: "/portrait.png", imageUrls: ["/other-photo.jpg"] }} actionLabel="Смотреть видео" />
+  </StaticRouter>);
+  const images = new JSDOM(markup).window.document.querySelectorAll("img");
+  assert.equal(images.length, 2);
+  assert.equal(images[0].style.objectPosition, "50% 12%");
+  assert.ok(images[0].classList.contains("object-cover"));
+  assert.equal(images[1].style.objectPosition, "");
+});
+
 test("blog cards preserve ordered media and SSR article microdata", () => {
   const markup = renderToStaticMarkup(<StaticRouter location="/blog/"><Blog mode="index" posts={[{
     id: "article-1",

@@ -51,6 +51,20 @@ test("article payload media identifiers resolve only through the supplied media 
   assert.equal(articlePresentation({ ...value, payload: { coverUrl: "00000000-0000-4000-8000-000000000099" } }, media).coverUrl, "");
 });
 
+test("article card crop coordinates leave the actual video presentation intact", () => {
+  const value = { ...entry("focused", "Видео", "2026-11-26T10:00:00Z"),
+    bodyMd: "[Видео, 1:56](https://cdn.example/clip.mp4)",
+    payload: { coverFocusY: 12, coverUrl: "https://cdn.example/portrait.jpg" } };
+  const card = articleCard(value);
+  assert.equal(card.coverFocusY, 12);
+  assert.equal(card.videoDuration, "1:56");
+  assert.equal(articlePresentation(value).bodyMd, value.bodyMd);
+  assert.equal(articlePresentation(value).coverUrl, value.payload.coverUrl);
+  for (const coverFocusY of [-1, 101, "12", null, NaN]) {
+    assert.equal(articleCard({ ...value, payload: { ...value.payload, coverFocusY } }).coverFocusY, undefined);
+  }
+});
+
 test("article cards expose only approved blog category slugs", () => {
   const valid = articleCard({
     ...entry("categorized", "Материал с категорией", "2026-09-18T08:00:00.000Z"),
