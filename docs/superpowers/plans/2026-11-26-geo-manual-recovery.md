@@ -25,3 +25,12 @@
 - [x] Implement selection of one blocked temporary/unavailable job under the existing queue lock and budget guard; always create a fresh run and preserve old observations/history.
 - [x] Run repository/service/MCP tests against a disposable kordev_test database and typecheck.
 - [ ] Document manual-only recovery, verify changes, commit and prepare the release for review; retain production content protection gates.
+
+## Release rehearsal repair
+
+CI run45778219737 reproduced broken internal links in the disposable runtime: the approved CMS text refers to public CMS-only pages absent from repository sources. Keep the actual404 checks and production ownership gates.
+
+- [x] Reconcile the12already approved CMS source bodies and verify exact managed-state equality12/12, without publication/date changes.
+- [x] Read the18published CMS-only pages and their4referenced public media records through the existing authenticated readers; exclude drafts/private data and preserve exact versions/provenance.
+- [x] Add a local-CI-only insert fixture command, production-target guards, atomic rollback/conflict checks, offline pinned public asset bytes, and runtime crawler coverage. The snapshot is not part of production release ownership.
+- [ ] Complete focused tests/typecheck/build, independent review of the fixture boundary, then full CI and immutable release verification.

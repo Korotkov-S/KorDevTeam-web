@@ -97,6 +97,26 @@ databaseTest("recovery does not detach jobs from an existing immutable run", asy
   } finally { await f.db.$client.end(); }
 });
 
+databaseTest("manual recovery admits a full triple at fifteen sends and refuses one at sixteen", async () => {
+  for (const spent of [15, 16]) {
+    const f = await fixture();
+    try {
+      const previous = await f.queue.claimWork({ tokenId: f.other, now, limit: 6 });
+      const attempts = previous.flatMap(work => work.prompts.flatMap(prompt => [1, 2, 3].map(repetition => ({
+        runId: work.runId, leaseId: work.leaseId, promptId: prompt.promptId, repetition,
+        tokenId: f.other, budgetDate: "2026-10-05", reservedAt: now,
+      })))).slice(0, spent);
+      assert.equal(attempts.length, spent);
+      await f.db.insert(geoCollectionAttempts).values(attempts);
+      await f.db.update(geoCollectionJobs).set({ state: "blocked", errorCode: "platform_unavailable", attempts: 3 });
+      const work = await f.queue.claimWork({ tokenId: f.token, now, limit: 1,
+        recovery: { platform: "bing_copilot", reason: "Owner-authorized capacity probe" } });
+      assert.equal(work.length, spent === 15 ? 1 : 0);
+      if (spent === 15) assert.deepEqual(work[0].prompts[0].missingRepetitions, [1, 2, 3]);
+    } finally { await f.db.$client.end(); }
+  }
+});
+
 databaseTest("recovery remains one probe across expiry, rollover and resume in either order", async () => {
   const f = await fixture();
   try {
