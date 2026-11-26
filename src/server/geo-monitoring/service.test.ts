@@ -8,6 +8,22 @@ const tokenId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
 const promptId = "33333333-3333-4333-8333-333333333333";
 
+test("manual GEO recovery requires one question, a known platform and a bounded reason", async () => {
+  let calls = 0;
+  const service = createGeoMonitoringService(fakeRepository({ collectionQueue: {
+    claimWork: async input => { calls++; return input; },
+  } as never }));
+  for (const input of [
+    { limit: 6, recovery: { platform: "bing_copilot", reason: "Owner requested recovery" } },
+    { limit: 1, recovery: { platform: "unknown", reason: "Owner requested recovery" } },
+    { limit: 1, recovery: { platform: "bing_copilot", reason: " " } },
+    { limit: 1, recovery: { platform: "bing_copilot", reason: "a".repeat(1001) } },
+  ]) assert.throws(() => service.claimCollectionWork(input as never, tokenId), /geo_recovery_invalid/);
+  assert.equal(calls, 0);
+  const result = await service.claimCollectionWork({ limit: 1, recovery: { platform: "bing_copilot", reason: " Owner requested recovery " } }, tokenId) as any;
+  assert.equal(result.recovery.reason, "Owner requested recovery");
+});
+
 function fakeRepository(overrides: Partial<GeoRepository> = {}): GeoRepository {
   return {
     syncPromptCatalog: async () => ({ inserted: 0, promoted: 0, preserved: 0 }),

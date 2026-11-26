@@ -29,6 +29,22 @@ import type { McpPrincipal, McpScope } from "./contracts";
 import { createKordevMcpServer, type McpAuditRecord, type McpServices } from "./tools";
 
 const ENTRY_ID = "00000000-0000-4000-8000-000000000010";
+test("GEO recovery is an explicit strict option of the existing SEO write tool", async t => {
+  const calls: unknown[] = [];
+  const c = await connected(["seo:read", "seo:write"], services({ geo: {
+    async claimCollectionWork(input) { calls.push(input); return { items: [] } as never; },
+  } }));
+  t.after(async () => { await c.client.close(); await c.server.close(); });
+  const request = { limit: 1, recovery: { platform: "bing_copilot", reason: "Owner requested availability recovery" } };
+  assert.notEqual((await c.client.callTool({ name: "claim_geo_collection_work", arguments: request })).isError, true);
+  assert.deepEqual(calls, [request]);
+  for (const recovery of [
+    { ...request.recovery, platform: "unknown" },
+    { ...request.recovery, reason: " " },
+    { ...request.recovery, tokenId: ENTRY_ID },
+  ]) assert.equal((await c.client.callTool({ name: "claim_geo_collection_work", arguments: { limit: 1, recovery } })).isError, true);
+  assert.equal(calls.length, 1);
+});
 test("tool_scopes_enforce_content_publish_and_strict_execution_authority", async t => {
   for (const scopes of [["seo:read"], ["seo:read", "content:read"], ["seo:read", "seo:write", "content:read", "content:write"], ["seo:read", "seo:write", "content:read", "content:write", "content:publish"]] as McpScope[][]) {
     const c = await connected(scopes); t.after(() => c.client.close());

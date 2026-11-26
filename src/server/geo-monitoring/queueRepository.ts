@@ -31,6 +31,8 @@ export type GeoQueueFilters = {
   cursor?: string | null;
   limit?: number;
 };
+export type GeoPlatformRecovery = { platform: GeoPlatform; reason: string };
+const humanActionBlocks = new Set(["platform_auth_required", "live_ui_confirmation_required", "captcha_required"]);
 export async function geoQueueLock(tx: GeoQueueTransaction) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtext('geo-collection-queue'))`,
@@ -128,9 +130,14 @@ async function ensureCycle(tx: GeoQueueTransaction, now: Date) {
     .insert(geoCoverageCycles)
     .values({ startedAt: now, promptIds: prompts.map((p) => p.id) })
     .returning();
-  const blockedPlatforms = new Map(
-    blockedJobs.map((job) => [job.platform, job]),
-  );
+  const blockedPlatforms = new Map<GeoPlatform, typeof geoCollectionJobs.$inferSelect>();
+  for (const job of blockedJobs) {
+    const previous = blockedPlatforms.get(job.platform);
+    // Unordered source rows must never replace a human-action barrier with
+    // an automatically recoverable temporary error in a successor cycle.
+    if (!previous || humanActionBlocks.has(job.errorCode ?? "")
+      || !humanActionBlocks.has(previous.errorCode ?? "")) blockedPlatforms.set(job.platform, job);
+  }
   if (prompts.length)
     await tx.insert(geoCollectionJobs).values(
       COVERAGE_PLATFORMS.flatMap((platform) =>
@@ -170,6 +177,8 @@ async function createRun(
 ) {
   const first = jobs[0],
     promptIds = jobs.map((j) => j.promptId).sort();
+  const previous = previousRunId ? (await tx.select({ metadata: geoRuns.metadata })
+    .from(geoRuns).where(eq(geoRuns.id, previousRunId)))[0] : null;
   const [run] = await tx
     .insert(geoRuns)
     .values({
@@ -184,6 +193,9 @@ async function createRun(
       startedAt: now,
       collectionManaged: true,
       previousRunId,
+      ...(previous?.metadata.availabilityRecovery ? { metadata: {
+        availabilityRecovery: previous.metadata.availabilityRecovery,
+      } } : {}),
       promptSetFingerprint: createHash("sha256")
         .update(promptIds.join("\0"))
         .digest("hex"),
@@ -191,12 +203,26 @@ async function createRun(
     .returning();
   return run;
 }
+async function assertRecoveryPlatformLease(
+  tx: GeoQueueTransaction,
+  run: Pick<typeof geoRuns.$inferSelect, "id" | "platform" | "metadata">,
+  now: Date,
+) {
+  const others = await tx.select({ metadata: geoRuns.metadata })
+    .from(geoCollectionLeases).innerJoin(geoRuns, eq(geoRuns.id, geoCollectionLeases.runId))
+    .where(and(eq(geoRuns.platform, run.platform), sql`${geoRuns.id} <> ${run.id}`,
+      sql`${geoCollectionLeases.releasedAt} IS NULL`, sql`${geoCollectionLeases.expiresAt} > ${now}`));
+  if (others.some(other => run.metadata.availabilityRecovery || other.metadata.availabilityRecovery))
+    throw new Error("geo_platform_recovery_in_progress");
+}
 async function leaseRun(
   tx: GeoQueueTransaction,
   runId: string,
   tokenId: string,
   now: Date,
 ) {
+  const [run] = await tx.select().from(geoRuns).where(eq(geoRuns.id, runId));
+  await assertRecoveryPlatformLease(tx, run, now);
   const [lease] = await tx
     .insert(geoCollectionLeases)
     .values({ runId, tokenId, expiresAt: new Date(+now + 15 * 60000) })
@@ -386,6 +412,7 @@ export async function finishGeoQueue(
   }
   await retireRunLeases(tx, runId, now);
   if (status === "success" && jobs.length) {
+    const [run] = await tx.select({ metadata: geoRuns.metadata }).from(geoRuns).where(eq(geoRuns.id, runId));
     // A complete manually resumed batch proves platform availability again.
     await tx
       .update(geoCollectionJobs)
@@ -400,7 +427,9 @@ export async function finishGeoQueue(
           sql`(${geoCollectionJobs.cycleId} = ${jobs[0].cycleId} OR ${geoCollectionJobs.cycleId} = (SELECT id FROM geo_coverage_cycles ORDER BY started_at DESC LIMIT 1))`,
           eq(geoCollectionJobs.platform, jobs[0].platform),
           eq(geoCollectionJobs.state, "blocked"),
-          sql`${geoCollectionJobs.errorCode} IN ('platform_auth_required','live_ui_confirmation_required','captcha_required','platform_unavailable','browser_unavailable')`,
+          run.metadata.availabilityRecovery
+            ? sql`${geoCollectionJobs.errorCode} IN ('platform_unavailable','browser_unavailable')`
+            : sql`${geoCollectionJobs.errorCode} IN ('platform_auth_required','live_ui_confirmation_required','captcha_required','platform_unavailable','browser_unavailable')`,
         ),
       );
   }
@@ -542,27 +571,59 @@ export function createGeoQueueRepository(db: Database) {
       tokenId,
       now,
       limit,
+      recovery,
     }: {
       tokenId: string;
       now: Date;
       limit: number;
+      recovery?: GeoPlatformRecovery;
     }) {
       if (!Number.isInteger(limit) || limit < 1 || limit > 6)
         throw new Error("geo_claim_limit_invalid");
+      if (recovery && (limit !== 1 || !COVERAGE_PLATFORMS.includes(recovery.platform)
+        || typeof recovery.reason !== "string" || !recovery.reason.trim()
+        || Buffer.byteLength(recovery.reason, "utf8") > 1000))
+        throw new Error("geo_recovery_invalid");
       return db.transaction(async (tx) => {
         await geoQueueLock(tx);
         await assertToken(tx, tokenId, now);
         const cycle = await ensureCycle(tx, now),
           day = await budget(tx, now);
         if (day.sends >= 18) return [];
+        if (recovery) {
+          // Explicit owner-directed availability probe; ordinary claims keep
+          // the three-check pause. Leave room for a full independent triple.
+          if (day.sends > 15) return [];
+          const unfinished = await tx.select().from(geoCollectionJobs).where(and(
+            eq(geoCollectionJobs.cycleId, cycle.id), eq(geoCollectionJobs.platform, recovery.platform),
+            sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled')`,
+          ));
+          // Only an inherited, unassigned platform pause can start a new
+          // probe. Existing plans (including expired probes) use resumeRun.
+          if (!unfinished.length || unfinished.some(job => job.state !== "blocked" || job.runId
+            || !["platform_unavailable", "browser_unavailable"].includes(job.errorCode ?? ""))) return [];
+          const [active] = await tx.select({ id: geoCollectionLeases.id })
+            .from(geoCollectionLeases)
+            .innerJoin(geoRuns, eq(geoRuns.id, geoCollectionLeases.runId))
+            .where(and(eq(geoRuns.platform, recovery.platform),
+              sql`${geoCollectionLeases.releasedAt} IS NULL`,
+              sql`${geoCollectionLeases.expiresAt} > ${now}`)).limit(1);
+          if (active) return [];
+        }
         const candidates = await tx
           .select()
           .from(geoCollectionJobs)
           .where(
             and(
               eq(geoCollectionJobs.cycleId, cycle.id),
-              sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled','blocked')`,
-              sql`(${geoCollectionJobs.nextAttemptAt} IS NULL OR ${geoCollectionJobs.nextAttemptAt} <= ${now})`,
+              recovery ? and(
+                eq(geoCollectionJobs.platform, recovery.platform),
+                eq(geoCollectionJobs.state, "blocked"),
+                sql`${geoCollectionJobs.errorCode} IN ('platform_unavailable','browser_unavailable')`,
+              ) : and(
+                sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled','blocked')`,
+                sql`(${geoCollectionJobs.nextAttemptAt} IS NULL OR ${geoCollectionJobs.nextAttemptAt} <= ${now})`,
+              ),
             ),
           );
         const eligible = [];
@@ -600,7 +661,8 @@ export function createGeoQueueRepository(db: Database) {
         for (const jobs of groups.values()) {
           let previous = null,
             run;
-          if (jobs[0].runId) {
+          if (recovery) previous = jobs[0].runId;
+          if (jobs[0].runId && !recovery) {
             const [old] = await tx
               .select()
               .from(geoRuns)
@@ -628,6 +690,13 @@ export function createGeoQueueRepository(db: Database) {
             }
           }
           run ??= await createRun(tx, jobs, tokenId, now, previous);
+          if (recovery) {
+            const metadata = { ...run.metadata, availabilityRecovery: {
+              reason: recovery.reason.trim(), requestedAt: now.toISOString(),
+              previousErrorCode: jobs[0].errorCode, cycleId: cycle.id,
+            } };
+            await tx.update(geoRuns).set({ metadata }).where(eq(geoRuns.id, run.id));
+          }
           const lease = await leaseRun(tx, run.id, tokenId, now);
           await tx
             .update(geoRuns)
@@ -654,7 +723,7 @@ export function createGeoQueueRepository(db: Database) {
               runId: run.id,
               leaseId: lease.id,
               state: "running",
-              completedRepetitions: previous ? 0 : undefined,
+              completedRepetitions: previous || recovery ? 0 : undefined,
               errorCode: null,
             })
             .where(inArray(geoCollectionJobs.id, ids));
@@ -914,6 +983,7 @@ export function createGeoQueueRepository(db: Database) {
           throw new Error("geo_legacy_resume_unavailable");
         if (old.status === "success")
           throw new Error("geo_run_already_finished");
+        await assertRecoveryPlatformLease(tx, old, input.now);
         await tx
           .update(geoCollectionJobs)
           .set({

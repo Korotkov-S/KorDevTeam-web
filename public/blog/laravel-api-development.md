@@ -35,6 +35,171 @@ Laravel предоставляет `Route::apiResource`, но генерация
 
 Сложное бизнес-действие можно выразить отдельным endpoint, например подтверждением или отменой заказа. Не нужно притворяться, что любое действие является обычным редактированием поля.
 
+## Практический пример REST API на Laravel 13
+
+Начнём с небольшой операции: получить предварительный расчёт заказа. Она принимает товар и количество, проверяет вход и возвращает JSON. Заказ при этом не создаётся. Для успешно рассчитанного предпросмотра подходит ответ `200 OK`.
+
+Это учебный пример с вымышленным товаром и ценой, а не код клиентского проекта или готового магазина. Цена задана на сервере в копейках; клиент не должен определять стоимость товара. Для запуска нужны Composer 2 и PHP 8.3–8.5 с расширениями, требуемыми Laravel 13.
+
+### 1. Подготовьте отдельный проект
+
+Выполняйте команды в новой локальной папке:
+
+```bash
+composer create-project --no-scripts "laravel/laravel:^13.0" demo-api
+cd demo-api
+cp .env.example .env
+php artisan key:generate
+php artisan install:api --without-migration-prompt --no-interaction
+php artisan make:controller OrderPreviewController --invokable
+```
+
+`install:api` подключает API-маршруты и Sanctum. Флаг `--without-migration-prompt` пропускает предложение выполнить миграции: этот пример не использует базу данных. Префикс `/api` Laravel добавляет к маршрутам автоматически.
+
+### 2. Опишите вход и ответ
+
+Замените содержимое `app/Http/Controllers/OrderPreviewController.php`:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class OrderPreviewController extends Controller
+{
+    public function __invoke(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'product_id' => ['required', 'integer', Rule::in([101])],
+            'quantity' => ['required', 'integer', 'min:1', 'max:100'],
+            'unit_price_minor' => ['prohibited'],
+        ]);
+
+        // Учебная цена в копейках; в реальной системе её читает сервер.
+        $unitPriceMinor = 125000;
+
+        return response()->json([
+            'data' => [
+                'product_id' => (int) $data['product_id'],
+                'quantity' => (int) $data['quantity'],
+                'currency' => 'RUB',
+                'total_minor' => $unitPriceMinor * (int) $data['quantity'],
+            ],
+        ]);
+    }
+}
+```
+
+Товар `101` и цена `125000` копеек здесь вымышлены. В рабочем проекте цену и доступность читает сервер из подтверждённого источника, а правила проверяют в контексте клиента. Поле `unit_price_minor` запрещено во входе: переданная клиентом цена не используется для расчёта.
+
+Для компактности валидация и расчёт показаны в одном контроллере. По мере роста сценария их разделяют на Form Request и бизнес-операцию; границы этих компонентов разобраны ниже.
+
+### 3. Добавьте маршрут
+
+В `routes/api.php` добавьте импорт контроллера и маршрут. В новом учебном проекте файл можно привести к такому виду:
+
+```php
+<?php
+
+use App\Http\Controllers\OrderPreviewController;
+use Illuminate\Support\Facades\Route;
+
+Route::post('/v1/order-previews', OrderPreviewController::class);
+```
+
+Здесь нет `auth:sanctum`: маршрут рассчитывает только вымышленный предпросмотр без записи данных и без доступа к чужим объектам. Для рабочего API отдельно нужны аутентификация там, где она требуется, проверка прав, ограничения запросов и бизнес-правила. Пример не реализует создание, оплату или резервирование заказа.
+
+### 4. Отправьте запрос и проверьте ошибку
+
+Запустите локальный сервер:
+
+```bash
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+В другом терминале отправьте запрос:
+
+```bash
+curl -i http://127.0.0.1:8000/api/v1/order-previews   -H 'Accept: application/json'   -H 'Content-Type: application/json'   -d '{"product_id":101,"quantity":2}'
+```
+
+Ожидаемый статус — `200`, тело ответа:
+
+```json
+{"data":{"product_id":101,"quantity":2,"currency":"RUB","total_minor":250000}}
+```
+
+Повторите запрос с `quantity: 0`: Laravel вернёт `422` и ошибку поля `quantity`. Заголовок `Accept: application/json` сообщает, что клиент ожидает JSON, в том числе при ошибке. Точный текст сообщения зависит от языка приложения; клиенту лучше опираться на статус и ключи в `errors`, а не разбирать предложение.
+
+### 5. Закрепите контракт тестом
+
+Создайте feature-тест:
+
+```bash
+php artisan make:test OrderPreviewTest
+```
+
+Замените содержимое `tests/Feature/OrderPreviewTest.php`:
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class OrderPreviewTest extends TestCase
+{
+    public function test_returns_a_server_calculated_preview(): void
+    {
+        $this->postJson('/api/v1/order-previews', [
+            'product_id' => 101,
+            'quantity' => 2,
+        ])->assertOk()->assertExactJson([
+            'data' => [
+                'product_id' => 101,
+                'quantity' => 2,
+                'currency' => 'RUB',
+                'total_minor' => 250000,
+            ],
+        ]);
+    }
+
+    public function test_rejects_zero_quantity(): void
+    {
+        $this->postJson('/api/v1/order-previews', [
+            'product_id' => 101,
+            'quantity' => 0,
+        ])->assertUnprocessable()->assertJsonValidationErrors('quantity');
+    }
+
+    public function test_rejects_unknown_product(): void
+    {
+        $this->postJson('/api/v1/order-previews', [
+            'product_id' => 999,
+            'quantity' => 2,
+        ])->assertUnprocessable()->assertJsonValidationErrors('product_id');
+    }
+
+    public function test_rejects_client_supplied_price(): void
+    {
+        $this->postJson('/api/v1/order-previews', [
+            'product_id' => 101,
+            'quantity' => 2,
+            'unit_price_minor' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors('unit_price_minor');
+    }
+}
+```
+
+Запустите `php artisan test --filter=OrderPreviewTest`. Четыре проверки закрепляют нормальный расчёт, запрет нулевого количества, неизвестного товара и подмены цены. Следующий шаг для реального проекта — определить данные, роли и последствия операции, а затем добавить проверки сохранения, доступа и повторной отправки.
+
+Официальные справочники: [API-маршруты Laravel 13](https://laravel.com/docs/13.x/routing#api-routes), [валидация JSON-запросов](https://laravel.com/docs/13.x/validation#validation-error-response-format) и [HTTP-тесты](https://laravel.com/docs/13.x/http-tests).
+
 ## Контроллер не должен содержать весь процесс
 
 Практичная структура:

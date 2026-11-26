@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { load } from "cheerio";
 import { resetTestDatabase } from "../../src/server/db/testDatabase";
@@ -14,6 +15,7 @@ import { escapeXml } from "../../src/server/seo/sitemaps";
 import { staticContentDates } from "../../src/server/seo/staticContentDates";
 import { applyPortfolioImport, planPortfolioImport } from "../../src/server/portfolio/importer";
 import { loadPortfolioSources } from "../../src/server/portfolio/loader";
+import { seedCrawlerCmsSnapshots, prepareCrawlerPublicAssets, assertCrawlerFixtureTarget } from "../../scripts/seed-crawler-cms-snapshots";
 
 function runCrawler(origin: string, args: string[] = []) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
@@ -29,6 +31,7 @@ function runCrawler(origin: string, args: string[] = []) {
 test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex, and own crawl resources", { timeout: 120_000 }, async t => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
+  assertCrawlerFixtureTarget(databaseUrl, { ci: "true", acknowledgement: "local-ci-only" });
   await resetTestDatabase(databaseUrl);
   const imported = await importLegacyContent({ db: createDb(databaseUrl), batchId: "sitemap-runtime" });
   assert.equal(imported.ok, true);
@@ -58,10 +61,14 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
     ["web-services", "Разработка веб-сервисов"],
     ["ai-automation", "Внедрение ИИ в бизнес-процессы"],
     ["additional-service", "Техническая поддержка и развитие"],
+    ["mobile-app-development", "Разработка мобильных приложений"],
   ] as const) {
     const serviceDraft = await service.saveDraft({ kind: "service", slug, title, seoTitle: title, seoDescription: `${title}: описание опубликованной страницы и её метаданных.`, bodyMd: "## Описание услуги\nТекст услуги для проверки SSR.", payload: servicePayload }, actor);
     await service.publishEntry(serviceDraft.id, serviceDraft.version, actor);
   }
+  const cmsFixture = JSON.parse(await readFile("tests/fixtures/crawler-cms-published.json", "utf8"));
+  await prepareCrawlerPublicAssets(databaseUrl, { ci: "true", acknowledgement: "local-ci-only" });
+  await seedCrawlerCmsSnapshots(databaseUrl, cmsFixture, { ci: "true", acknowledgement: "local-ci-only" });
   const runtime = await startTestRuntime({ DATABASE_URL: databaseUrl });
   t.after(runtime.close);
   const getXml = async (pathname: string) => {
@@ -92,8 +99,11 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
   );
   assert.equal(locations[0].filter(loc => locations[1].includes(loc)).length, 0);
   const caseLocations = locations[0].filter(location => /^https:\/\/kordev\.team\/cases\/[^/]+\/$/.test(location));
-  assert.equal(caseLocations.length, 23);
-  assert.deepEqual(new Set(caseLocations), new Set(portfolioSources.map(source => `https://kordev.team/cases/${source.slug}/`)));
+  const cmsCaseSlugs = cmsFixture.entries.filter((x: { entry: { kind: string } }) => x.entry.kind === "case")
+    .map((x: { entry: { slug: string } }) => x.entry.slug);
+  assert.equal(caseLocations.length, 23 + cmsCaseSlugs.length);
+  assert.deepEqual(new Set(caseLocations), new Set([...portfolioSources.map(source => source.slug), ...cmsCaseSlugs]
+    .map(slug => `https://kordev.team/cases/${slug}/`)));
   for (const pathname of ["/", "/blog/", "/services/", "/cases/", "/journal/", "/journal/issue-0/", "/video/", "/under-metup/video-1/", "/under-metup/video-2/", "/under-metup/video-3/", "/requisites/", "/privacy/", "/about-test/", "/services/test-service/"]) assert.ok(locations[0].includes(`https://kordev.team${pathname}`), pathname);
   assert.ok(locations[1].length > 0);
   assert.ok(locations[1].every(loc => loc.startsWith("https://kordev.team/blog/")));
@@ -221,6 +231,7 @@ test("XML escaping preserves all reserved characters and static content dates ar
 
 test("unavailable content produces safe noncacheable sitemap errors, never an empty success", async t => {
   assert.ok(process.env.TEST_DATABASE_URL);
+  assertCrawlerFixtureTarget(process.env.TEST_DATABASE_URL, { ci: "true", acknowledgement: "local-ci-only" });
   const unavailable = new URL(process.env.TEST_DATABASE_URL);
   unavailable.password = "private-sitemap-error-sentinel";
   const runtime = await startTestRuntime({ DATABASE_URL: unavailable.href });

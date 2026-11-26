@@ -10,6 +10,7 @@ import {
   GEO_RUN_MODES,
   type GeoCitationInput,
   type GeoObservationInput,
+  type GeoPlatform,
 } from "./contracts";
 import { normalizeCitationUrl, normalizeGeoPrompt, normalizeGeoTargetPath, normalizeResponseHash } from "./normalization";
 import type {
@@ -290,9 +291,15 @@ export function createGeoMonitoringService(
       if (input.platform && !platforms.has(input.platform)) throw new Error("geo_run_platform_invalid");
       return repository.collectionQueue.listQueue(input);
     },
-    claimCollectionWork(input: { limit: number }, tokenId: string) {
+    claimCollectionWork(input: { limit: number; recovery?: { platform: GeoPlatform; reason: string } }, tokenId: string) {
+      if (input.recovery && (input.limit !== 1 || !platforms.has(input.recovery.platform)))
+        throw new Error("geo_recovery_invalid");
       return repository.collectionQueue.claimWork({
         limit: boundedInteger(input.limit, 1, 6, "geo_claim_limit_invalid"),
+        ...(input.recovery ? { recovery: {
+          platform: input.recovery.platform,
+          reason: boundedText(input.recovery.reason, 1000, "geo_recovery_invalid"),
+        } } : {}),
         tokenId: uuid(tokenId, "geo_token_invalid"),
         now: clock(),
       });
