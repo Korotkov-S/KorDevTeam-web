@@ -31,6 +31,7 @@ export type GeoQueueFilters = {
   cursor?: string | null;
   limit?: number;
 };
+export type GeoPlatformRecovery = { platform: GeoPlatform; reason: string };
 export async function geoQueueLock(tx: GeoQueueTransaction) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtext('geo-collection-queue'))`,
@@ -542,27 +543,51 @@ export function createGeoQueueRepository(db: Database) {
       tokenId,
       now,
       limit,
+      recovery,
     }: {
       tokenId: string;
       now: Date;
       limit: number;
+      recovery?: GeoPlatformRecovery;
     }) {
       if (!Number.isInteger(limit) || limit < 1 || limit > 6)
         throw new Error("geo_claim_limit_invalid");
+      if (recovery && (limit !== 1 || !COVERAGE_PLATFORMS.includes(recovery.platform)
+        || typeof recovery.reason !== "string" || !recovery.reason.trim()
+        || Buffer.byteLength(recovery.reason, "utf8") > 1000))
+        throw new Error("geo_recovery_invalid");
       return db.transaction(async (tx) => {
         await geoQueueLock(tx);
         await assertToken(tx, tokenId, now);
         const cycle = await ensureCycle(tx, now),
           day = await budget(tx, now);
         if (day.sends >= 18) return [];
+        if (recovery) {
+          // Explicit owner-directed availability probe; ordinary claims keep
+          // the three-check pause. Leave room for a full independent triple.
+          if (day.sends > 15) return [];
+          const [active] = await tx.select({ id: geoCollectionLeases.id })
+            .from(geoCollectionLeases)
+            .innerJoin(geoRuns, eq(geoRuns.id, geoCollectionLeases.runId))
+            .where(and(eq(geoRuns.platform, recovery.platform),
+              sql`${geoCollectionLeases.releasedAt} IS NULL`,
+              sql`${geoCollectionLeases.expiresAt} > ${now}`)).limit(1);
+          if (active) return [];
+        }
         const candidates = await tx
           .select()
           .from(geoCollectionJobs)
           .where(
             and(
               eq(geoCollectionJobs.cycleId, cycle.id),
-              sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled','blocked')`,
-              sql`(${geoCollectionJobs.nextAttemptAt} IS NULL OR ${geoCollectionJobs.nextAttemptAt} <= ${now})`,
+              recovery ? and(
+                eq(geoCollectionJobs.platform, recovery.platform),
+                eq(geoCollectionJobs.state, "blocked"),
+                sql`${geoCollectionJobs.errorCode} IN ('platform_unavailable','browser_unavailable')`,
+              ) : and(
+                sql`${geoCollectionJobs.state} NOT IN ('complete','cancelled','blocked')`,
+                sql`(${geoCollectionJobs.nextAttemptAt} IS NULL OR ${geoCollectionJobs.nextAttemptAt} <= ${now})`,
+              ),
             ),
           );
         const eligible = [];
@@ -600,7 +625,8 @@ export function createGeoQueueRepository(db: Database) {
         for (const jobs of groups.values()) {
           let previous = null,
             run;
-          if (jobs[0].runId) {
+          if (recovery) previous = jobs[0].runId;
+          if (jobs[0].runId && !recovery) {
             const [old] = await tx
               .select()
               .from(geoRuns)
@@ -631,7 +657,12 @@ export function createGeoQueueRepository(db: Database) {
           const lease = await leaseRun(tx, run.id, tokenId, now);
           await tx
             .update(geoRuns)
-            .set({ status: "running", completedAt: null, errorCode: null })
+            .set({ status: "running", completedAt: null, errorCode: null,
+              ...(recovery ? { metadata: { ...run.metadata, availabilityRecovery: {
+                reason: recovery.reason.trim(), requestedAt: now.toISOString(),
+                previousErrorCode: jobs[0].errorCode, cycleId: cycle.id,
+              } } } : {}),
+            })
             .where(eq(geoRuns.id, run.id));
           // A run is the immutable unit: recover all its uncancelled prompts together.
           const ids =
@@ -654,7 +685,7 @@ export function createGeoQueueRepository(db: Database) {
               runId: run.id,
               leaseId: lease.id,
               state: "running",
-              completedRepetitions: previous ? 0 : undefined,
+              completedRepetitions: previous || recovery ? 0 : undefined,
               errorCode: null,
             })
             .where(inArray(geoCollectionJobs.id, ids));

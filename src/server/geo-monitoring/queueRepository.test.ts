@@ -21,6 +21,61 @@ const url = process.env.TEST_DATABASE_URL ?? "",
   databaseTest = url ? test : test.skip;
 const now = new Date("2026-10-05T06:00:00Z");
 
+databaseTest("explicit platform recovery creates one fresh owned question without lifting sibling blocks", async () => {
+  const f = await fixture();
+  try {
+    await f.queue.claimWork({ tokenId: f.other, now, limit: 1 });
+    // Successor cycles inherit platform blocks with no resumable owned run.
+    await f.db.update(geoCollectionJobs).set({
+      state: "blocked", errorCode: "platform_unavailable", attempts: 3,
+      runId: null, leaseId: null, nextAttemptAt: null,
+    });
+    assert.deepEqual(await f.queue.claimWork({ tokenId: f.token, now, limit: 6 }), []);
+    const [work] = await f.queue.claimWork({ tokenId: f.token, now, limit: 1,
+      recovery: { platform: "bing_copilot", reason: "Owner requested recovery after checking the official guest UI." } });
+    assert.ok(work, "an inherited temporary block must have an explicit recovery path");
+    assert.equal(work.platform, "bing_copilot");
+    assert.equal(work.prompts.length, 1);
+    assert.deepEqual(work.prompts[0].missingRepetitions, [1, 2, 3]);
+    const [run] = await f.db.select().from(geoRuns).where(eq(geoRuns.id, work.runId));
+    assert.equal(run.initiatedByMcpTokenId, f.token);
+    assert.equal(run.plannedCount, 3);
+    assert.equal((run.metadata as any).availabilityRecovery.reason, "Owner requested recovery after checking the official guest UI.");
+    const before = await f.db.select().from(geoCollectionJobs);
+    assert.equal(before.filter(j => j.state === "running").length, 1);
+    assert.ok(before.filter(j => j.platform !== "bing_copilot").every(j => j.state === "blocked"));
+    assert.deepEqual(await f.queue.claimWork({ tokenId: f.other, now, limit: 1,
+      recovery: { platform: "bing_copilot", reason: "Concurrent recovery" } }), [], "a recovery lease fences the whole platform probe");
+    await recordTriple(f, work, work.prompts[0].promptId, now);
+    await createGeoRepository(f.db, () => now).finishRun(work.runId, f.token, {
+      status: "success", completedCount: 3, storedCount: 3, errorCode: null, metadata: {},
+    });
+    const after = await f.db.select().from(geoCollectionJobs);
+    assert.ok(after.filter(j => j.platform === "bing_copilot").every(j => j.state !== "blocked"));
+    assert.ok(after.filter(j => j.platform !== "bing_copilot").every(j => j.state === "blocked"));
+  } finally { await f.db.$client.end(); }
+});
+
+databaseTest("manual recovery never clears authentication blocks or bypasses exhausted send budget", async () => {
+  const f = await fixture();
+  try {
+    const [old] = await f.queue.claimWork({ tokenId: f.token, now, limit: 1 });
+    await f.db.update(geoCollectionJobs).set({ state: "blocked", errorCode: "captcha_required", attempts: 3, runId: null, leaseId: null });
+    assert.deepEqual(await f.queue.claimWork({ tokenId: f.token, now, limit: 1,
+      recovery: { platform: "bing_copilot", reason: "No CAPTCHA authority" } }), []);
+    await f.db.update(geoCollectionJobs).set({ errorCode: "platform_unavailable" });
+    const prompts = await f.db.select().from(geoPrompts).limit(6);
+    await f.db.insert(geoCollectionAttempts).values(prompts.flatMap(p => [1, 2, 3].map(repetition => ({
+      runId: old.runId, leaseId: old.leaseId, promptId: p.id, repetition,
+      tokenId: f.token, budgetDate: "2026-10-05", reservedAt: now,
+    }))));
+    const runsBefore = (await f.db.select().from(geoRuns)).length;
+    assert.deepEqual(await f.queue.claimWork({ tokenId: f.token, now, limit: 1,
+      recovery: { platform: "bing_copilot", reason: "Budget remains binding" } }), []);
+    assert.equal((await f.db.select().from(geoRuns)).length, runsBefore);
+  } finally { await f.db.$client.end(); }
+});
+
 databaseTest("queue evidence belongs to the current run and exact prompt, never another platform or historical run", async () => {
   const f = await fixture();
   try {

@@ -1037,9 +1037,13 @@ export function createKordevMcpServer(
       {
         title: "Получить GEO-задания",
         description:
-          "Атомарно выдаёт до шести вопросов текущему токену с lease на 15 минут.",
+          "Атомарно выдаёт до шести вопросов с lease на 15 минут. recovery — только по отдельному прямому поручению владельца после проверки официального UI: один новый вопрос временно заблокированной платформы, limit=1. Обычный проход recovery не использует.",
         inputSchema: z.strictObject({
           limit: z.number().int().min(1).max(6).default(6),
+          recovery: z.strictObject({
+            platform: geoPlatform,
+            reason: z.string().trim().min(1).max(1000),
+          }).optional(),
         }),
         outputSchema: withError(genericRecord),
         annotations: annotations(false),
