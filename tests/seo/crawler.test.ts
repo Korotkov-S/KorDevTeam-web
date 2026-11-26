@@ -15,7 +15,7 @@ import { escapeXml } from "../../src/server/seo/sitemaps";
 import { staticContentDates } from "../../src/server/seo/staticContentDates";
 import { applyPortfolioImport, planPortfolioImport } from "../../src/server/portfolio/importer";
 import { loadPortfolioSources } from "../../src/server/portfolio/loader";
-import { seedCrawlerCmsSnapshots, prepareCrawlerPublicAssets } from "../../scripts/seed-crawler-cms-snapshots";
+import { seedCrawlerCmsSnapshots, prepareCrawlerPublicAssets, assertCrawlerFixtureTarget } from "../../scripts/seed-crawler-cms-snapshots";
 
 function runCrawler(origin: string, args: string[] = []) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
@@ -31,6 +31,7 @@ function runCrawler(origin: string, args: string[] = []) {
 test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex, and own crawl resources", { timeout: 120_000 }, async t => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert.ok(databaseUrl, "TEST_DATABASE_URL must point to dedicated kordev_test");
+  assertCrawlerFixtureTarget(databaseUrl, { ci: "true", acknowledgement: "local-ci-only" });
   await resetTestDatabase(databaseUrl);
   const imported = await importLegacyContent({ db: createDb(databaseUrl), batchId: "sitemap-runtime" });
   assert.equal(imported.ok, true);
@@ -66,8 +67,8 @@ test("live sitemaps are disjoint, use real record dates, exclude drafts/noindex,
     await service.publishEntry(serviceDraft.id, serviceDraft.version, actor);
   }
   const cmsFixture = JSON.parse(await readFile("tests/fixtures/crawler-cms-published.json", "utf8"));
-  await seedCrawlerCmsSnapshots(databaseUrl, cmsFixture, { ci: "true", acknowledgement: "local-ci-only" });
   await prepareCrawlerPublicAssets(databaseUrl, { ci: "true", acknowledgement: "local-ci-only" });
+  await seedCrawlerCmsSnapshots(databaseUrl, cmsFixture, { ci: "true", acknowledgement: "local-ci-only" });
   const runtime = await startTestRuntime({ DATABASE_URL: databaseUrl });
   t.after(runtime.close);
   const getXml = async (pathname: string) => {
@@ -230,6 +231,7 @@ test("XML escaping preserves all reserved characters and static content dates ar
 
 test("unavailable content produces safe noncacheable sitemap errors, never an empty success", async t => {
   assert.ok(process.env.TEST_DATABASE_URL);
+  assertCrawlerFixtureTarget(process.env.TEST_DATABASE_URL, { ci: "true", acknowledgement: "local-ci-only" });
   const unavailable = new URL(process.env.TEST_DATABASE_URL);
   unavailable.password = "private-sitemap-error-sentinel";
   const runtime = await startTestRuntime({ DATABASE_URL: unavailable.href });

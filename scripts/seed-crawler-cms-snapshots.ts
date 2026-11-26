@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
-import { inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "../src/server/db/schema";
@@ -17,18 +17,18 @@ const publicVideo = {
   sha256: "dc41d5ed318f65ccccad7b2765ed61cebd016774052d4284510a006355934f0a",
 };
 export async function prepareCrawlerPublicAssets(databaseUrl: string, acknowledgement: Acknowledgement,
-  publicRoot = path.resolve("build/client")) {
+  publicRoot = path.resolve("build/client"), workspaceRoot = process.cwd()) {
   assertCrawlerFixtureTarget(databaseUrl, acknowledgement);
+  if (path.resolve(publicRoot) !== path.resolve(workspaceRoot, "build/client")) throw Error("crawler_fixture_asset_invalid");
   const source = path.resolve("tests/fixtures/crawler-assets", publicVideo.filename);
   const sourceStat = await lstat(source);
   if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) throw Error("crawler_fixture_asset_invalid");
   const bytes = await readFile(source);
   const hash = (data: Uint8Array) => createHash("sha256").update(data).digest("hex");
   if (bytes.length !== publicVideo.bytes || hash(bytes) !== publicVideo.sha256) throw Error("crawler_fixture_asset_invalid");
-  await mkdir(publicRoot, { recursive: true });
-  const root = await realpath(publicRoot);
+  const root = await realpath(workspaceRoot);
   let directory = root;
-  for (const segment of ["blog", "uploads"]) {
+  for (const segment of ["build", "client", "blog", "uploads"]) {
     directory = path.join(directory, segment);
     try {
       const current = await lstat(directory);
@@ -107,14 +107,14 @@ export async function seedCrawlerCmsSnapshots(databaseUrl: string, raw: unknown,
     return await db.transaction(async tx => {
       const existing = await tx.select({ id: contentEntries.id }).from(contentEntries).where(or(
         inArray(contentEntries.id, fixture.entries.map(x => x.entry.id)),
-        inArray(contentEntries.slug, fixture.entries.map(x => x.entry.slug)),
+        ...fixture.entries.map(x => and(eq(contentEntries.kind, x.entry.kind), eq(contentEntries.slug, x.entry.slug))),
       ));
       if (existing.length) throw Error("crawler_fixture_conflict");
       if (fixture.mediaAssets.length) await tx.insert(mediaAssets).values(fixture.mediaAssets.map(x => ({
-        ...x, createdAt: new Date(x.createdAt), updatedAt: new Date(x.updatedAt),
+        ...x, createdAt: sql`${x.createdAt}::timestamptz`, updatedAt: sql`${x.updatedAt}::timestamptz`,
       })));
       await tx.insert(contentEntries).values(fixture.entries.map(({ entry }) => ({
-        ...entry, publishedAt: new Date(entry.publishedAt), createdAt: new Date(entry.createdAt), updatedAt: new Date(entry.updatedAt),
+        ...entry, publishedAt: sql`${entry.publishedAt}::timestamptz`, createdAt: sql`${entry.createdAt}::timestamptz`, updatedAt: sql`${entry.updatedAt}::timestamptz`,
       })));
       const targets = new Map((await tx.select({ id: contentEntries.id, kind: contentEntries.kind, slug: contentEntries.slug })
         .from(contentEntries)).map(x => [`${x.kind}:${x.slug}`, x.id]));
@@ -140,8 +140,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     const acknowledgement = { ci: process.env.CI, acknowledgement: process.env.CMS_CRAWLER_FIXTURE_ACK };
     assertCrawlerFixtureTarget(url, acknowledgement);
     const fixture = JSON.parse(await readFile("tests/fixtures/crawler-cms-published.json", "utf8"));
+    const assets = await prepareCrawlerPublicAssets(url, acknowledgement);
     const result = await seedCrawlerCmsSnapshots(url, fixture, acknowledgement);
-    console.log(JSON.stringify({ ...result, ...await prepareCrawlerPublicAssets(url, acknowledgement) }));
+    console.log(JSON.stringify({ ...result, ...assets }));
   })().catch(e => {
     console.error(e instanceof Error && /^crawler_fixture_/.test(e.message) ? e.message : "crawler_fixture_failed");
     process.exitCode = 1;
