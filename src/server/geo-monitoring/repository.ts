@@ -714,6 +714,9 @@ export function createGeoRepository(db: GeoDatabase, clock = () => new Date()) {
         }
         const [row] = await tx.update(geoRuns).set({
             ...input,
+            ...(ownedRun.metadata.availabilityRecovery ? { metadata: {
+              ...input.metadata, availabilityRecovery: ownedRun.metadata.availabilityRecovery,
+            } } : {}),
             completedAt: clock(),
           })
           .where(eq(geoRuns.id, runId))
