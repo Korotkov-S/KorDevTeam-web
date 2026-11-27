@@ -14,7 +14,7 @@ import type {
   ServiceCardView,
   ServicePageView,
 } from "./types";
-import { articlePresentation, legacyCaseContent } from "./presentation";
+import { articleCoverFocusY, articlePresentation, legacyCaseContent } from "./presentation";
 
 const ctaTypes = new Set<CtaType>(["form", "telegram", "email", "phone"]);
 
@@ -168,6 +168,7 @@ export function contentCard(entry: ContentEntry, media: MediaPresentationMap = {
   const previewUrl = [coverUrl, ...imageUrls].map(url => url.trim()).find(Boolean) ?? "";
   return {
     slug: entry.slug,
+    ...(articleCoverFocusY(entry) === undefined ? {} : { imageFocusY: articleCoverFocusY(entry) }),
     ...(viewCount === undefined ? {} : { viewCount }),
     title: entryTitle(entry),
     summary: text(entry.excerpt) ?? "",

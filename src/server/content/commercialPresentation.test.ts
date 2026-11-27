@@ -28,6 +28,13 @@ const localCover = {
   height: 1000,
 };
 
+test("homepage and service article previews preserve validated cover focus", () => {
+  const article: ContentEntry = { ...serviceFixture(), kind: "article", payload: { coverFocusY: 12 } };
+  assert.equal(contentCard(article).imageFocusY, 12);
+  assert.equal(contentCard({ ...article, payload: { coverFocusY: 101 } }).imageFocusY, undefined);
+  assert.equal(contentCard(serviceFixture({ coverFocusY: 12 })).imageFocusY, undefined);
+});
+
 test("compact article previews use their own legacy covers or gallery images", () => {
   const article: ContentEntry = {
     ...serviceFixture(),

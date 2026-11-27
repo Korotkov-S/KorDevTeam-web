@@ -62,6 +62,14 @@ test("case payload accepts structured local media and commercial fields", () => 
   assert.deepEqual(command.payload.screenshots, [localCover]);
 });
 
+test("article cover focus accepts a percentage and rejects invalid crop coordinates", () => {
+  const article = { kind: "article", slug: "video-cover-focus", payload: { coverFocusY: 12 } };
+  assert.equal(parseContentCommand(article).payload.coverFocusY, 12);
+  for (const coverFocusY of [-1, 101, NaN, Infinity, "12"]) {
+    assert.throws(() => parseContentCommand({ ...article, payload: { coverFocusY } }));
+  }
+});
+
 test("article payload preserves Telegram provenance and search metadata", () => {
   const command = parseContentCommand({
     kind: "article",
