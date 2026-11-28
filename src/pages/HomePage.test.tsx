@@ -38,6 +38,11 @@ test("home renders the editorial commercial sequence without unverified metrics"
   assert.ok(document.querySelector('a[href="/services/business-process-automation/"]'));
   assert.ok(document.querySelector('a[href="/blog/crm-guide/"]'));
   assert.equal(within(document.getElementById("process")).getAllByRole("listitem").length, 5);
+  const sources = require("../../content/services.ru.json") as Array<{ slug: string; payload: { priceHourlyRate: number; pricePackageHours: number } }>;
+  const support = sources.find(source => source.slug === "additional-service")!;
+  const minimumMonthlyPrice = new Intl.NumberFormat("ru-RU").format(support.payload.priceHourlyRate * support.payload.pricePackageHours).replace(/\s/gu, " ");
+  const heroText = (document.getElementById("home-hero")?.textContent ?? "").replace(/\s/gu, " ");
+  assert.ok(heroText.includes(`От ${minimumMonthlyPrice} ₽ в месяц`), "Home support minimum must match the service's hourly rate and minimum monthly package");
 });
 
 test("home omits empty content categories while retaining its contact form", () => {

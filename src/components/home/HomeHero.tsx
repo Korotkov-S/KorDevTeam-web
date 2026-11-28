@@ -64,7 +64,7 @@ export function HomeHero() {
       <div className="mt-5 sm:mt-7 lg:absolute lg:right-10 lg:bottom-6 lg:mt-0 lg:text-right xl:bottom-10">
         <p className="text-sm leading-5 text-[var(--public-subtle)]">Сопровождение проектов</p>
         <p className="mt-1 text-xl font-semibold leading-tight text-[var(--public-ink)] sm:text-2xl">
-          От 40 000 ₽ в месяц<sup>*</sup>
+          От 44 000 ₽ в месяц<sup>*</sup>
         </p>
         <small className="mt-1 block text-xs leading-5 text-[var(--public-subtle)]">* При заказе от 20 часов в месяц.</small>
       </div>
